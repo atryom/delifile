@@ -39,7 +39,7 @@
 /backend/.DS_Store
 /backend/.env
 /backend/.env.backup
-/backend/.env.production
+/backend/.env.prod
 /backend/.phpactor.json
 /backend/.phpunit.result.cache
 /backend/.codex

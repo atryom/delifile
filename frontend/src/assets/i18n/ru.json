@@ -6,7 +6,8 @@
     "min_length": "Минимум {{length}} символов.",
     "prev": "← Назад",
     "next": "Вперёд →",
-    "page_of": "Страница {{page}} из {{total}}"
+    "page_of": "Страница {{page}} из {{total}}",
+    "phone_format_error": "Введите номер в формате +7 (999) 888-77-66"
   },
   "auth": {
     "login": {
@@ -19,7 +20,14 @@
       "submitting": "Вход...",
       "no_account": "Нет аккаунта?",
       "register_link": "Создать аккаунт",
-      "error": "Ошибка входа. Попробуйте снова."
+      "error": "Ошибка входа. Попробуйте снова.",
+      "pin_label": "PIN-код",
+      "pin_placeholder": "Введите PIN",
+      "pin_hint": "Введите PIN для быстрого входа",
+      "pin_error": "Неверный PIN-код",
+      "use_password": "Войти с паролем →",
+      "use_pin": "← Войти по PIN",
+      "session_expired": "Сессия истекла. Войдите с паролем."
     },
     "register": {
       "title": "Создать аккаунт",
@@ -55,7 +63,8 @@
     "contacts": "Контакты",
     "activity": "Активность",
     "security": "Безопасность",
-    "logout": "Выйти"
+    "logout": "Выйти",
+    "menu": "Меню"
   },
   "files": {
     "list": {

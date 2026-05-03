@@ -1,11 +1,15 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { NgIf } from '@angular/common';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { ApiError } from '../../../../shared/models/api.models';
+
+function phoneValidator(ctrl: AbstractControl): ValidationErrors | null {
+  const v: string = ctrl.value ?? '';
+  return /^\+7 \(\d{3}\) \d{3}-\d{2}-\d{2}$/.test(v) ? null : { phone: true };
+}
 
 function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null {
   const pwd  = ctrl.get('password')?.value;
@@ -16,7 +20,7 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, NgIf, TranslateModule],
+  imports: [ReactiveFormsModule, RouterLink, TranslateModule],
   template: `
     <div class="auth-page">
       <div class="auth-card">
@@ -28,7 +32,9 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
 
         <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form" novalidate>
 
-          <div class="alert-error" *ngIf="serverError()">{{ serverError() }}</div>
+          @if (serverError()) {
+            <div class="alert-error">{{ serverError() }}</div>
+          }
 
           <!-- Phone -->
           <div class="field">
@@ -37,11 +43,14 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
               id="phone"
               type="tel"
               formControlName="phone"
-              placeholder="+79990000000"
+              placeholder="+7 (999) 888-77-66"
               autocomplete="username"
+              (input)="onPhoneInput($event)"
               [class.input-error]="fieldError('phone')"
             />
-            <span class="field-error" *ngIf="fieldError('phone')">{{ fieldError('phone') }}</span>
+            @if (fieldError('phone')) {
+              <span class="field-error">{{ fieldError('phone') }}</span>
+            }
           </div>
 
           <!-- Password -->
@@ -55,7 +64,9 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
               autocomplete="new-password"
               [class.input-error]="fieldError('password')"
             />
-            <span class="field-error" *ngIf="fieldError('password')">{{ fieldError('password') }}</span>
+            @if (fieldError('password')) {
+              <span class="field-error">{{ fieldError('password') }}</span>
+            }
           </div>
 
           <!-- Confirm Password -->
@@ -69,10 +80,9 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
               autocomplete="new-password"
               [class.input-error]="form.errors?.['passwordMismatch'] && form.get('password_confirmation')?.touched"
             />
-            <span class="field-error"
-              *ngIf="form.errors?.['passwordMismatch'] && form.get('password_confirmation')?.touched">
-              {{ 'auth.register.passwords_mismatch' | translate }}
-            </span>
+            @if (form.errors?.['passwordMismatch'] && form.get('password_confirmation')?.touched) {
+              <span class="field-error">{{ 'auth.register.passwords_mismatch' | translate }}</span>
+            }
           </div>
 
           <button type="submit" class="btn-primary btn-full" [disabled]="pending()">
@@ -85,6 +95,7 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
           </p>
 
         </form>
+
       </div>
     </div>
   `,
@@ -102,16 +113,44 @@ export class RegisterComponent {
   private fieldErrors  = signal<Record<string, string[]>>({});
 
   readonly form = this.fb.group({
-    phone:                 ['', [Validators.required]],
+    phone:                 ['', [Validators.required, phoneValidator]],
     password:              ['', [Validators.required, Validators.minLength(8)]],
     password_confirmation: ['', [Validators.required]],
   }, { validators: passwordMatchValidator });
+
+  onPhoneInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const pos   = input.selectionStart ?? 0;
+    const before = input.value.length;
+    const formatted = this.formatPhone(input.value);
+    input.value = formatted;
+    this.form.get('phone')!.setValue(formatted, { emitEvent: false });
+    const newPos = Math.max(0, pos + (formatted.length - before));
+    input.setSelectionRange(newPos, newPos);
+  }
+
+  private formatPhone(raw: string): string {
+    let d = raw.replace(/\D/g, '');
+    if (d.startsWith('7') || d.startsWith('8')) d = d.slice(1);
+    d = d.slice(0, 10);
+    if (!d) return '';
+    const g = [d.slice(0, 3), d.slice(3, 6), d.slice(6, 8), d.slice(8, 10)];
+    let r = '+7 (' + g[0];
+    if (!g[1]) return r;
+    r += ') ' + g[1];
+    if (!g[2]) return r;
+    r += '-' + g[2];
+    if (!g[3]) return r;
+    return r + '-' + g[3];
+  }
 
   fieldError(name: string): string | null {
     const ctrl = this.form.get(name);
     if (ctrl?.touched && ctrl.invalid) {
       if (ctrl.errors?.['required']) return this.translate.instant('common.required');
-      if (ctrl.errors?.['minlength']) return this.translate.instant('common.min_length', { length: ctrl.errors['minlength'].requiredLength });
+      if (ctrl.errors?.['phone'])    return this.translate.instant('common.phone_format_error');
+      if (ctrl.errors?.['minlength'])
+        return this.translate.instant('common.min_length', { length: ctrl.errors['minlength'].requiredLength });
     }
     return this.fieldErrors()[name]?.[0] ?? null;
   }
@@ -125,9 +164,10 @@ export class RegisterComponent {
     this.fieldErrors.set({});
 
     const { phone, password, password_confirmation } = this.form.getRawValue();
+    const normalizedPhone = '+' + phone!.replace(/\D/g, '');
 
     this.authApi.register({
-      phone: phone!,
+      phone: normalizedPhone,
       password: password!,
       password_confirmation: password_confirmation!,
     }).subscribe({
