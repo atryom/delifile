@@ -1,0 +1,62 @@
+/public
+# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# Compiled output
+/frontend/dist
+/frontend/tmp
+/frontend/out-tsc
+/frontend/bazel-out
+
+# Node
+/frontend/node_modules
+/frontendnpm-debug.log
+/frontendyarn-error.log
+
+# IDEs and editors
+.idea/
+/frontend/.project
+/frontend/.classpath
+/frontend/.c9/
+/frontend/*.launch
+/frontend/.settings/
+/frontend/*.sublime-workspace
+
+# Miscellaneous
+/frontend/.angular/cache
+/frontend/.sass-cache/
+/frontend/connect.lock
+/frontend/coverage
+/frontend/libpeerconnection.log
+/frontend/testem.log
+/frontend/typings
+/frontend__screenshots__/
+
+# System files
+/frontend/.DS_Store
+/frontend/Thumbs.db
+
+/backend/*.log
+/backend/.DS_Store
+/backend/.env
+/backend/.env.backup
+/backend/.env.production
+/backend/.phpactor.json
+/backend/.phpunit.result.cache
+/backend/.codex
+/backend/.cursor/
+/backend/.nova
+/backend/.phpunit.cache
+/backend/.vscode
+/backend/.zed
+/backend/auth.json
+/backend/node_modules
+/backend/public/build
+/backend/public/hot
+/backend/public/storage
+/backend/storage/*.key
+/backend/storage/pail
+/backend/vendor
+/backend/_ide_helper.php
+/backend/Homestead.json
+/backend/Homestead.yaml
+/backend/Thumbs.db
