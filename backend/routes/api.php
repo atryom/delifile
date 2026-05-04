@@ -28,6 +28,11 @@ Route::prefix('v1')->group(function () {
         Route::post('register', [AuthController::class, 'register']);
         Route::post('login',    [AuthController::class, 'login']);
 
+        // Password reset (public)
+        Route::post('password/forgot',             [AuthController::class, 'forgotPassword']);
+        Route::post('password/verify-reset-token', [AuthController::class, 'verifyResetToken']);
+        Route::post('password/reset',              [AuthController::class, 'resetPassword']);
+
         // Email verification (GET → redirect to SPA)
         Route::get('email/verify/{token}', [AuthController::class, 'verifyEmail'])
             ->name('email.verify');

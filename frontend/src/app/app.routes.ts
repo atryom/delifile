@@ -22,6 +22,17 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/pages/register/register.component').then(m => m.RegisterComponent),
   },
+  {
+    path: 'forgot-password',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/pages/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent),
+  },
+  {
+    path: 'reset-password',
+    loadComponent: () =>
+      import('./features/auth/pages/reset-password/reset-password.component').then(m => m.ResetPasswordComponent),
+  },
 
   // ─── Account blocked (accessible without auth guard to allow logout) ─────
   {

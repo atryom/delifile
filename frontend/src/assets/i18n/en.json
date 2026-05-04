@@ -23,7 +23,42 @@
       "error": "Login failed. Please try again.",
       "email_verified_success": "Email verified successfully! You can now sign in.",
       "email_verify_failed": "Verification link is invalid or expired.",
-      "remember_me": "Remember me"
+      "remember_me": "Remember me",
+      "forgot_password": "Forgot your password?"
+    },
+    "forgot": {
+      "title": "Reset password",
+      "subtitle": "Enter your email and we'll send a reset code",
+      "email_label": "Email",
+      "send_btn": "Send code",
+      "sending": "Sending…",
+      "back_to_login": "← Back to sign in",
+      "code_sent_hint": "A code has been sent to your inbox. Enter the 6-digit code or click the link in the email.",
+      "code_label": "Code from email",
+      "code_placeholder": "123456",
+      "code_format_error": "Please enter the 6-digit code.",
+      "verifying": "Verifying…",
+      "verify_btn": "Verify",
+      "code_invalid": "Invalid or expired code.",
+      "new_password": "New password",
+      "password_placeholder": "Minimum 8 characters",
+      "confirm_password": "Confirm password",
+      "confirm_placeholder": "Repeat password",
+      "saving": "Saving…",
+      "save_btn": "Save password",
+      "reset_error": "Failed to reset password. Please try again.",
+      "done_title": "Password changed!",
+      "done_desc": "You can now sign in with your new password.",
+      "go_login": "Sign in"
+    },
+    "reset": {
+      "title": "Reset password",
+      "verifying": "Verifying link…",
+      "no_token": "Invalid link: token is missing.",
+      "token_invalid": "This link is invalid or has expired.",
+      "hint": "Choose a new password for your account.",
+      "request_new": "Request a new link",
+      "error": "Failed to reset password. Please try again."
     },
     "register": {
       "title": "Create account",
@@ -198,7 +233,7 @@
       "never": "Never",
       "error": "Failed to create link",
       "allow_save_label": "Allow recipients to save the file",
-      "allow_save_hint": "Signed-in users will see a "Save to my files" button",
+      "allow_save_hint": "Signed-in users will see a \"Save to my files\" button",
       "save_allowed": "💾 Saving allowed"
     },
     "share": {

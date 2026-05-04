@@ -8,6 +8,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Services\AuthService;
 use App\Services\EmailVerificationService;
+use App\Services\PasswordResetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,7 +16,8 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly AuthService              $authService,
-        private readonly EmailVerificationService $verificationService
+        private readonly EmailVerificationService $verificationService,
+        private readonly PasswordResetService     $passwordResetService,
     ) {}
 
     /**
@@ -170,5 +172,62 @@ class AuthController extends Controller
             return $this->error('Текущий пароль неверен', 'WRONG_PASSWORD', [], 422);
         }
         return $this->success('Пароль успешно изменён');
+    }
+
+    /**
+     * POST /api/v1/auth/password/forgot
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate(['email' => ['required', 'email', 'max:255']]);
+
+        $this->passwordResetService->sendResetLink($request->email);
+
+        // Always return success to avoid email enumeration
+        return $this->success('Если аккаунт с таким email существует, мы отправили письмо со ссылкой и кодом.');
+    }
+
+    /**
+     * POST /api/v1/auth/password/verify-reset-token
+     */
+    public function verifyResetToken(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['nullable', 'email'],
+        ]);
+
+        $record = $this->passwordResetService->verify(
+            $request->token,
+            $request->email
+        );
+
+        if (!$record) {
+            return $this->error('Код недействителен или срок его действия истёк', 'INVALID_RESET_TOKEN', [], 422);
+        }
+
+        return $this->success('Код подтверждён', ['token' => $record->token]);
+    }
+
+    /**
+     * POST /api/v1/auth/password/reset
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token'                 => ['required', 'string'],
+            'password'              => ['required', 'string', 'min:8'],
+            'password_confirmation' => ['required', 'string', 'same:password'],
+        ]);
+
+        $record = $this->passwordResetService->verify($request->token);
+
+        if (!$record) {
+            return $this->error('Токен сброса недействителен или истёк', 'INVALID_RESET_TOKEN', [], 422);
+        }
+
+        $this->passwordResetService->resetPassword($record, $request->password);
+
+        return $this->success('Пароль успешно изменён. Войдите с новым паролем.');
     }
 }

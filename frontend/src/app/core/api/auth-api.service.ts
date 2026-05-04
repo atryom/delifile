@@ -67,4 +67,16 @@ export class AuthApiService {
   changePassword(data: ChangePasswordRequest): Observable<ApiResponse<Record<string, never>>> {
     return this.api.post('/auth/password/change', data);
   }
+
+  forgotPassword(email: string): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.post('/auth/password/forgot', { email });
+  }
+
+  verifyResetToken(token: string, email?: string): Observable<ApiResponse<{ token: string }>> {
+    return this.api.post('/auth/password/verify-reset-token', { token, email });
+  }
+
+  resetPassword(token: string, password: string, password_confirmation: string): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.post('/auth/password/reset', { token, password, password_confirmation });
+  }
 }
