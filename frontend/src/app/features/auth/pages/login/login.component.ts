@@ -15,7 +15,12 @@ import { ApiError } from '../../../../shared/models/api.models';
     <div class="auth-page">
       <div class="auth-card">
         <div class="auth-header">
-          <span class="auth-logo">🗂</span>
+          <span class="auth-logo"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                       fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                       stroke-linejoin="round"
+                                       class="lucide lucide-file-symlink-icon lucide-file-symlink"><path
+            d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7"/><path
+            d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 18 3-3-3-3"/></svg></span>
           <h1>{{ 'auth.login.title' | translate }}</h1>
           <p>{{ 'auth.login.subtitle' | translate }}</p>
         </div>
@@ -62,6 +67,13 @@ import { ApiError } from '../../../../shared/models/api.models';
             }
           </div>
 
+          <div class="remember-row">
+            <label class="remember-label">
+              <input type="checkbox" formControlName="remember" class="remember-check"/>
+              {{ 'auth.login.remember_me' | translate }}
+            </label>
+          </div>
+
           <button type="submit" class="btn-primary btn-full" [disabled]="pending()">
             {{ pending() ? ('auth.login.submitting' | translate) : ('auth.login.submit' | translate) }}
           </button>
@@ -75,7 +87,12 @@ import { ApiError } from '../../../../shared/models/api.models';
       </div>
     </div>
   `,
-  styles: [`@import url('../../../../../styles/auth.shared.css');`],
+  styles: [`
+    @import url('../../../../../styles/auth.shared.css');
+    .remember-row { display: flex; align-items: center; margin-bottom: 4px; }
+    .remember-label { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: #6b7280; cursor: pointer; }
+    .remember-check { width: 15px; height: 15px; cursor: pointer; accent-color: #6366f1; }
+  `],
 })
 export class LoginComponent {
   private readonly fb        = inject(FormBuilder);
@@ -96,6 +113,7 @@ export class LoginComponent {
   readonly form = this.fb.group({
     email:    ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(8)]],
+    remember: [true],
   });
 
   fieldError(name: string): string | null {
@@ -117,11 +135,11 @@ export class LoginComponent {
     this.serverError.set(null);
     this.fieldErrors.set({});
 
-    const { email, password } = this.form.getRawValue();
+    const { email, password, remember } = this.form.getRawValue();
 
     this.authApi.login({ email: email!, password: password! }).subscribe({
       next: (res) => {
-        this.authState.setUser(res.data.user, res.data.token);
+        this.authState.setUser(res.data.user, res.data.token, remember ?? true);
         if (res.data.user.account_status === 'blocked_unverified_email') {
           this.router.navigate(['/account-blocked']);
         } else {

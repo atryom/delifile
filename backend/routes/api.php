@@ -53,6 +53,11 @@ Route::prefix('v1')->group(function () {
         Route::post('{token}/download', [SharingController::class, 'downloadViaLink']);
     });
 
+    // ─── Save via link (requires auth) ────────────────────────────────────────
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('links/{token}/save', [SharingController::class, 'saveViaLink']);
+    });
+
     // ─── Public Invitation Info ────────────────────────────────────────────────
     Route::get('invitations/{token}', [InvitationController::class, 'show']);
 

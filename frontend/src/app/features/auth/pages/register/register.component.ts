@@ -1,9 +1,10 @@
-import { Component, inject, signal, input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, input, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
+import { InvitationsApiService } from '../../../../core/api/invitations-api.service';
 import { ApiError } from '../../../../shared/models/api.models';
 
 
@@ -22,7 +23,12 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
     <div class="auth-page">
       <div class="auth-card">
         <div class="auth-header">
-          <span class="auth-logo">🗂</span>
+          <span class="auth-logo"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                       fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                       stroke-linejoin="round"
+                                       class="lucide lucide-file-symlink-icon lucide-file-symlink"><path
+            d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7"/><path
+            d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 18 3-3-3-3"/></svg></span>
           <h1>{{ 'auth.register.title' | translate }}</h1>
           <p>{{ 'auth.register.subtitle' | translate }}</p>
         </div>
@@ -91,7 +97,8 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
               />
               <span>
                 {{ 'auth.register.privacy_prefix' | translate }}
-                <a routerLink="/privacy" target="_blank" class="link-primary">{{ 'auth.register.privacy_link' | translate }}</a>
+                <a routerLink="/privacy" target="_blank"
+                   class="link-primary">{{ 'auth.register.privacy_link' | translate }}</a>
               </span>
             </label>
             @if (privacyError()) {
@@ -134,26 +141,35 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
     }
   `],
 })
-export class RegisterComponent {
+export class RegisterComponent implements OnInit {
   private readonly fb        = inject(FormBuilder);
   private readonly authApi   = inject(AuthApiService);
   private readonly authState = inject(AuthStateService);
+  private readonly invApi    = inject(InvitationsApiService);
   private readonly router    = inject(Router);
   private readonly translate = inject(TranslateService);
 
-  // Pre-filled email from invitation flow (passed as query param)
-  readonly prefillEmail = input<string>('');
+  // Bound from query params via withComponentInputBinding()
+  readonly email  = input<string>('');
+  readonly invite = input<string>('');
 
   readonly pending     = signal(false);
   readonly serverError = signal<string | null>(null);
   private fieldErrors  = signal<Record<string, string[]>>({});
 
   readonly form = this.fb.group({
-    email:                 [this.prefillEmail() || '', [Validators.required, Validators.email]],
+    email:                 ['', [Validators.required, Validators.email]],
     password:              ['', [Validators.required, Validators.minLength(8)]],
     password_confirmation: ['', [Validators.required]],
     privacyAccepted:       [false, [Validators.requiredTrue]],
   }, { validators: passwordMatchValidator });
+
+  ngOnInit(): void {
+    const emailVal = this.email();
+    if (emailVal) {
+      this.form.patchValue({ email: emailVal });
+    }
+  }
 
   privacyError(): boolean {
     const ctrl = this.form.get('privacyAccepted');
@@ -180,6 +196,7 @@ export class RegisterComponent {
     this.fieldErrors.set({});
 
     const { email, password, password_confirmation } = this.form.getRawValue();
+    const inviteToken = this.invite();
 
     this.authApi.register({
       email: email!,
@@ -188,7 +205,14 @@ export class RegisterComponent {
     }).subscribe({
       next: (res) => {
         this.authState.setUser(res.data.user, res.data.token);
-        this.router.navigate(['/files']);
+        if (inviteToken) {
+          this.invApi.accept(inviteToken).subscribe({
+            next:  () => this.router.navigate(['/files']),
+            error: () => this.router.navigate(['/files']),
+          });
+        } else {
+          this.router.navigate(['/files']);
+        }
       },
       error: (err: ApiError) => {
         this.pending.set(false);

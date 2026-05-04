@@ -22,18 +22,29 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
       <div class="page-header">
         <h1 class="page-title">{{ 'files.list.title' | translate }}</h1>
         <div class="header-actions">
-          <button class="btn-secondary" (click)="showAddLink.set(!showAddLink())">
-            {{ 'files.list.add_link_btn' | translate }}
-          </button>
           <label class="btn-primary">
             <span>{{ 'files.list.upload_btn' | translate }}</span>
-            <input type="file" (change)="onFileSelected($event)" style="display:none" />
+            <input #fileInput type="file" (change)="onFileSelected($event)" style="display:none" />
           </label>
         </div>
       </div>
 
-      <!-- Add link form -->
-      @if (showAddLink()) {
+      <!-- Upload zone -->
+      @if (uploadState().phase === 'idle') {
+        <label
+          class="upload-zone"
+          [class.drag-over]="isDragOver()"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave()"
+          (drop)="onDrop($event)"
+        >
+          <input type="file" (change)="onFileSelected($event)" style="display:none" />
+          <span class="upload-icon">☁️</span>
+          <p>{{ 'files.list.drop_hint' | translate }}</p>
+          <span class="upload-hint">{{ 'files.list.expire_hint' | translate }}</span>
+        </label>
+
+        <!-- Inline add-link form -->
         <div class="add-link-card">
           <h3>{{ 'files.add_link.title' | translate }}</h3>
           <form [formGroup]="linkForm" (ngSubmit)="saveLink()" class="link-form">
@@ -59,9 +70,6 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
               >
                 {{ savingLink() ? ('files.add_link.saving' | translate) : ('files.add_link.save_btn' | translate) }}
               </button>
-              <button type="button" class="btn-ghost-sm" (click)="showAddLink.set(false)">
-                {{ 'files.add_link.cancel' | translate }}
-              </button>
             </div>
           </form>
 
@@ -82,21 +90,6 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
           @if (linkError()) {
             <p class="field-error">{{ linkError() }}</p>
           }
-        </div>
-      }
-
-      <!-- Upload zone -->
-      @if (uploadState().phase === 'idle' && !showAddLink()) {
-        <div
-          class="upload-zone"
-          [class.drag-over]="isDragOver()"
-          (dragover)="onDragOver($event)"
-          (dragleave)="onDragLeave()"
-          (drop)="onDrop($event)"
-        >
-          <span class="upload-icon">☁️</span>
-          <p>{{ 'files.list.drop_hint' | translate }}</p>
-          <span class="upload-hint">{{ 'files.list.expire_hint' | translate }}</span>
         </div>
       }
 
@@ -214,7 +207,11 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
                 [class.expired]="file.status === 'expired'"
                 (click)="openFile(file)"
               >
-                <div class="file-icon">{{ mimeIcon(file.mime_type ?? '') }}</div>
+                @if (file.preview_url) {
+                  <img [src]="file.preview_url" alt="" class="file-preview-img" loading="lazy" />
+                } @else {
+                  <div class="file-icon">{{ mimeIcon(file.mime_type ?? '') }}</div>
+                }
                 <div class="file-info">
                   <p class="file-name" [title]="file.original_name">{{ file.original_name }}</p>
                   <p class="file-meta">
@@ -251,8 +248,8 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
     .header-actions { display: flex; gap: 10px; }
 
     /* ── Add link ─────────────────────────────────────────── */
-    .add-link-card { background: #fff; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-    .add-link-card h3 { margin: 0 0 14px; font-size: 1rem; font-weight: 600; }
+    .add-link-card { background: #fff; border-radius: 12px; padding: 16px 20px; margin-top: 12px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.05); border: 1px solid #e5e7eb; }
+    .add-link-card h3 { margin: 0 0 10px; font-size: 0.88rem; font-weight: 600; color: #9ca3af; letter-spacing: 0.02em; }
     .link-form { display: flex; flex-direction: column; gap: 10px; }
     .link-input { border: 1px solid #d1d5db; border-radius: 6px; padding: 9px 12px; font-size: 0.93rem; outline: none; width: 100%; box-sizing: border-box; }
     .link-input:focus { border-color: #6366f1; }
@@ -267,7 +264,8 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
     .preview-desc { font-size: 0.82rem; color: #374151; margin: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
     /* ── Upload zone ──────────────────────────────────────── */
-    .upload-zone { border: 2px dashed #c7d2fe; border-radius: 12px; background: #f0f4ff; text-align: center; padding: 36px 20px; margin-bottom: 24px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+    .upload-zone { display: block; border: 2px dashed #c7d2fe; border-radius: 12px; background: #f0f4ff; text-align: center; padding: 36px 20px; margin-bottom: 0; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+    .upload-zone:hover { border-color: #6366f1; background: #e8eeff; }
     .upload-zone.drag-over { border-color: #6366f1; background: #e0e7ff; }
     .upload-icon { font-size: 2.4rem; display: block; margin-bottom: 8px; }
     .upload-hint { color: #888; font-size: 0.82rem; margin-top: 6px; display: block; }
@@ -283,7 +281,7 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
     .snackbar-link { color: #a5b4fc; text-decoration: none; }
     .snackbar-close { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 1rem; }
 
-    .filter-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; flex-wrap: wrap; }
+    .filter-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; flex-wrap: wrap; margin-top: 24px; }
     .filter-tabs { display: flex; gap: 4px; background: #f3f4f6; border-radius: 8px; padding: 4px; }
     .filter-tab { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.87rem; background: transparent; color: #6b7280; transition: all 0.15s; }
     .filter-tab.active { background: #fff; color: #6366f1; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
@@ -302,6 +300,7 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
     .file-card:hover { border-color: #c7d2fe; box-shadow: 0 2px 12px rgba(99,102,241,0.08); }
     .file-card.expired { opacity: 0.55; }
     .file-icon { font-size: 2rem; width: 40px; text-align: center; flex-shrink: 0; }
+    .file-preview-img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
     .file-info { flex: 1; min-width: 0; }
     .file-name { font-size: 0.95rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 0 4px; }
     .file-meta { font-size: 0.8rem; color: #9ca3af; margin: 0 0 4px; }
@@ -330,13 +329,10 @@ import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shar
 
     .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 9px 20px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 0.92rem; font-weight: 600; cursor: pointer; }
     .btn-primary:hover { background: #4f46e5; }
-    .btn-secondary { display: inline-flex; align-items: center; padding: 9px 16px; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.92rem; font-weight: 500; cursor: pointer; }
-    .btn-secondary:hover { background: #e5e7eb; }
     .btn-primary-sm { padding: 7px 14px; background: #6366f1; color: #fff; border: none; border-radius: 6px; font-size: 0.87rem; font-weight: 600; cursor: pointer; }
     .btn-primary-sm:disabled { opacity: 0.6; cursor: not-allowed; }
     .btn-secondary-sm { padding: 7px 14px; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.87rem; cursor: pointer; }
     .btn-secondary-sm:disabled { opacity: 0.6; cursor: not-allowed; }
-    .btn-ghost-sm { padding: 7px 14px; background: none; color: #6b7280; border: none; border-radius: 6px; font-size: 0.87rem; cursor: pointer; }
     .field-error { color: #dc2626; font-size: 0.82rem; margin-top: 6px; }
 
     @media (max-width: 600px) {
@@ -368,7 +364,6 @@ export class FileListComponent implements OnInit {
   readonly activeTagId  = signal<string>('');
   readonly activeFolderId = signal<string>('');
 
-  readonly showAddLink  = signal(false);
   readonly previewing   = signal(false);
   readonly savingLink   = signal(false);
   readonly linkPreview  = signal<LinkPreview | null>(null);
@@ -396,7 +391,6 @@ export class FileListComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // Read tag_id / folder_id from query params (e.g. from tags/folders pages)
     const qp = this.route.snapshot.queryParamMap;
     if (qp.get('tag_id'))    this.activeTagId.set(qp.get('tag_id')!);
     if (qp.get('folder_id')) this.activeFolderId.set(qp.get('folder_id')!);
@@ -414,7 +408,7 @@ export class FileListComponent implements OnInit {
     });
   }
 
-  private flattenFolders(nodes: any[], out: { id: string; name: string }[], prefix: string): void {
+  private flattenFolders(nodes: FolderTreeNode[], out: { id: string; name: string }[], prefix: string): void {
     for (const n of nodes) {
       out.push({ id: n.id, name: prefix + n.name });
       if (n.children?.length) this.flattenFolders(n.children, out, prefix + n.name + ' / ');
@@ -493,7 +487,6 @@ export class FileListComponent implements OnInit {
     this.urlFilesApi.create(this.linkForm.getRawValue().url!).subscribe({
       next: () => {
         this.savingLink.set(false);
-        this.showAddLink.set(false);
         this.linkForm.reset();
         this.linkPreview.set(null);
         this.loadFiles();

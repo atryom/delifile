@@ -2,11 +2,14 @@ import { Injectable, signal, computed } from '@angular/core';
 import { AccountStatus, CurrentUser } from '../../shared/models/api.models';
 
 const TOKEN_KEY = 'auth_token';
+const REMEMBER_KEY = 'auth_remember';
 
 @Injectable({ providedIn: 'root' })
 export class AuthStateService {
   private readonly _user  = signal<CurrentUser | null>(null);
-  private readonly _token = signal<string | null>(localStorage.getItem(TOKEN_KEY));
+  private readonly _token = signal<string | null>(
+    localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY)
+  );
 
   readonly user            = this._user.asReadonly();
   readonly token           = this._token.asReadonly();
@@ -26,10 +29,18 @@ export class AuthStateService {
     this._user()?.email_verification_deadline_at ?? null
   );
 
-  setUser(user: CurrentUser, token: string): void {
+  setUser(user: CurrentUser, token: string, remember = true): void {
     this._user.set(user);
     this._token.set(token);
-    localStorage.setItem(TOKEN_KEY, token);
+    if (remember) {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(REMEMBER_KEY, '1');
+      sessionStorage.removeItem(TOKEN_KEY);
+    } else {
+      sessionStorage.setItem(TOKEN_KEY, token);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REMEMBER_KEY);
+    }
   }
 
   updateUser(user: CurrentUser): void {
@@ -40,7 +51,9 @@ export class AuthStateService {
     this._user.set(null);
     this._token.set(null);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
     localStorage.removeItem('fs_device_pin');
+    sessionStorage.removeItem(TOKEN_KEY);
   }
 
   restoreUser(user: CurrentUser): void {

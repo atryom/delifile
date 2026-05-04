@@ -20,6 +20,7 @@ class ShareLink extends Model
         'status',
         'ttl_hours',
         'expires_at',
+        'allow_save',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ class ShareLink extends Model
             'status'     => ShareLinkStatus::class,
             'expires_at' => 'datetime',
             'ttl_hours'  => 'integer',
+            'allow_save' => 'boolean',
         ];
     }
 

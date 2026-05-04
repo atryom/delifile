@@ -11,6 +11,7 @@ use App\Models\ContactPendingShare;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\ShareLink;
+use App\Models\User;
 use App\Services\ActivityService;
 use App\Services\FileService;
 use Illuminate\Http\JsonResponse;
@@ -49,6 +50,15 @@ class SharingController extends Controller
             return $this->notFound('Contact not found');
         }
 
+        // Auto-resolve contact by email/phone if not yet resolved
+        if (!$contact->isRegistered() && $contact->email) {
+            $resolved = User::where('email', $contact->email)->first();
+            if ($resolved) {
+                $contact->update(['resolved_user_id' => $resolved->id]);
+                $contact->refresh();
+            }
+        }
+
         if (!$contact->isRegistered()) {
             // Contact hasn't accepted invitation yet — queue the file as pending
             DB::transaction(function () use ($file, $contact, $request) {
@@ -74,7 +84,9 @@ class SharingController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($file, $contact, $request) {
+        $recipientUser = $contact->resolvedUser;
+
+        DB::transaction(function () use ($file, $contact, $request, $recipientUser) {
             FileUserAccess::firstOrCreate([
                 'file_id'     => $file->id,
                 'user_id'     => $contact->resolved_user_id,
@@ -87,6 +99,13 @@ class SharingController extends Controller
                 'contact_id'   => $contact->id,
                 'contact_name' => $contact->name,
             ]);
+
+            // Log activity for the recipient as notification
+            if ($recipientUser) {
+                $this->activityService->log($file, $recipientUser, ActivityType::FileReceived, [
+                    'shared_by' => $request->user()->email,
+                ]);
+            }
         });
 
         return $this->success(__('messages.sharing.access_granted'), [
@@ -134,7 +153,8 @@ class SharingController extends Controller
     public function createLink(Request $request, string $fileId): JsonResponse
     {
         $request->validate([
-            'ttl_hours' => 'nullable|integer|min:1|max:720',
+            'ttl_hours'  => 'nullable|integer|min:1|max:720',
+            'allow_save' => 'nullable|boolean',
         ]);
 
         $file = File::find($fileId);
@@ -146,20 +166,23 @@ class SharingController extends Controller
             return $this->error(__('messages.sharing.file_not_available_link'), 'FILE_NOT_AVAILABLE', [], 422);
         }
 
-        $ttlHours = $request->ttl_hours ?? config('app.file_default_ttl_hours', 12);
+        $ttlHours  = (int) ($request->ttl_hours ?? config('app.file_default_ttl_hours', 12));
+        $allowSave = (bool) $request->input('allow_save', false);
 
-        $link = DB::transaction(function () use ($file, $request, $ttlHours) {
+        $link = DB::transaction(function () use ($file, $request, $ttlHours, $allowSave) {
             $link = ShareLink::create([
                 'file_id'    => $file->id,
                 'created_by' => $request->user()->id,
                 'status'     => ShareLinkStatus::Active,
                 'ttl_hours'  => $ttlHours,
                 'expires_at' => now()->addHours($ttlHours),
+                'allow_save' => $allowSave,
             ]);
 
             $this->activityService->log($file, $request->user(), ActivityType::LinkCreated, [
-                'link_id'   => $link->id,
-                'ttl_hours' => $ttlHours,
+                'link_id'    => $link->id,
+                'ttl_hours'  => $ttlHours,
+                'allow_save' => $allowSave,
             ]);
 
             return $link;
@@ -169,6 +192,7 @@ class SharingController extends Controller
             'link' => [
                 'id'         => $link->id,
                 'url'        => $link->url,
+                'allow_save' => $link->allow_save,
                 'expires_at' => $link->expires_at?->toIso8601String(),
             ],
         ], 201);
@@ -192,6 +216,7 @@ class SharingController extends Controller
                 'url'        => $l->url,
                 'status'     => $l->status->value,
                 'ttl_hours'  => $l->ttl_hours,
+                'allow_save' => $l->allow_save,
                 'expires_at' => $l->expires_at?->toIso8601String(),
                 'created_at' => $l->created_at?->toIso8601String(),
             ]);
@@ -212,7 +237,6 @@ class SharingController extends Controller
             return $this->notFound('Link not found');
         }
 
-        // Verify ownership through file
         if (!$link->file->isOwnedBy($request->user())) {
             return $this->forbidden();
         }
@@ -238,15 +262,38 @@ class SharingController extends Controller
             return $this->error(__('messages.sharing.link_invalid'), 'LINK_INVALID', [], 404);
         }
 
+        $previewUrl = null;
+        if ($link->file->storage_key && str_starts_with($link->file->mime_type ?? '', 'image/') && $link->file->isAvailable()) {
+            try {
+                $previewUrl = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
+                    $link->file->storage_key,
+                    now()->addMinutes(60)
+                );
+            } catch (\Throwable) {}
+        }
+
+        $fileData = [
+            'id'            => $link->file->id,
+            'content_kind'  => $link->file->content_kind ?? 'binary_file',
+            'original_name' => $link->file->original_name,
+            'size'          => $link->file->size,
+            'mime_type'     => $link->file->mime_type,
+            'preview_url'   => $previewUrl,
+        ];
+
+        if ($link->file->content_kind === 'url_file') {
+            $fileData['link_url']         = $link->file->link_url;
+            $fileData['link_title']       = $link->file->link_title;
+            $fileData['link_description'] = $link->file->link_description;
+            $fileData['link_image_url']   = $link->file->link_image_url;
+            $fileData['link_site_name']   = $link->file->link_site_name;
+        }
+
         return $this->success(__('messages.sharing.link_resolved'), [
-            'file' => [
-                'id'            => $link->file->id,
-                'original_name' => $link->file->original_name,
-                'size'          => $link->file->size,
-                'mime_type'     => $link->file->mime_type,
-            ],
+            'file' => $fileData,
             'link' => [
                 'expires_at' => $link->expires_at?->toIso8601String(),
+                'allow_save' => $link->allow_save,
             ],
         ]);
     }
@@ -267,12 +314,65 @@ class SharingController extends Controller
             return $this->error(__('messages.files.not_available'), 'FILE_NOT_AVAILABLE', [], 422);
         }
 
-        // FileService without auth check (link IS the auth)
         $url = app(FileService::class)->generateDownloadUrl($link->file);
 
         return $this->success(__('messages.files.download_url'), [
             'url'        => $url,
             'expires_in' => 3600,
+        ]);
+    }
+
+    /**
+     * POST /api/v1/links/{token}/save
+     * Authenticated — save a file from a public link to the user's own account.
+     */
+    public function saveViaLink(Request $request, string $token): JsonResponse
+    {
+        $link = ShareLink::where('token', $token)->with('file')->first();
+
+        if (!$link || !$link->isValid()) {
+            return $this->error(__('messages.sharing.link_invalid'), 'LINK_INVALID', [], 404);
+        }
+
+        if (!$link->allow_save) {
+            return $this->error('Saving is not allowed for this link.', 'SAVE_NOT_ALLOWED', [], 403);
+        }
+
+        if (!$link->file->isAvailable()) {
+            return $this->error(__('messages.files.not_available'), 'FILE_NOT_AVAILABLE', [], 422);
+        }
+
+        $user = $request->user();
+
+        // Don't save to own files
+        if ($link->file->isOwnedBy($user)) {
+            return $this->error('Это ваш файл.', 'OWN_FILE', [], 422);
+        }
+
+        // Check if any access record already exists for this user+file
+        $existing = FileUserAccess::where('file_id', $link->file->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($existing) {
+            return $this->error('Файл уже есть в вашем аккаунте.', 'ALREADY_SAVED', [], 422);
+        }
+
+        DB::transaction(function () use ($link, $user) {
+            FileUserAccess::create([
+                'file_id'     => $link->file->id,
+                'user_id'     => $user->id,
+                'access_type' => AccessType::Saved,
+                'saved_at'    => now(),
+            ]);
+
+            $this->activityService->log($link->file, $user, ActivityType::SavedViaLink, [
+                'link_id' => $link->id,
+            ]);
+        });
+
+        return $this->success('Файл сохранён в ваш аккаунт.', [
+            'file_id' => $link->file->id,
         ]);
     }
 }

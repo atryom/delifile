@@ -22,14 +22,22 @@ import { ShareLink } from '../../../../shared/models/api.models';
             <div class="field">
               <label for="ttl">{{ 'files.create_link.expires_label' | translate }}</label>
               <select id="ttl" formControlName="ttl_hours" class="select-input">
-                <option value="1">1 hour</option>
-                <option value="6">6 hours</option>
-                <option value="12">12 hours (default)</option>
-                <option value="24">24 hours</option>
-                <option value="72">3 days</option>
-                <option value="168">7 days</option>
-                <option value="720">30 days</option>
+                <option value="1">1 час</option>
+                <option value="6">6 часов</option>
+                <option value="12">12 часов (по умолчанию)</option>
+                <option value="24">24 часа</option>
+                <option value="72">3 дня</option>
+                <option value="168">7 дней</option>
+                <option value="720">30 дней</option>
               </select>
+            </div>
+
+            <div class="field-check">
+              <label class="check-label">
+                <input type="checkbox" formControlName="allow_save" class="check-input" />
+                {{ 'files.create_link.allow_save_label' | translate }}
+              </label>
+              <p class="check-hint">{{ 'files.create_link.allow_save_hint' | translate }}</p>
             </div>
 
             <div class="info-box">
@@ -55,6 +63,9 @@ import { ShareLink } from '../../../../shared/models/api.models';
           <p class="link-expires">
             {{ 'files.create_link.expires_at' | translate:{ date: formatExpiry(createdLink()!.expires_at) } }}
           </p>
+          @if (createdLink()!.allow_save) {
+            <p class="save-badge">{{ 'files.create_link.save_allowed' | translate }}</p>
+          }
         </div>
 
         <div class="dialog-footer">
@@ -84,6 +95,10 @@ import { ShareLink } from '../../../../shared/models/api.models';
     .field label { display: block; font-size: 0.88rem; font-weight: 600; color: #374151; margin-bottom: 6px; }
     .select-input { width: 100%; padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; }
     .select-input:focus { border-color: #6366f1; }
+    .field-check { margin-bottom: 16px; }
+    .check-label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 500; color: #374151; cursor: pointer; }
+    .check-input { width: 16px; height: 16px; cursor: pointer; accent-color: #6366f1; }
+    .check-hint { margin: 4px 0 0 24px; font-size: 0.78rem; color: #9ca3af; }
     .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 14px; font-size: 0.83rem; color: #1e40af; }
     .error-msg { color: #dc2626; font-size: 0.85rem; margin-top: 12px; }
 
@@ -93,7 +108,8 @@ import { ShareLink } from '../../../../shared/models/api.models';
     .link-display { display: flex; gap: 8px; margin-bottom: 10px; }
     .link-input { flex: 1; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.85rem; color: #6366f1; background: #f5f3ff; }
     .btn-copy { padding: 8px 14px; background: #6366f1; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; white-space: nowrap; }
-    .link-expires { font-size: 0.8rem; color: #9ca3af; }
+    .link-expires { font-size: 0.8rem; color: #9ca3af; margin-bottom: 6px; }
+    .save-badge { display: inline-block; font-size: 0.78rem; padding: 3px 10px; background: #dcfce7; color: #15803d; border-radius: 99px; }
 
     .btn-primary { padding: 9px 20px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; cursor: pointer; font-weight: 600; }
     .btn-primary:hover:not(:disabled) { background: #4f46e5; }
@@ -117,7 +133,8 @@ export class CreateLinkDialogComponent {
   readonly copied      = signal(false);
 
   readonly form = this.fb.group({
-    ttl_hours: [12, [Validators.required, Validators.min(1)]],
+    ttl_hours:  [12, [Validators.required, Validators.min(1)]],
+    allow_save: [false],
   });
 
   submit(): void {
@@ -125,9 +142,9 @@ export class CreateLinkDialogComponent {
     this.submitting.set(true);
     this.error.set(null);
 
-    const ttl = this.form.getRawValue().ttl_hours ?? 12;
+    const { ttl_hours, allow_save } = this.form.getRawValue();
 
-    this.filesApi.createLink(this.fileId(), ttl).subscribe({
+    this.filesApi.createLink(this.fileId(), ttl_hours ?? 12, allow_save ?? false).subscribe({
       next: (res) => {
         this.createdLink.set(res.data.link);
         this.submitting.set(false);

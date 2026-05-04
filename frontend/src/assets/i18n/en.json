@@ -22,7 +22,8 @@
       "register_link": "Create account",
       "error": "Login failed. Please try again.",
       "email_verified_success": "Email verified successfully! You can now sign in.",
-      "email_verify_failed": "Verification link is invalid or expired."
+      "email_verify_failed": "Verification link is invalid or expired.",
+      "remember_me": "Remember me"
     },
     "register": {
       "title": "Create account",
@@ -148,7 +149,10 @@
       "confirm_delete": "Delete \"{{name}}\"? This action cannot be undone.",
       "link_copied": "Link copied to clipboard",
       "access_granted": "Access granted successfully",
-      "link_created": "Public link created"
+      "link_created": "Public link created",
+      "tag_search_placeholder": "Search tags…",
+      "create_tag": "Create tag \"{{name}}\"",
+      "no_tags": "No tags found"
     },
     "invite": {
       "title": "Invite user",
@@ -170,7 +174,13 @@
       "download": "⬇️ Download file",
       "downloading": "Generating download link…",
       "success": "✅ Download started!",
-      "manual": "If the download didn't begin, click here."
+      "manual": "If the download didn't begin, click here.",
+      "save_to_account": "Save to my files",
+      "saving": "Saving…",
+      "saved": "Saved to your files",
+      "save_login_hint": "Sign in to save this file to your account.",
+      "login_to_save": "Sign in",
+      "save_error": "Failed to save file"
     },
     "create_link": {
       "title": "Create public link",
@@ -186,7 +196,10 @@
       "close": "Close",
       "done": "Done",
       "never": "Never",
-      "error": "Failed to create link"
+      "error": "Failed to create link",
+      "allow_save_label": "Allow recipients to save the file",
+      "allow_save_hint": "Signed-in users will see a "Save to my files" button",
+      "save_allowed": "💾 Saving allowed"
     },
     "share": {
       "title": "Share to contact",
@@ -202,6 +215,7 @@
       "submitting": "Sharing…",
       "pending_invite": "Awaiting invite",
       "pending_notice": "The file will be delivered automatically when the contact accepts the invitation.",
+      "access_granted_notice": "Access granted! The contact can now see this file.",
       "error": "Could not share file."
     }
   },
@@ -291,7 +305,8 @@
     "delete_btn": "Delete contact",
     "deleted": "Contact deleted",
     "delete_error": "Failed to delete contact",
-    "resolved": "Resolved {{n}} new contact(s) as DeliFile users"
+    "resolved": "Resolved {{n}} new contact(s) as DeliFile users",
+    "delete_confirm": "Delete contact \"{{name}}\"? This cannot be undone."
   },
   "activity": {
     "title": "Activity",
@@ -308,7 +323,9 @@
       "link_created": "Link created",
       "link_disabled": "Link disabled",
       "access_revoked": "Access revoked",
-      "viewed": "Viewed"
+      "viewed": "Viewed",
+      "file_received": "File received",
+      "saved_via_link": "Saved via link"
     }
   },
   "security": {

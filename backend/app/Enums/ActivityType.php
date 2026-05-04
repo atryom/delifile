@@ -18,6 +18,8 @@ enum ActivityType: string
     case TagUpdated        = 'tag_updated';
     case SavedByRecipient  = 'saved_by_recipient';
     case Deleted           = 'deleted';
+    case FileReceived      = 'file_received';
+    case SavedViaLink      = 'saved_via_link';
 
     public function label(): string
     {
@@ -36,6 +38,8 @@ enum ActivityType: string
             self::TagUpdated       => 'Tags updated',
             self::SavedByRecipient => 'Saved by recipient',
             self::Deleted          => 'File deleted',
+            self::FileReceived     => 'File received',
+            self::SavedViaLink     => 'Saved via link',
         };
     }
 }

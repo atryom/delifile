@@ -49,6 +49,7 @@ export interface FileListItem {
   status: FileStatus;
   expires_at: string | null;
   uploaded_at: string | null;
+  preview_url?: string | null;
   // url_file preview fields
   link_url?: string | null;
   link_title?: string | null;
@@ -107,6 +108,7 @@ export interface ShareLink {
   url: string;
   status: ShareLinkStatus;
   ttl_hours: number;
+  allow_save: boolean;
   expires_at: string | null;
   created_at: string | null;
 }

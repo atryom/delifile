@@ -62,8 +62,11 @@ import { Contact } from '../../../../shared/models/api.models';
             <div class="loading-contacts">{{ 'files.share.loading' | translate }}</div>
           }
 
-          @if (selectedContact() && !selectedContact()!.is_registered) {
+          @if (shareStatus() === 'pending') {
             <div class="pending-notice">{{ 'files.share.pending_notice' | translate }}</div>
+          }
+          @if (shareStatus() === 'shared') {
+            <div class="success-notice">{{ 'files.share.access_granted_notice' | translate }}</div>
           }
         </div>
 
@@ -108,6 +111,7 @@ import { Contact } from '../../../../shared/models/api.models';
     .reg-badge.registered { background: #dcfce7; color: #16a34a; }
     .reg-badge.pending { background: #fef9c3; color: #854d0e; }
     .pending-notice { margin-top: 12px; padding: 10px 14px; background: #fefce8; border: 1px solid #fde047; border-radius: 8px; font-size: 0.83rem; color: #713f12; }
+    .success-notice { margin-top: 12px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; font-size: 0.83rem; color: #15803d; }
     .error-msg { flex: 1; color: #dc2626; font-size: 0.85rem; }
     .btn-primary { padding: 9px 20px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; cursor: pointer; font-weight: 600; }
     .btn-primary:hover:not(:disabled) { background: #4f46e5; }
@@ -131,6 +135,7 @@ export class ShareContactDialogComponent implements OnInit {
   readonly loading         = signal(false);
   readonly submitting      = signal(false);
   readonly error           = signal<string | null>(null);
+  readonly shareStatus     = signal<'none' | 'pending' | 'shared'>('none');
   searchQuery = '';
 
   ngOnInit(): void {
@@ -156,6 +161,7 @@ export class ShareContactDialogComponent implements OnInit {
     this.selectedId.set(contact.id);
     this.selectedContact.set(contact);
     this.error.set(null);
+    this.shareStatus.set('none');
   }
 
   submit(): void {
@@ -166,9 +172,15 @@ export class ShareContactDialogComponent implements OnInit {
     this.error.set(null);
 
     this.filesApi.shareToContact(this.fileId(), id).subscribe({
-      next: () => {
+      next: (res) => {
         this.submitting.set(false);
-        this.shared.emit();
+        const status = res.data?.share?.status ?? 'shared';
+        this.shareStatus.set(status as 'pending' | 'shared');
+        if (status === 'shared') {
+          this.shared.emit();
+        } else {
+          setTimeout(() => this.closed.emit(), 2500);
+        }
       },
       error: (err) => {
         this.submitting.set(false);

@@ -100,8 +100,8 @@ export class FilesApiService {
     return this.api.delete(`/files/${fileId}/share-to-contact/${contactId}`);
   }
 
-  createLink(fileId: string, ttlHours = 12): Observable<ApiResponse<{ link: ShareLink }>> {
-    return this.api.post(`/files/${fileId}/create-link`, { ttl_hours: ttlHours });
+  createLink(fileId: string, ttlHours = 12, allowSave = false): Observable<ApiResponse<{ link: ShareLink }>> {
+    return this.api.post(`/files/${fileId}/create-link`, { ttl_hours: ttlHours, allow_save: allowSave });
   }
 
   listLinks(fileId: string): Observable<ApiResponse<{ items: ShareLink[] }>> {
@@ -112,11 +112,15 @@ export class FilesApiService {
     return this.api.post(`/links/${linkId}/disable`);
   }
 
-  resolveLink(token: string): Observable<ApiResponse<{ file: FileListItem; link: { expires_at: string } }>> {
+  resolveLink(token: string): Observable<ApiResponse<{ file: FileListItem; link: { expires_at: string; allow_save: boolean } }>> {
     return this.api.post(`/links/${token}/resolve`);
   }
 
   downloadViaLink(token: string): Observable<ApiResponse<{ url: string; expires_in: number }>> {
     return this.api.post(`/links/${token}/download`);
+  }
+
+  saveViaLink(token: string): Observable<ApiResponse<{ file_id: string }>> {
+    return this.api.post(`/links/${token}/save`);
   }
 }

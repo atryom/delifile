@@ -313,6 +313,18 @@ class FileService
             $base['link_description'] = $file->link_description;
             $base['link_image_url']   = $file->link_image_url;
             $base['link_site_name']   = $file->link_site_name;
+            $base['preview_url']      = null;
+        } elseif ($file->storage_key && str_starts_with($file->mime_type ?? '', 'image/') && $file->isAvailable()) {
+            try {
+                $base['preview_url'] = Storage::disk('s3')->temporaryUrl(
+                    $file->storage_key,
+                    now()->addMinutes(60)
+                );
+            } catch (\Throwable) {
+                $base['preview_url'] = null;
+            }
+        } else {
+            $base['preview_url'] = null;
         }
 
         return $base;
@@ -384,6 +396,7 @@ class FileService
             'status'        => $f->status->value,
             'expires_at'    => $f->expires_at?->toIso8601String(),
             'uploaded_at'   => $f->created_at?->toIso8601String(),
+            'preview_url'   => null,
         ];
 
         if ($f->content_kind === 'url_file') {
@@ -391,6 +404,15 @@ class FileService
             $item['link_title']     = $f->link_title;
             $item['link_image_url'] = $f->link_image_url;
             $item['link_site_name'] = $f->link_site_name;
+        } elseif ($f->storage_key && str_starts_with($f->mime_type ?? '', 'image/') && $f->isAvailable()) {
+            try {
+                $item['preview_url'] = Storage::disk('s3')->temporaryUrl(
+                    $f->storage_key,
+                    now()->addMinutes(60)
+                );
+            } catch (\Throwable) {
+                $item['preview_url'] = null;
+            }
         }
 
         return $item;

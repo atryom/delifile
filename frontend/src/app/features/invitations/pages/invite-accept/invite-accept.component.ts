@@ -29,7 +29,12 @@ type PageState =
       <div class="invite-card">
 
         <div class="invite-header">
-          <span class="invite-logo">🗂</span>
+          <span class="invite-logo"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round"
+                                         class="lucide lucide-file-symlink-icon lucide-file-symlink"><path
+            d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7"/><path
+            d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 18 3-3-3-3"/></svg></span>
           <h1>DeliFile</h1>
         </div>
 
@@ -38,7 +43,6 @@ type PageState =
           @case ('loading') {
             <p class="info-text">{{ 'invite.loading' | translate }}</p>
           }
-
           @case ('not_found') {
             <div class="state-block">
               <span class="state-icon">❌</span>
@@ -47,7 +51,6 @@ type PageState =
               <a routerLink="/login" class="btn-primary">{{ 'invite.go_login' | translate }}</a>
             </div>
           }
-
           @case ('expired') {
             <div class="state-block">
               <span class="state-icon">⏰</span>
@@ -55,14 +58,12 @@ type PageState =
               <p>{{ 'invite.expired_desc' | translate }}</p>
             </div>
           }
-
           @case ('accepted') {
             <div class="state-block">
               <span class="state-icon">✅</span>
               <h2>{{ 'invite.already_accepted' | translate }}</h2>
             </div>
           }
-
           @case ('need_login') {
             <div class="state-block">
               <span class="state-icon">🔑</span>
@@ -77,12 +78,12 @@ type PageState =
               <a [routerLink]="['/login']" [queryParams]="{ invite: token() }" class="btn-primary btn-full">
                 {{ 'invite.login_btn' | translate }}
               </a>
-              <a [routerLink]="['/register']" [queryParams]="{ invite: token(), email: info()?.target_email }" class="btn-secondary btn-full">
+              <a [routerLink]="['/register']" [queryParams]="{ invite: token(), email: info()?.target_email }"
+                 class="btn-secondary btn-full">
                 {{ 'invite.register_instead' | translate }}
               </a>
             </div>
           }
-
           @case ('need_register') {
             <div class="state-block">
               <span class="state-icon">👋</span>
@@ -103,7 +104,6 @@ type PageState =
               </a>
             </div>
           }
-
           @case ('ready') {
             <div class="state-block">
               <span class="state-icon">🎉</span>
@@ -123,11 +123,9 @@ type PageState =
               </button>
             </div>
           }
-
           @case ('accepting') {
             <p class="info-text">{{ 'invite.accepting' | translate }}</p>
           }
-
           @case ('done') {
             <div class="state-block">
               <span class="state-icon">✅</span>
@@ -135,7 +133,6 @@ type PageState =
               <a routerLink="/files" class="btn-primary">{{ 'invite.go_files' | translate }}</a>
             </div>
           }
-
           @case ('error') {
             <div class="state-block">
               <span class="state-icon">⚠️</span>

@@ -46,7 +46,11 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
               </div>
             } @else {
               <div class="file-header-card">
-                <div class="file-big-icon" aria-hidden="true">{{ mimeIcon(file()!.mime_type ?? '') }}</div>
+                @if (file()!.preview_url) {
+                  <img [src]="file()!.preview_url" alt="" class="file-preview-thumb" loading="lazy" />
+                } @else {
+                  <div class="file-big-icon" aria-hidden="true">{{ mimeIcon(file()!.mime_type ?? '') }}</div>
+                }
                 <div class="file-header-info">
                   <h1 class="file-title">{{ file()!.original_name }}</h1>
                   <div class="file-meta-row">
@@ -58,7 +62,7 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
                   </div>
                   <div class="file-meta-row">
                     <span class="meta-item">{{ 'files.detail.uploaded' | translate:{date: (file()!.uploaded_at | date:'MMM d, y, HH:mm')} }}</span>
-                    @if (file()!.expires_at) {
+                    @if (file()!.expires_at && !file()!.is_pinned) {
                       <span class="meta-item">{{ 'files.detail.expires' | translate:{date: (file()!.expires_at | date:'MMM d, y, HH:mm')} }}</span>
                     }
                   </div>
@@ -128,22 +132,28 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
                   @if (!showTagPicker()) {
                     <button class="tag-add-btn" (click)="openTagPicker()">+ тег</button>
                   } @else {
-                    <div class="tag-picker">
+                    <div class="tag-picker" (mouseleave)="onTagPickerMouseLeave()">
                       <input
                         #tagInput
                         class="tag-search"
                         type="text"
-                        placeholder="Поиск тегов..."
+                        [placeholder]="'files.detail.tag_search_placeholder' | translate"
                         (input)="onTagSearch($event)"
-                        (keydown.escape)="showTagPicker.set(false)"
-                        aria-label="Поиск тегов"
+                        (keydown.escape)="closeTagPicker()"
+                        (blur)="onTagInputBlur()"
+                        [attr.aria-label]="'files.detail.tag_search_placeholder' | translate"
                       />
                       <div class="tag-dropdown">
                         @for (tag of filteredTags(); track tag.id) {
-                          <button class="tag-option" (click)="addTag(tag)">{{ tag.name }}</button>
+                          <button class="tag-option" (mousedown)="$event.preventDefault()" (click)="addTag(tag)">{{ tag.name }}</button>
                         }
-                        @if (filteredTags().length === 0) {
-                          <span class="tag-empty">Нет тегов</span>
+                        @if (tagSearchQuery() && !tagExactMatch()) {
+                          <button class="tag-option tag-create" (mousedown)="$event.preventDefault()" (click)="createAndAddTag()">
+                            {{ 'files.detail.create_tag' | translate:{name: tagSearchQuery()} }}
+                          </button>
+                        }
+                        @if (!tagSearchQuery() && filteredTags().length === 0) {
+                          <span class="tag-empty">{{ 'files.detail.no_tags' | translate }}</span>
                         }
                       </div>
                     </div>
@@ -214,6 +224,9 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
                   <div class="link-meta">
                     {{ 'files.detail.link_expires' | translate:{date: (link.expires_at | date:'MMM d, HH:mm')} }}
                     · <span class="badge badge-{{ link.status }}">{{ link.status }}</span>
+                    @if (link.allow_save) {
+                      · <span class="badge badge-save">💾</span>
+                    }
                   </div>
                   <div class="link-actions">
                     <button class="btn-mini" (click)="copyLink(link.url)">{{ 'files.detail.copy' | translate }}</button>
@@ -235,7 +248,7 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
               }
               @for (a of accesses(); track a.id) {
                 <div class="access-item">
-                  <span class="access-user">{{ a.user?.email ?? '—' }}</span>
+                  <span class="access-user">{{ a.user?.name ?? a.user?.email ?? '—' }}</span>
                   <span class="access-type badge badge-access">{{ a.access_type }}</span>
                 </div>
               }
@@ -272,7 +285,7 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
       @if (showLinkDialog()) {
         <app-create-link-dialog
           [fileId]="id()"
-          (closed)="showLinkDialog.set(false)"
+          (closed)="onLinkDialogClosed()"
           (created)="onLinkCreated()"
         />
       }
@@ -299,6 +312,7 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
     /* Regular file header card */
     .file-header-card { display: flex; align-items: flex-start; gap: 20px; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; margin-bottom: 18px; }
     .file-big-icon { font-size: 3rem; flex-shrink: 0; }
+    .file-preview-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
     .file-header-info { flex: 1; min-width: 0; }
     .file-title { font-size: 1.3rem; font-weight: 700; margin: 0 0 10px; word-break: break-all; }
     .file-meta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; font-size: 0.85rem; color: #6b7280; }
@@ -332,6 +346,8 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
     .tag-dropdown { position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); min-width: 160px; z-index: 100; max-height: 180px; overflow-y: auto; }
     .tag-option { display: block; width: 100%; text-align: left; padding: 7px 12px; border: none; background: none; cursor: pointer; font-size: 0.84rem; }
     .tag-option:hover { background: #f5f3ff; }
+    .tag-create { color: #6366f1; font-style: italic; border-top: 1px solid #f0f0f0; }
+    .tag-create:hover { background: #eef2ff; }
     .tag-empty { display: block; padding: 8px 12px; font-size: 0.82rem; color: #9ca3af; }
 
     /* Folder */
@@ -373,6 +389,7 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
     .badge-active     { background: #dcfce7; color: #16a34a; }
     .badge-disabled   { background: #f3f4f6; color: #6b7280; }
     .badge-access     { background: #ede9fe; color: #7c3aed; }
+    .badge-save       { background: #dcfce7; color: #15803d; }
 
     @media (max-width: 768px) {
       .file-detail-layout { grid-template-columns: 1fr; }
@@ -397,10 +414,13 @@ export class FileDetailComponent implements OnInit {
   readonly showShareDialog = signal(false);
   readonly showLinkDialog  = signal(false);
 
-  readonly allTags       = signal<Tag[]>([]);
-  readonly tagSearch     = signal('');
-  readonly showTagPicker = signal(false);
-  readonly filteredTags  = signal<Tag[]>([]);
+  readonly allTags         = signal<Tag[]>([]);
+  readonly tagSearch       = signal('');
+  readonly tagSearchQuery  = signal('');
+  readonly showTagPicker   = signal(false);
+  readonly filteredTags    = signal<Tag[]>([]);
+  readonly creatingTag     = signal(false);
+  private tagPickerHovered = false;
 
   readonly allFolders    = signal<FolderTreeNode[]>([]);
   readonly flatFolders   = signal<{ id: string; name: string; indent: string }[]>([]);
@@ -515,15 +535,39 @@ export class FileDetailComponent implements OnInit {
     });
   }
 
+  readonly tagExactMatch = (): boolean => {
+    const q = this.tagSearchQuery().toLowerCase();
+    return this.filteredTags().some((t) => t.name.toLowerCase() === q) ||
+      (this.file()?.tags ?? []).some((t) => t.name.toLowerCase() === q);
+  };
+
   openTagPicker(): void {
+    this.tagSearchQuery.set('');
     this.tagSearch.set('');
     this.filterTags('');
     this.showTagPicker.set(true);
   }
 
+  closeTagPicker(): void {
+    this.showTagPicker.set(false);
+    this.tagSearchQuery.set('');
+  }
+
+  onTagInputBlur(): void {
+    if (!this.tagPickerHovered) {
+      setTimeout(() => this.closeTagPicker(), 150);
+    }
+  }
+
+  onTagPickerMouseLeave(): void {
+    this.tagPickerHovered = false;
+  }
+
   onTagSearch(e: Event): void {
     const q = (e.target as HTMLInputElement).value;
+    this.tagSearchQuery.set(q);
     this.filterTags(q);
+    this.tagPickerHovered = true;
   }
 
   private filterTags(q: string): void {
@@ -535,17 +579,28 @@ export class FileDetailComponent implements OnInit {
   }
 
   addTag(tag: Tag): void {
-    this.showTagPicker.set(false);
-    const currentIds = this.file()?.tags.map((t) => t.id) ?? [];
-    const newIds = [...currentIds, tag.id];
+    this.closeTagPicker();
     this.orgApi.attachTags(this.id(), [tag.id]).subscribe({
       next: () => {
         this.file.update((f) => f ? { ...f, tags: [...f.tags, tag] } : f);
-        this.showFeedback(this.translate.instant('files.detail.tags'));
       },
       error: () => {},
     });
-    void newIds;
+  }
+
+  createAndAddTag(): void {
+    const name = this.tagSearchQuery().trim();
+    if (!name || this.creatingTag()) return;
+    this.creatingTag.set(true);
+    this.orgApi.createTag(name).subscribe({
+      next: (res) => {
+        const newTag = res.data.tag;
+        this.allTags.update((tags) => [...tags, newTag]);
+        this.creatingTag.set(false);
+        this.addTag(newTag);
+      },
+      error: () => { this.creatingTag.set(false); },
+    });
   }
 
   removeTag(tag: Tag): void {
@@ -588,9 +643,25 @@ export class FileDetailComponent implements OnInit {
   }
 
   copyLink(url: string): void {
-    navigator.clipboard.writeText(url).then(() =>
-      this.showFeedback(this.translate.instant('files.detail.link_copied'))
-    );
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() =>
+        this.showFeedback(this.translate.instant('files.detail.link_copied'))
+      );
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand('copy');
+        this.showFeedback(this.translate.instant('files.detail.link_copied'));
+      } finally {
+        document.body.removeChild(ta);
+      }
+    }
   }
 
   disableLink(link: ShareLink): void {
@@ -605,7 +676,18 @@ export class FileDetailComponent implements OnInit {
     this.loadSidePanels();
   }
 
+  private linkWasCreated = false;
+
+  onLinkDialogClosed(): void {
+    this.showLinkDialog.set(false);
+    if (this.linkWasCreated) {
+      this.linkWasCreated = false;
+      this.loadSidePanels();
+    }
+  }
+
   onLinkCreated(): void {
+    this.linkWasCreated = true;
     this.showLinkDialog.set(false);
     this.showFeedback(this.translate.instant('files.detail.link_created'));
     this.loadSidePanels();

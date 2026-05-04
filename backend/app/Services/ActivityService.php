@@ -25,10 +25,16 @@ class ActivityService
 
     /**
      * Get activity logs for a specific file.
+     * Pass $userId to scope to that user's events only (for non-owners).
      */
-    public function getForFile(File $file, int $limit = 50): array
+    public function getForFile(File $file, int $limit = 50, ?int $userId = null): array
     {
-        return ActivityLog::where('file_id', $file->id)
+        $query = ActivityLog::where('file_id', $file->id);
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query
             ->with('user:id,phone,name')
             ->orderByDesc('created_at')
             ->limit($limit)

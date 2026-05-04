@@ -13,7 +13,13 @@ import { AuthStateService } from '../../../../core/auth/auth-state.service';
     <div class="auth-page">
       <div class="auth-card">
         <div class="auth-header">
-          <span class="auth-logo">🔒</span>
+          <span class="auth-logo"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                       fill="none" stroke="#a89d1f" stroke-width="2" stroke-linecap="round"
+                                       stroke-linejoin="round"
+                                       class="lucide lucide-lock-keyhole-icon lucide-lock-keyhole"><circle cx="12"
+                                                                                                           cy="16"
+                                                                                                           r="1"/><rect
+            x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span>
           <h1>{{ 'auth.blocked.title' | translate }}</h1>
           <p>{{ 'auth.blocked.description' | translate }}</p>
         </div>

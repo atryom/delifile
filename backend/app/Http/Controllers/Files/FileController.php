@@ -289,7 +289,8 @@ class FileController extends Controller
             return $this->notFound('File not found');
         }
 
-        $logs = $this->activityService->getForFile($file);
+        $isOwner = $file->isOwnedBy($request->user());
+        $logs = $this->activityService->getForFile($file, 50, $isOwner ? null : $request->user()->id);
 
         return $this->success(__('messages.files.activity_fetched'), [
             'items' => $logs,
@@ -307,13 +308,14 @@ class FileController extends Controller
         }
 
         $accesses = $file->accesses()
-            ->with('user:id,phone,name')
+            ->with('user:id,email,phone,name')
             ->get()
             ->map(fn ($a) => [
                 'id'          => $a->id,
                 'access_type' => $a->access_type,
                 'user'        => $a->user ? [
                     'id'    => $a->user->id,
+                    'email' => $a->user->email,
                     'phone' => $a->user->phone,
                     'name'  => $a->user->name,
                 ] : null,
