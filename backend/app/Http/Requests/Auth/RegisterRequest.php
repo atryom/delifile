@@ -14,7 +14,7 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone'                 => ['required', 'string', 'max:20', 'unique:users,phone'],
+            'email'                 => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password'              => ['required', 'string', 'min:8', 'confirmed'],
             'password_confirmation' => ['required', 'string'],
         ];
@@ -23,7 +23,8 @@ class RegisterRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'phone.unique' => 'This phone number is already registered.',
+            'email.unique' => 'Этот email уже зарегистрирован.',
+            'email.email'  => 'Введите корректный email-адрес.',
         ];
     }
 }

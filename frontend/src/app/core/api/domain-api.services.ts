@@ -15,7 +15,7 @@ export class ContactsApiService {
     return this.api.get('/contacts', params);
   }
 
-  create(data: { name: string; phone: string }): Observable<ApiResponse<{ contact: Contact }>> {
+  create(data: { name: string; email?: string | null; phone?: string | null }): Observable<ApiResponse<{ contact: Contact }>> {
     return this.api.post('/contacts', data);
   }
 

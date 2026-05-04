@@ -1,4 +1,4 @@
-import { Component, inject, computed, signal } from '@angular/core';
+import { Component, inject, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthStateService } from '../../auth/auth-state.service';
@@ -7,11 +7,32 @@ import { AuthApiService } from '../../api/auth-api.service';
 @Component({
   selector: 'app-layout',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, RouterLinkActive, TranslateModule],
   template: `
     <div class="app-shell">
 
       @if (isAuth()) {
+        <!-- Email verification banner -->
+        @if (needsVerification() && !resent()) {
+          <div class="verify-banner" role="alert">
+            <span class="verify-text">
+              ⚠️ {{ 'layout.verify_banner.text' | translate }}
+              @if (deadline()) {
+                {{ 'layout.verify_banner.deadline' | translate : { date: deadline() } }}
+              }
+            </span>
+            <button class="btn-resend" (click)="resendVerification()" [disabled]="resending()">
+              {{ resending() ? ('layout.verify_banner.resending' | translate) : ('layout.verify_banner.resend_btn' | translate) }}
+            </button>
+          </div>
+        }
+        @if (resent()) {
+          <div class="verify-banner verify-banner--sent" role="status">
+            ✅ {{ 'layout.verify_banner.sent' | translate }}
+          </div>
+        }
+
         <!-- Mobile top bar -->
         <header class="mobile-header">
           <span class="mobile-brand">
@@ -50,6 +71,18 @@ import { AuthApiService } from '../../api/auth-api.service';
               </a>
             </li>
             <li>
+              <a routerLink="/folders" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
+                <span class="nav-icon">🗂</span>
+                <span>{{ 'nav.folders' | translate }}</span>
+              </a>
+            </li>
+            <li>
+              <a routerLink="/tags" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
+                <span class="nav-icon">🏷</span>
+                <span>{{ 'nav.tags' | translate }}</span>
+              </a>
+            </li>
+            <li>
               <a routerLink="/contacts" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
                 <span class="nav-icon">👥</span>
                 <span>{{ 'nav.contacts' | translate }}</span>
@@ -70,14 +103,17 @@ import { AuthApiService } from '../../api/auth-api.service';
           </ul>
 
           <div class="sidebar-footer">
-            <span class="user-phone">{{ userPhone() }}</span>
+            <span class="user-email" [title]="userEmail()">{{ userEmail() }}</span>
+            @if (!emailVerified()) {
+              <span class="unverified-badge">{{ 'layout.sidebar.unverified' | translate }}</span>
+            }
             <button class="btn-logout" (click)="logout()">{{ 'nav.logout' | translate }}</button>
           </div>
         </nav>
       }
 
       <!-- Main content -->
-      <main class="main-content" [class.no-sidebar]="!isAuth()">
+      <main class="main-content" [class.no-sidebar]="!isAuth()" [class.has-banner]="needsVerification() || resent()">
         <ng-content />
       </main>
     </div>
@@ -88,6 +124,43 @@ import { AuthApiService } from '../../api/auth-api.service';
       min-height: 100vh;
       background: #f8f9fa;
     }
+
+    /* ── Email verification banner ──────────────────────────── */
+    .verify-banner {
+      position: fixed;
+      top: 0; left: 240px; right: 0;
+      z-index: 200;
+      background: #fef3c7;
+      border-bottom: 1px solid #f59e0b;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.88rem;
+      color: #92400e;
+    }
+
+    .verify-banner--sent {
+      background: #d1fae5;
+      border-color: #10b981;
+      color: #065f46;
+    }
+
+    .verify-text { flex: 1; }
+
+    .btn-resend {
+      white-space: nowrap;
+      background: #f59e0b;
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-resend:disabled { opacity: 0.6; cursor: not-allowed; }
 
     /* ── Sidebar ────────────────────────────────────────────── */
     .sidebar {
@@ -150,12 +223,21 @@ import { AuthApiService } from '../../api/auth-api.service';
       gap: 8px;
     }
 
-    .user-phone {
-      font-size: 0.8rem;
+    .user-email {
+      font-size: 0.78rem;
       color: #888;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .unverified-badge {
+      font-size: 0.72rem;
+      background: rgba(245,158,11,0.2);
+      color: #fbbf24;
+      border-radius: 4px;
+      padding: 2px 7px;
+      display: inline-block;
     }
 
     .btn-logout {
@@ -181,6 +263,7 @@ import { AuthApiService } from '../../api/auth-api.service';
     }
 
     .main-content.no-sidebar { margin-left: 0; }
+    .main-content.has-banner { padding-top: 42px; }
 
     /* ── Mobile header ──────────────────────────────────────── */
     .mobile-header {
@@ -217,9 +300,7 @@ import { AuthApiService } from '../../api/auth-api.service';
     .burger-btn:hover { background: rgba(255,255,255,0.1); }
 
     /* ── Backdrop ───────────────────────────────────────────── */
-    .backdrop {
-      display: none;
-    }
+    .backdrop { display: none; }
     .backdrop.visible {
       display: block;
       position: fixed;
@@ -232,6 +313,8 @@ import { AuthApiService } from '../../api/auth-api.service';
     @media (max-width: 768px) {
       .mobile-header { display: flex; }
 
+      .verify-banner { left: 0; top: 56px; }
+
       .sidebar {
         transform: translateX(-100%);
         top: 0;
@@ -243,6 +326,7 @@ import { AuthApiService } from '../../api/auth-api.service';
         margin-left: 0;
         padding-top: 56px;
       }
+      .main-content.has-banner { padding-top: calc(56px + 42px); }
     }
   `],
 })
@@ -251,12 +335,34 @@ export class AppLayoutComponent {
   private readonly authApi   = inject(AuthApiService);
   private readonly router    = inject(Router);
 
-  readonly isAuth      = this.authState.isAuthenticated;
-  readonly userPhone   = computed(() => this.authState.user()?.phone ?? '');
-  readonly sidebarOpen = signal(false);
+  readonly isAuth          = this.authState.isAuthenticated;
+  readonly needsVerification = this.authState.needsEmailVerification;
+  readonly emailVerified   = this.authState.isEmailVerified;
+  readonly userEmail       = computed(() => this.authState.user()?.email ?? '');
+  readonly sidebarOpen     = signal(false);
+  readonly resending       = signal(false);
+  readonly resent          = signal(false);
+
+  readonly deadline = computed(() => {
+    const d = this.authState.verificationDeadline();
+    if (!d) return null;
+    return new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' });
+  });
 
   toggleSidebar(): void { this.sidebarOpen.update(v => !v); }
   closeSidebar(): void  { this.sidebarOpen.set(false); }
+
+  resendVerification(): void {
+    if (this.resending()) return;
+    this.resending.set(true);
+    this.authApi.resendVerification().subscribe({
+      next: () => {
+        this.resending.set(false);
+        this.resent.set(true);
+      },
+      error: () => this.resending.set(false),
+    });
+  }
 
   logout(): void {
     this.authApi.logout().subscribe({

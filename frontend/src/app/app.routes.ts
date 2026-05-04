@@ -14,23 +14,21 @@ export const routes: Routes = [
     path: 'login',
     canActivate: [guestGuard],
     loadComponent: () =>
-      import('./features/auth/pages/login/login.component').then(
-        (m) => m.LoginComponent
-      ),
+      import('./features/auth/pages/login/login.component').then(m => m.LoginComponent),
   },
   {
     path: 'register',
     canActivate: [guestGuard],
     loadComponent: () =>
-      import('./features/auth/pages/register/register.component').then(
-        (m) => m.RegisterComponent
-      ),
+      import('./features/auth/pages/register/register.component').then(m => m.RegisterComponent),
   },
+
+  // ─── Account blocked (accessible without auth guard to allow logout) ─────
   {
-    path: 'pin-setup',
+    path: 'account-blocked',
     loadComponent: () =>
-      import('./features/auth/pages/pin-setup/pin-setup.component').then(
-        (m) => m.PinSetupComponent
+      import('./features/auth/pages/account-blocked/account-blocked.component').then(
+        m => m.AccountBlockedComponent
       ),
   },
 
@@ -39,41 +37,61 @@ export const routes: Routes = [
     path: 'files',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/files/pages/file-list/file-list.component').then(
-        (m) => m.FileListComponent
-      ),
+      import('./features/files/pages/file-list/file-list.component').then(m => m.FileListComponent),
   },
   {
     path: 'files/:id',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/files/pages/file-detail/file-detail.component').then(
-        (m) => m.FileDetailComponent
+      import('./features/files/pages/file-detail/file-detail.component').then(m => m.FileDetailComponent),
+  },
+  {
+    path: 'folders',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/folders/pages/folders-tree/folders-tree.component').then(
+        m => m.FoldersTreeComponent
       ),
+  },
+  {
+    path: 'tags',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/tags/pages/tags-list/tags-list.component').then(m => m.TagsListComponent),
   },
   {
     path: 'contacts',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/contacts/pages/contacts/contacts.component').then(
-        (m) => m.ContactsComponent
-      ),
+      import('./features/contacts/pages/contacts/contacts.component').then(m => m.ContactsComponent),
   },
   {
     path: 'activity',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/activity/pages/activity/activity.component').then(
-        (m) => m.ActivityComponent
-      ),
+      import('./features/activity/pages/activity/activity.component').then(m => m.ActivityComponent),
   },
   {
     path: 'settings/security',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/settings/pages/security/security.component').then(
-        (m) => m.SecurityComponent
+      import('./features/settings/pages/security/security.component').then(m => m.SecurityComponent),
+  },
+
+  // ─── Invitation flow ─────────────────────────────────────────────────────
+  {
+    path: 'invite/:token',
+    loadComponent: () =>
+      import('./features/invitations/pages/invite-accept/invite-accept.component').then(
+        m => m.InviteAcceptComponent
       ),
+  },
+
+  // ─── Legal pages ─────────────────────────────────────────────────────────
+  {
+    path: 'privacy',
+    loadComponent: () =>
+      import('./features/legal/pages/privacy/privacy.component').then(m => m.PrivacyComponent),
   },
 
   // ─── Public link flow ────────────────────────────────────────────────────
@@ -81,7 +99,7 @@ export const routes: Routes = [
     path: 'link/:token',
     loadComponent: () =>
       import('./features/files/pages/public-link/public-link.component').then(
-        (m) => m.PublicLinkComponent
+        m => m.PublicLinkComponent
       ),
   },
 

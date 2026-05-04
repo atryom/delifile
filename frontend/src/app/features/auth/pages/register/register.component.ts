@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, input, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -6,10 +6,6 @@ import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { ApiError } from '../../../../shared/models/api.models';
 
-function phoneValidator(ctrl: AbstractControl): ValidationErrors | null {
-  const v: string = ctrl.value ?? '';
-  return /^\+7 \(\d{3}\) \d{3}-\d{2}-\d{2}$/.test(v) ? null : { phone: true };
-}
 
 function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null {
   const pwd  = ctrl.get('password')?.value;
@@ -20,6 +16,7 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
 @Component({
   selector: 'app-register',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, RouterLink, TranslateModule],
   template: `
     <div class="auth-page">
@@ -36,20 +33,19 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
             <div class="alert-error">{{ serverError() }}</div>
           }
 
-          <!-- Phone -->
+          <!-- Email -->
           <div class="field">
-            <label for="phone">{{ 'auth.register.phone' | translate }}</label>
+            <label for="email">{{ 'auth.register.email' | translate }}</label>
             <input
-              id="phone"
-              type="tel"
-              formControlName="phone"
-              placeholder="+7 (999) 888-77-66"
+              id="email"
+              type="email"
+              formControlName="email"
+              placeholder="you@example.com"
               autocomplete="username"
-              (input)="onPhoneInput($event)"
-              [class.input-error]="fieldError('phone')"
+              [class.input-error]="fieldError('email')"
             />
-            @if (fieldError('phone')) {
-              <span class="field-error">{{ fieldError('phone') }}</span>
+            @if (fieldError('email')) {
+              <span class="field-error">{{ fieldError('email') }}</span>
             }
           </div>
 
@@ -85,6 +81,24 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
             }
           </div>
 
+          <!-- Privacy policy checkbox -->
+          <div class="field field-checkbox">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                formControlName="privacyAccepted"
+                [class.input-error]="privacyError()"
+              />
+              <span>
+                {{ 'auth.register.privacy_prefix' | translate }}
+                <a routerLink="/privacy" target="_blank" class="link-primary">{{ 'auth.register.privacy_link' | translate }}</a>
+              </span>
+            </label>
+            @if (privacyError()) {
+              <span class="field-error">{{ 'auth.register.privacy_required' | translate }}</span>
+            }
+          </div>
+
           <button type="submit" class="btn-primary btn-full" [disabled]="pending()">
             {{ pending() ? ('auth.register.submitting' | translate) : ('auth.register.submit' | translate) }}
           </button>
@@ -99,7 +113,26 @@ function passwordMatchValidator(ctrl: AbstractControl): ValidationErrors | null 
       </div>
     </div>
   `,
-  styles: [`@import url('../../../../../styles/auth.shared.css');`],
+  styles: [`
+    @import url('../../../../../styles/auth.shared.css');
+    .field-checkbox { margin-top: 4px; }
+    .checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .checkbox-label input[type="checkbox"] {
+      margin-top: 3px;
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      accent-color: #6366f1;
+      cursor: pointer;
+    }
+  `],
 })
 export class RegisterComponent {
   private readonly fb        = inject(FormBuilder);
@@ -108,47 +141,30 @@ export class RegisterComponent {
   private readonly router    = inject(Router);
   private readonly translate = inject(TranslateService);
 
+  // Pre-filled email from invitation flow (passed as query param)
+  readonly prefillEmail = input<string>('');
+
   readonly pending     = signal(false);
   readonly serverError = signal<string | null>(null);
   private fieldErrors  = signal<Record<string, string[]>>({});
 
   readonly form = this.fb.group({
-    phone:                 ['', [Validators.required, phoneValidator]],
+    email:                 [this.prefillEmail() || '', [Validators.required, Validators.email]],
     password:              ['', [Validators.required, Validators.minLength(8)]],
     password_confirmation: ['', [Validators.required]],
+    privacyAccepted:       [false, [Validators.requiredTrue]],
   }, { validators: passwordMatchValidator });
 
-  onPhoneInput(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const pos   = input.selectionStart ?? 0;
-    const before = input.value.length;
-    const formatted = this.formatPhone(input.value);
-    input.value = formatted;
-    this.form.get('phone')!.setValue(formatted, { emitEvent: false });
-    const newPos = Math.max(0, pos + (formatted.length - before));
-    input.setSelectionRange(newPos, newPos);
-  }
-
-  private formatPhone(raw: string): string {
-    let d = raw.replace(/\D/g, '');
-    if (d.startsWith('7') || d.startsWith('8')) d = d.slice(1);
-    d = d.slice(0, 10);
-    if (!d) return '';
-    const g = [d.slice(0, 3), d.slice(3, 6), d.slice(6, 8), d.slice(8, 10)];
-    let r = '+7 (' + g[0];
-    if (!g[1]) return r;
-    r += ') ' + g[1];
-    if (!g[2]) return r;
-    r += '-' + g[2];
-    if (!g[3]) return r;
-    return r + '-' + g[3];
+  privacyError(): boolean {
+    const ctrl = this.form.get('privacyAccepted');
+    return !!(ctrl?.touched && ctrl.invalid);
   }
 
   fieldError(name: string): string | null {
     const ctrl = this.form.get(name);
     if (ctrl?.touched && ctrl.invalid) {
       if (ctrl.errors?.['required']) return this.translate.instant('common.required');
-      if (ctrl.errors?.['phone'])    return this.translate.instant('common.phone_format_error');
+      if (ctrl.errors?.['email'])    return this.translate.instant('common.email_format_error');
       if (ctrl.errors?.['minlength'])
         return this.translate.instant('common.min_length', { length: ctrl.errors['minlength'].requiredLength });
     }
@@ -163,22 +179,16 @@ export class RegisterComponent {
     this.serverError.set(null);
     this.fieldErrors.set({});
 
-    const { phone, password, password_confirmation } = this.form.getRawValue();
-    const normalizedPhone = '+' + phone!.replace(/\D/g, '');
+    const { email, password, password_confirmation } = this.form.getRawValue();
 
     this.authApi.register({
-      phone: normalizedPhone,
+      email: email!,
       password: password!,
       password_confirmation: password_confirmation!,
     }).subscribe({
       next: (res) => {
         this.authState.setUser(res.data.user, res.data.token);
-        // next_step from spec
-        if (res.data.next_step === 'pin_offer') {
-          this.router.navigate(['/pin-setup']);
-        } else {
-          this.router.navigate(['/files']);
-        }
+        this.router.navigate(['/files']);
       },
       error: (err: ApiError) => {
         this.pending.set(false);

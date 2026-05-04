@@ -6,25 +6,28 @@
     "min_length": "Minimum {{length}} characters.",
     "prev": "← Prev",
     "next": "Next →",
-    "page_of": "Page {{page}} of {{total}}"
+    "page_of": "Page {{page}} of {{total}}",
+    "email_format_error": "Please enter a valid email address.",
+    "phone_format_error": "Enter phone in format +7 (999) 888-77-66"
   },
   "auth": {
     "login": {
       "title": "Sign in to DeliFile",
       "subtitle": "Access your personal file space",
-      "phone": "Phone number",
+      "email": "Email",
       "password": "Password",
-      "forgot": "Forgot password?",
       "submit": "Sign in",
       "submitting": "Signing in…",
       "no_account": "Don't have an account?",
       "register_link": "Create account",
-      "error": "Login failed. Please try again."
+      "error": "Login failed. Please try again.",
+      "email_verified_success": "Email verified successfully! You can now sign in.",
+      "email_verify_failed": "Verification link is invalid or expired."
     },
     "register": {
       "title": "Create account",
       "subtitle": "Start your personal file space",
-      "phone": "Phone number",
+      "email": "Email",
       "password": "Password",
       "password_hint": "Minimum 8 characters",
       "confirm_password": "Confirm password",
@@ -34,33 +37,46 @@
       "submitting": "Creating account…",
       "have_account": "Already have an account?",
       "login_link": "Sign in",
-      "error": "Registration failed."
+      "error": "Registration failed.",
+      "privacy_prefix": "I have read and accept the",
+      "privacy_link": "privacy policy",
+      "privacy_required": "You must accept the privacy policy to continue."
     },
-    "pin_setup": {
-      "title": "Quick access PIN",
-      "subtitle": "Set up a PIN for faster access on this device. This is optional.",
-      "hint": "PIN is a convenience shortcut stored locally. Your password is always the primary method.",
-      "pin_label": "PIN (4–6 digits)",
-      "pin_placeholder": "Enter PIN",
-      "pin_error": "PIN must be 4–6 digits.",
-      "confirm_label": "Confirm PIN",
-      "confirm_placeholder": "Repeat PIN",
-      "confirm_error": "PINs do not match.",
-      "submit": "Enable quick login",
-      "skip": "Skip for now"
+    "blocked": {
+      "title": "Account blocked",
+      "description": "Your email was not verified within 24 hours of registration. Resend the verification email to restore access.",
+      "resend_btn": "Resend verification email",
+      "resending": "Sending…",
+      "logout_btn": "Sign out"
+    }
+  },
+  "layout": {
+    "verify_banner": {
+      "text": "Your email is not verified.",
+      "deadline": "Verify by {{date}} or your account will be blocked.",
+      "resend_btn": "Send email",
+      "resending": "Sending…",
+      "sent": "Email sent! Check your inbox."
+    },
+    "sidebar": {
+      "unverified": "Email not verified"
     }
   },
   "nav": {
     "files": "My Files",
+    "folders": "Folders",
+    "tags": "Tags",
     "contacts": "Contacts",
     "activity": "Activity",
     "security": "Security",
-    "logout": "Log out"
+    "logout": "Sign out",
+    "menu": "Menu"
   },
   "files": {
     "list": {
       "title": "My Files",
       "upload_btn": "+ Upload file",
+      "add_link_btn": "+ Add link",
       "drop_hint": "Drag & drop a file here or click Upload file",
       "expire_hint": "Files expire in 12 hours unless pinned",
       "search": "Search files…",
@@ -73,7 +89,10 @@
       "open_title": "Open card",
       "filter_my": "My files",
       "filter_received": "Received",
-      "filter_favorites": "Favorites"
+      "filter_favorites": "Favorites",
+      "filter_all_tags": "All tags",
+      "filter_all_folders": "All folders",
+      "open_link": "Open link"
     },
     "upload": {
       "preparing": "Preparing upload…",
@@ -83,6 +102,16 @@
       "success": "✅ File uploaded!",
       "open": "Open file →"
     },
+    "add_link": {
+      "title": "Add link",
+      "url_label": "URL",
+      "url_placeholder": "https://example.com/article",
+      "preview_btn": "Preview",
+      "save_btn": "Save link",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "error": "Failed to save link"
+    },
     "detail": {
       "back": "← My Files",
       "loading": "Loading file…",
@@ -90,6 +119,8 @@
       "expires": "Expires {{date}}",
       "owner": "Owner",
       "download": "⬇️ Download",
+      "open_link": "🌐 Open link",
+      "copy_link": "📋 Copy link",
       "favorited": "★ Favorited",
       "favorite": "☆ Favorite",
       "pinned": "📌 Pinned",
@@ -98,6 +129,9 @@
       "create_link": "🔗 Create link",
       "delete": "🗑 Delete file",
       "tags": "Tags",
+      "folder": "Folder",
+      "no_folder": "No folder",
+      "remove_from_folder": "Remove from folder",
       "active_links": "Active links",
       "no_links": "No active links",
       "link_expires": "Expires {{date}}",
@@ -115,6 +149,18 @@
       "link_copied": "Link copied to clipboard",
       "access_granted": "Access granted successfully",
       "link_created": "Public link created"
+    },
+    "invite": {
+      "title": "Invite user",
+      "email_label": "Recipient email",
+      "email_placeholder": "friend@example.com",
+      "comment_label": "Comment (optional)",
+      "comment_placeholder": "Message for the recipient…",
+      "submit": "Send invitation",
+      "submitting": "Sending…",
+      "cancel": "Cancel",
+      "sent": "Invitation sent to {{email}}",
+      "error": "Failed to send invitation"
     },
     "public_link": {
       "resolving": "Resolving link…",
@@ -144,7 +190,7 @@
     },
     "share": {
       "title": "Share to contact",
-      "search": "Search by name or phone…",
+      "search": "Search by name or email…",
       "no_contacts": "No contacts found",
       "no_contacts_yet": "No contacts yet. Add contacts first.",
       "registered": "Registered",
@@ -156,6 +202,67 @@
       "error": "Could not share file. Make sure the contact is registered."
     }
   },
+  "tags": {
+    "title": "Tags",
+    "add_btn": "Add",
+    "add_placeholder": "New tag name",
+    "adding": "Adding…",
+    "search_placeholder": "Search tags…",
+    "loading": "Loading tags…",
+    "empty": "No tags yet. Create your first tag above.",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "delete_btn": "Delete",
+    "deleting": "Deleting…",
+    "view_files": "Files",
+    "confirm_delete_title": "Delete tag?",
+    "confirm_delete_desc": "Tag «{{name}}» will be removed from all files. Files will remain.",
+    "files_with_tag": "Files with this tag: {{count}}"
+  },
+  "folders": {
+    "title": "Folders",
+    "create_btn": "Create folder",
+    "folder_name_placeholder": "Folder name",
+    "save": "Save",
+    "rename": "Rename",
+    "delete": "Delete",
+    "delete_btn": "Delete",
+    "deleting": "Deleting…",
+    "loading": "Loading folders…",
+    "empty": "No folders yet. Create your first folder.",
+    "view_files": "Files",
+    "confirm_delete_title": "Delete folder?",
+    "confirm_delete_desc": "Delete folder «{{name}}»?",
+    "force_delete_title": "Folder has files",
+    "force_delete_desc": "This folder contains files. They will remain in the system but lose their folder assignment. Continue?",
+    "force_delete_btn": "Yes, delete",
+    "has_children": "Cannot delete a folder with nested folders."
+  },
+  "invite": {
+    "loading": "Loading invitation…",
+    "not_found": "Invitation not found",
+    "not_found_desc": "The link is invalid or has expired.",
+    "go_login": "Go to login",
+    "expired": "Invitation expired",
+    "expired_desc": "This invitation has expired.",
+    "already_accepted": "Invitation already accepted",
+    "need_login_title": "Sign in to accept the invitation",
+    "need_register_title": "Create an account",
+    "sender": "User",
+    "invited_you": "is inviting you to DeliFile.",
+    "has_file": "A file is attached to this invitation.",
+    "login_btn": "Sign in",
+    "register_instead": "I don't have an account",
+    "register_btn": "Register",
+    "have_account": "I already have an account",
+    "ready_title": "Accept invitation",
+    "accept_btn": "Accept",
+    "accepting": "Accepting…",
+    "done_title": "Invitation accepted!",
+    "go_files": "Go to files",
+    "error": "Error"
+  },
   "contacts": {
     "title": "Contacts",
     "add_btn": "+ Add contact",
@@ -163,6 +270,7 @@
     "new_contact": "New contact",
     "name": "Name",
     "name_placeholder": "Full name",
+    "email": "Email",
     "phone": "Phone",
     "search": "Search contacts…",
     "resolve_btn": "🔄 Resolve users",
@@ -197,6 +305,16 @@
   },
   "security": {
     "title": "Security settings",
+    "email_status": {
+      "title": "Email status",
+      "verified": "Email verified",
+      "unverified": "Email not verified",
+      "deadline": "Verify by {{date}} or your account will be blocked",
+      "resend_btn": "Resend verification email",
+      "resending": "Sending…",
+      "sent": "Email sent",
+      "change_email_btn": "Change email"
+    },
     "password": {
       "title": "Change password",
       "hint": "Use a strong password of at least 8 characters.",
@@ -222,5 +340,10 @@
       "end_session": "End session",
       "empty": "No active sessions found."
     }
+  },
+  "cookie": {
+    "text": "Our site uses cookies. By continuing to use it, you agree to the processing of personal data in accordance with our",
+    "policy_link": "privacy policy",
+    "accept": "Accept"
   }
 }

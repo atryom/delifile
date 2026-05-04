@@ -1,55 +1,87 @@
-import { Component, inject, signal, OnInit, input } from '@angular/core';
+import { Component, inject, signal, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { NgIf, NgFor, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
-import { FileCard, ShareLink, FileAccess, ActivityLog } from '../../../../shared/models/api.models';
+import { OrganizationApiService } from '../../../../core/api/organization-api.service';
+import { FileCard, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode } from '../../../../shared/models/api.models';
 import { ShareContactDialogComponent } from '../../dialogs/share-contact/share-contact-dialog.component';
 import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link-dialog.component';
 
 @Component({
   selector: 'app-file-detail',
   standalone: true,
-  imports: [NgIf, NgFor, DatePipe, RouterLink, ShareContactDialogComponent, CreateLinkDialogComponent, TranslateModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [DatePipe, RouterLink, ShareContactDialogComponent, CreateLinkDialogComponent, TranslateModule],
   template: `
     <div class="page">
-      <!-- Back -->
       <a routerLink="/files" class="back-link">{{ 'files.detail.back' | translate }}</a>
 
-      <!-- Loading -->
-      <div class="loading-state" *ngIf="loading()">{{ 'files.detail.loading' | translate }}</div>
+      @if (loading()) {
+        <div class="loading-state">{{ 'files.detail.loading' | translate }}</div>
+      }
 
-      <ng-container *ngIf="!loading() && file()">
+      @if (!loading() && file()) {
         <div class="file-detail-layout">
 
-          <!-- Left: Metadata -->
+          <!-- Left: Metadata + Actions -->
           <div class="file-main">
-            <div class="file-header-card">
-              <div class="file-big-icon">{{ mimeIcon(file()!.mime_type) }}</div>
-              <div class="file-header-info">
-                <h1 class="file-title">{{ file()!.original_name }}</h1>
-                <div class="file-meta-row">
-                  <span class="badge" [class]="'badge-' + file()!.status">{{ file()!.status }}</span>
-                  <span class="meta-item">{{ formatSize(file()!.size) }}</span>
-                  <span class="meta-item">{{ file()!.mime_type }}</span>
-                </div>
-                <div class="file-meta-row">
-                  <span class="meta-item">{{ 'files.detail.uploaded' | translate:{ date: (file()!.uploaded_at | date:'MMM d, y, HH:mm') } }}</span>
-                  <span class="meta-item" *ngIf="file()!.expires_at">
-                    {{ 'files.detail.expires' | translate:{ date: (file()!.expires_at | date:'MMM d, y, HH:mm') } }}
-                  </span>
-                </div>
-                <div class="file-meta-row" *ngIf="file()!.is_owner">
-                  <span class="owner-badge">{{ 'files.detail.owner' | translate }}</span>
+
+            <!-- URL file card -->
+            @if (file()!.content_kind === 'url_file') {
+              <div class="url-card">
+                @if (file()!.link_image_url) {
+                  <img [src]="file()!.link_image_url" alt="" class="url-card-img" loading="lazy" />
+                }
+                <div class="url-card-body">
+                  <p class="url-site">{{ file()!.link_site_name ?? file()!.link_url }}</p>
+                  <h2 class="url-card-title">{{ file()!.original_name }}</h2>
+                  @if (file()!.link_description) {
+                    <p class="url-card-desc">{{ file()!.link_description }}</p>
+                  }
+                  <a [href]="file()!.link_url" target="_blank" rel="noopener noreferrer" class="url-open-btn">
+                    {{ 'files.detail.open_link' | translate }}
+                  </a>
                 </div>
               </div>
-            </div>
+            } @else {
+              <div class="file-header-card">
+                <div class="file-big-icon" aria-hidden="true">{{ mimeIcon(file()!.mime_type ?? '') }}</div>
+                <div class="file-header-info">
+                  <h1 class="file-title">{{ file()!.original_name }}</h1>
+                  <div class="file-meta-row">
+                    <span class="badge" [class]="'badge-' + file()!.status">{{ file()!.status }}</span>
+                    <span class="meta-item">{{ formatSize(file()!.size) }}</span>
+                    @if (file()!.mime_type) {
+                      <span class="meta-item">{{ file()!.mime_type }}</span>
+                    }
+                  </div>
+                  <div class="file-meta-row">
+                    <span class="meta-item">{{ 'files.detail.uploaded' | translate:{date: (file()!.uploaded_at | date:'MMM d, y, HH:mm')} }}</span>
+                    @if (file()!.expires_at) {
+                      <span class="meta-item">{{ 'files.detail.expires' | translate:{date: (file()!.expires_at | date:'MMM d, y, HH:mm')} }}</span>
+                    }
+                  </div>
+                  @if (file()!.is_owner) {
+                    <div class="file-meta-row">
+                      <span class="owner-badge">{{ 'files.detail.owner' | translate }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
 
             <!-- Primary actions -->
             <div class="actions-bar">
-              <button class="btn-action btn-primary" (click)="download()" [disabled]="actionPending()">
-                {{ 'files.detail.download' | translate }}
-              </button>
+              @if (file()!.content_kind === 'url_file') {
+                <button class="btn-action btn-primary" (click)="copyUrlLink()">
+                  {{ 'files.detail.copy_link' | translate }}
+                </button>
+              } @else {
+                <button class="btn-action btn-primary" (click)="download()" [disabled]="actionPending()">
+                  {{ 'files.detail.download' | translate }}
+                </button>
+              }
               <button
                 class="btn-action"
                 [class.btn-active]="file()!.is_favorite"
@@ -69,32 +101,102 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
             </div>
 
             <!-- Share actions (owner only) -->
-            <div class="share-actions" *ngIf="file()!.is_owner">
-              <button class="btn-action btn-share" (click)="showShareDialog.set(true)">
-                {{ 'files.detail.share' | translate }}
-              </button>
-              <button class="btn-action btn-share" (click)="showLinkDialog.set(true)">
-                {{ 'files.detail.create_link' | translate }}
-              </button>
-            </div>
+            @if (file()!.is_owner) {
+              <div class="share-actions">
+                <button class="btn-action btn-share" (click)="showShareDialog.set(true)">
+                  {{ 'files.detail.share' | translate }}
+                </button>
+                <button class="btn-action btn-share" (click)="showLinkDialog.set(true)">
+                  {{ 'files.detail.create_link' | translate }}
+                </button>
+              </div>
+            }
 
-            <!-- Danger actions (owner only) -->
-            <div class="danger-actions" *ngIf="file()!.is_owner">
-              <button class="btn-danger" (click)="deleteFile()" [disabled]="actionPending()">
-                {{ 'files.detail.delete' | translate }}
-              </button>
-            </div>
-
-            <!-- Tags -->
-            <div class="section" *ngIf="file()!.tags.length">
+            <!-- Tags (editable for owner) -->
+            <div class="section">
               <h3 class="section-title">{{ 'files.detail.tags' | translate }}</h3>
               <div class="tags-row">
-                <span class="tag" *ngFor="let t of file()!.tags">{{ t.name }}</span>
+                @for (t of file()!.tags; track t.id) {
+                  <span class="tag">
+                    {{ t.name }}
+                    @if (file()!.is_owner) {
+                      <button class="tag-remove" (click)="removeTag(t)" aria-label="Удалить тег">×</button>
+                    }
+                  </span>
+                }
+                @if (file()!.is_owner) {
+                  @if (!showTagPicker()) {
+                    <button class="tag-add-btn" (click)="openTagPicker()">+ тег</button>
+                  } @else {
+                    <div class="tag-picker">
+                      <input
+                        #tagInput
+                        class="tag-search"
+                        type="text"
+                        placeholder="Поиск тегов..."
+                        (input)="onTagSearch($event)"
+                        (keydown.escape)="showTagPicker.set(false)"
+                        aria-label="Поиск тегов"
+                      />
+                      <div class="tag-dropdown">
+                        @for (tag of filteredTags(); track tag.id) {
+                          <button class="tag-option" (click)="addTag(tag)">{{ tag.name }}</button>
+                        }
+                        @if (filteredTags().length === 0) {
+                          <span class="tag-empty">Нет тегов</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                }
               </div>
             </div>
 
+            <!-- Folder (owner only) -->
+            @if (file()!.is_owner) {
+              <div class="section">
+                <h3 class="section-title">{{ 'files.detail.folder' | translate }}</h3>
+                @if (!showFolderPicker()) {
+                  <div class="folder-row">
+                    <span class="folder-name">
+                      {{ currentFolderName() ?? ('files.detail.no_folder' | translate) }}
+                    </span>
+                    <button class="btn-mini" (click)="openFolderPicker()">Изменить</button>
+                    @if (file()!.folder_id) {
+                      <button class="btn-mini btn-mini-danger" (click)="removeFromFolder()">
+                        {{ 'files.detail.remove_from_folder' | translate }}
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <div class="folder-picker">
+                    <select class="folder-select" (change)="onFolderSelect($event)">
+                      <option value="">{{ 'files.detail.no_folder' | translate }}</option>
+                      @for (node of flatFolders(); track node.id) {
+                        <option [value]="node.id" [selected]="node.id === file()!.folder_id">
+                          {{ node.indent }}{{ node.name }}
+                        </option>
+                      }
+                    </select>
+                    <button class="btn-mini" (click)="showFolderPicker.set(false)">{{ 'common.cancel' | translate }}</button>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Danger actions (owner only) -->
+            @if (file()!.is_owner) {
+              <div class="danger-actions">
+                <button class="btn-danger" (click)="deleteFile()" [disabled]="actionPending()">
+                  {{ 'files.detail.delete' | translate }}
+                </button>
+              </div>
+            }
+
             <!-- Action feedback -->
-            <div class="feedback" *ngIf="feedback()">{{ feedback() }}</div>
+            @if (feedback()) {
+              <div class="feedback" role="status">{{ feedback() }}</div>
+            }
           </div>
 
           <!-- Right: Sidebar panels -->
@@ -103,61 +205,77 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
             <!-- Active share links -->
             <div class="sidebar-section">
               <h3 class="section-title">{{ 'files.detail.active_links' | translate }}</h3>
-              <div class="empty-panel" *ngIf="!links().length">{{ 'files.detail.no_links' | translate }}</div>
-              <div *ngFor="let link of links()" class="link-item">
-                <div class="link-url" [title]="link.url">{{ link.url }}</div>
-                <div class="link-meta">
-                  {{ 'files.detail.link_expires' | translate:{ date: (link.expires_at | date:'MMM d, HH:mm') } }}
-                  · <span class="badge badge-{{ link.status }}">{{ link.status }}</span>
+              @if (!links().length) {
+                <div class="empty-panel">{{ 'files.detail.no_links' | translate }}</div>
+              }
+              @for (link of links(); track link.id) {
+                <div class="link-item">
+                  <div class="link-url" [title]="link.url">{{ link.url }}</div>
+                  <div class="link-meta">
+                    {{ 'files.detail.link_expires' | translate:{date: (link.expires_at | date:'MMM d, HH:mm')} }}
+                    · <span class="badge badge-{{ link.status }}">{{ link.status }}</span>
+                  </div>
+                  <div class="link-actions">
+                    <button class="btn-mini" (click)="copyLink(link.url)">{{ 'files.detail.copy' | translate }}</button>
+                    @if (link.status === 'active') {
+                      <button class="btn-mini btn-mini-danger" (click)="disableLink(link)">
+                        {{ 'files.detail.disable' | translate }}
+                      </button>
+                    }
+                  </div>
                 </div>
-                <div class="link-actions">
-                  <button class="btn-mini" (click)="copyLink(link.url)">{{ 'files.detail.copy' | translate }}</button>
-                  <button class="btn-mini btn-mini-danger" (click)="disableLink(link)" *ngIf="link.status === 'active'">
-                    {{ 'files.detail.disable' | translate }}
-                  </button>
-                </div>
-              </div>
+              }
             </div>
 
             <!-- Who has access -->
             <div class="sidebar-section">
               <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>
-              <div class="empty-panel" *ngIf="!accesses().length">{{ 'files.detail.only_you' | translate }}</div>
-              <div *ngFor="let a of accesses()" class="access-item">
-                <span class="access-user">{{ a.user?.phone ?? '—' }}</span>
-                <span class="access-type badge badge-access">{{ a.access_type }}</span>
-              </div>
+              @if (!accesses().length) {
+                <div class="empty-panel">{{ 'files.detail.only_you' | translate }}</div>
+              }
+              @for (a of accesses(); track a.id) {
+                <div class="access-item">
+                  <span class="access-user">{{ a.user?.email ?? '—' }}</span>
+                  <span class="access-type badge badge-access">{{ a.access_type }}</span>
+                </div>
+              }
             </div>
 
             <!-- Activity -->
             <div class="sidebar-section">
               <h3 class="section-title">{{ 'files.detail.activity_section' | translate }}</h3>
-              <div class="empty-panel" *ngIf="!activity().length">{{ 'files.detail.no_activity' | translate }}</div>
-              <div *ngFor="let log of activity()" class="activity-item">
-                <span class="activity-label">{{ log.label }}</span>
-                <span class="activity-meta">{{ log.created_at | date:'MMM d, HH:mm' }}</span>
-              </div>
+              @if (!activity().length) {
+                <div class="empty-panel">{{ 'files.detail.no_activity' | translate }}</div>
+              }
+              @for (log of activity(); track log.id) {
+                <div class="activity-item">
+                  <span class="activity-label">{{ log.label }}</span>
+                  <span class="activity-meta">{{ log.created_at | date:'MMM d, HH:mm' }}</span>
+                </div>
+              }
             </div>
 
           </aside>
         </div>
-      </ng-container>
+      }
 
       <!-- Share to contact dialog -->
-      <app-share-contact-dialog
-        *ngIf="showShareDialog()"
-        [fileId]="id()"
-        (closed)="showShareDialog.set(false)"
-        (shared)="onShared()"
-      />
+      @if (showShareDialog()) {
+        <app-share-contact-dialog
+          [fileId]="id()"
+          (closed)="showShareDialog.set(false)"
+          (shared)="onShared()"
+        />
+      }
 
       <!-- Create link dialog -->
-      <app-create-link-dialog
-        *ngIf="showLinkDialog()"
-        [fileId]="id()"
-        (closed)="showLinkDialog.set(false)"
-        (created)="onLinkCreated()"
-      />
+      @if (showLinkDialog()) {
+        <app-create-link-dialog
+          [fileId]="id()"
+          (closed)="showLinkDialog.set(false)"
+          (created)="onLinkCreated()"
+        />
+      }
     </div>
   `,
   styles: [`
@@ -168,6 +286,17 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
 
     .file-detail-layout { display: grid; grid-template-columns: 1fr 340px; gap: 28px; margin-top: 20px; }
 
+    /* URL file card */
+    .url-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; margin-bottom: 18px; }
+    .url-card-img { width: 100%; max-height: 240px; object-fit: cover; display: block; }
+    .url-card-body { padding: 20px 22px; }
+    .url-site { font-size: 0.78rem; color: #9ca3af; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .url-card-title { font-size: 1.2rem; font-weight: 700; margin: 0 0 8px; color: #1f2937; }
+    .url-card-desc { font-size: 0.88rem; color: #6b7280; margin: 0 0 14px; line-height: 1.5; }
+    .url-open-btn { display: inline-block; padding: 8px 18px; background: #6366f1; color: #fff; border-radius: 8px; text-decoration: none; font-size: 0.88rem; font-weight: 600; }
+    .url-open-btn:hover { background: #4f46e5; }
+
+    /* Regular file header card */
     .file-header-card { display: flex; align-items: flex-start; gap: 20px; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; margin-bottom: 18px; }
     .file-big-icon { font-size: 3rem; flex-shrink: 0; }
     .file-header-info { flex: 1; min-width: 0; }
@@ -189,8 +318,28 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
 
     .section { margin-top: 20px; }
     .section-title { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca3af; margin: 0 0 10px; }
-    .tags-row { display: flex; gap: 6px; flex-wrap: wrap; }
-    .tag { background: #ede9fe; color: #7c3aed; font-size: 0.8rem; padding: 3px 10px; border-radius: 99px; }
+
+    /* Tags */
+    .tags-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; background: #ede9fe; color: #7c3aed; font-size: 0.8rem; padding: 3px 8px 3px 10px; border-radius: 99px; }
+    .tag-remove { background: none; border: none; cursor: pointer; color: #7c3aed; font-size: 0.9rem; line-height: 1; padding: 0; opacity: 0.7; }
+    .tag-remove:hover { opacity: 1; }
+    .tag-add-btn { padding: 3px 10px; background: #f3f4f6; border: 1px dashed #d1d5db; border-radius: 99px; font-size: 0.8rem; cursor: pointer; color: #6b7280; }
+    .tag-add-btn:hover { background: #ede9fe; border-color: #a5b4fc; color: #7c3aed; }
+    .tag-picker { position: relative; }
+    .tag-search { padding: 4px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.82rem; outline: none; width: 140px; }
+    .tag-search:focus { border-color: #6366f1; }
+    .tag-dropdown { position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); min-width: 160px; z-index: 100; max-height: 180px; overflow-y: auto; }
+    .tag-option { display: block; width: 100%; text-align: left; padding: 7px 12px; border: none; background: none; cursor: pointer; font-size: 0.84rem; }
+    .tag-option:hover { background: #f5f3ff; }
+    .tag-empty { display: block; padding: 8px 12px; font-size: 0.82rem; color: #9ca3af; }
+
+    /* Folder */
+    .folder-row { display: flex; align-items: center; gap: 8px; }
+    .folder-name { font-size: 0.88rem; color: #374151; }
+    .folder-picker { display: flex; align-items: center; gap: 8px; }
+    .folder-select { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.88rem; outline: none; max-width: 220px; }
+    .folder-select:focus { border-color: #6366f1; }
 
     .feedback { margin-top: 16px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; color: #15803d; font-size: 0.88rem; }
 
@@ -234,21 +383,38 @@ export class FileDetailComponent implements OnInit {
   readonly id = input.required<string>();
 
   private readonly filesApi  = inject(FilesApiService);
+  private readonly orgApi    = inject(OrganizationApiService);
   private readonly router    = inject(Router);
   private readonly translate = inject(TranslateService);
 
-  readonly file         = signal<FileCard | null>(null);
-  readonly loading      = signal(false);
+  readonly file          = signal<FileCard | null>(null);
+  readonly loading       = signal(false);
   readonly actionPending = signal(false);
-  readonly feedback     = signal<string | null>(null);
-  readonly links        = signal<ShareLink[]>([]);
-  readonly accesses     = signal<FileAccess[]>([]);
-  readonly activity     = signal<ActivityLog[]>([]);
+  readonly feedback      = signal<string | null>(null);
+  readonly links         = signal<ShareLink[]>([]);
+  readonly accesses      = signal<FileAccess[]>([]);
+  readonly activity      = signal<ActivityLog[]>([]);
   readonly showShareDialog = signal(false);
   readonly showLinkDialog  = signal(false);
 
+  readonly allTags       = signal<Tag[]>([]);
+  readonly tagSearch     = signal('');
+  readonly showTagPicker = signal(false);
+  readonly filteredTags  = signal<Tag[]>([]);
+
+  readonly allFolders    = signal<FolderTreeNode[]>([]);
+  readonly flatFolders   = signal<{ id: string; name: string; indent: string }[]>([]);
+  readonly showFolderPicker = signal(false);
+
+  readonly currentFolderName = signal<string | null>(null);
+
   ngOnInit(): void {
     this.loadFile();
+    this.orgApi.getTags().subscribe((r) => this.allTags.set(r.data.items));
+    this.orgApi.getFolderTree().subscribe((r) => {
+      this.allFolders.set(r.data.items);
+      this.flatFolders.set(this.flattenTree(r.data.items, 0));
+    });
   }
 
   loadFile(): void {
@@ -258,6 +424,7 @@ export class FileDetailComponent implements OnInit {
         this.file.set(res.data.file);
         this.loading.set(false);
         this.loadSidePanels();
+        this.updateFolderName(res.data.file.folder_id);
       },
       error: () => this.loading.set(false),
     });
@@ -269,10 +436,40 @@ export class FileDetailComponent implements OnInit {
     this.filesApi.activity(this.id()).subscribe((r) => this.activity.set(r.data.items));
   }
 
+  private updateFolderName(folderId: string | null): void {
+    if (!folderId) { this.currentFolderName.set(null); return; }
+    const found = this.flatFolders().find((f) => f.id === folderId);
+    if (found) { this.currentFolderName.set(found.name); return; }
+    this.orgApi.getFolderTree().subscribe((r) => {
+      this.allFolders.set(r.data.items);
+      const flat = this.flattenTree(r.data.items, 0);
+      this.flatFolders.set(flat);
+      this.currentFolderName.set(flat.find((f) => f.id === folderId)?.name ?? null);
+    });
+  }
+
+  private flattenTree(nodes: FolderTreeNode[], depth: number): { id: string; name: string; indent: string }[] {
+    const result: { id: string; name: string; indent: string }[] = [];
+    for (const node of nodes) {
+      result.push({ id: node.id, name: node.name, indent: '  '.repeat(depth) });
+      if (node.children?.length) {
+        result.push(...this.flattenTree(node.children, depth + 1));
+      }
+    }
+    return result;
+  }
+
   download(): void {
     this.filesApi.download(this.id()).subscribe((res) => {
       window.open(res.data.url, '_blank');
     });
+  }
+
+  copyUrlLink(): void {
+    const url = this.file()?.link_url ?? '';
+    navigator.clipboard.writeText(url).then(() =>
+      this.showFeedback(this.translate.instant('files.detail.link_copied'))
+    );
   }
 
   toggleFavorite(): void {
@@ -283,7 +480,9 @@ export class FileDetailComponent implements OnInit {
     req.subscribe({
       next: () => {
         this.file.update((f) => f ? { ...f, is_favorite: !isFav } : f);
-        this.showFeedback(isFav ? this.translate.instant('files.detail.removed_favorite') : this.translate.instant('files.detail.added_favorite'));
+        this.showFeedback(isFav
+          ? this.translate.instant('files.detail.removed_favorite')
+          : this.translate.instant('files.detail.added_favorite'));
         this.actionPending.set(false);
       },
       error: () => this.actionPending.set(false),
@@ -298,7 +497,9 @@ export class FileDetailComponent implements OnInit {
     req.subscribe({
       next: () => {
         this.file.update((f) => f ? { ...f, is_pinned: !isPinned } : f);
-        this.showFeedback(isPinned ? this.translate.instant('files.detail.unpinned') : this.translate.instant('files.detail.file_pinned'));
+        this.showFeedback(isPinned
+          ? this.translate.instant('files.detail.unpinned')
+          : this.translate.instant('files.detail.file_pinned'));
         this.actionPending.set(false);
       },
       error: () => this.actionPending.set(false),
@@ -314,8 +515,82 @@ export class FileDetailComponent implements OnInit {
     });
   }
 
+  openTagPicker(): void {
+    this.tagSearch.set('');
+    this.filterTags('');
+    this.showTagPicker.set(true);
+  }
+
+  onTagSearch(e: Event): void {
+    const q = (e.target as HTMLInputElement).value;
+    this.filterTags(q);
+  }
+
+  private filterTags(q: string): void {
+    const current = new Set(this.file()?.tags.map((t) => t.id) ?? []);
+    const lower = q.toLowerCase();
+    this.filteredTags.set(
+      this.allTags().filter((t) => !current.has(t.id) && t.name.toLowerCase().includes(lower))
+    );
+  }
+
+  addTag(tag: Tag): void {
+    this.showTagPicker.set(false);
+    const currentIds = this.file()?.tags.map((t) => t.id) ?? [];
+    const newIds = [...currentIds, tag.id];
+    this.orgApi.attachTags(this.id(), [tag.id]).subscribe({
+      next: () => {
+        this.file.update((f) => f ? { ...f, tags: [...f.tags, tag] } : f);
+        this.showFeedback(this.translate.instant('files.detail.tags'));
+      },
+      error: () => {},
+    });
+    void newIds;
+  }
+
+  removeTag(tag: Tag): void {
+    this.orgApi.detachTags(this.id(), [tag.id]).subscribe({
+      next: () => {
+        this.file.update((f) => f ? { ...f, tags: f.tags.filter((t) => t.id !== tag.id) } : f);
+      },
+      error: () => {},
+    });
+  }
+
+  openFolderPicker(): void {
+    this.showFolderPicker.set(true);
+  }
+
+  onFolderSelect(e: Event): void {
+    const folderId = (e.target as HTMLSelectElement).value || null;
+    this.showFolderPicker.set(false);
+    this.filesApi.moveFolder(this.id(), folderId).subscribe({
+      next: () => {
+        this.file.update((f) => f ? { ...f, folder_id: folderId } : f);
+        this.currentFolderName.set(
+          folderId ? (this.flatFolders().find((f) => f.id === folderId)?.name ?? null) : null
+        );
+        this.showFeedback(this.translate.instant('files.detail.folder'));
+      },
+      error: () => {},
+    });
+  }
+
+  removeFromFolder(): void {
+    this.filesApi.moveFolder(this.id(), null).subscribe({
+      next: () => {
+        this.file.update((f) => f ? { ...f, folder_id: null } : f);
+        this.currentFolderName.set(null);
+        this.showFeedback(this.translate.instant('files.detail.remove_from_folder'));
+      },
+      error: () => {},
+    });
+  }
+
   copyLink(url: string): void {
-    navigator.clipboard.writeText(url).then(() => this.showFeedback(this.translate.instant('files.detail.link_copied')));
+    navigator.clipboard.writeText(url).then(() =>
+      this.showFeedback(this.translate.instant('files.detail.link_copied'))
+    );
   }
 
   disableLink(link: ShareLink): void {

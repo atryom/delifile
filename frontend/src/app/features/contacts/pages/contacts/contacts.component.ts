@@ -1,5 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
-import { NgIf, NgFor } from '@angular/common';
+import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ContactsApiService } from '../../../../core/api/domain-api.services';
@@ -8,7 +7,8 @@ import { Contact } from '../../../../shared/models/api.models';
 @Component({
   selector: 'app-contacts',
   standalone: true,
-  imports: [NgIf, NgFor, ReactiveFormsModule, TranslateModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ReactiveFormsModule, TranslateModule],
   template: `
     <div class="page">
       <div class="page-header">
@@ -19,27 +19,31 @@ import { Contact } from '../../../../shared/models/api.models';
       </div>
 
       <!-- Add contact form -->
-      <div class="add-form-card" *ngIf="showAddForm()">
-        <h3>{{ 'contacts.new_contact' | translate }}</h3>
-        <form [formGroup]="addForm" (ngSubmit)="addContact()" class="add-form" novalidate>
-          <div class="form-row">
-            <div class="field">
-              <label>{{ 'contacts.name' | translate }}</label>
-              <input type="text" formControlName="name" [placeholder]="'contacts.name_placeholder' | translate" />
+      @if (showAddForm()) {
+        <div class="add-form-card">
+          <h3>{{ 'contacts.new_contact' | translate }}</h3>
+          <form [formGroup]="addForm" (ngSubmit)="addContact()" class="add-form" novalidate>
+            <div class="form-row">
+              <div class="field">
+                <label for="contact-name">{{ 'contacts.name' | translate }}</label>
+                <input id="contact-name" type="text" formControlName="name" [placeholder]="'contacts.name_placeholder' | translate" />
+              </div>
+              <div class="field">
+                <label for="contact-email">{{ 'contacts.email' | translate }}</label>
+                <input id="contact-email" type="email" formControlName="email" placeholder="friend@example.com" />
+              </div>
             </div>
-            <div class="field">
-              <label>{{ 'contacts.phone' | translate }}</label>
-              <input type="tel" formControlName="phone" placeholder="+79990000000" />
+            @if (addError()) {
+              <div class="error-msg" role="alert">{{ addError() }}</div>
+            }
+            <div class="form-actions">
+              <button type="submit" class="btn-primary" [disabled]="addForm.invalid || adding()">
+                {{ adding() ? ('contacts.add_submitting' | translate) : ('contacts.add_submit' | translate) }}
+              </button>
             </div>
-          </div>
-          <div class="error-msg" *ngIf="addError()">{{ addError() }}</div>
-          <div class="form-actions">
-            <button type="submit" class="btn-primary" [disabled]="addForm.invalid || adding()">
-              {{ adding() ? ('contacts.add_submitting' | translate) : ('contacts.add_submit' | translate) }}
-            </button>
-          </div>
-        </form>
-      </div>
+          </form>
+        </div>
+      }
 
       <!-- Search + resolve -->
       <div class="toolbar">
@@ -48,6 +52,7 @@ import { Contact } from '../../../../shared/models/api.models';
           type="search"
           [placeholder]="'contacts.search' | translate"
           (input)="onSearch($event)"
+          aria-label="{{ 'contacts.search' | translate }}"
         />
         <button class="btn-outline" (click)="resolveContacts()" [disabled]="resolving()">
           {{ resolving() ? ('contacts.resolving' | translate) : ('contacts.resolve_btn' | translate) }}
@@ -55,32 +60,42 @@ import { Contact } from '../../../../shared/models/api.models';
       </div>
 
       <!-- Feedback -->
-      <div class="feedback" *ngIf="feedback()">{{ feedback() }}</div>
+      @if (feedback()) {
+        <div class="feedback" role="status">{{ feedback() }}</div>
+      }
 
       <!-- Loading -->
-      <div class="loading-state" *ngIf="loading()">{{ 'contacts.loading' | translate }}</div>
+      @if (loading()) {
+        <div class="loading-state">{{ 'contacts.loading' | translate }}</div>
+      }
 
       <!-- Empty -->
-      <div class="empty-state" *ngIf="!loading() && contacts().length === 0">
-        <span class="empty-icon">👥</span>
-        <p>{{ 'contacts.empty' | translate }}</p>
-      </div>
+      @if (!loading() && contacts().length === 0) {
+        <div class="empty-state">
+          <span class="empty-icon" aria-hidden="true">👥</span>
+          <p>{{ 'contacts.empty' | translate }}</p>
+        </div>
+      }
 
       <!-- Contact list -->
-      <div class="contact-grid" *ngIf="!loading() && contacts().length > 0">
-        <div *ngFor="let contact of contacts()" class="contact-card">
-          <div class="contact-avatar">{{ contact.name[0]?.toUpperCase() }}</div>
-          <div class="contact-info">
-            <p class="contact-name">{{ contact.name }}</p>
-            <p class="contact-phone">{{ contact.phone }}</p>
-          </div>
-          <div class="contact-status">
-            <span class="reg-badge" [class.registered]="contact.is_registered">
-              {{ contact.is_registered ? ('contacts.in_app' | translate) : ('contacts.not_registered' | translate) }}
-            </span>
-          </div>
+      @if (!loading() && contacts().length > 0) {
+        <div class="contact-grid">
+          @for (contact of contacts(); track contact.id) {
+            <div class="contact-card">
+              <div class="contact-avatar" aria-hidden="true">{{ contact.name[0]?.toUpperCase() }}</div>
+              <div class="contact-info">
+                <p class="contact-name">{{ contact.name }}</p>
+                <p class="contact-email">{{ contact.email ?? contact.phone ?? '—' }}</p>
+              </div>
+              <div class="contact-status">
+                <span class="reg-badge" [class.registered]="contact.is_registered">
+                  {{ contact.is_registered ? ('contacts.in_app' | translate) : ('contacts.not_registered' | translate) }}
+                </span>
+              </div>
+            </div>
+          }
         </div>
-      </div>
+      }
     </div>
   `,
   styles: [`
@@ -110,7 +125,7 @@ import { Contact } from '../../../../shared/models/api.models';
     .contact-avatar { width: 42px; height: 42px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem; flex-shrink: 0; }
     .contact-info { flex: 1; }
     .contact-name { font-size: 0.95rem; font-weight: 600; margin: 0 0 3px; }
-    .contact-phone { font-size: 0.82rem; color: #9ca3af; margin: 0; }
+    .contact-email { font-size: 0.82rem; color: #9ca3af; margin: 0; }
     .contact-status { flex-shrink: 0; }
     .reg-badge { font-size: 0.75rem; padding: 3px 10px; border-radius: 99px; background: #fee2e2; color: #dc2626; }
     .reg-badge.registered { background: #dcfce7; color: #16a34a; }
@@ -128,18 +143,18 @@ export class ContactsComponent implements OnInit {
   private readonly fb          = inject(FormBuilder);
   private readonly translate   = inject(TranslateService);
 
-  readonly contacts   = signal<Contact[]>([]);
-  readonly loading    = signal(false);
-  readonly adding     = signal(false);
-  readonly resolving  = signal(false);
+  readonly contacts    = signal<Contact[]>([]);
+  readonly loading     = signal(false);
+  readonly adding      = signal(false);
+  readonly resolving   = signal(false);
   readonly showAddForm = signal(false);
-  readonly addError   = signal<string | null>(null);
-  readonly feedback   = signal<string | null>(null);
+  readonly addError    = signal<string | null>(null);
+  readonly feedback    = signal<string | null>(null);
   private searchTimer?: ReturnType<typeof setTimeout>;
 
   readonly addForm = this.fb.group({
     name:  ['', [Validators.required]],
-    phone: ['', [Validators.required]],
+    email: ['', [Validators.email]],
   });
 
   ngOnInit(): void {
@@ -168,9 +183,9 @@ export class ContactsComponent implements OnInit {
     this.adding.set(true);
     this.addError.set(null);
 
-    const { name, phone } = this.addForm.getRawValue();
+    const { name, email } = this.addForm.getRawValue();
 
-    this.contactsApi.create({ name: name!, phone: phone! }).subscribe({
+    this.contactsApi.create({ name: name!, email: email || null }).subscribe({
       next: () => {
         this.adding.set(false);
         this.addForm.reset();

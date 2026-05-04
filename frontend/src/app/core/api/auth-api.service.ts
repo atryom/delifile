@@ -4,12 +4,12 @@ import { ApiService } from '../api/api.service';
 import { ApiResponse, CurrentUser, DeviceSession } from '../../shared/models/api.models';
 
 export interface LoginRequest {
-  phone: string;
+  email: string;
   password: string;
 }
 
 export interface RegisterRequest {
-  phone: string;
+  email: string;
   password: string;
   password_confirmation: string;
 }
@@ -20,11 +20,15 @@ export interface ChangePasswordRequest {
   password_confirmation: string;
 }
 
+export interface ChangeEmailRequest {
+  email: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthApiService {
   private readonly api = inject(ApiService);
 
-  register(data: RegisterRequest): Observable<ApiResponse<{ token: string; user: CurrentUser; next_step: string }>> {
+  register(data: RegisterRequest): Observable<ApiResponse<{ token: string; user: CurrentUser }>> {
     return this.api.post('/auth/register', data);
   }
 
@@ -52,12 +56,12 @@ export class AuthApiService {
     return this.api.delete(`/auth/sessions/${id}`);
   }
 
-  forgotPassword(phone: string): Observable<ApiResponse<Record<string, never>>> {
-    return this.api.post('/auth/password/forgot', { phone });
+  resendVerification(): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.post('/auth/email/resend-verification');
   }
 
-  resetPassword(data: { phone: string; token: string; password: string; password_confirmation: string }): Observable<ApiResponse<Record<string, never>>> {
-    return this.api.post('/auth/password/reset', data);
+  changeEmail(data: ChangeEmailRequest): Observable<ApiResponse<{ user: CurrentUser }>> {
+    return this.api.post('/auth/email/change', data);
   }
 
   changePassword(data: ChangePasswordRequest): Observable<ApiResponse<Record<string, never>>> {

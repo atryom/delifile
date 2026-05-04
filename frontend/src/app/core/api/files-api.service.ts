@@ -20,9 +20,17 @@ export type FileFilter = 'mine' | 'received' | 'favorites';
 export class FilesApiService {
   private readonly api = inject(ApiService);
 
-  list(filter: FileFilter = 'mine', page = 1, search?: string): Observable<ApiResponse<PaginatedData<FileListItem>>> {
+  list(
+    filter: FileFilter = 'mine',
+    page = 1,
+    search?: string,
+    options?: { tag_id?: string; folder_id?: string; content_kind?: string }
+  ): Observable<ApiResponse<PaginatedData<FileListItem>>> {
     const params: Record<string, string | number> = { filter, page };
     if (search) params['search'] = search;
+    if (options?.tag_id)       params['tag_id']    = options.tag_id;
+    if (options?.folder_id)    params['folder_id'] = options.folder_id;
+    if (options?.content_kind) params['content_kind'] = options.content_kind;
     return this.api.get('/files', params);
   }
 

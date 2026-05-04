@@ -13,22 +13,46 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
+        'email',
         'phone',
         'name',
         'password',
+        'email_verified_at',
+        'email_verification_token',
+        'email_verification_sent_at',
+        'email_verification_deadline_at',
+        'account_status',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'email_verification_token',
     ];
 
     protected function casts(): array
     {
         return [
-            'password'           => 'hashed',
-            'phone_verified_at'  => 'datetime',
+            'password'                       => 'hashed',
+            'email_verified_at'              => 'datetime',
+            'email_verification_sent_at'     => 'datetime',
+            'email_verification_deadline_at' => 'datetime',
         ];
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->email_verified_at !== null;
+    }
+
+    public function isBlocked(): bool
+    {
+        return $this->account_status === 'blocked_unverified_email';
+    }
+
+    public function isActive(): bool
+    {
+        return in_array($this->account_status, ['active', 'pending_email_verification']);
     }
 
     // Relations
@@ -65,5 +89,10 @@ class User extends Authenticatable
     public function deviceSessions(): HasMany
     {
         return $this->hasMany(DeviceSession::class);
+    }
+
+    public function sentInvitations(): HasMany
+    {
+        return $this->hasMany(Invitation::class, 'sender_user_id');
     }
 }

@@ -36,7 +36,7 @@ import { ActivityLog } from '../../../../shared/models/api.models';
               </ng-container>
             </p>
             <p class="activity-meta">
-              <span *ngIf="log.user">{{ log.user.phone }}</span>
+              <span *ngIf="log.user">{{ log.user.email }}</span>
               <span class="meta-sep" *ngIf="log.user">·</span>
               {{ log.created_at | date:'MMM d, y, HH:mm' }}
             </p>

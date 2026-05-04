@@ -13,3 +13,7 @@ Schedule::job(new ExpireShareLinksJob)->everyThirtyMinutes()
 Schedule::job(new CleanExpiredFilesJob)->hourly()
     ->name('clean-expired-files')
     ->withoutOverlapping();
+
+Schedule::command('auth:block-unverified')->everyFifteenMinutes()
+    ->name('block-unverified-accounts')
+    ->withoutOverlapping();

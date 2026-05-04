@@ -19,26 +19,17 @@ class ContactController extends Controller
         $search = $request->get('search');
 
         $query = Contact::where('user_id', $request->user()->id)
-            ->with('resolvedUser:id,phone,name');
+            ->with('resolvedUser:id,email,name');
 
         if ($search) {
             $query->where(fn ($q) =>
                 $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%")
             );
         }
 
-        $contacts = $query->orderBy('name')->get()->map(fn ($c) => [
-            'id'          => $c->id,
-            'name'        => $c->name,
-            'phone'       => $c->phone,
-            'is_registered' => $c->isRegistered(),
-            'resolved_user' => $c->resolvedUser ? [
-                'id'    => $c->resolvedUser->id,
-                'name'  => $c->resolvedUser->name,
-                'phone' => $c->resolvedUser->phone,
-            ] : null,
-        ]);
+        $contacts = $query->orderBy('name')->get()->map(fn ($c) => $this->formatContact($c));
 
         return $this->success(__('messages.contacts.fetched'), [
             'items' => $contacts,
@@ -52,27 +43,30 @@ class ContactController extends Controller
     {
         $request->validate([
             'name'  => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:20',
         ]);
 
+        if (empty($request->email) && empty($request->phone)) {
+            return $this->error('Email или телефон обязателен', ['code' => 'VALIDATION_ERROR'], 422);
+        }
+
         $contact = DB::transaction(function () use ($request) {
-            $resolved = User::where('phone', $request->phone)->first();
+            $resolved = $request->email
+                ? User::where('email', $request->email)->first()
+                : null;
 
             return Contact::create([
                 'user_id'          => $request->user()->id,
                 'name'             => $request->name,
+                'email'            => $request->email,
                 'phone'            => $request->phone,
                 'resolved_user_id' => $resolved?->id,
             ]);
         });
 
         return $this->success(__('messages.contacts.created'), [
-            'contact' => [
-                'id'            => $contact->id,
-                'name'          => $contact->name,
-                'phone'         => $contact->phone,
-                'is_registered' => $contact->isRegistered(),
-            ],
+            'contact' => $this->formatContact($contact),
         ], 201);
     }
 
@@ -83,7 +77,7 @@ class ContactController extends Controller
     {
         $contact = Contact::where('id', $contactId)
             ->where('user_id', $request->user()->id)
-            ->with('resolvedUser:id,phone,name')
+            ->with('resolvedUser:id,email,name')
             ->first();
 
         if (!$contact) {
@@ -91,30 +85,20 @@ class ContactController extends Controller
         }
 
         return $this->success(__('messages.contacts.fetched_one'), [
-            'contact' => [
-                'id'            => $contact->id,
-                'name'          => $contact->name,
-                'phone'         => $contact->phone,
-                'is_registered' => $contact->isRegistered(),
-                'resolved_user' => $contact->resolvedUser ? [
-                    'id'    => $contact->resolvedUser->id,
-                    'name'  => $contact->resolvedUser->name,
-                    'phone' => $contact->resolvedUser->phone,
-                ] : null,
-            ],
+            'contact' => $this->formatContact($contact),
         ]);
     }
 
     /**
      * POST /api/v1/contacts/import
-     * Bulk import contacts and resolve against registered users.
      */
     public function import(Request $request): JsonResponse
     {
         $request->validate([
-            'contacts'        => 'required|array|min:1|max:500',
-            'contacts.*.name' => 'required|string|max:255',
-            'contacts.*.phone' => 'required|string|max:20',
+            'contacts'         => 'required|array|min:1|max:500',
+            'contacts.*.name'  => 'required|string|max:255',
+            'contacts.*.email' => 'nullable|email|max:255',
+            'contacts.*.phone' => 'nullable|string|max:20',
         ]);
 
         $user    = $request->user();
@@ -122,15 +106,20 @@ class ContactController extends Controller
 
         DB::transaction(function () use ($request, $user, &$created) {
             foreach ($request->contacts as $item) {
-                $resolved = User::where('phone', $item['phone'])->first();
+                $resolved = !empty($item['email'])
+                    ? User::where('email', $item['email'])->first()
+                    : null;
 
-                Contact::updateOrCreate(
-                    ['user_id' => $user->id, 'phone' => $item['phone']],
-                    [
-                        'name'             => $item['name'],
-                        'resolved_user_id' => $resolved?->id,
-                    ]
-                );
+                $key = !empty($item['email'])
+                    ? ['user_id' => $user->id, 'email' => $item['email']]
+                    : ['user_id' => $user->id, 'phone' => $item['phone']];
+
+                Contact::updateOrCreate($key, [
+                    'name'             => $item['name'],
+                    'email'            => $item['email'] ?? null,
+                    'phone'            => $item['phone'] ?? null,
+                    'resolved_user_id' => $resolved?->id,
+                ]);
                 $created++;
             }
         });
@@ -142,7 +131,6 @@ class ContactController extends Controller
 
     /**
      * POST /api/v1/contacts/resolve
-     * Re-check which contacts are now registered users.
      */
     public function resolve(Request $request): JsonResponse
     {
@@ -152,7 +140,13 @@ class ContactController extends Controller
 
         $resolved = 0;
         foreach ($contacts as $contact) {
-            $user = User::where('phone', $contact->phone)->first();
+            $user = null;
+            if ($contact->email) {
+                $user = User::where('email', $contact->email)->first();
+            }
+            if (!$user && $contact->phone) {
+                $user = User::where('phone', $contact->phone)->first();
+            }
             if ($user) {
                 $contact->update(['resolved_user_id' => $user->id]);
                 $resolved++;
@@ -177,7 +171,6 @@ class ContactController extends Controller
             return $this->notFound('Contact not found');
         }
 
-        // Show files shared with this contact
         $sharedFiles = \App\Models\FileUserAccess::where('contact_id', $contact->id)
             ->with('file:id,original_name,status,created_at')
             ->get()
@@ -194,5 +187,21 @@ class ContactController extends Controller
         return $this->success(__('messages.contacts.history_fetched'), [
             'items' => $sharedFiles,
         ]);
+    }
+
+    private function formatContact(Contact $c): array
+    {
+        return [
+            'id'            => $c->id,
+            'name'          => $c->name,
+            'email'         => $c->email,
+            'phone'         => $c->phone,
+            'is_registered' => $c->isRegistered(),
+            'resolved_user' => $c->resolvedUser ? [
+                'id'    => $c->resolvedUser->id,
+                'name'  => $c->resolvedUser->name,
+                'email' => $c->resolvedUser->email,
+            ] : null,
+        ];
     }
 }

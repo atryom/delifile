@@ -24,15 +24,28 @@ class File extends Model
         'status',
         'folder_id',
         'expires_at',
+        'content_kind',
+        'link_url',
+        'link_title',
+        'link_description',
+        'link_image_url',
+        'link_site_name',
+        'link_fetched_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'status'     => FileStatus::class,
-            'expires_at' => 'datetime',
-            'size'       => 'integer',
+            'status'          => FileStatus::class,
+            'expires_at'      => 'datetime',
+            'link_fetched_at' => 'datetime',
+            'size'            => 'integer',
         ];
+    }
+
+    public function isUrlFile(): bool
+    {
+        return $this->content_kind === 'url_file';
     }
 
     // Relations

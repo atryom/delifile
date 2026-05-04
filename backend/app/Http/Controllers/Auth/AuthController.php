@@ -3,17 +3,19 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
-use App\Http\Requests\Auth\ChangePasswordRequest;
 use App\Services\AuthService;
+use App\Services\EmailVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AuthController extends Controller
 {
     public function __construct(
-        private readonly AuthService $authService
+        private readonly AuthService              $authService,
+        private readonly EmailVerificationService $verificationService
     ) {}
 
     /**
@@ -23,11 +25,14 @@ class AuthController extends Controller
     {
         $result = $this->authService->register($request->validated());
 
-        return $this->success(__('messages.auth.registered'), [
-            'token'     => $result['token'],
-            'user'      => $result['user'],
-            'next_step' => 'pin_offer',
-        ], 201);
+        return $this->success(
+            'Учётная запись создана. Пожалуйста, подтвердите свой email в течение 24 часов.',
+            [
+                'token' => $result['token'],
+                'user'  => $result['user'],
+            ],
+            201
+        );
     }
 
     /**
@@ -42,10 +47,19 @@ class AuthController extends Controller
         );
 
         if (!$result) {
-            return $this->error(__('messages.auth.invalid_credentials'), 'INVALID_CREDENTIALS', [], 401);
+            return $this->error('Неверный email или пароль', 'INVALID_CREDENTIALS', [], 401);
         }
 
-        return $this->success(__('messages.auth.logged_in'), [
+        if (!empty($result['blocked'])) {
+            return $this->error(
+                'Учётная запись заблокирована из-за неподтверждённого email.',
+                'ACCOUNT_BLOCKED',
+                ['user' => $result['user']],
+                403
+            );
+        }
+
+        return $this->success('Вход выполнен успешно', [
             'token' => $result['token'],
             'user'  => $result['user'],
         ]);
@@ -57,8 +71,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $this->authService->logout($request->user());
-
-        return $this->success(__('messages.auth.logged_out'));
+        return $this->success('Выход выполнен успешно');
     }
 
     /**
@@ -67,8 +80,7 @@ class AuthController extends Controller
     public function logoutAll(Request $request): JsonResponse
     {
         $this->authService->logoutAll($request->user());
-
-        return $this->success(__('messages.auth.all_sessions_terminated'));
+        return $this->success('Все сессии завершены');
     }
 
     /**
@@ -76,12 +88,8 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        return $this->success(__('messages.auth.user_fetched'), [
-            'user' => [
-                'id'    => $request->user()->id,
-                'phone' => $request->user()->phone,
-                'name'  => $request->user()->name,
-            ],
+        return $this->success('Текущий пользователь получен', [
+            'user' => $this->authService->formatUser($request->user()),
         ]);
     }
 
@@ -91,10 +99,7 @@ class AuthController extends Controller
     public function sessions(Request $request): JsonResponse
     {
         $sessions = $this->authService->getSessions($request->user());
-
-        return $this->success(__('messages.auth.sessions_fetched'), [
-            'items' => $sessions,
-        ]);
+        return $this->success('Сессии получены', ['items' => $sessions]);
     }
 
     /**
@@ -102,51 +107,58 @@ class AuthController extends Controller
      */
     public function deleteSession(Request $request, string $sessionId): JsonResponse
     {
-        $deleted = $this->authService->deleteSession($request->user(), $sessionId);
+        if (!$this->authService->deleteSession($request->user(), $sessionId)) {
+            return $this->notFound('Сессия не найдена');
+        }
+        return $this->success('Сессия завершена');
+    }
 
-        if (!$deleted) {
-            return $this->notFound('Session not found');
+    /**
+     * POST /api/v1/auth/email/resend-verification
+     */
+    public function resendVerification(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->isEmailVerified()) {
+            return $this->error('Email уже подтверждён', 'EMAIL_ALREADY_VERIFIED', [], 422);
         }
 
-        return $this->success(__('messages.auth.session_terminated'));
+        $this->verificationService->send($user);
+
+        return $this->success('Письмо с подтверждением отправлено');
     }
 
     /**
-     * POST /api/v1/auth/password/forgot
+     * GET /api/v1/auth/email/verify/{token}
      */
-    public function forgotPassword(Request $request): JsonResponse
+    public function verifyEmail(string $token): \Illuminate\Http\RedirectResponse
     {
-        $request->validate(['phone' => 'required|string']);
+        $user = $this->verificationService->verify($token);
 
-        // Stub: In production, trigger SMS flow
-        $this->authService->sendPasswordResetToken($request->phone);
+        $appUrl = rtrim(config('app.url'), '/');
 
-        return $this->success(__('messages.auth.reset_sent'));
+        if (!$user) {
+            return redirect($appUrl . '/?email_verified=false');
+        }
+
+        return redirect($appUrl . '/?email_verified=true');
     }
 
     /**
-     * POST /api/v1/auth/password/reset
+     * POST /api/v1/auth/email/change
      */
-    public function resetPassword(Request $request): JsonResponse
+    public function changeEmail(Request $request): JsonResponse
     {
         $request->validate([
-            'phone'                 => 'required|string',
-            'token'                 => 'required|string',
-            'password'              => 'required|string|min:8|confirmed',
-            'password_confirmation' => 'required|string',
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
         ]);
 
-        $success = $this->authService->resetPassword(
-            $request->phone,
-            $request->token,
-            $request->password
-        );
+        $this->authService->changeEmail($request->user(), $request->email);
 
-        if (!$success) {
-            return $this->error(__('messages.auth.reset_invalid'), 'INVALID_TOKEN', [], 422);
-        }
-
-        return $this->success(__('messages.auth.password_reset'));
+        return $this->success('Email изменён. Подтвердите новый адрес в течение 24 часов.', [
+            'user' => $this->authService->formatUser($request->user()->fresh()),
+        ]);
     }
 
     /**
@@ -154,15 +166,9 @@ class AuthController extends Controller
      */
     public function changePassword(ChangePasswordRequest $request): JsonResponse
     {
-        $success = $this->authService->changePassword(
-            $request->user(),
-            $request->validated()
-        );
-
-        if (!$success) {
-            return $this->error(__('messages.auth.wrong_current_password'), 'WRONG_PASSWORD', [], 422);
+        if (!$this->authService->changePassword($request->user(), $request->validated())) {
+            return $this->error('Текущий пароль неверен', 'WRONG_PASSWORD', [], 422);
         }
-
-        return $this->success(__('messages.auth.password_changed'));
+        return $this->success('Пароль успешно изменён');
     }
 }

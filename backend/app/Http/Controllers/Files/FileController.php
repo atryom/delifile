@@ -27,17 +27,28 @@ class FileController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $filter = $request->get('filter', 'mine'); // mine | received | favorites
-        $page   = (int) $request->get('page', 1);
+        $filter  = $request->get('filter', 'mine'); // mine | received | favorites
+        $page    = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 20);
         $search  = $request->get('search');
+
+        $options = array_filter([
+            'tag_id'       => $request->get('tag_id'),
+            'content_kind' => $request->get('content_kind'),
+        ]);
+
+        // folder_id can be explicitly null (no-folder filter)
+        if ($request->has('folder_id')) {
+            $options['folder_id'] = $request->get('folder_id');
+        }
 
         $result = $this->fileService->listFiles(
             $request->user(),
             $filter,
             $search,
             $page,
-            $perPage
+            $perPage,
+            $options
         );
 
         return $this->success(__('messages.files.fetched'), $result);
@@ -154,9 +165,19 @@ class FileController extends Controller
             return $this->error(__('messages.files.not_available'), 'FILE_NOT_AVAILABLE', [], 422);
         }
 
-        $url = $this->fileService->generateDownloadUrl($file);
-
         $this->activityService->log($file, $request->user(), ActivityType::Downloaded);
+
+        // URL files are returned as inline .url content
+        if ($file->isUrlFile()) {
+            $content  = $this->fileService->buildUrlFileContent($file);
+            $filename = $file->original_name ?: 'link.url';
+            return response($content, 200, [
+                'Content-Type'        => 'application/internet-shortcut',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
+        }
+
+        $url = $this->fileService->generateDownloadUrl($file);
 
         return $this->success(__('messages.files.download_url'), [
             'url'        => $url,

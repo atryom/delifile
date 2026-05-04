@@ -8,42 +8,50 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthService
 {
+    public function __construct(
+        private readonly EmailVerificationService $verificationService
+    ) {}
+
     /**
-     * Register a new user.
+     * Register a new user by email + password.
      */
     public function register(array $data): array
     {
         $user = User::create([
-            'phone'    => $data['phone'],
-            'password' => $data['password'],
+            'email'                          => $data['email'],
+            'password'                       => $data['password'],
+            'account_status'                 => 'pending_email_verification',
+            'email_verification_deadline_at' => now()->addHours(24),
         ]);
+
+        // Send verification email
+        $this->verificationService->send($user);
 
         $token = $user->createToken('web-spa');
 
         return [
             'token' => $token->plainTextToken,
-            'user'  => [
-                'id'    => $user->id,
-                'phone' => $user->phone,
-            ],
+            'user'  => $this->formatUser($user),
         ];
     }
 
     /**
-     * Login user with phone and password. Returns user data or null on failure.
+     * Login by email + password.
      */
     public function login(array $credentials, ?string $userAgent = null, ?string $ip = null): ?array
     {
-        $user = User::where('phone', $credentials['phone'])->first();
+        $user = User::where('email', $credentials['email'])->first();
 
         if (!$user || !Hash::check($credentials['password'], $user->password)) {
             return null;
         }
 
-        // Create Sanctum token
+        if ($user->isBlocked()) {
+            return ['blocked' => true, 'user' => $this->formatUser($user)];
+        }
+
         $token = $user->createToken('web-spa');
 
-        // Record device session
         DeviceSession::create([
             'user_id'        => $user->id,
             'token_id'       => $token->accessToken->id,
@@ -55,35 +63,21 @@ class AuthService
 
         return [
             'token' => $token->plainTextToken,
-            'user'  => [
-                'id'    => $user->id,
-                'phone' => $user->phone,
-                'name'  => $user->name,
-            ],
+            'user'  => $this->formatUser($user),
         ];
     }
 
-    /**
-     * Logout current user session.
-     */
     public function logout(User $user): void
     {
-        // Revoke current token
         $user->currentAccessToken()?->delete();
     }
 
-    /**
-     * Logout all sessions.
-     */
     public function logoutAll(User $user): void
     {
         $user->tokens()->delete();
         DeviceSession::where('user_id', $user->id)->delete();
     }
 
-    /**
-     * Get all active sessions for user.
-     */
     public function getSessions(User $user): array
     {
         return DeviceSession::where('user_id', $user->id)
@@ -98,9 +92,6 @@ class AuthService
             ->toArray();
     }
 
-    /**
-     * Terminate a specific session.
-     */
     public function deleteSession(User $user, string $sessionId): bool
     {
         $session = DeviceSession::where('user_id', $user->id)
@@ -111,41 +102,12 @@ class AuthService
             return false;
         }
 
-        // Also revoke the associated sanctum token
         $user->tokens()->where('id', $session->token_id)->delete();
         $session->delete();
 
         return true;
     }
 
-    /**
-     * Stub: Send password reset token via SMS.
-     */
-    public function sendPasswordResetToken(string $phone): void
-    {
-        // TODO: Integrate real SMS provider
-        // For MVP stub: store token in password_resets table
-    }
-
-    /**
-     * Verify token and reset password.
-     */
-    public function resetPassword(string $phone, string $token, string $newPassword): bool
-    {
-        // TODO: Verify against password_resets table
-        // Stub implementation
-        $user = User::where('phone', $phone)->first();
-        if (!$user) {
-            return false;
-        }
-
-        $user->update(['password' => $newPassword]);
-        return true;
-    }
-
-    /**
-     * Change password for authenticated user.
-     */
     public function changePassword(User $user, array $data): bool
     {
         if (!Hash::check($data['current_password'], $user->password)) {
@@ -154,5 +116,32 @@ class AuthService
 
         $user->update(['password' => $data['password']]);
         return true;
+    }
+
+    /**
+     * Change email for authenticated user (triggers new verification).
+     */
+    public function changeEmail(User $user, string $newEmail): void
+    {
+        $user->update([
+            'email'                          => $newEmail,
+            'email_verified_at'              => null,
+            'account_status'                 => 'pending_email_verification',
+            'email_verification_deadline_at' => now()->addHours(24),
+        ]);
+
+        $this->verificationService->send($user);
+    }
+
+    public function formatUser(User $user): array
+    {
+        return [
+            'id'                             => $user->id,
+            'email'                          => $user->email,
+            'name'                           => $user->name,
+            'email_verified'                 => $user->isEmailVerified(),
+            'account_status'                 => $user->account_status,
+            'email_verification_deadline_at' => $user->email_verification_deadline_at?->toIso8601String(),
+        ];
     }
 }

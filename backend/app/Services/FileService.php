@@ -232,6 +232,51 @@ class FileService
     }
 
     /**
+     * Create a url_file object from a URL with preview metadata.
+     */
+    public function createUrlFile(User $user, string $url, array $preview): array
+    {
+        return DB::transaction(function () use ($user, $url, $preview) {
+            $hostname = $preview['hostname'] ?? parse_url($url, PHP_URL_HOST) ?? $url;
+            $title    = $preview['title'] ?? $hostname;
+
+            $file = File::create([
+                'owner_id'        => $user->id,
+                'original_name'   => mb_substr($title, 0, 255) . '.url',
+                'storage_key'     => null,
+                'size'            => 0,
+                'mime_type'       => 'application/internet-shortcut',
+                'status'          => FileStatus::Available,
+                'content_kind'    => 'url_file',
+                'link_url'        => $url,
+                'link_title'      => $preview['title'] ?? null,
+                'link_description'=> $preview['description'] ?? null,
+                'link_image_url'  => $preview['image_url'] ?? null,
+                'link_site_name'  => $preview['site_name'] ?? $hostname,
+                'link_fetched_at' => now(),
+            ]);
+
+            FileUserAccess::create([
+                'file_id'     => $file->id,
+                'user_id'     => $user->id,
+                'access_type' => AccessType::Owner,
+            ]);
+
+            $this->activityService->log($file, $user, ActivityType::Uploaded);
+
+            return ['file' => $this->buildFileCard($file->load(['owner', 'tags']), $user)];
+        });
+    }
+
+    /**
+     * Generate .url file content for download.
+     */
+    public function buildUrlFileContent(File $file): string
+    {
+        return "[InternetShortcut]\r\nURL=" . $file->link_url . "\r\n";
+    }
+
+    /**
      * Build full file card data.
      */
     public function buildFileCard(File $file, User $user): array
@@ -240,8 +285,9 @@ class FileService
             ->where('user_id', $user->id)
             ->first();
 
-        return [
+        $base = [
             'id'            => $file->id,
+            'content_kind'  => $file->content_kind ?? 'binary_file',
             'original_name' => $file->original_name,
             'size'          => $file->size,
             'mime_type'     => $file->mime_type,
@@ -256,16 +302,26 @@ class FileService
             'tags'          => $file->tags->map(fn ($t) => ['id' => $t->id, 'name' => $t->name]),
             'owner'         => [
                 'id'    => $file->owner->id,
-                'phone' => $file->owner->phone,
+                'email' => $file->owner->email,
                 'name'  => $file->owner->name,
             ],
         ];
+
+        if ($file->isUrlFile()) {
+            $base['link_url']         = $file->link_url;
+            $base['link_title']       = $file->link_title;
+            $base['link_description'] = $file->link_description;
+            $base['link_image_url']   = $file->link_image_url;
+            $base['link_site_name']   = $file->link_site_name;
+        }
+
+        return $base;
     }
 
     /**
-     * List files for a user based on filter.
+     * List files for a user based on filter with tag/folder/content_kind filters.
      */
-    public function listFiles(User $user, string $filter, ?string $search, int $page, int $perPage): array
+    public function listFiles(User $user, string $filter, ?string $search, int $page, int $perPage, array $options = []): array
     {
         $query = File::query()->whereNull('deleted_at');
 
@@ -285,28 +341,59 @@ class FileService
             $query->where('original_name', 'like', "%{$search}%");
         }
 
-        $total     = $query->count();
-        $items     = $query->orderByDesc('created_at')
-                           ->offset(($page - 1) * $perPage)
-                           ->limit($perPage)
-                           ->get();
+        if (!empty($options['tag_id'])) {
+            $query->whereHas('tags', fn ($q) => $q->where('tags.id', $options['tag_id']));
+        }
+
+        if (array_key_exists('folder_id', $options)) {
+            if ($options['folder_id'] === null) {
+                $query->whereNull('folder_id');
+            } else {
+                $query->where('folder_id', $options['folder_id']);
+            }
+        }
+
+        if (!empty($options['content_kind'])) {
+            $query->where('content_kind', $options['content_kind']);
+        }
+
+        $total = $query->count();
+        $items = $query->orderByDesc('created_at')
+                       ->offset(($page - 1) * $perPage)
+                       ->limit($perPage)
+                       ->get();
 
         return [
-            'items'      => $items->map(fn ($f) => [
-                'id'            => $f->id,
-                'original_name' => $f->original_name,
-                'size'          => $f->size,
-                'mime_type'     => $f->mime_type,
-                'status'        => $f->status->value,
-                'expires_at'    => $f->expires_at?->toIso8601String(),
-                'uploaded_at'   => $f->created_at?->toIso8601String(),
-            ]),
+            'items'      => $items->map(fn ($f) => $this->buildListItem($f)),
             'pagination' => [
                 'page'     => $page,
                 'per_page' => $perPage,
                 'total'    => $total,
             ],
         ];
+    }
+
+    private function buildListItem(File $f): array
+    {
+        $item = [
+            'id'            => $f->id,
+            'content_kind'  => $f->content_kind ?? 'binary_file',
+            'original_name' => $f->original_name,
+            'size'          => $f->size,
+            'mime_type'     => $f->mime_type,
+            'status'        => $f->status->value,
+            'expires_at'    => $f->expires_at?->toIso8601String(),
+            'uploaded_at'   => $f->created_at?->toIso8601String(),
+        ];
+
+        if ($f->content_kind === 'url_file') {
+            $item['link_url']       = $f->link_url;
+            $item['link_title']     = $f->link_title;
+            $item['link_image_url'] = $f->link_image_url;
+            $item['link_site_name'] = $f->link_site_name;
+        }
+
+        return $item;
     }
 
     /**
