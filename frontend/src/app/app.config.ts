@@ -17,6 +17,7 @@ import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { authInitializer } from './core/auth/auth.initializer';
+import { translateInitializer } from './core/i18n/translate.initializer';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -32,7 +33,12 @@ export const appConfig: ApplicationConfig = {
       useFactory: authInitializer,
       multi: true,
     },
-    provideTranslateService({ lang: 'ru', fallbackLang: 'ru' }),
+    {
+      provide: APP_INITIALIZER,
+      useFactory: translateInitializer,
+      multi: true,
+    },
+    provideTranslateService({ fallbackLang: 'ru' }),
     provideTranslateHttpLoader({ prefix: '/assets/i18n/', suffix: '.json' }),
   ],
 };
