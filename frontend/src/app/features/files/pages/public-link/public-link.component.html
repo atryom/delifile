@@ -1,0 +1,115 @@
+    <div class="link-page">
+      <div class="link-card">
+        <div class="brand">
+          <span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     class="lucide lucide-file-symlink-icon lucide-file-symlink"><path
+            d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7"/><path
+            d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 18 3-3-3-3"/></svg></span>
+          <span class="brand-name">DeliFile</span>
+        </div>
+
+        @if (status() === 'loading') {
+          <div class="state loading">{{ 'files.public_link.resolving' | translate }}</div>
+        }
+
+        @if (status() === 'invalid') {
+          <div class="state error">
+            <span class="state-icon">🚫</span>
+            <h2>{{ 'files.public_link.invalid' | translate }}</h2>
+            <p>{{ 'files.public_link.invalid_desc' | translate }}</p>
+          </div>
+        }
+
+        @if (status() === 'ready') {
+          <div class="state ready">
+            @if (fileInfo()?.content_kind === 'url_file') {
+              <!-- URL-ссылка -->
+              <div class="url-card">
+                @if (fileInfo()!.link_image_url) {
+                  <img [src]="fileInfo()!.link_image_url!" alt="" class="url-card-img" loading="lazy" />
+                }
+                <div class="url-card-body">
+                  @if (fileInfo()!.link_site_name) {
+                    <p class="url-site">{{ fileInfo()!.link_site_name }}</p>
+                  }
+                  <h2 class="url-card-title">{{ fileInfo()!.original_name }}</h2>
+                  @if (fileInfo()!.link_description) {
+                    <p class="url-card-desc">{{ fileInfo()!.link_description }}</p>
+                  }
+                  @if (fileInfo()!.link_url) {
+                    <a [href]="fileInfo()!.link_url!" target="_blank" rel="noopener noreferrer" class="url-open-btn">
+                      {{ 'files.detail.open_link' | translate }}
+                    </a>
+                  }
+                </div>
+              </div>
+            } @else {
+              <!-- Обычный файл -->
+              @if (fileInfo()?.preview_url) {
+                <img [src]="fileInfo()!.preview_url!" alt="" class="file-preview-img" loading="lazy" />
+              } @else {
+                <div class="file-icon">{{ fileIcon() }}</div>
+              }
+              <h2 class="file-name">{{ fileInfo()?.original_name }}</h2>
+              <p class="file-meta">
+                {{ formatSize(fileInfo()?.size ?? 0) }}
+                · {{ fileInfo()?.mime_type }}
+              </p>
+            }
+
+            @if (expiresAt()) {
+              <p class="link-expiry">{{ 'files.public_link.expires' | translate:{date: expiresAt()} }}</p>
+            }
+
+            @if (fileInfo()?.content_kind !== 'url_file') {
+              <button class="btn-download" (click)="download()" [disabled]="downloading()">
+                {{ downloading() ? ('files.public_link.downloading' | translate) : ('files.public_link.download' | translate) }}
+              </button>
+            }
+
+            @if (allowSave() && isLoggedIn()) {
+              <button class="btn-save" (click)="saveToAccount()" [disabled]="saving() || saved()">
+                @if (saved()) {
+                  ✅ {{ 'files.public_link.saved' | translate }}
+                } @else if (saving()) {
+                  {{ 'files.public_link.saving' | translate }}
+                } @else {
+                  💾 {{ 'files.public_link.save_to_account' | translate }}
+                }
+              </button>
+              @if (saveError()) {
+                <p class="save-error">{{ saveError() }}</p>
+              }
+            }
+
+            @if (allowSave() && !isLoggedIn()) {
+              <p class="save-hint">
+                {{ 'files.public_link.save_login_hint' | translate }}
+                <a routerLink="/login" class="login-link">{{ 'files.public_link.login_to_save' | translate }}</a>
+              </p>
+            }
+          </div>
+        }
+
+        @if (status() === 'downloaded') {
+          <div class="state ready">
+            <span class="state-icon">✅</span>
+            <h2>{{ 'files.public_link.success' | translate }}</h2>
+            <p>{{ 'files.public_link.manual' | translate }} <a [href]="downloadUrl()" target="_blank">{{ 'files.public_link.manual' | translate }}</a>.</p>
+            @if (allowSave() && isLoggedIn() && !saved()) {
+              <button class="btn-save" (click)="saveToAccount()" [disabled]="saving()">
+                {{ saving() ? ('files.public_link.saving' | translate) : ('💾 ' + ('files.public_link.save_to_account' | translate)) }}
+              </button>
+              @if (saveError()) {
+                <p class="save-error">{{ saveError() }}</p>
+              }
+            }
+            @if (saved()) {
+              <p class="save-success">✅ {{ 'files.public_link.saved' | translate }}</p>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  

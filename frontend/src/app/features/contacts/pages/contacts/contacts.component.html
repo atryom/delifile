@@ -1,0 +1,96 @@
+    <div class="page">
+      <div class="page-header">
+        <h1 class="page-title">{{ 'contacts.title' | translate }}</h1>
+        <button class="btn-primary" (click)="showAddForm.set(!showAddForm())">
+          {{ showAddForm() ? ('contacts.cancel_btn' | translate) : ('contacts.add_btn' | translate) }}
+        </button>
+      </div>
+
+      <!-- Add contact form -->
+      @if (showAddForm()) {
+        <div class="add-form-card">
+          <h3>{{ 'contacts.new_contact' | translate }}</h3>
+          <form [formGroup]="addForm" (ngSubmit)="addContact()" class="add-form" novalidate>
+            <div class="form-row">
+              <div class="field">
+                <label for="contact-name">{{ 'contacts.name' | translate }}</label>
+                <input id="contact-name" type="text" formControlName="name" [placeholder]="'contacts.name_placeholder' | translate" />
+              </div>
+              <div class="field">
+                <label for="contact-email">{{ 'contacts.email' | translate }}</label>
+                <input id="contact-email" type="email" formControlName="email" placeholder="friend@example.com" />
+              </div>
+            </div>
+            @if (addError()) {
+              <div class="error-msg" role="alert">{{ addError() }}</div>
+            }
+            <div class="form-actions">
+              <button type="submit" class="btn-primary" [disabled]="addForm.invalid || adding()">
+                {{ adding() ? ('contacts.add_submitting' | translate) : ('contacts.add_submit' | translate) }}
+              </button>
+            </div>
+          </form>
+        </div>
+      }
+
+      <!-- Search + resolve -->
+      <div class="toolbar">
+        <input
+          class="search-input"
+          type="search"
+          [placeholder]="'contacts.search' | translate"
+          (input)="onSearch($event)"
+          aria-label="{{ 'contacts.search' | translate }}"
+        />
+        <button class="btn-outline" (click)="resolveContacts()" [disabled]="resolving()">
+          {{ resolving() ? ('contacts.resolving' | translate) : ('contacts.resolve_btn' | translate) }}
+        </button>
+      </div>
+
+      <!-- Feedback -->
+      @if (feedback()) {
+        <div class="feedback" role="status">{{ feedback() }}</div>
+      }
+
+      <!-- Loading -->
+      @if (loading()) {
+        <div class="loading-state">{{ 'contacts.loading' | translate }}</div>
+      }
+
+      <!-- Empty -->
+      @if (!loading() && contacts().length === 0) {
+        <div class="empty-state">
+          <span class="empty-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9126d9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span>
+          <p>{{ 'contacts.empty' | translate }}</p>
+        </div>
+      }
+
+      <!-- Contact list -->
+      @if (!loading() && contacts().length > 0) {
+        <div class="contact-grid">
+          @for (contact of contacts(); track contact.id) {
+            <div class="contact-card">
+              <div class="contact-avatar" aria-hidden="true">{{ contact.name[0]?.toUpperCase() }}</div>
+              <div class="contact-info">
+                <p class="contact-name">{{ contact.name }}</p>
+                <p class="contact-email">{{ contact.email ?? contact.phone ?? '—' }}</p>
+              </div>
+              <div class="contact-status">
+                <span class="reg-badge" [class.registered]="contact.is_registered">
+                  {{ contact.is_registered ? ('contacts.in_app' | translate) : ('contacts.not_registered' | translate) }}
+                </span>
+              </div>
+              <button
+                class="btn-delete"
+                [attr.aria-label]="'contacts.delete_btn' | translate"
+                [disabled]="deletingId() === contact.id"
+                (click)="deleteContact(contact)"
+              >
+                {{ deletingId() === contact.id ? '…' : '✕' }}
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  

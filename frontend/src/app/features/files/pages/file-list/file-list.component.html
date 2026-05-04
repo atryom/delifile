@@ -1,0 +1,224 @@
+    <div class="page">
+      <!-- Page header -->
+      <div class="page-header">
+        <h1 class="page-title">{{ 'files.list.title' | translate }}</h1>
+        <div class="header-actions">
+          <label class="btn-primary">
+            <span>{{ 'files.list.upload_btn' | translate }}</span>
+            <input #fileInput type="file" (change)="onFileSelected($event)" style="display:none" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Upload zone -->
+      @if (uploadState().phase === 'idle') {
+        <label
+          class="upload-zone"
+          [class.drag-over]="isDragOver()"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave()"
+          (drop)="onDrop($event)"
+        >
+          <input type="file" (change)="onFileSelected($event)" style="display:none" />
+          <span class="upload-icon">☁️</span>
+          <p>{{ 'files.list.drop_hint' | translate }}</p>
+          <span class="upload-hint">{{ 'files.list.expire_hint' | translate }}</span>
+        </label>
+
+        <!-- Inline add-link form -->
+        <div class="add-link-card">
+          <h3>{{ 'files.add_link.title' | translate }}</h3>
+          <form [formGroup]="linkForm" (ngSubmit)="saveLink()" class="link-form">
+            <input
+              formControlName="url"
+              type="url"
+              [placeholder]="'files.add_link.url_placeholder' | translate"
+              class="link-input"
+            />
+            <div class="link-actions">
+              <button
+                type="button"
+                class="btn-secondary-sm"
+                (click)="previewLink()"
+                [disabled]="linkForm.invalid || previewing()"
+              >
+                {{ previewing() ? '...' : ('files.add_link.preview_btn' | translate) }}
+              </button>
+              <button
+                type="submit"
+                class="btn-primary-sm"
+                [disabled]="linkForm.invalid || savingLink()"
+              >
+                {{ savingLink() ? ('files.add_link.saving' | translate) : ('files.add_link.save_btn' | translate) }}
+              </button>
+            </div>
+          </form>
+
+          @if (linkPreview()) {
+            <div class="link-preview-card">
+              @if (linkPreview()!.image_url) {
+                <img [src]="linkPreview()!.image_url" alt="" class="preview-img" />
+              }
+              <div class="preview-body">
+                <p class="preview-title">{{ linkPreview()!.title }}</p>
+                <p class="preview-site">{{ linkPreview()!.site_name }}</p>
+                @if (linkPreview()!.description) {
+                  <p class="preview-desc">{{ linkPreview()!.description }}</p>
+                }
+              </div>
+            </div>
+          }
+          @if (linkError()) {
+            <p class="field-error">{{ linkError() }}</p>
+          }
+        </div>
+      }
+
+      <!-- Upload in progress -->
+      @if (uploadState().phase !== 'idle' && uploadState().phase !== 'done') {
+        <div class="upload-progress-card">
+          <div class="upload-progress-info">
+            <span>{{ phaseLabel() }}</span>
+            <span class="upload-percent">{{ uploadState().progress }}%</span>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" [style.width]="uploadState().progress + '%'"></div>
+          </div>
+          @if (uploadState().fileId) {
+            <button class="btn-text-danger" (click)="cancelUpload()">
+              {{ 'files.upload.cancel' | translate }}
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Upload done snackbar -->
+      @if (uploadDone()) {
+        <div class="snackbar">
+          {{ 'files.upload.success' | translate }}
+          <a [routerLink]="['/files', uploadState().fileId]" class="snackbar-link">{{ 'files.upload.open' | translate }}</a>
+          <button class="snackbar-close" (click)="dismissUpload()">✕</button>
+        </div>
+      }
+
+      <!-- Filters + search -->
+      <div class="filter-bar">
+        <div class="filter-tabs">
+          @for (f of filters; track f.key) {
+            <button
+              [class.active]="activeFilter() === f.key"
+              (click)="setFilter(f.key)"
+              class="filter-tab"
+            >{{ f.label | translate }}</button>
+          }
+        </div>
+        <input
+          class="search-input"
+          type="search"
+          [placeholder]="'files.list.search' | translate"
+          [(ngModel)]="searchQuery"
+          (ngModelChange)="onSearchChange($event)"
+        />
+      </div>
+
+      <!-- Tag/folder filters -->
+      <div class="secondary-filters">
+        <select class="filter-select" (change)="onTagFilter($event)">
+          <option value="">{{ 'files.list.filter_all_tags' | translate }}</option>
+          @for (tag of tags(); track tag.id) {
+            <option [value]="tag.id" [selected]="activeTagId() === tag.id">{{ tag.name }}</option>
+          }
+        </select>
+
+        <select class="filter-select" (change)="onFolderFilter($event)">
+          <option value="">{{ 'files.list.filter_all_folders' | translate }}</option>
+          @for (folder of flatFolders(); track folder.id) {
+            <option [value]="folder.id" [selected]="activeFolderId() === folder.id">{{ folder.name }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Loading -->
+      @if (loading()) {
+        <div class="loading-state">{{ 'files.list.loading' | translate }}</div>
+      }
+
+      <!-- Empty state -->
+      @if (!loading() && files().length === 0) {
+        <div class="empty-state">
+          <span class="empty-icon">📂</span>
+          <p>{{ emptyMessage() }}</p>
+        </div>
+      }
+
+      <!-- File grid -->
+      @if (!loading() && files().length > 0) {
+        <div class="file-grid">
+          @for (file of files(); track file.id) {
+            @if (file.content_kind === 'url_file') {
+              <!-- URL file card -->
+              <div
+                class="file-card url-card"
+                [class.expired]="file.status === 'expired'"
+                (click)="openFile(file)"
+              >
+                @if (file.link_image_url) {
+                  <img [src]="file.link_image_url" alt="" class="url-thumb" />
+                } @else {
+                  <div class="url-thumb-placeholder">🔗</div>
+                }
+                <div class="file-info">
+                  <p class="file-name" [title]="file.link_title ?? file.original_name">
+                    {{ file.link_title ?? file.original_name }}
+                  </p>
+                  <p class="file-meta">
+                    <span class="url-site">{{ file.link_site_name }}</span>
+                  </p>
+                  <p class="url-href">{{ file.link_url }}</p>
+                </div>
+                <div class="file-actions" (click)="$event.stopPropagation()">
+                  <a [href]="file.link_url" target="_blank" rel="noopener" class="btn-icon" [title]="'files.list.open_link' | translate">🌐</a>
+                  <button class="btn-icon" [title]="'files.list.open_title' | translate" (click)="openFile(file)">→</button>
+                </div>
+              </div>
+            } @else {
+              <!-- Binary file card -->
+              <div
+                class="file-card"
+                [class.expired]="file.status === 'expired'"
+                (click)="openFile(file)"
+              >
+                @if (file.preview_url) {
+                  <img [src]="file.preview_url" alt="" class="file-preview-img" loading="lazy" />
+                } @else {
+                  <div class="file-icon">{{ mimeIcon(file.mime_type ?? '') }}</div>
+                }
+                <div class="file-info">
+                  <p class="file-name" [title]="file.original_name">{{ file.original_name }}</p>
+                  <p class="file-meta">
+                    {{ formatSize(file.size) }}
+                    <span class="meta-sep">·</span>
+                    {{ file.uploaded_at | date:'MMM d, y' }}
+                  </p>
+                  <span class="file-badge" [class]="'badge-' + file.status">{{ file.status }}</span>
+                </div>
+                <div class="file-actions" (click)="$event.stopPropagation()">
+                  <button class="btn-icon" [title]="'files.list.download_title' | translate" (click)="quickDownload(file, $event)">⬇️</button>
+                  <button class="btn-icon" [title]="'files.list.open_title' | translate" (click)="openFile(file)">→</button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- Pagination -->
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <button [disabled]="page() === 1" (click)="goToPage(page() - 1)">{{ 'common.prev' | translate }}</button>
+          <span>{{ 'common.page_of' | translate:{ page: page(), total: totalPages() } }}</span>
+          <button [disabled]="page() === totalPages()" (click)="goToPage(page() + 1)">{{ 'common.next' | translate }}</button>
+        </div>
+      }
+    </div>
+  

@@ -1,0 +1,12 @@
+    @if (visible()) {
+      <div class="cookie-banner" role="dialog" aria-live="polite" aria-label="Cookie consent">
+        <p class="cookie-text">
+          {{ 'cookie.text' | translate }}
+          <a routerLink="/privacy" class="cookie-link">{{ 'cookie.policy_link' | translate }}</a>.
+        </p>
+        <button type="button" class="cookie-btn" (click)="accept()">
+          {{ 'cookie.accept' | translate }}
+        </button>
+      </div>
+    }
+  

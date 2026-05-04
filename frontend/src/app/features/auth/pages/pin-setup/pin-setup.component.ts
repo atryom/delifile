@@ -1,7 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { NgIf } from '@angular/common';
 import { TranslateModule } from '@ngx-translate/core';
 
 /**
@@ -14,79 +13,9 @@ import { TranslateModule } from '@ngx-translate/core';
 @Component({
   selector: 'app-pin-setup',
   standalone: true,
-  imports: [ReactiveFormsModule, NgIf, TranslateModule],
-  template: `
-    <div class="auth-page">
-      <div class="auth-card">
-        <div class="auth-header">
-          <span class="auth-logo">🔑</span>
-          <h1>{{ 'auth.pin_setup.title' | translate }}</h1>
-          <p>{{ 'auth.pin_setup.subtitle' | translate }}</p>
-        </div>
-
-        <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form" novalidate>
-
-          <div class="pin-notice">
-            {{ 'auth.pin_setup.hint' | translate }}
-          </div>
-
-          <div class="field">
-            <label for="pin">{{ 'auth.pin_setup.pin_label' | translate }}</label>
-            <input
-              id="pin"
-              type="password"
-              formControlName="pin"
-              [placeholder]="'auth.pin_setup.pin_placeholder' | translate"
-              inputmode="numeric"
-              maxlength="6"
-              [class.input-error]="form.get('pin')?.touched && form.get('pin')?.invalid"
-            />
-            <span class="field-error" *ngIf="form.get('pin')?.touched && form.get('pin')?.invalid">
-              {{ 'auth.pin_setup.pin_error' | translate }}
-            </span>
-          </div>
-
-          <div class="field">
-            <label for="pin_confirm">{{ 'auth.pin_setup.confirm_label' | translate }}</label>
-            <input
-              id="pin_confirm"
-              type="password"
-              formControlName="pin_confirm"
-              [placeholder]="'auth.pin_setup.confirm_placeholder' | translate"
-              inputmode="numeric"
-              maxlength="6"
-              [class.input-error]="form.errors?.['pinMismatch'] && form.get('pin_confirm')?.touched"
-            />
-            <span class="field-error"
-              *ngIf="form.errors?.['pinMismatch'] && form.get('pin_confirm')?.touched">
-              {{ 'auth.pin_setup.confirm_error' | translate }}
-            </span>
-          </div>
-
-          <button type="submit" class="btn-primary btn-full" [disabled]="form.invalid">
-            {{ 'auth.pin_setup.submit' | translate }}
-          </button>
-
-          <button type="button" class="btn-secondary btn-full" (click)="skip()">
-            {{ 'auth.pin_setup.skip' | translate }}
-          </button>
-
-        </form>
-      </div>
-    </div>
-  `,
-  styles: [`
-    @import url('../../../../../styles/auth.shared.css');
-    .pin-notice {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-      border-radius: 8px;
-      padding: 12px 14px;
-      font-size: 0.82rem;
-      color: #92400e;
-      margin-bottom: 4px;
-    }
-  `],
+  imports: [ReactiveFormsModule, TranslateModule],
+  templateUrl: './pin-setup.component.html',
+  styleUrl: './pin-setup.component.scss',
 })
 export class PinSetupComponent {
   private readonly fb     = inject(FormBuilder);

@@ -7,9 +7,6 @@ import { CookieConsentComponent } from './shared/components/cookie-consent/cooki
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet, AppLayoutComponent, CookieConsentComponent],
-  template: `
-    <app-layout><router-outlet /></app-layout>
-    <app-cookie-consent />
-  `,
+  templateUrl: './app.component.html',
 })
 export class AppComponent {}

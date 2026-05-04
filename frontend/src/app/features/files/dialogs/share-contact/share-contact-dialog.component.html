@@ -1,0 +1,78 @@
+    <div class="dialog-overlay" (click)="closed.emit()">
+      <div class="dialog" (click)="$event.stopPropagation()">
+        <div class="dialog-header">
+          <h2>{{ 'files.share.title' | translate }}</h2>
+          <button class="dialog-close" (click)="closed.emit()" [attr.aria-label]="'files.share.cancel' | translate">✕</button>
+        </div>
+
+        <div class="dialog-body">
+          <input
+            class="search-input"
+            type="search"
+            [placeholder]="'files.share.search' | translate"
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="onSearch($event)"
+          />
+
+          @if (!loading()) {
+            <div class="contacts-list">
+              @if (contacts().length === 0) {
+                <div class="empty-contacts">
+                  {{ searchQuery ? ('files.share.no_contacts' | translate) : ('files.share.no_contacts_yet' | translate) }}
+                </div>
+              }
+              @for (contact of contacts(); track contact.id) {
+                <div
+                  class="contact-item"
+                  [class.selected]="selectedId() === contact.id"
+                  (click)="select(contact)"
+                >
+                  <div class="contact-avatar" aria-hidden="true">{{ contact.name[0]?.toUpperCase() }}</div>
+                  <div class="contact-info">
+                    <p class="contact-name">{{ contact.name }}</p>
+                    <p class="contact-sub">{{ contact.email ?? contact.phone ?? '' }}</p>
+                  </div>
+                  <span
+                    class="reg-badge"
+                    [class.registered]="contact.is_registered"
+                    [class.pending]="!contact.is_registered"
+                  >
+                    {{ contact.is_registered
+                      ? ('files.share.registered' | translate)
+                      : ('files.share.pending_invite' | translate) }}
+                  </span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (loading()) {
+            <div class="loading-contacts">{{ 'files.share.loading' | translate }}</div>
+          }
+
+          @if (shareStatus() === 'pending') {
+            <div class="pending-notice">{{ 'files.share.pending_notice' | translate }}</div>
+          }
+          @if (shareStatus() === 'shared') {
+            <div class="success-notice">{{ 'files.share.access_granted_notice' | translate }}</div>
+          }
+        </div>
+
+        <div class="dialog-footer">
+          @if (error()) {
+            <div class="error-msg">{{ error() }}</div>
+          }
+          <button class="btn-secondary" (click)="closed.emit()">{{ 'files.share.cancel' | translate }}</button>
+          <button
+            class="btn-primary"
+            [disabled]="!selectedId() || submitting()"
+            (click)="submit()"
+          >
+            {{ submitting()
+              ? ('files.share.submitting' | translate)
+              : (selectedContact()?.is_registered ? ('files.share.submit' | translate) : ('files.share.submit_pending' | translate)) }}
+          </button>
+        </div>
+      </div>
+    </div>
+  

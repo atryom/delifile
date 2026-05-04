@@ -1,0 +1,25 @@
+.page { padding: 28px 32px; max-width: 800px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.page-title { font-size: 1.6rem; font-weight: 700; color: #1a1a2e; margin: 0; }
+
+.loading-state, .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+.empty-icon { font-size: 3rem; display: block; margin-bottom: 12px; }
+
+.activity-list { display: flex; flex-direction: column; gap: 2px; }
+.activity-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px; background: #fff; border: 1px solid #f0f0f0; border-radius: 10px; }
+.activity-icon { font-size: 1.4rem; flex-shrink: 0; width: 32px; text-align: center; margin-top: 2px; }
+.activity-body { flex: 1; }
+.activity-label { font-size: 0.92rem; margin: 0 0 4px; color: #1f2937; }
+.action-text { font-weight: 500; }
+.file-link { color: #6366f1; text-decoration: none; }
+.file-link:hover { text-decoration: underline; }
+.activity-meta { font-size: 0.8rem; color: #9ca3af; margin: 0; }
+.meta-sep { margin: 0 6px; }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 28px; }
+.pagination button { padding: 8px 18px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; cursor: pointer; }
+.pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-outline { padding: 8px 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.88rem; cursor: pointer; }
+.btn-outline:hover:not(:disabled) { background: #f9fafb; }
+.btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -1,0 +1,95 @@
+    <div class="page">
+      <div class="page-header">
+        <h1>{{ 'tags.title' | translate }}</h1>
+      </div>
+
+      <!-- Add tag form -->
+      <div class="add-card">
+        <form [formGroup]="addForm" (ngSubmit)="addTag()" class="add-form">
+          <input
+            formControlName="name"
+            type="text"
+            [placeholder]="'tags.add_placeholder' | translate"
+            class="add-input"
+            maxlength="50"
+          />
+          <button type="submit" class="btn-primary" [disabled]="addForm.invalid || adding()">
+            {{ adding() ? ('tags.adding' | translate) : ('tags.add_btn' | translate) }}
+          </button>
+        </form>
+        @if (addError()) {
+          <p class="field-error">{{ addError() }}</p>
+        }
+      </div>
+
+      <!-- Search -->
+      <div class="search-row">
+        <input
+          type="search"
+          [placeholder]="'tags.search_placeholder' | translate"
+          class="search-input"
+          (input)="onSearch($event)"
+        />
+      </div>
+
+      <!-- Tags list -->
+      @if (loading()) {
+        <p class="loading-text">{{ 'tags.loading' | translate }}</p>
+      } @else if (filtered().length === 0) {
+        <p class="empty-text">{{ 'tags.empty' | translate }}</p>
+      } @else {
+        <ul class="tags-list" role="list">
+          @for (tag of filtered(); track tag.id) {
+            <li class="tag-item">
+              @if (editingId() === tag.id) {
+                <div class="edit-row">
+                  <input
+                    type="text"
+                    [value]="editName()"
+                    (input)="editName.set($any($event.target).value)"
+                    class="edit-input"
+                    maxlength="50"
+                    (keydown.enter)="saveEdit(tag)"
+                    (keydown.escape)="cancelEdit()"
+                    autofocus
+                  />
+                  <button class="btn-sm btn-save" (click)="saveEdit(tag)">{{ 'tags.save' | translate }}</button>
+                  <button class="btn-sm btn-cancel" (click)="cancelEdit()">{{ 'common.cancel' | translate }}</button>
+                </div>
+              } @else {
+                <div class="tag-row">
+                  <span class="tag-name">{{ tag.name }}</span>
+                  <span class="tag-count">{{ tag.files_count ?? 0 }}</span>
+                  <div class="tag-actions">
+                    <a
+                      [routerLink]="['/files']"
+                      [queryParams]="{ tag_id: tag.id }"
+                      class="btn-sm btn-view"
+                    >{{ 'tags.view_files' | translate }}</a>
+                    <button class="btn-sm btn-edit" (click)="startEdit(tag)">{{ 'tags.edit' | translate }}</button>
+                    <button class="btn-sm btn-delete" (click)="confirmDelete(tag)">{{ 'tags.delete' | translate }}</button>
+                  </div>
+                </div>
+              }
+            </li>
+          }
+        </ul>
+      }
+
+      <!-- Confirm delete modal -->
+      @if (deleteTarget()) {
+        <div class="modal-backdrop" (click)="cancelDelete()">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <h3>{{ 'tags.confirm_delete_title' | translate }}</h3>
+            <p>{{ 'tags.confirm_delete_desc' | translate : { name: deleteTarget()!.name } }}</p>
+            <div class="modal-actions">
+              <button class="btn-primary btn-danger" (click)="deleteTag()" [disabled]="deleting()">
+                {{ deleting() ? ('tags.deleting' | translate) : ('tags.delete_btn' | translate) }}
+              </button>
+              <button class="btn-secondary" (click)="cancelDelete()">{{ 'common.cancel' | translate }}</button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  

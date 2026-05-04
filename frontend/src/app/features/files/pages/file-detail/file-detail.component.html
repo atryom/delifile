@@ -1,0 +1,277 @@
+    <div class="page">
+      <a routerLink="/files" class="back-link">{{ 'files.detail.back' | translate }}</a>
+
+      @if (loading()) {
+        <div class="loading-state">{{ 'files.detail.loading' | translate }}</div>
+      }
+
+      @if (!loading() && file()) {
+        <div class="file-detail-layout">
+
+          <!-- Left: Metadata + Actions -->
+          <div class="file-main">
+
+            <!-- URL file card -->
+            @if (file()!.content_kind === 'url_file') {
+              <div class="url-card">
+                @if (file()!.link_image_url) {
+                  <img [src]="file()!.link_image_url" alt="" class="url-card-img" loading="lazy" />
+                }
+                <div class="url-card-body">
+                  <p class="url-site">{{ file()!.link_site_name ?? file()!.link_url }}</p>
+                  <h2 class="url-card-title">{{ file()!.original_name }}</h2>
+                  @if (file()!.link_description) {
+                    <p class="url-card-desc">{{ file()!.link_description }}</p>
+                  }
+                  <a [href]="file()!.link_url" target="_blank" rel="noopener noreferrer" class="url-open-btn">
+                    {{ 'files.detail.open_link' | translate }}
+                  </a>
+                </div>
+              </div>
+            } @else {
+              <div class="file-header-card">
+                @if (file()!.preview_url) {
+                  <img [src]="file()!.preview_url" alt="" class="file-preview-thumb" loading="lazy" />
+                } @else {
+                  <div class="file-big-icon" aria-hidden="true">{{ mimeIcon(file()!.mime_type ?? '') }}</div>
+                }
+                <div class="file-header-info">
+                  <h1 class="file-title">{{ file()!.original_name }}</h1>
+                  <div class="file-meta-row">
+                    <span class="badge" [class]="'badge-' + file()!.status">{{ file()!.status }}</span>
+                    <span class="meta-item">{{ formatSize(file()!.size) }}</span>
+                    @if (file()!.mime_type) {
+                      <span class="meta-item">{{ file()!.mime_type }}</span>
+                    }
+                  </div>
+                  <div class="file-meta-row">
+                    <span class="meta-item">{{ 'files.detail.uploaded' | translate:{date: (file()!.uploaded_at | date:'MMM d, y, HH:mm')} }}</span>
+                    @if (file()!.expires_at && !file()!.is_pinned) {
+                      <span class="meta-item">{{ 'files.detail.expires' | translate:{date: (file()!.expires_at | date:'MMM d, y, HH:mm')} }}</span>
+                    }
+                  </div>
+                  @if (file()!.is_owner) {
+                    <div class="file-meta-row">
+                      <span class="owner-badge">{{ 'files.detail.owner' | translate }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- Primary actions -->
+            <div class="actions-bar">
+              @if (file()!.content_kind === 'url_file') {
+                <button class="btn-action btn-primary" (click)="copyUrlLink()">
+                  {{ 'files.detail.copy_link' | translate }}
+                </button>
+              } @else {
+                <button class="btn-action btn-primary" (click)="download()" [disabled]="actionPending()">
+                  {{ 'files.detail.download' | translate }}
+                </button>
+              }
+              <button
+                class="btn-action"
+                [class.btn-active]="file()!.is_favorite"
+                (click)="toggleFavorite()"
+                [disabled]="actionPending()"
+              >
+                {{ file()!.is_favorite ? ('files.detail.favorited' | translate) : ('files.detail.favorite' | translate) }}
+              </button>
+              <button
+                class="btn-action"
+                [class.btn-active]="file()!.is_pinned"
+                (click)="togglePin()"
+                [disabled]="actionPending()"
+              >
+                {{ file()!.is_pinned ? ('files.detail.pinned' | translate) : ('files.detail.pin' | translate) }}
+              </button>
+            </div>
+
+            <!-- Share actions (owner only) -->
+            @if (file()!.is_owner) {
+              <div class="share-actions">
+                <button class="btn-action btn-share" (click)="showShareDialog.set(true)">
+                  {{ 'files.detail.share' | translate }}
+                </button>
+                <button class="btn-action btn-share" (click)="showLinkDialog.set(true)">
+                  {{ 'files.detail.create_link' | translate }}
+                </button>
+              </div>
+            }
+
+            <!-- Tags (editable for owner) -->
+            <div class="section">
+              <h3 class="section-title">{{ 'files.detail.tags' | translate }}</h3>
+              <div class="tags-row">
+                @for (t of file()!.tags; track t.id) {
+                  <span class="tag">
+                    {{ t.name }}
+                    @if (file()!.is_owner) {
+                      <button class="tag-remove" (click)="removeTag(t)" aria-label="Удалить тег">×</button>
+                    }
+                  </span>
+                }
+                @if (file()!.is_owner) {
+                  @if (!showTagPicker()) {
+                    <button class="tag-add-btn" (click)="openTagPicker()">+ тег</button>
+                  } @else {
+                    <div class="tag-picker" (mouseleave)="onTagPickerMouseLeave()">
+                      <input
+                        #tagInput
+                        class="tag-search"
+                        type="text"
+                        [placeholder]="'files.detail.tag_search_placeholder' | translate"
+                        (input)="onTagSearch($event)"
+                        (keydown.escape)="closeTagPicker()"
+                        (blur)="onTagInputBlur()"
+                        [attr.aria-label]="'files.detail.tag_search_placeholder' | translate"
+                      />
+                      <div class="tag-dropdown">
+                        @for (tag of filteredTags(); track tag.id) {
+                          <button class="tag-option" (mousedown)="$event.preventDefault()" (click)="addTag(tag)">{{ tag.name }}</button>
+                        }
+                        @if (tagSearchQuery() && !tagExactMatch()) {
+                          <button class="tag-option tag-create" (mousedown)="$event.preventDefault()" (click)="createAndAddTag()">
+                            {{ 'files.detail.create_tag' | translate:{name: tagSearchQuery()} }}
+                          </button>
+                        }
+                        @if (!tagSearchQuery() && filteredTags().length === 0) {
+                          <span class="tag-empty">{{ 'files.detail.no_tags' | translate }}</span>
+                        }
+                      </div>
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+
+            <!-- Folder (owner only) -->
+            @if (file()!.is_owner) {
+              <div class="section">
+                <h3 class="section-title">{{ 'files.detail.folder' | translate }}</h3>
+                @if (!showFolderPicker()) {
+                  <div class="folder-row">
+                    <span class="folder-name">
+                      {{ currentFolderName() ?? ('files.detail.no_folder' | translate) }}
+                    </span>
+                    <button class="btn-mini" (click)="openFolderPicker()">Изменить</button>
+                    @if (file()!.folder_id) {
+                      <button class="btn-mini btn-mini-danger" (click)="removeFromFolder()">
+                        {{ 'files.detail.remove_from_folder' | translate }}
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <div class="folder-picker">
+                    <select class="folder-select" (change)="onFolderSelect($event)">
+                      <option value="">{{ 'files.detail.no_folder' | translate }}</option>
+                      @for (node of flatFolders(); track node.id) {
+                        <option [value]="node.id" [selected]="node.id === file()!.folder_id">
+                          {{ node.indent }}{{ node.name }}
+                        </option>
+                      }
+                    </select>
+                    <button class="btn-mini" (click)="showFolderPicker.set(false)">{{ 'common.cancel' | translate }}</button>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Danger actions (owner only) -->
+            @if (file()!.is_owner) {
+              <div class="danger-actions">
+                <button class="btn-danger" (click)="deleteFile()" [disabled]="actionPending()">
+                  {{ 'files.detail.delete' | translate }}
+                </button>
+              </div>
+            }
+
+            <!-- Action feedback -->
+            @if (feedback()) {
+              <div class="feedback" role="status">{{ feedback() }}</div>
+            }
+          </div>
+
+          <!-- Right: Sidebar panels -->
+          <aside class="file-sidebar">
+
+            <!-- Active share links -->
+            <div class="sidebar-section">
+              <h3 class="section-title">{{ 'files.detail.active_links' | translate }}</h3>
+              @if (!links().length) {
+                <div class="empty-panel">{{ 'files.detail.no_links' | translate }}</div>
+              }
+              @for (link of links(); track link.id) {
+                <div class="link-item">
+                  <div class="link-url" [title]="link.url">{{ link.url }}</div>
+                  <div class="link-meta">
+                    {{ 'files.detail.link_expires' | translate:{date: (link.expires_at | date:'MMM d, HH:mm')} }}
+                    · <span class="badge badge-{{ link.status }}">{{ link.status }}</span>
+                    @if (link.allow_save) {
+                      · <span class="badge badge-save">💾</span>
+                    }
+                  </div>
+                  <div class="link-actions">
+                    <button class="btn-mini" (click)="copyLink(link.url)">{{ 'files.detail.copy' | translate }}</button>
+                    @if (link.status === 'active') {
+                      <button class="btn-mini btn-mini-danger" (click)="disableLink(link)">
+                        {{ 'files.detail.disable' | translate }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Who has access -->
+            <div class="sidebar-section">
+              <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>
+              @if (!accesses().length) {
+                <div class="empty-panel">{{ 'files.detail.only_you' | translate }}</div>
+              }
+              @for (a of accesses(); track a.id) {
+                <div class="access-item">
+                  <span class="access-user">{{ a.user?.name ?? a.user?.email ?? '—' }}</span>
+                  <span class="access-type badge badge-access">{{ a.access_type }}</span>
+                </div>
+              }
+            </div>
+
+            <!-- Activity -->
+            <div class="sidebar-section">
+              <h3 class="section-title">{{ 'files.detail.activity_section' | translate }}</h3>
+              @if (!activity().length) {
+                <div class="empty-panel">{{ 'files.detail.no_activity' | translate }}</div>
+              }
+              @for (log of activity(); track log.id) {
+                <div class="activity-item">
+                  <span class="activity-label">{{ log.label }}</span>
+                  <span class="activity-meta">{{ log.created_at | date:'MMM d, HH:mm' }}</span>
+                </div>
+              }
+            </div>
+
+          </aside>
+        </div>
+      }
+
+      <!-- Share to contact dialog -->
+      @if (showShareDialog()) {
+        <app-share-contact-dialog
+          [fileId]="id()"
+          (closed)="showShareDialog.set(false)"
+          (shared)="onShared()"
+        />
+      }
+
+      <!-- Create link dialog -->
+      @if (showLinkDialog()) {
+        <app-create-link-dialog
+          [fileId]="id()"
+          (closed)="onLinkDialogClosed()"
+          (created)="onLinkCreated()"
+        />
+      }
+    </div>
+  

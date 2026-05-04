@@ -1,0 +1,150 @@
+    <div class="app-shell">
+
+      @if (isAuth()) {
+        <!-- Email verification banner -->
+        @if (needsVerification() && !resent()) {
+          <div class="verify-banner" role="alert">
+            <span class="verify-text">
+              ⚠️ {{ 'layout.verify_banner.text' | translate }}
+              @if (deadline()) {
+                {{ 'layout.verify_banner.deadline' | translate : {date: deadline()} }}
+              }
+            </span>
+            <button class="btn-resend" (click)="resendVerification()" [disabled]="resending()">
+              {{ resending() ? ('layout.verify_banner.resending' | translate) : ('layout.verify_banner.resend_btn' | translate) }}
+            </button>
+          </div>
+        }
+        @if (resent()) {
+          <div class="verify-banner verify-banner--sent" role="status">
+            ✅ {{ 'layout.verify_banner.sent' | translate }}
+          </div>
+        }
+
+        <!-- Mobile top bar -->
+        <header class="mobile-header">
+          <span class="mobile-brand">
+            <span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                   class="lucide lucide-file-symlink-icon lucide-file-symlink"><path
+                d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7"/><path
+                d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 18 3-3-3-3"/></svg>
+            </span>
+            <span>DeliFile</span>
+          </span>
+          <button
+            class="burger-btn"
+            (click)="toggleSidebar()"
+            [attr.aria-expanded]="sidebarOpen()"
+            [attr.aria-label]="'nav.menu' | translate">
+            {{ sidebarOpen() ? '✕' : '☰' }}
+          </button>
+        </header>
+
+        <!-- Backdrop -->
+        <div
+          class="backdrop"
+          [class.visible]="sidebarOpen()"
+          (click)="closeSidebar()"
+          aria-hidden="true">
+        </div>
+
+        <!-- Sidebar -->
+        <nav class="sidebar" [class.open]="sidebarOpen()">
+          <div class="sidebar-brand">
+            <span class="brand-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          class="lucide lucide-file-symlink-icon lucide-file-symlink"><path
+              d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7"/><path
+              d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 18 3-3-3-3"/></svg></span>
+            <span class="brand-name">DeliFile</span>
+          </div>
+
+          <ul class="nav-links">
+            <li>
+              <a routerLink="/files" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
+                <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                            viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round"
+                                            class="lucide lucide-folder-heart-icon lucide-folder-heart"><path
+                  d="M10.638 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v3.417"/><path
+                  d="M14.62 18.8A2.25 2.25 0 1 1 18 15.836a2.25 2.25 0 1 1 3.38 2.966l-2.626 2.856a.998.998 0 0 1-1.507 0z"/></svg></span>
+                <span>{{ 'nav.files' | translate }}</span>
+              </a>
+            </li>
+            <li>
+              <a routerLink="/folders" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
+                <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                            viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round"
+                                            class="lucide lucide-folder-bookmark-icon lucide-folder-bookmark"><path
+                  d="M12 6v8l3-3 3 3V6"/><path
+                  d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg></span>
+                <span>{{ 'nav.folders' | translate }}</span>
+              </a>
+            </li>
+            <li>
+              <a routerLink="/tags" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
+                <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                            viewBox="0 0 24 24" fill="none" stroke="#dc1818" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round"
+                                            class="lucide lucide-tag-icon lucide-tag"><path
+                  d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle
+                  cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>
+                <span>{{ 'nav.tags' | translate }}</span>
+              </a>
+            </li>
+            <li>
+              <a routerLink="/contacts" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
+                <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                            viewBox="0 0 24 24" fill="none" stroke="#9126d9" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round"
+                                            class="lucide lucide-users-icon lucide-users"><path
+                  d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path
+                  d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span>
+                <span>{{ 'nav.contacts' | translate }}</span>
+              </a>
+            </li>
+            <li>
+              <a routerLink="/activity" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
+                <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                            viewBox="0 0 24 24" fill="none" stroke="#d6d5dd" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round"
+                                            class="lucide lucide-scroll-text-icon lucide-scroll-text"><path
+                  d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path
+                  d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg></span>
+                <span>{{ 'nav.activity' | translate }}</span>
+              </a>
+            </li>
+            <li>
+              <a routerLink="/settings/security" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
+                <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                            viewBox="0 0 24 24" fill="none" stroke="#a89d1f" stroke-width="2"
+                                            stroke-linecap="round" stroke-linejoin="round"
+                                            class="lucide lucide-lock-keyhole-icon lucide-lock-keyhole"><circle cx="12"
+                                                                                                                cy="16"
+                                                                                                                r="1"/><rect
+                  x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span>
+                <span>{{ 'nav.security' | translate }}</span>
+              </a>
+            </li>
+          </ul>
+
+          <div class="sidebar-footer">
+            <span class="user-email" [title]="userEmail()">{{ userEmail() }}</span>
+            @if (!emailVerified()) {
+              <span class="unverified-badge">{{ 'layout.sidebar.unverified' | translate }}</span>
+            }
+            <button class="btn-logout" (click)="logout()">{{ 'nav.logout' | translate }}</button>
+          </div>
+        </nav>
+      }
+
+      <!-- Main content -->
+      <main class="main-content" [class.no-sidebar]="!isAuth()" [class.has-banner]="needsVerification() || resent()">
+        <ng-content/>
+      </main>
+    </div>
+  

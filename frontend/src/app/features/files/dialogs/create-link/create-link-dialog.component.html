@@ -1,0 +1,77 @@
+<div class="dialog-overlay" (click)="closed.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <h2>{{ 'files.create_link.title' | translate }}</h2>
+      <button class="dialog-close" (click)="closed.emit()">✕</button>
+    </div>
+
+    @if (!createdLink()) {
+      <div class="dialog-body">
+        <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+          <div class="field">
+            <label for="ttl">{{ 'files.create_link.expires_label' | translate }}</label>
+            <select id="ttl" formControlName="ttl_hours" class="select-input">
+              <option value="1">1 час</option>
+              <option value="6">6 часов</option>
+              <option value="12">12 часов (по умолчанию)</option>
+              <option value="24">24 часа</option>
+              <option value="72">3 дня</option>
+              <option value="168">7 дней</option>
+              <option value="720">30 дней</option>
+            </select>
+          </div>
+
+          <div class="field-check">
+            <label class="check-label">
+              <input type="checkbox" formControlName="allow_save" class="check-input" />
+              {{ 'files.create_link.allow_save_label' | translate }}
+            </label>
+            <p class="check-hint">{{ 'files.create_link.allow_save_hint' | translate }}</p>
+          </div>
+
+          <div class="info-box">
+            {{ 'files.create_link.note' | translate }}
+          </div>
+
+          @if (error()) {
+            <div class="error-msg">{{ error() }}</div>
+          }
+        </form>
+      </div>
+    }
+
+    @if (createdLink()) {
+      <div class="dialog-body success-state">
+        <div class="success-icon">✅</div>
+        <p class="success-title">{{ 'files.create_link.created' | translate }}</p>
+
+        <div class="link-display">
+          <input type="text" [value]="createdLink()!.url" readonly class="link-input" />
+          <button class="btn-copy" (click)="copyLink()">
+            {{ copied() ? ('files.create_link.copied' | translate) : ('files.create_link.copy' | translate) }}
+          </button>
+        </div>
+
+        <p class="link-expires">
+          {{ 'files.create_link.expires_at' | translate:{ date: formatExpiry(createdLink()!.expires_at) } }}
+        </p>
+        @if (createdLink()!.allow_save) {
+          <p class="save-badge">{{ 'files.create_link.save_allowed' | translate }}</p>
+        }
+      </div>
+    }
+
+    <div class="dialog-footer">
+      @if (!createdLink()) {
+        <button class="btn-secondary" (click)="closed.emit()">{{ 'files.create_link.cancel' | translate }}</button>
+        <button class="btn-primary" (click)="submit()" [disabled]="submitting()">
+          {{ submitting() ? ('files.create_link.submitting' | translate) : ('files.create_link.submit' | translate) }}
+        </button>
+      }
+      @if (createdLink()) {
+        <button class="btn-secondary" (click)="closed.emit()">{{ 'files.create_link.close' | translate }}</button>
+        <button class="btn-primary" (click)="created.emit()">{{ 'files.create_link.done' | translate }}</button>
+      }
+    </div>
+  </div>
+</div>

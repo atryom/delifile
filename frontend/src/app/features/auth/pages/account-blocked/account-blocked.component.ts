@@ -9,53 +9,8 @@ import { AuthStateService } from '../../../../core/auth/auth-state.service';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslateModule],
-  template: `
-    <div class="auth-page">
-      <div class="auth-card">
-        <div class="auth-header">
-          <span class="auth-logo"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                       fill="none" stroke="#a89d1f" stroke-width="2" stroke-linecap="round"
-                                       stroke-linejoin="round"
-                                       class="lucide lucide-lock-keyhole-icon lucide-lock-keyhole"><circle cx="12"
-                                                                                                           cy="16"
-                                                                                                           r="1"/><rect
-            x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span>
-          <h1>{{ 'auth.blocked.title' | translate }}</h1>
-          <p>{{ 'auth.blocked.description' | translate }}</p>
-        </div>
-
-        @if (successMsg()) {
-          <div class="alert-success">{{ successMsg() }}</div>
-        }
-        @if (errorMsg()) {
-          <div class="alert-error">{{ errorMsg() }}</div>
-        }
-
-        <div class="blocked-actions">
-          <button
-            class="btn-primary btn-full"
-            (click)="resend()"
-            [disabled]="resending()"
-          >
-            {{ resending() ? ('auth.blocked.resending' | translate) : ('auth.blocked.resend_btn' | translate) }}
-          </button>
-
-          <button class="btn-secondary btn-full" (click)="logout()">
-            {{ 'auth.blocked.logout_btn' | translate }}
-          </button>
-        </div>
-      </div>
-    </div>
-  `,
-  styles: [`
-    @import url('../../../../../styles/auth.shared.css');
-    .blocked-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
-    .btn-secondary {
-      background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
-      padding: 12px 20px; border-radius: 8px; font-size: 0.97rem; font-weight: 500; cursor: pointer;
-    }
-    .btn-secondary:hover { background: #e5e7eb; }
-  `],
+  templateUrl: './account-blocked.component.html',
+  styleUrl: './account-blocked.component.scss',
 })
 export class AccountBlockedComponent {
   private readonly authApi   = inject(AuthApiService);

@@ -1,0 +1,87 @@
+.privacy-page {
+  min-height: 100vh;
+  background: #f8f9fa;
+  padding: 40px 20px;
+}
+
+.privacy-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.07);
+  overflow: hidden;
+}
+
+.privacy-header {
+  background: #1a1a2e;
+  color: #fff;
+  padding: 32px 44px;
+}
+
+.back-link {
+  color: #a5b4fc;
+  text-decoration: none;
+  font-size: 0.88rem;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+.back-link:hover { text-decoration: underline; }
+
+.privacy-header h1 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.effective-date {
+  font-size: 0.85rem;
+  color: #a5b4fc;
+  margin: 0;
+}
+
+.privacy-body {
+  padding: 36px 44px 48px;
+  color: #374151;
+  line-height: 1.75;
+  font-size: 0.94rem;
+}
+
+.privacy-body h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 32px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.privacy-body p {
+  margin: 0 0 14px;
+}
+
+.privacy-body ul {
+  margin: 0 0 14px;
+  padding-left: 24px;
+}
+
+.privacy-body li {
+  margin-bottom: 6px;
+}
+
+.privacy-body code {
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: monospace;
+}
+
+.privacy-body strong {
+  color: #1f2937;
+}
+
+@media (max-width: 600px) {
+  .privacy-header { padding: 24px 20px; }
+  .privacy-body { padding: 24px 20px 36px; }
+}

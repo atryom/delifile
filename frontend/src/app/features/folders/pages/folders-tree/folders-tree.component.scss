@@ -1,0 +1,32 @@
+.page { max-width: 640px; margin: 0 auto; padding: 32px 20px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.page-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+.loading-text, .empty-text { color: #6b7280; text-align: center; padding: 32px 0; }
+.tree-root, .tree-children { list-style: none; padding: 0; margin: 0; }
+.tree-node { margin-bottom: 4px; }
+.node-row { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.expand-btn { background: none; border: none; cursor: pointer; font-size: 0.85rem; color: #6b7280; width: 20px; padding: 0; }
+.folder-icon { font-size: 1.1rem; }
+.folder-name { flex: 1; font-weight: 500; font-size: 0.95rem; }
+.folder-count { font-size: 0.78rem; color: #6b7280; background: #f3f4f6; border-radius: 10px; padding: 2px 7px; }
+.node-actions { display: flex; gap: 5px; }
+.inline-create { display: flex; gap: 8px; align-items: center; margin: 8px 0; background: #f9fafb; border-radius: 8px; padding: 10px 12px; }
+.create-input, .edit-input { flex: 1; border: 1px solid #6366f1; border-radius: 6px; padding: 7px 10px; font-size: 0.93rem; outline: none; }
+.edit-row { display: flex; gap: 8px; align-items: center; padding: 8px 12px; }
+.btn-primary { background: #6366f1; color: #fff; border: none; padding: 9px 18px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-primary.btn-danger { background: #ef4444; }
+.btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; padding: 9px 18px; border-radius: 6px; font-size: 0.9rem; cursor: pointer; }
+.btn-sm { font-size: 0.78rem; padding: 4px 9px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; }
+.btn-view { background: #ede9fe; color: #5b21b6; text-decoration: none; display: inline-block; }
+.btn-add-child { background: #d1fae5; color: #065f46; font-size: 1rem; font-weight: 700; }
+.btn-edit { background: #e0f2fe; color: #0369a1; }
+.btn-save { background: #d1fae5; color: #065f46; }
+.btn-cancel { background: #f3f4f6; color: #374151; }
+.btn-delete { background: #fee2e2; color: #dc2626; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 300; }
+.modal { background: #fff; border-radius: 12px; padding: 28px; max-width: 380px; width: 90%; }
+.modal h3 { margin: 0 0 10px; font-size: 1.1rem; }
+.modal p { color: #374151; font-size: 0.93rem; margin: 0 0 20px; }
+.modal-actions { display: flex; gap: 10px; }
+.alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 6px; padding: 10px 14px; font-size: 0.88rem; margin-bottom: 12px; }

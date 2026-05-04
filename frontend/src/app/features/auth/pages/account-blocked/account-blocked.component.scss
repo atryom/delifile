@@ -1,0 +1,8 @@
+@use 'styles/auth-shared' as *;
+
+.blocked-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
+    .btn-secondary {
+      background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
+      padding: 12px 20px; border-radius: 8px; font-size: 0.97rem; font-weight: 500; cursor: pointer;
+    }
+    .btn-secondary:hover { background: #e5e7eb; }

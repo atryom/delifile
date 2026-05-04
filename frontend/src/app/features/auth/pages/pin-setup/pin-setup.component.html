@@ -1,0 +1,57 @@
+    <div class="auth-page">
+      <div class="auth-card">
+        <div class="auth-header">
+          <span class="auth-logo">🔑</span>
+          <h1>{{ 'auth.pin_setup.title' | translate }}</h1>
+          <p>{{ 'auth.pin_setup.subtitle' | translate }}</p>
+        </div>
+
+        <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form" novalidate>
+
+          <div class="pin-notice">
+            {{ 'auth.pin_setup.hint' | translate }}
+          </div>
+
+          <div class="field">
+            <label for="pin">{{ 'auth.pin_setup.pin_label' | translate }}</label>
+            <input
+              id="pin"
+              type="password"
+              formControlName="pin"
+              [placeholder]="'auth.pin_setup.pin_placeholder' | translate"
+              inputmode="numeric"
+              maxlength="6"
+              [class.input-error]="form.get('pin')?.touched && form.get('pin')?.invalid"
+            />
+            @if (form.get('pin')?.touched && form.get('pin')?.invalid) {
+              <span class="field-error">{{ 'auth.pin_setup.pin_error' | translate }}</span>
+            }
+          </div>
+
+          <div class="field">
+            <label for="pin_confirm">{{ 'auth.pin_setup.confirm_label' | translate }}</label>
+            <input
+              id="pin_confirm"
+              type="password"
+              formControlName="pin_confirm"
+              [placeholder]="'auth.pin_setup.confirm_placeholder' | translate"
+              inputmode="numeric"
+              maxlength="6"
+              [class.input-error]="form.errors?.['pinMismatch'] && form.get('pin_confirm')?.touched"
+            />
+            @if (form.errors?.['pinMismatch'] && form.get('pin_confirm')?.touched) {
+              <span class="field-error">{{ 'auth.pin_setup.confirm_error' | translate }}</span>
+            }
+          </div>
+
+          <button type="submit" class="btn-primary btn-full" [disabled]="form.invalid">
+            {{ 'auth.pin_setup.submit' | translate }}
+          </button>
+
+          <button type="button" class="btn-secondary btn-full" (click)="skip()">
+            {{ 'auth.pin_setup.skip' | translate }}
+          </button>
+
+        </form>
+      </div>
+    </div>

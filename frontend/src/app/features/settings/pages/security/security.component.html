@@ -1,0 +1,136 @@
+    <div class="page">
+      <h1 class="page-title">{{ 'security.title' | translate }}</h1>
+
+      <!-- Email verification section -->
+      <div class="settings-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">{{ 'security.email_status.title' | translate }}</h2>
+            <p class="section-desc">{{ authState.user()?.email }}</p>
+          </div>
+          @if (authState.isEmailVerified()) {
+            <span class="badge-verified">{{ 'security.email_status.verified' | translate }}</span>
+          } @else {
+            <span class="badge-unverified">{{ 'security.email_status.unverified' | translate }}</span>
+          }
+        </div>
+
+        @if (!authState.isEmailVerified()) {
+          @if (authState.verificationDeadline()) {
+            <p class="deadline-warning">
+              {{ 'security.email_status.deadline' | translate:{date: (authState.verificationDeadline()! | date:'MMM d, y, HH:mm')} }}
+            </p>
+          }
+          <div class="email-actions">
+            <button class="btn-outline" (click)="resendVerification()" [disabled]="resending() || resentOk()">
+              {{ resending() ? ('security.email_status.resending' | translate) : resentOk() ? ('security.email_status.sent' | translate) : ('security.email_status.resend_btn' | translate) }}
+            </button>
+          </div>
+        }
+
+        <!-- Change email form -->
+        @if (showChangeEmail()) {
+          <form [formGroup]="emailForm" (ngSubmit)="changeEmail()" class="settings-form" style="margin-top:16px" novalidate>
+            <div class="field">
+              <label for="new-email">Новый email</label>
+              <input id="new-email" type="email" formControlName="email" autocomplete="email" />
+            </div>
+            @if (emailError()) {
+              <div class="error-msg" role="alert">{{ emailError() }}</div>
+            }
+            @if (emailSuccess()) {
+              <div class="success-msg" role="status">{{ 'security.email_status.sent' | translate }}</div>
+            }
+            <div class="form-row-actions">
+              <button type="submit" class="btn-primary" [disabled]="emailForm.invalid || changingEmail()">
+                {{ changingEmail() ? 'Сохранение...' : 'Сохранить' }}
+              </button>
+              <button type="button" class="btn-outline" (click)="showChangeEmail.set(false)">{{ 'common.cancel' | translate }}</button>
+            </div>
+          </form>
+        } @else {
+          <button class="btn-text" (click)="showChangeEmail.set(true)" style="margin-top:12px">
+            {{ 'security.email_status.change_email_btn' | translate }}
+          </button>
+        }
+      </div>
+
+      <!-- Change password section -->
+      <div class="settings-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">{{ 'security.password.title' | translate }}</h2>
+            <p class="section-desc">{{ 'security.password.hint' | translate }}</p>
+          </div>
+        </div>
+
+        <form [formGroup]="pwdForm" (ngSubmit)="changePassword()" class="settings-form" novalidate>
+          <div class="field">
+            <label for="current-pwd">{{ 'security.password.current' | translate }}</label>
+            <input id="current-pwd" type="password" formControlName="current_password" autocomplete="current-password" />
+          </div>
+          <div class="field">
+            <label for="new-pwd">{{ 'security.password.new' | translate }}</label>
+            <input id="new-pwd" type="password" formControlName="password" autocomplete="new-password" />
+            @if (pwdForm.get('password')?.touched && pwdForm.get('password')?.errors?.['minlength']) {
+              <span class="field-error">{{ 'security.password.new_hint' | translate }}</span>
+            }
+          </div>
+          <div class="field">
+            <label for="confirm-pwd">{{ 'security.password.confirm' | translate }}</label>
+            <input id="confirm-pwd" type="password" formControlName="password_confirmation" autocomplete="new-password" />
+            @if (pwdForm.errors?.['mismatch'] && pwdForm.get('password_confirmation')?.touched) {
+              <span class="field-error">{{ 'security.password.mismatch' | translate }}</span>
+            }
+          </div>
+          @if (pwdError()) {
+            <div class="error-msg" role="alert">{{ pwdError() }}</div>
+          }
+          @if (pwdSuccess()) {
+            <div class="success-msg" role="status">{{ 'security.password.success' | translate }}</div>
+          }
+          <button type="submit" class="btn-primary" [disabled]="pwdForm.invalid || changingPwd()">
+            {{ changingPwd() ? ('security.password.submitting' | translate) : ('security.password.submit' | translate) }}
+          </button>
+        </form>
+      </div>
+
+      <!-- Active sessions section -->
+      <div class="settings-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">{{ 'security.sessions.title' | translate }}</h2>
+            <p class="section-desc">{{ 'security.sessions.hint' | translate }}</p>
+          </div>
+          <button class="btn-danger-outline" (click)="logoutAll()" [disabled]="loggingOutAll()">
+            {{ loggingOutAll() ? ('security.sessions.logging_out' | translate) : ('security.sessions.logout_all' | translate) }}
+          </button>
+        </div>
+
+        @if (loadingSessions()) {
+          <div class="loading-state">{{ 'security.sessions.loading' | translate }}</div>
+        } @else {
+          <div class="sessions-list">
+            @for (session of sessions(); track session.id) {
+              <div class="session-item">
+                <div class="session-icon" aria-hidden="true">💻</div>
+                <div class="session-info">
+                  <p class="session-device">{{ session.device_name }}</p>
+                  <p class="session-meta">
+                    {{ session.ip_address ?? ('security.sessions.unknown_ip' | translate) }}
+                    · {{ 'security.sessions.last_active' | translate:{date: (session.last_active_at | date:'MMM d, y, HH:mm')} }}
+                  </p>
+                </div>
+                <button class="btn-mini-danger" (click)="deleteSession(session)">
+                  {{ 'security.sessions.end_session' | translate }}
+                </button>
+              </div>
+            }
+            @if (sessions().length === 0) {
+              <div class="empty-state">{{ 'security.sessions.empty' | translate }}</div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  
