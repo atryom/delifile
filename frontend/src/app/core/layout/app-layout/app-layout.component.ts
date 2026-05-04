@@ -163,7 +163,7 @@ import {AuthApiService} from '../../api/auth-api.service';
   styles: [`
     .app-shell {
       display: flex;
-      min-height: 100vh;
+      min-height: 100vh; min-height: 100svh;
       background: #f8f9fa;
     }
 
@@ -215,7 +215,7 @@ import {AuthApiService} from '../../api/auth-api.service';
     /* ── Sidebar ────────────────────────────────────────────── */
     .sidebar {
       width: 240px;
-      min-height: 100vh;
+      min-height: 100vh; min-height: 100svh;
       background: #1a1a2e;
       color: #e0e0e0;
       display: flex;
@@ -326,7 +326,7 @@ import {AuthApiService} from '../../api/auth-api.service';
     .main-content {
       margin-left: 240px;
       flex: 1;
-      min-height: 100vh;
+      min-height: 100vh; min-height: 100svh;
       display: flex;
       flex-direction: column;
       min-width: 0;

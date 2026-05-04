@@ -2,6 +2,11 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+html {
+  /* iOS Safari: make 100dvh/100svh available */
+  height: -webkit-fill-available;
+}
+
 html, body {
   margin: 0;
   padding: 0;

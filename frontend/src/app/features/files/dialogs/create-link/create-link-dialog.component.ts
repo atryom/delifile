@@ -84,13 +84,13 @@ import { ShareLink } from '../../../../shared/models/api.models';
     </div>
   `,
   styles: [`
-    .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 500; }
-    .dialog { background: #fff; border-radius: 14px; width: 440px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0; }
+    .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 16px; overflow-y: auto; }
+    .dialog { background: #fff; border-radius: 14px; width: 440px; max-width: 100%; max-height: calc(100svh - 32px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0; }
     .dialog-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
     .dialog-close { background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #9ca3af; }
-    .dialog-body { padding: 20px 24px; }
-    .dialog-footer { padding: 16px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 10px; }
+    .dialog-body { padding: 20px 24px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1 1 auto; }
+    .dialog-footer { padding: 16px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0; }
     .field { margin-bottom: 16px; }
     .field label { display: block; font-size: 0.88rem; font-weight: 600; color: #374151; margin-bottom: 6px; }
     .select-input { width: 100%; padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; }
@@ -157,10 +157,28 @@ export class CreateLinkDialogComponent {
   }
 
   copyLink(): void {
-    navigator.clipboard.writeText(this.createdLink()!.url).then(() => {
-      this.copied.set(true);
-      setTimeout(() => this.copied.set(false), 2000);
-    });
+    const url = this.createdLink()!.url;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        this.copied.set(true);
+        setTimeout(() => this.copied.set(false), 2000);
+      });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand('copy');
+        this.copied.set(true);
+        setTimeout(() => this.copied.set(false), 2000);
+      } finally {
+        document.body.removeChild(ta);
+      }
+    }
   }
 
   formatExpiry(iso: string | null): string {

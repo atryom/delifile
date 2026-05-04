@@ -2,11 +2,14 @@
 
 .auth-page {
   min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
   padding: 20px;
+  padding-top: max(20px, env(safe-area-inset-top));
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
 }
 
 .auth-card {

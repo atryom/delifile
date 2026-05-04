@@ -89,13 +89,13 @@ import { Contact } from '../../../../shared/models/api.models';
     </div>
   `,
   styles: [`
-    .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 500; }
-    .dialog { background: #fff; border-radius: 14px; width: 480px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0; }
+    .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 16px; overflow-y: auto; }
+    .dialog { background: #fff; border-radius: 14px; width: 480px; max-width: 100%; max-height: calc(100svh - 32px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0; }
     .dialog-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
     .dialog-close { background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #9ca3af; }
-    .dialog-body { flex: 1; overflow-y: auto; padding: 18px 24px; }
-    .dialog-footer { padding: 16px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+    .dialog-body { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 18px 24px; }
+    .dialog-footer { padding: 16px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 10px; align-items: center; flex-shrink: 0; }
     .search-input { width: 100%; padding: 9px 14px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; box-sizing: border-box; margin-bottom: 14px; }
     .search-input:focus { border-color: #6366f1; }
     .contacts-list { display: flex; flex-direction: column; gap: 6px; }

@@ -128,6 +128,7 @@ import { AuthStateService } from '../../../../core/auth/auth-state.service';
   styles: [`
     .link-page {
       min-height: 100vh;
+      min-height: 100svh;
       display: flex;
       align-items: center;
       justify-content: center;
