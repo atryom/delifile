@@ -2,9 +2,14 @@
 
 namespace App\Services;
 
+use App\Enums\AccessType;
 use App\Mail\InvitationMail;
+use App\Models\Contact;
+use App\Models\ContactPendingShare;
+use App\Models\FileUserAccess;
 use App\Models\Invitation;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 
 class InvitationService
@@ -28,6 +33,7 @@ class InvitationService
 
     /**
      * Accept invitation as current user.
+     * Resolves matching contacts and delivers any queued pending file shares.
      */
     public function accept(Invitation $invitation, User $user): bool
     {
@@ -35,10 +41,37 @@ class InvitationService
             return false;
         }
 
-        $invitation->update([
-            'status'              => 'accepted',
-            'accepted_by_user_id' => $user->id,
-        ]);
+        DB::transaction(function () use ($invitation, $user) {
+            $invitation->update([
+                'status'              => 'accepted',
+                'accepted_by_user_id' => $user->id,
+            ]);
+
+            // Resolve all contacts that belong to the sender and match the target email
+            $contacts = Contact::where('user_id', $invitation->sender_user_id)
+                ->where('email', $invitation->target_email)
+                ->get();
+
+            foreach ($contacts as $contact) {
+                $contact->update(['resolved_user_id' => $user->id]);
+
+                // Apply pending file shares queued for this contact
+                $pendingShares = ContactPendingShare::where('contact_id', $contact->id)->get();
+
+                foreach ($pendingShares as $pending) {
+                    FileUserAccess::firstOrCreate([
+                        'file_id'     => $pending->file_id,
+                        'user_id'     => $user->id,
+                        'access_type' => AccessType::Shared,
+                    ], [
+                        'contact_id' => $contact->id,
+                    ]);
+                }
+
+                // Remove processed pending shares
+                ContactPendingShare::where('contact_id', $contact->id)->delete();
+            }
+        });
 
         return true;
     }

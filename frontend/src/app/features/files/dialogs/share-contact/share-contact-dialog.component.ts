@@ -1,5 +1,4 @@
-import { Component, inject, signal, input, output, OnInit } from '@angular/core';
-import { NgIf, NgFor } from '@angular/common';
+import { Component, inject, signal, input, output, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
@@ -8,14 +7,14 @@ import { Contact } from '../../../../shared/models/api.models';
 
 @Component({
   selector: 'app-share-contact-dialog',
-  standalone: true,
-  imports: [NgIf, NgFor, FormsModule, TranslateModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, TranslateModule],
   template: `
     <div class="dialog-overlay" (click)="closed.emit()">
       <div class="dialog" (click)="$event.stopPropagation()">
         <div class="dialog-header">
           <h2>{{ 'files.share.title' | translate }}</h2>
-          <button class="dialog-close" (click)="closed.emit()">✕</button>
+          <button class="dialog-close" (click)="closed.emit()" [attr.aria-label]="'files.share.cancel' | translate">✕</button>
         </div>
 
         <div class="dialog-body">
@@ -27,40 +26,60 @@ import { Contact } from '../../../../shared/models/api.models';
             (ngModelChange)="onSearch($event)"
           />
 
-          <div class="contacts-list" *ngIf="!loading()">
-            <div class="empty-contacts" *ngIf="contacts().length === 0">
-              {{ searchQuery ? ('files.share.no_contacts' | translate) : ('files.share.no_contacts_yet' | translate) }}
+          @if (!loading()) {
+            <div class="contacts-list">
+              @if (contacts().length === 0) {
+                <div class="empty-contacts">
+                  {{ searchQuery ? ('files.share.no_contacts' | translate) : ('files.share.no_contacts_yet' | translate) }}
+                </div>
+              }
+              @for (contact of contacts(); track contact.id) {
+                <div
+                  class="contact-item"
+                  [class.selected]="selectedId() === contact.id"
+                  (click)="select(contact)"
+                >
+                  <div class="contact-avatar" aria-hidden="true">{{ contact.name[0]?.toUpperCase() }}</div>
+                  <div class="contact-info">
+                    <p class="contact-name">{{ contact.name }}</p>
+                    <p class="contact-sub">{{ contact.email ?? contact.phone ?? '' }}</p>
+                  </div>
+                  <span
+                    class="reg-badge"
+                    [class.registered]="contact.is_registered"
+                    [class.pending]="!contact.is_registered"
+                  >
+                    {{ contact.is_registered
+                      ? ('files.share.registered' | translate)
+                      : ('files.share.pending_invite' | translate) }}
+                  </span>
+                </div>
+              }
             </div>
+          }
 
-            <div
-              *ngFor="let contact of contacts()"
-              class="contact-item"
-              [class.selected]="selectedId() === contact.id"
-              (click)="select(contact)"
-            >
-              <div class="contact-avatar">{{ contact.name[0]?.toUpperCase() }}</div>
-              <div class="contact-info">
-                <p class="contact-name">{{ contact.name }}</p>
-                <p class="contact-phone">{{ contact.phone }}</p>
-              </div>
-              <span class="reg-badge" [class.registered]="contact.is_registered">
-                {{ contact.is_registered ? ('files.share.registered' | translate) : ('files.share.not_registered' | translate) }}
-              </span>
-            </div>
-          </div>
+          @if (loading()) {
+            <div class="loading-contacts">{{ 'files.share.loading' | translate }}</div>
+          }
 
-          <div class="loading-contacts" *ngIf="loading()">{{ 'files.share.loading' | translate }}</div>
+          @if (selectedContact() && !selectedContact()!.is_registered) {
+            <div class="pending-notice">{{ 'files.share.pending_notice' | translate }}</div>
+          }
         </div>
 
         <div class="dialog-footer">
-          <div class="error-msg" *ngIf="error()">{{ error() }}</div>
+          @if (error()) {
+            <div class="error-msg">{{ error() }}</div>
+          }
           <button class="btn-secondary" (click)="closed.emit()">{{ 'files.share.cancel' | translate }}</button>
           <button
             class="btn-primary"
             [disabled]="!selectedId() || submitting()"
             (click)="submit()"
           >
-            {{ submitting() ? ('files.share.submitting' | translate) : ('files.share.submit' | translate) }}
+            {{ submitting()
+              ? ('files.share.submitting' | translate)
+              : (selectedContact()?.is_registered ? ('files.share.submit' | translate) : ('files.share.submit_pending' | translate)) }}
           </button>
         </div>
       </div>
@@ -84,9 +103,11 @@ import { Contact } from '../../../../shared/models/api.models';
     .contact-avatar { width: 36px; height: 36px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
     .contact-info { flex: 1; min-width: 0; }
     .contact-name { font-size: 0.9rem; font-weight: 600; margin: 0 0 2px; }
-    .contact-phone { font-size: 0.8rem; color: #9ca3af; margin: 0; }
-    .reg-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 99px; background: #fee2e2; color: #dc2626; white-space: nowrap; }
+    .contact-sub { font-size: 0.8rem; color: #9ca3af; margin: 0; }
+    .reg-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
     .reg-badge.registered { background: #dcfce7; color: #16a34a; }
+    .reg-badge.pending { background: #fef9c3; color: #854d0e; }
+    .pending-notice { margin-top: 12px; padding: 10px 14px; background: #fefce8; border: 1px solid #fde047; border-radius: 8px; font-size: 0.83rem; color: #713f12; }
     .error-msg { flex: 1; color: #dc2626; font-size: 0.85rem; }
     .btn-primary { padding: 9px 20px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; cursor: pointer; font-weight: 600; }
     .btn-primary:hover:not(:disabled) { background: #4f46e5; }
@@ -104,11 +125,12 @@ export class ShareContactDialogComponent implements OnInit {
   private readonly contactsApi = inject(ContactsApiService);
   private readonly translate   = inject(TranslateService);
 
-  readonly contacts   = signal<Contact[]>([]);
-  readonly selectedId = signal<string | null>(null);
-  readonly loading    = signal(false);
-  readonly submitting = signal(false);
-  readonly error      = signal<string | null>(null);
+  readonly contacts        = signal<Contact[]>([]);
+  readonly selectedId      = signal<string | null>(null);
+  readonly selectedContact = signal<Contact | null>(null);
+  readonly loading         = signal(false);
+  readonly submitting      = signal(false);
+  readonly error           = signal<string | null>(null);
   searchQuery = '';
 
   ngOnInit(): void {
@@ -132,6 +154,7 @@ export class ShareContactDialogComponent implements OnInit {
 
   select(contact: Contact): void {
     this.selectedId.set(contact.id);
+    this.selectedContact.set(contact);
     this.error.set(null);
   }
 

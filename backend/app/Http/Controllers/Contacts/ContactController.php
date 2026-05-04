@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Contacts;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Models\User;
+use App\Services\InvitationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ContactController extends Controller
 {
+    public function __construct(private readonly InvitationService $invitationService) {}
+
     /**
      * GET /api/v1/contacts
      */
@@ -51,22 +54,44 @@ class ContactController extends Controller
             return $this->error('Email или телефон обязателен', ['code' => 'VALIDATION_ERROR'], 422);
         }
 
-        $contact = DB::transaction(function () use ($request) {
+        // Duplicate check
+        $duplicateQuery = Contact::where('user_id', $request->user()->id);
+        if ($request->email) {
+            $duplicateQuery->where('email', $request->email);
+        } elseif ($request->phone) {
+            $duplicateQuery->where('phone', $request->phone);
+        }
+        if ($duplicateQuery->exists()) {
+            return $this->error(__('messages.contacts.already_exists'), 'CONTACT_DUPLICATE', [], 422);
+        }
+
+        $invitationSent = false;
+
+        $contact = DB::transaction(function () use ($request, &$invitationSent) {
             $resolved = $request->email
                 ? User::where('email', $request->email)->first()
                 : null;
 
-            return Contact::create([
+            $contact = Contact::create([
                 'user_id'          => $request->user()->id,
                 'name'             => $request->name,
                 'email'            => $request->email,
                 'phone'            => $request->phone,
                 'resolved_user_id' => $resolved?->id,
             ]);
+
+            // Send invitation if email provided and user is not yet registered
+            if ($request->email && !$resolved) {
+                $this->invitationService->send($request->user(), ['email' => $request->email]);
+                $invitationSent = true;
+            }
+
+            return $contact;
         });
 
         return $this->success(__('messages.contacts.created'), [
-            'contact' => $this->formatContact($contact),
+            'contact'          => $this->formatContact($contact),
+            'invitation_sent'  => $invitationSent,
         ], 201);
     }
 
@@ -187,6 +212,24 @@ class ContactController extends Controller
         return $this->success(__('messages.contacts.history_fetched'), [
             'items' => $sharedFiles,
         ]);
+    }
+
+    /**
+     * DELETE /api/v1/contacts/{contactId}
+     */
+    public function destroy(Request $request, string $contactId): JsonResponse
+    {
+        $contact = Contact::where('id', $contactId)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (!$contact) {
+            return $this->notFound('Contact not found');
+        }
+
+        $contact->delete();
+
+        return $this->success(__('messages.contacts.deleted'));
     }
 
     private function formatContact(Contact $c): array

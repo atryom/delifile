@@ -92,6 +92,14 @@ import { Contact } from '../../../../shared/models/api.models';
                   {{ contact.is_registered ? ('contacts.in_app' | translate) : ('contacts.not_registered' | translate) }}
                 </span>
               </div>
+              <button
+                class="btn-delete"
+                [attr.aria-label]="'contacts.delete_btn' | translate"
+                [disabled]="deletingId() === contact.id"
+                (click)="deleteContact(contact)"
+              >
+                {{ deletingId() === contact.id ? '…' : '✕' }}
+              </button>
             </div>
           }
         </div>
@@ -130,6 +138,10 @@ import { Contact } from '../../../../shared/models/api.models';
     .reg-badge { font-size: 0.75rem; padding: 3px 10px; border-radius: 99px; background: #fee2e2; color: #dc2626; }
     .reg-badge.registered { background: #dcfce7; color: #16a34a; }
 
+    .btn-delete { background: none; border: none; color: #9ca3af; font-size: 0.9rem; cursor: pointer; padding: 6px 8px; border-radius: 6px; flex-shrink: 0; line-height: 1; }
+    .btn-delete:hover:not(:disabled) { background: #fee2e2; color: #dc2626; }
+    .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }
+
     .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
     .btn-primary:hover:not(:disabled) { background: #4f46e5; }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -147,6 +159,7 @@ export class ContactsComponent implements OnInit {
   readonly loading     = signal(false);
   readonly adding      = signal(false);
   readonly resolving   = signal(false);
+  readonly deletingId  = signal<string | null>(null);
   readonly showAddForm = signal(false);
   readonly addError    = signal<string | null>(null);
   readonly feedback    = signal<string | null>(null);
@@ -184,13 +197,27 @@ export class ContactsComponent implements OnInit {
     this.addError.set(null);
 
     const { name, email } = this.addForm.getRawValue();
+    const emailNorm = email?.trim().toLowerCase() || null;
 
-    this.contactsApi.create({ name: name!, email: email || null }).subscribe({
-      next: () => {
+    // Client-side duplicate check
+    if (emailNorm) {
+      const exists = this.contacts().some(c => c.email?.toLowerCase() === emailNorm);
+      if (exists) {
+        this.adding.set(false);
+        this.addError.set(this.translate.instant('contacts.duplicate_error'));
+        return;
+      }
+    }
+
+    this.contactsApi.create({ name: name!, email: emailNorm }).subscribe({
+      next: (res) => {
         this.adding.set(false);
         this.addForm.reset();
         this.showAddForm.set(false);
-        this.showFeedback(this.translate.instant('contacts.added'));
+        const msg = res.data.invitation_sent
+          ? this.translate.instant('contacts.added_with_invite', { email: emailNorm })
+          : this.translate.instant('contacts.added');
+        this.showFeedback(msg);
         this.loadContacts();
       },
       error: (err) => {
@@ -210,6 +237,22 @@ export class ContactsComponent implements OnInit {
         this.loadContacts();
       },
       error: () => this.resolving.set(false),
+    });
+  }
+
+  deleteContact(contact: Contact): void {
+    if (this.deletingId()) return;
+    this.deletingId.set(contact.id);
+    this.contactsApi.delete(contact.id).subscribe({
+      next: () => {
+        this.deletingId.set(null);
+        this.contacts.update(list => list.filter(c => c.id !== contact.id));
+        this.showFeedback(this.translate.instant('contacts.deleted'));
+      },
+      error: () => {
+        this.deletingId.set(null);
+        this.showFeedback(this.translate.instant('contacts.delete_error'));
+      },
     });
   }
 

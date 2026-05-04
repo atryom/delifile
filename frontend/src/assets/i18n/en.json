@@ -198,8 +198,11 @@
       "loading": "Loading contacts…",
       "cancel": "Cancel",
       "submit": "Grant access",
+      "submit_pending": "Schedule delivery",
       "submitting": "Sharing…",
-      "error": "Could not share file. Make sure the contact is registered."
+      "pending_invite": "Awaiting invite",
+      "pending_notice": "The file will be delivered automatically when the contact accepts the invitation.",
+      "error": "Could not share file."
     }
   },
   "tags": {
@@ -282,7 +285,12 @@
     "add_submit": "Add contact",
     "add_submitting": "Adding…",
     "added": "Contact added successfully",
+    "added_with_invite": "Contact added, invitation sent to {{email}}",
     "add_error": "Failed to add contact",
+    "duplicate_error": "A contact with this email already exists in your list",
+    "delete_btn": "Delete contact",
+    "deleted": "Contact deleted",
+    "delete_error": "Failed to delete contact",
     "resolved": "Resolved {{n}} new contact(s) as DeliFile users"
   },
   "activity": {

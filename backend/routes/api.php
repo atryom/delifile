@@ -101,6 +101,7 @@ Route::prefix('v1')->group(function () {
         Route::post('contacts/resolve',            [ContactController::class, 'resolve']);
         Route::get('contacts/{id}',                [ContactController::class, 'show']);
         Route::get('contacts/{id}/history',        [ContactController::class, 'history']);
+        Route::delete('contacts/{id}',             [ContactController::class, 'destroy']);
 
         // Organization — Folders
         Route::get('folders/tree',    [OrganizationController::class, 'folderTree']);

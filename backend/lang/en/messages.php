@@ -44,6 +44,7 @@ return [
         'contact_not_found'        => 'Contact not found',
         'contact_not_registered'   => 'Contact is not a registered user. Send an invitation first.',
         'access_granted'           => 'Access granted to contact',
+        'access_pending'           => 'File queued — will be delivered when the contact accepts the invitation',
         'access_revoked'           => 'Access revoked successfully',
         'file_not_available_link'  => 'File must be available to create a link',
         'link_created'             => 'Public link created successfully',
@@ -60,6 +61,8 @@ return [
         'imported'        => 'Contacts imported successfully',
         'resolved'        => 'Contacts resolved successfully',
         'history_fetched' => 'Contact history fetched successfully',
+        'deleted'         => 'Contact deleted',
+        'already_exists'  => 'A contact with this email already exists in your list',
     ],
     'invitations' => [
         'sent'          => 'Invitation sent successfully',

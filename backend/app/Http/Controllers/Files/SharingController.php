@@ -7,6 +7,7 @@ use App\Enums\ActivityType;
 use App\Enums\ShareLinkStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
+use App\Models\ContactPendingShare;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\ShareLink;
@@ -49,12 +50,28 @@ class SharingController extends Controller
         }
 
         if (!$contact->isRegistered()) {
-            return $this->error(
-                __('messages.sharing.contact_not_registered'),
-                'CONTACT_NOT_REGISTERED',
-                [],
-                422
-            );
+            // Contact hasn't accepted invitation yet — queue the file as pending
+            DB::transaction(function () use ($file, $contact, $request) {
+                ContactPendingShare::firstOrCreate([
+                    'contact_id' => $contact->id,
+                    'file_id'    => $file->id,
+                ], [
+                    'sender_user_id' => $request->user()->id,
+                ]);
+
+                $this->activityService->log($file, $request->user(), ActivityType::SharedToContact, [
+                    'contact_id'   => $contact->id,
+                    'contact_name' => $contact->name,
+                    'pending'      => true,
+                ]);
+            });
+
+            return $this->success(__('messages.sharing.access_pending'), [
+                'share' => [
+                    'contact_id' => $contact->id,
+                    'status'     => 'pending',
+                ],
+            ]);
         }
 
         DB::transaction(function () use ($file, $contact, $request) {

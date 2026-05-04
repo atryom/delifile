@@ -15,7 +15,7 @@ export class ContactsApiService {
     return this.api.get('/contacts', params);
   }
 
-  create(data: { name: string; email?: string | null; phone?: string | null }): Observable<ApiResponse<{ contact: Contact }>> {
+  create(data: { name: string; email?: string | null; phone?: string | null }): Observable<ApiResponse<{ contact: Contact; invitation_sent: boolean }>> {
     return this.api.post('/contacts', data);
   }
 
@@ -29,6 +29,10 @@ export class ContactsApiService {
 
   resolve(): Observable<ApiResponse<{ newly_resolved: number }>> {
     return this.api.post('/contacts/resolve');
+  }
+
+  delete(id: string): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.delete(`/contacts/${id}`);
   }
 
   history(id: string): Observable<ApiResponse<{ items: unknown[] }>> {
