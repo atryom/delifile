@@ -5,11 +5,13 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Files\FileController;
 use App\Http\Controllers\Files\SharingController;
 use App\Http\Controllers\Contacts\ContactController;
+use App\Http\Controllers\Contacts\ContactRequestController;
 use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Activity\ActivityController;
 use App\Http\Controllers\Invitations\InvitationController;
 use App\Http\Controllers\Links\UrlFileController;
 use App\Http\Controllers\Tariff\TariffController;
+use App\Http\Controllers\User\UserSettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -139,7 +141,16 @@ Route::prefix('v1')->group(function () {
 
         // Tariffs
         Route::get('tariffs',         [TariffController::class, 'index']);
+        Route::get('tariffs/usage',   [TariffController::class, 'usage']);
         Route::post('tariffs/request', [TariffController::class, 'request']);
+
+        // User settings
+        Route::patch('user/settings', [UserSettingsController::class, 'update']);
+
+        // Contact requests
+        Route::get('contact-requests',                      [ContactRequestController::class, 'index']);
+        Route::post('contact-requests/{id}/accept',         [ContactRequestController::class, 'accept']);
+        Route::post('contact-requests/{id}/reject',         [ContactRequestController::class, 'reject']);
 
         // Admin (superuser only)
         Route::middleware(\App\Http\Middleware\SuperUserMiddleware::class)->prefix('admin')->group(function () {

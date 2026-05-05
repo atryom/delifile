@@ -2,6 +2,13 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { Observable, switchMap, tap, throwError } from 'rxjs';
 import { FilesApiService } from '../../../core/api/files-api.service';
+import { AuthStateService } from '../../../core/auth/auth-state.service';
+
+const PLAN_FILE_LIMITS: Record<string, number> = {
+  free:   50  * 1024 * 1024,
+  silver: 100 * 1024 * 1024,
+  gold:   150 * 1024 * 1024,
+};
 
 export interface UploadState {
   phase: 'idle' | 'init' | 'uploading' | 'completing' | 'done' | 'error';
@@ -24,6 +31,7 @@ export interface UploadState {
 export class FileUploadService {
   private readonly filesApi = inject(FilesApiService);
   private readonly http = inject(HttpClient);
+  private readonly authState = inject(AuthStateService);
 
   private readonly _state = signal<UploadState>({
     phase: 'idle',
@@ -39,6 +47,20 @@ export class FileUploadService {
    * Returns an Observable that emits the final fileId on success.
    */
   upload(file: File): Observable<string> {
+    // Client-side size check before making any requests
+    const plan = this.authState.plan() ?? 'free';
+    const limitBytes = PLAN_FILE_LIMITS[plan] ?? PLAN_FILE_LIMITS['free'];
+    if (file.size > limitBytes) {
+      const limitMb = Math.round(limitBytes / 1024 / 1024);
+      this._setState({
+        phase: 'error',
+        progress: 0,
+        fileId: null,
+        error: `Размер файла превышает допустимый лимит для вашего тарифа (${limitMb} МБ)`,
+      });
+      return throwError(() => new Error('FILE_SIZE_LIMIT_EXCEEDED'));
+    }
+
     this._setState({ phase: 'init', progress: 0, fileId: null, error: null });
 
     // Step 1 — init upload

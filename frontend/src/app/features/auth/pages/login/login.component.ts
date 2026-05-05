@@ -73,6 +73,10 @@ export class LoginComponent {
           this.router.navigate(['/account-blocked']);
           return;
         }
+        if (code === 'DEVICE_LIMIT_EXCEEDED') {
+          this.serverError.set(this.translate.instant('auth.login.device_limit_exceeded'));
+          return;
+        }
         if (err.data?.errors && Object.keys(err.data.errors).length) {
           this.fieldErrors.set(err.data.errors);
         } else {

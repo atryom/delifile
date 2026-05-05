@@ -1,15 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { UpperCasePipe } from '@angular/common';
+import { DecimalPipe, UpperCasePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { TariffApiService } from '../../../../core/api/tariff-api.service';
-import { TariffPlanInfo } from '../../../../shared/models/api.models';
+import { TariffPlanInfo, TariffUsage } from '../../../../shared/models/api.models';
 
 @Component({
   selector: 'app-tariffs',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslateModule, UpperCasePipe],
+  imports: [RouterLink, TranslateModule, UpperCasePipe, DecimalPipe],
   template: `
     <div class="tariffs-page">
       <div class="tariffs-header">
@@ -20,6 +20,82 @@ import { TariffPlanInfo } from '../../../../shared/models/api.models';
       @if (loading()) {
         <p class="info-text">{{ 'common.loading' | translate }}</p>
       } @else {
+        <!-- Usage stats for current plan -->
+        @if (usage()) {
+          <div class="usage-card">
+            <h2 class="usage-title">{{ 'tariffs.usage.title' | translate }}</h2>
+            <div class="usage-rows">
+
+              <!-- Storage -->
+              <div class="usage-row">
+                <div class="usage-meta">
+                  <span class="usage-name">{{ 'tariffs.usage.storage' | translate }}</span>
+                  <span class="usage-values">
+                    {{ formatBytes(usage()!.storage_used_bytes) }}
+                    / {{ formatBytes(usage()!.storage_limit_bytes) }}
+                  </span>
+                </div>
+                <div class="progress-bar-wrap" role="progressbar"
+                     [attr.aria-valuenow]="storagePercent()"
+                     aria-valuemin="0" aria-valuemax="100">
+                  <div class="progress-bar" [style.width.%]="storagePercent()"
+                       [class.progress-bar--warn]="storagePercent() >= 80"
+                       [class.progress-bar--danger]="storagePercent() >= 95">
+                  </div>
+                </div>
+                <span class="usage-pct">{{ storagePercent() | number:'1.0-0' }}%</span>
+              </div>
+
+              <!-- Devices -->
+              <div class="usage-row">
+                <div class="usage-meta">
+                  <span class="usage-name">{{ 'tariffs.usage.devices' | translate }}</span>
+                  <span class="usage-values">
+                    {{ usage()!.device_count }}
+                    @if (usage()!.device_limit !== null) {
+                      / {{ usage()!.device_limit }}
+                    } @else {
+                      / {{ 'tariffs.devices_unlimited' | translate }}
+                    }
+                  </span>
+                </div>
+                @if (usage()!.device_limit !== null) {
+                  <div class="progress-bar-wrap" role="progressbar"
+                       [attr.aria-valuenow]="devicePercent()"
+                       aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar" [style.width.%]="devicePercent()"
+                         [class.progress-bar--warn]="devicePercent() >= 80"
+                         [class.progress-bar--danger]="devicePercent() >= 100">
+                    </div>
+                  </div>
+                  <span class="usage-pct">{{ devicePercent() | number:'1.0-0' }}%</span>
+                }
+              </div>
+
+              <!-- Max file size ever uploaded -->
+              <div class="usage-row">
+                <div class="usage-meta">
+                  <span class="usage-name">{{ 'tariffs.usage.max_file' | translate }}</span>
+                  <span class="usage-values">
+                    {{ formatBytes(usage()!.max_file_size_bytes) }}
+                    / {{ formatBytes(usage()!.file_size_limit_bytes) }}
+                  </span>
+                </div>
+                <div class="progress-bar-wrap" role="progressbar"
+                     [attr.aria-valuenow]="maxFilePercent()"
+                     aria-valuemin="0" aria-valuemax="100">
+                  <div class="progress-bar" [style.width.%]="maxFilePercent()"
+                       [class.progress-bar--warn]="maxFilePercent() >= 80"
+                       [class.progress-bar--danger]="maxFilePercent() >= 100">
+                  </div>
+                </div>
+                <span class="usage-pct">{{ maxFilePercent() | number:'1.0-0' }}%</span>
+              </div>
+
+            </div>
+          </div>
+        }
+
         <div class="plans-grid">
           @for (plan of plans(); track plan.key) {
             <div class="plan-card" [class.plan-card--current]="plan.key === currentPlan()">
@@ -68,6 +144,37 @@ import { TariffPlanInfo } from '../../../../shared/models/api.models';
     .tariffs-header h1 { margin: 0; font-size: 1.6rem; color: #1a1a2e; }
     .btn-back { color: #6366f1; text-decoration: none; font-size: 0.9rem; }
     .btn-back:hover { text-decoration: underline; }
+
+    .usage-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-bottom: 28px;
+    }
+    .usage-title { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin: 0 0 18px; }
+    .usage-rows { display: flex; flex-direction: column; gap: 18px; }
+    .usage-row { display: flex; flex-direction: column; gap: 6px; }
+    .usage-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .usage-name { font-size: 0.85rem; font-weight: 600; color: #374151; }
+    .usage-values { font-size: 0.8rem; color: #9ca3af; }
+    .usage-pct { font-size: 0.78rem; color: #9ca3af; text-align: right; }
+
+    .progress-bar-wrap {
+      width: 100%;
+      height: 8px;
+      background: #f3f4f6;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #6366f1;
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+    .progress-bar--warn { background: #f59e0b; }
+    .progress-bar--danger { background: #dc2626; }
 
     .plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
 
@@ -123,9 +230,28 @@ export class TariffsComponent {
 
   readonly currentPlan  = this.authState.plan;
   readonly plans        = signal<TariffPlanInfo[]>([]);
+  readonly usage        = signal<TariffUsage | null>(null);
   readonly loading      = signal(true);
   readonly requesting   = signal(false);
   readonly requestedPlan = signal<string | null>(null);
+
+  readonly storagePercent = computed(() => {
+    const u = this.usage();
+    if (!u || u.storage_limit_bytes === 0) return 0;
+    return Math.min(100, Math.round((u.storage_used_bytes / u.storage_limit_bytes) * 100));
+  });
+
+  readonly devicePercent = computed(() => {
+    const u = this.usage();
+    if (!u || u.device_limit === null || u.device_limit === 0) return 0;
+    return Math.min(100, Math.round((u.device_count / u.device_limit) * 100));
+  });
+
+  readonly maxFilePercent = computed(() => {
+    const u = this.usage();
+    if (!u || u.file_size_limit_bytes === 0) return 0;
+    return Math.min(100, Math.round((u.max_file_size_bytes / u.file_size_limit_bytes) * 100));
+  });
 
   constructor() {
     this.tariffApi.getPlans().subscribe({
@@ -135,10 +261,22 @@ export class TariffsComponent {
       },
       error: () => this.loading.set(false),
     });
+
+    this.tariffApi.getUsage().subscribe({
+      next: res => this.usage.set(res.data),
+      error: () => { /* ignore, usage is optional */ },
+    });
   }
 
   storageMbLabel(mb: number): string {
     return mb >= 1024 ? `${mb / 1024} ГБ` : `${mb} МБ`;
+  }
+
+  formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 МБ';
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1024) return `${(mb / 1024).toFixed(1)} ГБ`;
+    return `${mb.toFixed(1)} МБ`;
   }
 
   requestPlan(planKey: string): void {

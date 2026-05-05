@@ -11,7 +11,7 @@
       </div>
 
       <!-- Upload zone -->
-      @if (uploadState().phase === 'idle') {
+      @if (uploadState().phase === 'idle' || uploadState().phase === 'error') {
         <label
           class="upload-zone"
           [class.drag-over]="isDragOver()"
@@ -74,8 +74,17 @@
         </div>
       }
 
+      <!-- Upload error -->
+      @if (uploadState().phase === 'error') {
+        <div class="upload-error-card">
+          <span class="upload-error-icon">⚠️</span>
+          <span class="upload-error-text">{{ uploadState().error }}</span>
+          <button class="btn-text-danger" (click)="resetUpload()">{{ 'common.cancel' | translate }}</button>
+        </div>
+      }
+
       <!-- Upload in progress -->
-      @if (uploadState().phase !== 'idle' && uploadState().phase !== 'done') {
+      @if (uploadState().phase !== 'idle' && uploadState().phase !== 'done' && uploadState().phase !== 'error') {
         <div class="upload-progress-card">
           <div class="upload-progress-info">
             <span>{{ phaseLabel() }}</span>

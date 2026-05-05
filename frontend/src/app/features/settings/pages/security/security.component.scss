@@ -43,3 +43,77 @@
 .btn-mini-danger:hover { background: #fff5f5; }
 .btn-text { background: none; border: none; color: #6366f1; font-size: 0.86rem; cursor: pointer; padding: 0; text-decoration: underline; }
 .btn-text:hover { color: #4f46e5; }
+
+// Toggle switches
+.toggles-list { display: flex; flex-direction: column; gap: 0; }
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  gap: 16px;
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-row--disabled { opacity: 0.45; pointer-events: none; }
+.toggle-info { flex: 1; }
+.toggle-label { display: block; font-size: 0.9rem; font-weight: 600; color: #1f2937; }
+.toggle-desc  { display: block; font-size: 0.8rem; color: #9ca3af; margin-top: 2px; }
+.toggle-switch {
+  width: 44px;
+  height: 24px;
+  border-radius: 99px;
+  background: #e5e7eb;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.toggle-switch--on { background: #6366f1; }
+.toggle-switch:disabled { cursor: not-allowed; }
+.toggle-thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+.toggle-switch--on .toggle-thumb { transform: translateX(20px); }
+
+// Contact requests
+.contact-requests { margin-top: 16px; }
+.requests-title { font-size: 0.88rem; font-weight: 600; color: #374151; margin: 0 0 12px; }
+.request-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+.request-info { flex: 1; }
+.request-name { display: block; font-size: 0.9rem; font-weight: 600; }
+.request-email { display: block; font-size: 0.8rem; color: #9ca3af; }
+.request-actions { display: flex; gap: 8px; }
+.btn-accept {
+  padding: 5px 12px;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-accept:hover { background: #4f46e5; }

@@ -132,5 +132,126 @@
           </div>
         }
       </div>
+
+      <!-- Global notifications section -->
+      <div class="settings-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">{{ 'security.notifications.title' | translate }}</h2>
+            <p class="section-desc">{{ 'security.notifications.hint' | translate }}</p>
+          </div>
+          @if (settingsSaved()) {
+            <span class="badge-verified">{{ 'security.notifications.saved' | translate }}</span>
+          }
+        </div>
+
+        <div class="toggles-list">
+          <label class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">{{ 'security.notifications.global_label' | translate }}</span>
+              <span class="toggle-desc">{{ 'security.notifications.global_desc' | translate }}</span>
+            </div>
+            <button
+              class="toggle-switch"
+              [class.toggle-switch--on]="notificationsEnabled()"
+              [attr.aria-checked]="notificationsEnabled()"
+              role="switch"
+              [attr.aria-label]="'security.notifications.global_label' | translate"
+              (click)="toggleGlobalNotifications(!notificationsEnabled())">
+              <span class="toggle-thumb"></span>
+            </button>
+          </label>
+
+          <label class="toggle-row" [class.toggle-row--disabled]="!notificationsEnabled()">
+            <div class="toggle-info">
+              <span class="toggle-label">{{ 'security.notifications.new_files_label' | translate }}</span>
+              <span class="toggle-desc">{{ 'security.notifications.new_files_desc' | translate }}</span>
+            </div>
+            <button
+              class="toggle-switch"
+              [class.toggle-switch--on]="notifyNewFiles() && notificationsEnabled()"
+              [attr.aria-checked]="notifyNewFiles() && notificationsEnabled()"
+              [disabled]="!notificationsEnabled()"
+              role="switch"
+              [attr.aria-label]="'security.notifications.new_files_label' | translate"
+              (click)="toggleNotifyNewFiles(!notifyNewFiles())">
+              <span class="toggle-thumb"></span>
+            </button>
+          </label>
+
+          <label class="toggle-row" [class.toggle-row--disabled]="!notificationsEnabled()">
+            <div class="toggle-info">
+              <span class="toggle-label">{{ 'security.notifications.contacts_label' | translate }}</span>
+              <span class="toggle-desc">{{ 'security.notifications.contacts_desc' | translate }}</span>
+            </div>
+            <button
+              class="toggle-switch"
+              [class.toggle-switch--on]="notifyContactsAdded() && notificationsEnabled()"
+              [attr.aria-checked]="notifyContactsAdded() && notificationsEnabled()"
+              [disabled]="!notificationsEnabled()"
+              role="switch"
+              [attr.aria-label]="'security.notifications.contacts_label' | translate"
+              (click)="toggleNotifyContacts(!notifyContactsAdded())">
+              <span class="toggle-thumb"></span>
+            </button>
+          </label>
+        </div>
+      </div>
+
+      <!-- Contact privacy section -->
+      <div class="settings-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">{{ 'security.contacts_privacy.title' | translate }}</h2>
+            <p class="section-desc">{{ 'security.contacts_privacy.hint' | translate }}</p>
+          </div>
+        </div>
+
+        <div class="toggles-list">
+          <label class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">{{ 'security.contacts_privacy.allow_label' | translate }}</span>
+              <span class="toggle-desc">{{ 'security.contacts_privacy.allow_desc' | translate }}</span>
+            </div>
+            <button
+              class="toggle-switch"
+              [class.toggle-switch--on]="allowContactsWithout()"
+              [attr.aria-checked]="allowContactsWithout()"
+              role="switch"
+              [attr.aria-label]="'security.contacts_privacy.allow_label' | translate"
+              (click)="toggleAllowContacts(!allowContactsWithout())">
+              <span class="toggle-thumb"></span>
+            </button>
+          </label>
+        </div>
+
+        <!-- Pending contact requests -->
+        @if (!allowContactsWithout()) {
+          <div class="contact-requests">
+            <h3 class="requests-title">{{ 'security.contacts_privacy.requests_title' | translate }}</h3>
+            @if (loadingRequests()) {
+              <div class="loading-state">{{ 'common.loading' | translate }}</div>
+            } @else if (contactRequests().length === 0) {
+              <div class="empty-state">{{ 'security.contacts_privacy.no_requests' | translate }}</div>
+            } @else {
+              @for (req of contactRequests(); track req.id) {
+                <div class="request-item">
+                  <div class="request-info">
+                    <span class="request-name">{{ req.requester.name ?? req.requester.email }}</span>
+                    <span class="request-email">{{ req.requester.email }}</span>
+                  </div>
+                  <div class="request-actions">
+                    <button class="btn-accept" (click)="acceptContactRequest(req.id)">
+                      {{ 'security.contacts_privacy.accept' | translate }}
+                    </button>
+                    <button class="btn-mini-danger" (click)="rejectContactRequest(req.id)">
+                      {{ 'security.contacts_privacy.reject' | translate }}
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
     </div>
-  

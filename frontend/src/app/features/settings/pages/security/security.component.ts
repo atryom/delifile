@@ -1,11 +1,13 @@
-import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, OnInit, ChangeDetectionStrategy, computed } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
-import { DeviceSession } from '../../../../shared/models/api.models';
+import { UserSettingsApiService } from '../../../../core/api/user-settings-api.service';
+import { NotificationService } from '../../../../core/notifications/notification.service';
+import { DeviceSession, ContactRequestItem } from '../../../../shared/models/api.models';
 
 @Component({
   selector: 'app-security',
@@ -16,11 +18,13 @@ import { DeviceSession } from '../../../../shared/models/api.models';
   styleUrl: './security.component.scss',
 })
 export class SecurityComponent implements OnInit {
-  private readonly authApi   = inject(AuthApiService);
-  readonly authState         = inject(AuthStateService);
-  private readonly fb        = inject(FormBuilder);
-  private readonly router    = inject(Router);
-  private readonly translate = inject(TranslateService);
+  private readonly authApi        = inject(AuthApiService);
+  readonly authState              = inject(AuthStateService);
+  private readonly fb             = inject(FormBuilder);
+  private readonly router         = inject(Router);
+  private readonly translate      = inject(TranslateService);
+  private readonly settingsApi    = inject(UserSettingsApiService);
+  readonly notifService           = inject(NotificationService);
 
   readonly sessions        = signal<DeviceSession[]>([]);
   readonly loadingSessions = signal(false);
@@ -35,6 +39,21 @@ export class SecurityComponent implements OnInit {
   readonly changingEmail   = signal(false);
   readonly emailError      = signal<string | null>(null);
   readonly emailSuccess    = signal(false);
+
+  readonly savingSettings  = signal(false);
+  readonly settingsSaved   = signal(false);
+
+  // Notification toggles (mirrored from user state for local editing)
+  readonly notificationsEnabled   = signal(true);
+  readonly notifyNewFiles         = signal(true);
+  readonly notifyContactsAdded    = signal(true);
+
+  // Contact settings
+  readonly allowContactsWithout   = signal(true);
+
+  // Contact requests
+  readonly contactRequests        = signal<ContactRequestItem[]>([]);
+  readonly loadingRequests        = signal(false);
 
   readonly pwdForm = this.fb.group({
     current_password:      ['', [Validators.required]],
@@ -54,6 +73,28 @@ export class SecurityComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSessions();
+    this._syncSettingsFromUser();
+    this._loadContactRequests();
+  }
+
+  private _syncSettingsFromUser(): void {
+    const user = this.authState.user();
+    if (!user) return;
+    this.notificationsEnabled.set(user.notifications_enabled ?? true);
+    this.notifyNewFiles.set(user.notify_new_files ?? true);
+    this.notifyContactsAdded.set(user.notify_contacts_added ?? true);
+    this.allowContactsWithout.set(user.allow_contacts_without_confirmation ?? true);
+  }
+
+  private _loadContactRequests(): void {
+    this.loadingRequests.set(true);
+    this.settingsApi.getContactRequests().subscribe({
+      next: res => {
+        this.contactRequests.set(res.data.items);
+        this.loadingRequests.set(false);
+      },
+      error: () => this.loadingRequests.set(false),
+    });
   }
 
   loadSessions(): void {
@@ -147,6 +188,60 @@ export class SecurityComponent implements OnInit {
         this.router.navigate(['/login']);
       },
       error: () => this.loggingOutAll.set(false),
+    });
+  }
+
+  async toggleGlobalNotifications(enabled: boolean): Promise<void> {
+    if (enabled && this.notifService.permission() === 'default') {
+      await this.notifService.requestPermission();
+    }
+    this.notificationsEnabled.set(enabled);
+    this._saveSettings();
+  }
+
+  toggleNotifyNewFiles(value: boolean): void {
+    this.notifyNewFiles.set(value);
+    this._saveSettings();
+  }
+
+  toggleNotifyContacts(value: boolean): void {
+    this.notifyContactsAdded.set(value);
+    this._saveSettings();
+  }
+
+  toggleAllowContacts(value: boolean): void {
+    this.allowContactsWithout.set(value);
+    this._saveSettings();
+  }
+
+  private _saveSettings(): void {
+    if (this.savingSettings()) return;
+    this.savingSettings.set(true);
+    this.settingsApi.updateSettings({
+      notifications_enabled:               this.notificationsEnabled(),
+      notify_new_files:                    this.notifyNewFiles(),
+      notify_contacts_added:               this.notifyContactsAdded(),
+      allow_contacts_without_confirmation: this.allowContactsWithout(),
+    }).subscribe({
+      next: res => {
+        this.savingSettings.set(false);
+        this.authState.updateUser(res.data.user);
+        this.settingsSaved.set(true);
+        setTimeout(() => this.settingsSaved.set(false), 2000);
+      },
+      error: () => this.savingSettings.set(false),
+    });
+  }
+
+  acceptContactRequest(id: string): void {
+    this.settingsApi.acceptContactRequest(id).subscribe(() => {
+      this.contactRequests.update(rs => rs.filter(r => r.id !== id));
+    });
+  }
+
+  rejectContactRequest(id: string): void {
+    this.settingsApi.rejectContactRequest(id).subscribe(() => {
+      this.contactRequests.update(rs => rs.filter(r => r.id !== id));
     });
   }
 }

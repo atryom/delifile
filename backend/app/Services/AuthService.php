@@ -141,14 +141,18 @@ class AuthService
     public function formatUser(User $user): array
     {
         return [
-            'id'                             => $user->id,
-            'email'                          => $user->email,
-            'name'                           => $user->name,
-            'email_verified'                 => $user->isEmailVerified(),
-            'account_status'                 => $user->account_status,
-            'email_verification_deadline_at' => $user->email_verification_deadline_at?->toIso8601String(),
-            'plan'                           => $user->plan?->value,
-            'is_superuser'                   => $user->is_superuser,
+            'id'                                    => $user->id,
+            'email'                                 => $user->email,
+            'name'                                  => $user->name,
+            'email_verified'                        => $user->isEmailVerified(),
+            'account_status'                        => $user->account_status,
+            'email_verification_deadline_at'        => $user->email_verification_deadline_at?->toIso8601String(),
+            'plan'                                  => $user->plan?->value,
+            'is_superuser'                          => $user->is_superuser,
+            'notifications_enabled'                 => (bool) ($user->notifications_enabled ?? true),
+            'notify_new_files'                      => (bool) ($user->notify_new_files ?? true),
+            'notify_contacts_added'                 => (bool) ($user->notify_contacts_added ?? true),
+            'allow_contacts_without_confirmation'   => (bool) ($user->allow_contacts_without_confirmation ?? true),
         ];
     }
 }

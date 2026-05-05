@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Contacts;
 
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
+use App\Models\ContactRequest;
 use App\Models\User;
 use App\Services\InvitationService;
 use Illuminate\Http\JsonResponse;
@@ -65,20 +66,46 @@ class ContactController extends Controller
             return $this->error(__('messages.contacts.already_exists'), 'CONTACT_DUPLICATE', [], 422);
         }
 
-        $invitationSent = false;
+        $invitationSent   = false;
+        $requiresApproval = false;
 
-        $contact = DB::transaction(function () use ($request, &$invitationSent) {
+        $contact = DB::transaction(function () use ($request, &$invitationSent, &$requiresApproval) {
             $resolved = $request->email
                 ? User::where('email', $request->email)->first()
                 : null;
+
+            // If resolved user has disabled auto-add, create a pending request instead of resolving
+            $resolvedUserId = null;
+            if ($resolved) {
+                $allowWithout = $resolved->allow_contacts_without_confirmation ?? true;
+                if ($allowWithout) {
+                    $resolvedUserId = $resolved->id;
+                } else {
+                    $requiresApproval = true;
+                }
+            }
 
             $contact = Contact::create([
                 'user_id'          => $request->user()->id,
                 'name'             => $request->name,
                 'email'            => $request->email,
                 'phone'            => $request->phone,
-                'resolved_user_id' => $resolved?->id,
+                'resolved_user_id' => $resolvedUserId,
             ]);
+
+            // If approval needed, create a contact request
+            if ($requiresApproval && $resolved) {
+                ContactRequest::updateOrCreate(
+                    [
+                        'requester_id'   => $request->user()->id,
+                        'target_user_id' => $resolved->id,
+                    ],
+                    [
+                        'contact_id' => $contact->id,
+                        'status'     => 'pending',
+                    ]
+                );
+            }
 
             // Send invitation if email provided and user is not yet registered
             if ($request->email && !$resolved) {
@@ -90,8 +117,9 @@ class ContactController extends Controller
         });
 
         return $this->success(__('messages.contacts.created'), [
-            'contact'          => $this->formatContact($contact),
-            'invitation_sent'  => $invitationSent,
+            'contact'           => $this->formatContact($contact),
+            'invitation_sent'   => $invitationSent,
+            'requires_approval' => $requiresApproval,
         ], 201);
     }
 

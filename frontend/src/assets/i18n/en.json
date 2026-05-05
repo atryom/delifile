@@ -21,6 +21,7 @@
       "no_account": "Don't have an account?",
       "register_link": "Create account",
       "error": "Login failed. Please try again.",
+      "device_limit_exceeded": "Device limit reached for your plan. Sign out of one device and try again.",
       "email_verified_success": "Email verified successfully! You can now sign in.",
       "email_verify_failed": "Verification link is invalid or expired.",
       "remember_me": "Remember me",
@@ -121,7 +122,13 @@
     "devices_unlimited": "Unlimited devices",
     "select_btn": "Switch to this plan",
     "current_btn": "Current plan",
-    "request_accepted": "Request accepted"
+    "request_accepted": "Request accepted",
+    "usage": {
+      "title": "Current plan usage",
+      "storage": "Storage used",
+      "devices": "Connected devices",
+      "max_file": "Largest uploaded file"
+    }
   },
   "files": {
     "list": {
@@ -414,7 +421,37 @@
       "last_active": "Last active {{date}}",
       "end_session": "End session",
       "empty": "No active sessions found."
+    },
+    "notifications": {
+      "title": "Global notifications",
+      "hint": "Manage push notifications in your browser.",
+      "saved": "Saved",
+      "global_label": "Enable global notifications",
+      "global_desc": "Enables or disables all browser notifications.",
+      "new_files_label": "Notify about new files",
+      "new_files_desc": "Notification when a new file is shared with you.",
+      "contacts_label": "Notify about contact requests",
+      "contacts_desc": "Notification when another user wants to add you as a contact."
+    },
+    "contacts_privacy": {
+      "title": "Contact privacy",
+      "hint": "Control how other users can add you to their contacts.",
+      "allow_label": "Allow adding to contacts without confirmation",
+      "allow_desc": "If disabled, you will receive a request when someone adds you as a contact.",
+      "requests_title": "Incoming contact requests",
+      "no_requests": "No incoming requests.",
+      "accept": "Allow",
+      "reject": "Decline"
     }
+  },
+  "notifications": {
+    "banner_text": "Enable notifications",
+    "banner_btn": "Enable",
+    "open": "Open",
+    "new_file_title": "New file",
+    "new_file_body": "User {{name}} shared file «{{file}}» with you.",
+    "contact_request_title": "Contact request",
+    "contact_request_body": "User {{name}} wants to add you as a contact."
   },
   "cookie": {
     "text": "Our site uses cookies. By continuing to use it, you agree to the processing of personal data in accordance with our",

@@ -148,6 +148,10 @@ export interface CurrentUser {
   email_verification_deadline_at: string | null;
   plan: TariffPlan | null;
   is_superuser: boolean;
+  notifications_enabled: boolean;
+  notify_new_files: boolean;
+  notify_contacts_added: boolean;
+  allow_contacts_without_confirmation: boolean;
 }
 
 // ─── Admin Models ─────────────────────────────────────────────────────────────
@@ -250,4 +254,33 @@ export interface DeviceSession {
   device_name: string;
   ip_address: string | null;
   last_active_at: string | null;
+}
+
+// ─── Tariff Usage Models ─────────────────────────────────────────────────────
+
+export interface TariffUsage {
+  storage_used_bytes: number;
+  storage_limit_bytes: number;
+  device_count: number;
+  device_limit: number | null;
+  max_file_size_bytes: number;
+  file_size_limit_bytes: number;
+}
+
+// ─── Contact Request Models ──────────────────────────────────────────────────
+
+export interface ContactRequestItem {
+  id: string;
+  requester: { id: number; email: string; name: string | null };
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string | null;
+}
+
+// ─── User Settings ───────────────────────────────────────────────────────────
+
+export interface UserSettings {
+  notifications_enabled?: boolean;
+  notify_new_files?: boolean;
+  notify_contacts_added?: boolean;
+  allow_contacts_without_confirmation?: boolean;
 }

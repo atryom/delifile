@@ -9,7 +9,11 @@ import { FilesApiService, FileFilter } from '../../../../core/api/files-api.serv
 import { FileUploadService } from '../../services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
+import { NotificationService } from '../../../../core/notifications/notification.service';
+import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shared/models/api.models';
+
+const LAST_RECEIVED_KEY = 'fs_last_received_check';
 
 @Component({
   selector: 'app-file-list',
@@ -28,6 +32,8 @@ export class FileListComponent implements OnInit {
   private readonly route         = inject(ActivatedRoute);
   private readonly translate     = inject(TranslateService);
   private readonly fb            = inject(FormBuilder);
+  private readonly notifService  = inject(NotificationService);
+  private readonly authState     = inject(AuthStateService);
 
   readonly files        = signal<FileListItem[]>([]);
   readonly loading      = signal(false);
@@ -129,9 +135,37 @@ export class FileListComponent implements OnInit {
         const p = res.data.pagination;
         this.totalPages.set(Math.ceil(p.total / p.per_page) || 1);
         this.loading.set(false);
+
+        if (this.activeFilter() === 'received') {
+          this._checkNewReceivedFiles(res.data.items);
+        }
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  private _checkNewReceivedFiles(files: FileListItem[]): void {
+    const user = this.authState.user();
+    if (!user?.notifications_enabled || !user?.notify_new_files) return;
+
+    const lastCheckStr = localStorage.getItem(LAST_RECEIVED_KEY);
+    const lastCheck = lastCheckStr ? new Date(lastCheckStr).getTime() : 0;
+    const now = new Date().toISOString();
+
+    const newFiles = files.filter(f => {
+      if (!f.uploaded_at) return false;
+      return new Date(f.uploaded_at).getTime() > lastCheck;
+    });
+
+    for (const f of newFiles.slice(0, 3)) {
+      this.notifService.show(
+        this.translate.instant('notifications.new_file_title'),
+        f.original_name,
+        `/files/${f.id}`
+      );
+    }
+
+    localStorage.setItem(LAST_RECEIVED_KEY, now);
   }
 
   openFile(file: FileListItem): void {
@@ -203,6 +237,7 @@ export class FileListComponent implements OnInit {
   }
 
   dismissUpload(): void { this.uploadService.reset(); }
+  resetUpload(): void { this.uploadService.reset(); }
 
   readonly phaseLabel = computed(() => {
     const p = this.uploadState().phase;

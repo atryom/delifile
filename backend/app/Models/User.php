@@ -25,6 +25,10 @@ class User extends Authenticatable
         'account_status',
         'plan',
         'is_superuser',
+        'notifications_enabled',
+        'notify_new_files',
+        'notify_contacts_added',
+        'allow_contacts_without_confirmation',
     ];
 
     protected $hidden = [
@@ -40,8 +44,12 @@ class User extends Authenticatable
             'email_verified_at'              => 'datetime',
             'email_verification_sent_at'     => 'datetime',
             'email_verification_deadline_at' => 'datetime',
-            'plan'                           => TariffPlan::class,
-            'is_superuser'                   => 'boolean',
+            'plan'                                  => TariffPlan::class,
+            'is_superuser'                          => 'boolean',
+            'notifications_enabled'                 => 'boolean',
+            'notify_new_files'                      => 'boolean',
+            'notify_contacts_added'                 => 'boolean',
+            'allow_contacts_without_confirmation'   => 'boolean',
         ];
     }
 
