@@ -50,6 +50,11 @@ class AuthService
             return ['blocked' => true, 'user' => $this->formatUser($user)];
         }
 
+        $deviceLimit = $user->getPlan()->deviceLimit();
+        if ($deviceLimit !== null && DeviceSession::where('user_id', $user->id)->count() >= $deviceLimit) {
+            return ['device_limit' => true, 'user' => $this->formatUser($user)];
+        }
+
         $token = $user->createToken('web-spa');
 
         DeviceSession::create([
@@ -142,6 +147,8 @@ class AuthService
             'email_verified'                 => $user->isEmailVerified(),
             'account_status'                 => $user->account_status,
             'email_verification_deadline_at' => $user->email_verification_deadline_at?->toIso8601String(),
+            'plan'                           => $user->plan?->value,
+            'is_superuser'                   => $user->is_superuser,
         ];
     }
 }

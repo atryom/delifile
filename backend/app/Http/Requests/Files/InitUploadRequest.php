@@ -13,7 +13,8 @@ class InitUploadRequest extends FormRequest
 
     public function rules(): array
     {
-        $maxBytes = config('app.file_max_size_mb', 100) * 1024 * 1024;
+        $user     = $this->user();
+        $maxBytes = $user ? $user->getPlan()->fileSizeLimitBytes() : (100 * 1024 * 1024);
 
         return [
             'original_name' => ['required', 'string', 'max:255'],

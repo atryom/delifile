@@ -103,6 +103,10 @@ class FileController extends Controller
      */
     public function initUpload(InitUploadRequest $request): JsonResponse
     {
+        if (!$this->fileService->checkStorageQuota($request->user(), $request->validated()['size'])) {
+            return $this->error('Превышен лимит хранилища вашего тарифного плана', 'STORAGE_LIMIT_EXCEEDED', [], 422);
+        }
+
         $result = $this->fileService->initUpload($request->user(), $request->validated());
 
         return $this->success(__('messages.files.upload_initialized'), $result, 201);

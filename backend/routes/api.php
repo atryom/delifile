@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Files\FileController;
 use App\Http\Controllers\Files\SharingController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Activity\ActivityController;
 use App\Http\Controllers\Invitations\InvitationController;
 use App\Http\Controllers\Links\UrlFileController;
+use App\Http\Controllers\Tariff\TariffController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -134,5 +136,18 @@ Route::prefix('v1')->group(function () {
 
         // Activity
         Route::get('activity', [ActivityController::class, 'index']);
+
+        // Tariffs
+        Route::get('tariffs',         [TariffController::class, 'index']);
+        Route::post('tariffs/request', [TariffController::class, 'request']);
+
+        // Admin (superuser only)
+        Route::middleware(\App\Http\Middleware\SuperUserMiddleware::class)->prefix('admin')->group(function () {
+            Route::get('stats',                           [AdminController::class, 'stats']);
+            Route::get('users',                           [AdminController::class, 'users']);
+            Route::patch('users/{id}/plan',               [AdminController::class, 'updatePlan']);
+            Route::post('users/{id}/block',               [AdminController::class, 'blockUser']);
+            Route::post('users/{id}/reset-link',          [AdminController::class, 'generateResetLink']);
+        });
     });
 });

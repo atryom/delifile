@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { AccountStatus, CurrentUser } from '../../shared/models/api.models';
+import { AccountStatus, CurrentUser, TariffPlan } from '../../shared/models/api.models';
 
 const TOKEN_KEY = 'auth_token';
 const REMEMBER_KEY = 'auth_remember';
@@ -28,6 +28,10 @@ export class AuthStateService {
   readonly verificationDeadline = computed(() =>
     this._user()?.email_verification_deadline_at ?? null
   );
+
+  readonly plan = computed<TariffPlan | null>(() => this._user()?.plan ?? null);
+
+  readonly isSuperUser = computed(() => this._user()?.is_superuser ?? false);
 
   setUser(user: CurrentUser, token: string, remember = true): void {
     this._user.set(user);

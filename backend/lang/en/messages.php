@@ -87,4 +87,15 @@ return [
     'activity' => [
         'fetched' => 'Activity fetched successfully',
     ],
+    'tariffs' => [
+        'fetched'          => 'Tariff plans fetched successfully',
+        'request_accepted' => 'Request accepted',
+    ],
+    'admin' => [
+        'users_fetched'    => 'User list fetched successfully',
+        'plan_updated'     => 'Tariff plan updated successfully',
+        'user_blocked'     => 'User status updated',
+        'reset_link'       => 'Password reset link generated',
+        'stats_fetched'    => 'Stats fetched successfully',
+    ],
 ];

@@ -39,6 +39,7 @@ class EmailVerificationService
             'email_verified_at'          => now(),
             'email_verification_token'   => null,
             'account_status'             => 'active',
+            'plan'                       => $user->plan?->value ?? 'free',
         ]);
 
         return $user;

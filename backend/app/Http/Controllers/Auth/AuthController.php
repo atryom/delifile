@@ -61,6 +61,15 @@ class AuthController extends Controller
             );
         }
 
+        if (!empty($result['device_limit'])) {
+            return $this->error(
+                'Достигнуто максимальное количество устройств для вашего тарифного плана.',
+                'DEVICE_LIMIT_EXCEEDED',
+                [],
+                403
+            );
+        }
+
         return $this->success('Вход выполнен успешно', [
             'token' => $result['token'],
             'user'  => $result['user'],

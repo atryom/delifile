@@ -144,6 +144,41 @@
   display: inline-block;
 }
 
+.sidebar-plan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0 4px;
+}
+
+.plan-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.plan-badge--free   { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+.plan-badge--silver { background: rgba(148, 163, 184, 0.25); color: #cbd5e1; }
+.plan-badge--gold   { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+
+.btn-change-plan {
+  font-size: 0.72rem;
+  color: #818cf8;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-change-plan:hover {
+  color: #a5b4fc;
+  text-decoration: underline;
+}
+
 .btn-logout {
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.3);

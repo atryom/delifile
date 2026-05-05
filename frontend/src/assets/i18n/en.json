@@ -95,7 +95,8 @@
       "sent": "Email sent! Check your inbox."
     },
     "sidebar": {
-      "unverified": "Email not verified"
+      "unverified": "Email not verified",
+      "change_plan": "Change plan"
     }
   },
   "nav": {
@@ -105,8 +106,22 @@
     "contacts": "Contacts",
     "activity": "Activity",
     "security": "Security",
+    "admin": "Administration",
     "logout": "Sign out",
     "menu": "Menu"
+  },
+  "tariffs": {
+    "title": "Tariff Plans",
+    "current": "Your plan",
+    "free_label": "Free",
+    "per_month": "RUB/mo.",
+    "file_size": "Max file size: {{mb}} MB",
+    "storage": "Storage: {{mb}}",
+    "devices": "Up to {{n}} devices",
+    "devices_unlimited": "Unlimited devices",
+    "select_btn": "Switch to this plan",
+    "current_btn": "Current plan",
+    "request_accepted": "Request accepted"
   },
   "files": {
     "list": {

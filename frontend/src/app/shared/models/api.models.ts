@@ -131,6 +131,8 @@ export type AccountStatus =
   | 'pending_email_verification'
   | 'blocked_unverified_email';
 
+export type TariffPlan = 'free' | 'silver' | 'gold';
+
 export interface UserRef {
   id: number;
   email: string;
@@ -144,6 +146,40 @@ export interface CurrentUser {
   email_verified: boolean;
   account_status: AccountStatus;
   email_verification_deadline_at: string | null;
+  plan: TariffPlan | null;
+  is_superuser: boolean;
+}
+
+// ─── Admin Models ─────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string | null;
+  account_status: AccountStatus;
+  email_verified: boolean;
+  plan: TariffPlan | null;
+  is_superuser: boolean;
+  last_login_at: string | null;
+  created_at: string | null;
+}
+
+export interface AdminStats {
+  total_users: number;
+  total_files: number;
+  total_size: number;
+  pinned_files: number;
+  pinned_size: number;
+}
+
+// ─── Tariff Models ────────────────────────────────────────────────────────────
+
+export interface TariffPlanInfo {
+  key: TariffPlan;
+  price_rub: number;
+  file_size_mb: number;
+  storage_mb: number;
+  device_limit: number | null;
 }
 
 // ─── Activity Models ─────────────────────────────────────────────────────────

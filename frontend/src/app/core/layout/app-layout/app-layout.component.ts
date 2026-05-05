@@ -21,9 +21,16 @@ export class AppLayoutComponent {
   readonly needsVerification = this.authState.needsEmailVerification;
   readonly emailVerified = this.authState.isEmailVerified;
   readonly userEmail = computed(() => this.authState.user()?.email ?? '');
+  readonly userPlan = this.authState.plan;
+  readonly isSuperUser = this.authState.isSuperUser;
   readonly sidebarOpen = signal(false);
   readonly resending = signal(false);
   readonly resent = signal(false);
+
+  readonly planLabel = computed(() => {
+    const map: Record<string, string> = { free: 'Free', silver: 'Silver', gold: 'Gold' };
+    return map[this.userPlan() ?? 'free'] ?? 'Free';
+  });
 
   readonly deadline = computed(() => {
     const d = this.authState.verificationDeadline();

@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
   {
@@ -96,6 +97,22 @@ export const routes: Routes = [
       import('./features/invitations/pages/invite-accept/invite-accept.component').then(
         m => m.InviteAcceptComponent
       ),
+  },
+
+  // ─── Tariff plans ────────────────────────────────────────────────────────
+  {
+    path: 'tariffs',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/tariffs/pages/tariffs/tariffs.component').then(m => m.TariffsComponent),
+  },
+
+  // ─── Admin ───────────────────────────────────────────────────────────────
+  {
+    path: 'admin',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./features/admin/pages/admin/admin.component').then(m => m.AdminComponent),
   },
 
   // ─── Legal pages ─────────────────────────────────────────────────────────

@@ -1,0 +1,145 @@
+<div class="admin-page">
+  <div class="admin-header">
+    <a routerLink="/files" class="btn-back">← Мои файлы</a>
+    <h1>Административная панель</h1>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn" [class.tab-btn--active]="activeTab() === 'stats'" (click)="setTab('stats')">
+      Обзор
+    </button>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab() === 'users'" (click)="setTab('users')">
+      Пользователи
+    </button>
+  </div>
+
+  @if (activeTab() === 'stats') {
+    <section class="stats-section">
+      @if (statsError()) {
+        <p class="error-text">Не удалось загрузить статистику.</p>
+      } @else if (!stats()) {
+        <p class="info-text">Загрузка...</p>
+      } @else {
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Пользователей</div>
+            <div class="stat-value">{{ stats()!.total_users }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Файлов в системе</div>
+            <div class="stat-value">{{ stats()!.total_files }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Общий объём</div>
+            <div class="stat-value">{{ formatSize(stats()!.total_size) }}</div>
+          </div>
+          <div class="stat-card stat-card--pinned">
+            <div class="stat-label">Закреплённых файлов</div>
+            <div class="stat-value">{{ stats()!.pinned_files }}</div>
+            <div class="stat-sub">{{ formatSize(stats()!.pinned_size) }}</div>
+          </div>
+        </div>
+      }
+    </section>
+  }
+
+  @if (activeTab() === 'users') {
+    <section class="users-section">
+      <div class="section-toolbar">
+        <button class="btn-refresh" (click)="loadUsers()">↺ Обновить</button>
+      </div>
+
+      @if (usersError()) {
+        <p class="error-text">Не удалось загрузить список пользователей.</p>
+      } @else if (users().length === 0) {
+        <p class="info-text">Загрузка...</p>
+      } @else {
+        <div class="table-wrap">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Статус</th>
+                <th>Email подтверждён</th>
+                <th>Последний вход</th>
+                <th>Тариф</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (user of users(); track user.id) {
+                <tr [class.row--blocked]="user.account_status === 'blocked_unverified_email'">
+                  <td class="cell-email">
+                    <span class="email-text">{{ user.email }}</span>
+                    @if (user.is_superuser) {
+                      <span class="badge badge--super">superuser</span>
+                    }
+                  </td>
+                  <td>
+                    <span class="status-badge" [class]="'status-badge--' + user.account_status">
+                      {{ statusLabel(user.account_status) }}
+                    </span>
+                  </td>
+                  <td>
+                    @if (user.email_verified) {
+                      <span class="verified yes">✓ Да</span>
+                    } @else {
+                      <span class="verified no">✗ Нет</span>
+                    }
+                  </td>
+                  <td class="cell-date">{{ formatDate(user.last_login_at) }}</td>
+                  <td>
+                    <div class="plan-edit">
+                      <select
+                        class="plan-select"
+                        [value]="getPlanEdit(user.id, user.plan)"
+                        (change)="setPlanEdit(user.id, $any($event.target).value)">
+                        <option value="free">Free</option>
+                        <option value="silver">Silver</option>
+                        <option value="gold">Gold</option>
+                      </select>
+                      <button
+                        class="btn-save"
+                        [disabled]="savingPlan()[user.id]"
+                        (click)="savePlan(user.id)">
+                        {{ savingPlan()[user.id] ? '...' : 'Сохранить' }}
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="actions">
+                      <button
+                        class="btn-action btn-block"
+                        [disabled]="blockingUser()[user.id]"
+                        (click)="toggleBlock(user.id)">
+                        {{ user.account_status === 'active' ? 'Заблокировать' : 'Разблокировать' }}
+                      </button>
+                      <button
+                        class="btn-action btn-reset"
+                        [disabled]="resetLinkLoading()[user.id]"
+                        (click)="generateResetLink(user.id)">
+                        {{ resetLinkLoading()[user.id] ? '...' : 'Сброс пароля' }}
+                      </button>
+                      @if (resetLinkMap()[user.id]) {
+                        <div class="reset-link-box">
+                          <input
+                            class="reset-link-input"
+                            [value]="resetLinkMap()[user.id]"
+                            readonly
+                            aria-label="Ссылка сброса пароля" />
+                          <button class="btn-copy" (click)="copyToClipboard(resetLinkMap()[user.id])">
+                            Копировать
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+</div>

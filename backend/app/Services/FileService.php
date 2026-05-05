@@ -19,6 +19,15 @@ class FileService
     ) {}
 
     /**
+     * Return true if user has quota to upload a file of given size.
+     */
+    public function checkStorageQuota(User $user, int $fileSize): bool
+    {
+        $used = (int) File::where('owner_id', $user->id)->sum('size');
+        return ($used + $fileSize) <= $user->getPlan()->storageLimitBytes();
+    }
+
+    /**
      * Step 1 of upload flow.
      * Create file record in 'uploading' status and return S3 presigned PUT URL.
      */
