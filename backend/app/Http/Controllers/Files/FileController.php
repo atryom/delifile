@@ -33,8 +33,11 @@ class FileController extends Controller
         $search  = $request->get('search');
 
         $options = array_filter([
-            'tag_id'       => $request->get('tag_id'),
-            'content_kind' => $request->get('content_kind'),
+            'tag_id'          => $request->get('tag_id'),
+            'content_kind'    => $request->get('content_kind'),
+            'file_type_group' => $request->get('file_type_group'),
+            'sort_by'         => $request->get('sort_by'),
+            'sort_order'      => $request->get('sort_order'),
         ]);
 
         // folder_id can be explicitly null (no-folder filter)

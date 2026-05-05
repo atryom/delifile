@@ -9,7 +9,7 @@ import { FilesApiService, FileFilter } from '../../../../core/api/files-api.serv
 import { FileUploadService } from '../../services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
-import { FileListItem, Tag, FolderTreeNode, LinkPreview } from '../../../../shared/models/api.models';
+import { FileListItem, FileTypeGroup, Tag, FolderTreeNode, LinkPreview } from '../../../../shared/models/api.models';
 
 @Component({
   selector: 'app-file-list',
@@ -29,18 +29,22 @@ export class FileListComponent implements OnInit {
   private readonly translate     = inject(TranslateService);
   private readonly fb            = inject(FormBuilder);
 
-  readonly files        = signal<FileListItem[]>([]);
-  readonly loading      = signal(false);
-  readonly page         = signal(1);
-  readonly totalPages   = signal(1);
-  readonly activeFilter = signal<FileFilter>('mine');
-  readonly isDragOver   = signal(false);
-  readonly uploadState  = this.uploadService.state;
-  readonly uploadDone   = computed(() => this.uploadState().phase === 'done');
-  readonly tags         = signal<Tag[]>([]);
-  readonly flatFolders  = signal<{ id: string; name: string }[]>([]);
-  readonly activeTagId  = signal<string>('');
-  readonly activeFolderId = signal<string>('');
+  readonly files              = signal<FileListItem[]>([]);
+  readonly loading            = signal(false);
+  readonly page               = signal(1);
+  readonly totalPages         = signal(1);
+  readonly activeFilter       = signal<FileFilter>('all');
+  readonly isDragOver         = signal(false);
+  readonly uploadState        = this.uploadService.state;
+  readonly uploadDone         = computed(() => this.uploadState().phase === 'done');
+  readonly tags               = signal<Tag[]>([]);
+  readonly flatFolders        = signal<{ id: string; name: string }[]>([]);
+  readonly activeTagId        = signal<string>('');
+  readonly activeFolderId     = signal<string>('');
+  readonly activeTypeGroup    = signal<string>('');
+  readonly sortBy             = signal<'date' | 'extension' | 'size'>('date');
+  readonly sortOrder          = signal<'asc' | 'desc'>('desc');
+  readonly availableTypeGroups = signal<FileTypeGroup[]>([]);
 
   readonly previewing   = signal(false);
   readonly savingLink   = signal(false);
@@ -53,19 +57,34 @@ export class FileListComponent implements OnInit {
   readonly linkForm = this.fb.group({ url: ['', [Validators.required, Validators.pattern(/^https?:\/\/.+/)]] });
 
   readonly filters = [
+    { key: 'all' as FileFilter,       label: 'files.list.filter_all' },
     { key: 'mine' as FileFilter,      label: 'files.list.filter_my' },
     { key: 'received' as FileFilter,  label: 'files.list.filter_received' },
     { key: 'favorites' as FileFilter, label: 'files.list.filter_favorites' },
   ];
 
+  readonly typeGroups = [
+    { key: 'image' as FileTypeGroup,    label: 'files.list.type_image',    icon: '🖼️' },
+    { key: 'video' as FileTypeGroup,    label: 'files.list.type_video',    icon: '🎬' },
+    { key: 'audio' as FileTypeGroup,    label: 'files.list.type_audio',    icon: '🎵' },
+    { key: 'document' as FileTypeGroup, label: 'files.list.type_document', icon: '📄' },
+    { key: 'archive' as FileTypeGroup,  label: 'files.list.type_archive',  icon: '🗜️' },
+    { key: 'link' as FileTypeGroup,     label: 'files.list.type_link',     icon: '🔗' },
+    { key: 'other' as FileTypeGroup,    label: 'files.list.type_other',    icon: '📎' },
+  ];
+
+  readonly visibleTypeGroups = computed(() =>
+    this.typeGroups.filter(g => this.availableTypeGroups().includes(g.key))
+  );
+
   readonly emptyMessage = computed(() => {
     const q = this.searchQuery;
     if (q) return this.translate.instant('files.list.empty_search', { q });
-    return this.activeFilter() === 'received'
-      ? this.translate.instant('files.list.empty_shared')
-      : this.activeFilter() === 'favorites'
-      ? this.translate.instant('files.list.empty_favorites')
-      : this.translate.instant('files.list.empty_default');
+    const f = this.activeFilter();
+    if (f === 'received')  return this.translate.instant('files.list.empty_shared');
+    if (f === 'favorites') return this.translate.instant('files.list.empty_favorites');
+    if (f === 'all')       return this.translate.instant('files.list.empty_all');
+    return this.translate.instant('files.list.empty_default');
   });
 
   ngOnInit(): void {
@@ -107,6 +126,25 @@ export class FileListComponent implements OnInit {
 
   setFilter(f: FileFilter): void {
     this.activeFilter.set(f);
+    this.activeTypeGroup.set('');
+    this.page.set(1);
+    this.loadFiles();
+  }
+
+  setTypeGroup(key: string): void {
+    this.activeTypeGroup.set(this.activeTypeGroup() === key ? '' : key);
+    this.page.set(1);
+    this.loadFiles();
+  }
+
+  onSortByChange(event: Event): void {
+    this.sortBy.set((event.target as HTMLSelectElement).value as 'date' | 'extension' | 'size');
+    this.page.set(1);
+    this.loadFiles();
+  }
+
+  onSortOrderChange(event: Event): void {
+    this.sortOrder.set((event.target as HTMLSelectElement).value as 'asc' | 'desc');
     this.page.set(1);
     this.loadFiles();
   }
@@ -120,16 +158,31 @@ export class FileListComponent implements OnInit {
 
   loadFiles(): void {
     this.loading.set(true);
-    const tagId    = this.activeTagId() || undefined;
-    const folderId = this.activeFolderId() || undefined;
+    const tagId     = this.activeTagId() || undefined;
+    const folderId  = this.activeFolderId() || undefined;
+    const typeGroup = this.activeTypeGroup() || undefined;
 
-    this.filesApi.list(this.activeFilter(), this.page(), this.searchQuery || undefined, { tag_id: tagId, folder_id: folderId }).subscribe({
+    this.filesApi.list(
+      this.activeFilter(),
+      this.page(),
+      this.searchQuery || undefined,
+      {
+        tag_id: tagId,
+        folder_id: folderId,
+        file_type_group: typeGroup,
+        sort_by: this.sortBy(),
+        sort_order: this.sortOrder(),
+        per_page: 10,
+      }
+    ).subscribe({
       next: (res) => {
         this.files.set(res.data.items);
         const p = res.data.pagination;
         this.totalPages.set(Math.ceil(p.total / p.per_page) || 1);
+        if (p.available_type_groups) {
+          this.availableTypeGroups.set(p.available_type_groups);
+        }
         this.loading.set(false);
-
       },
       error: () => this.loading.set(false),
     });

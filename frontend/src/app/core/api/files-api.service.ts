@@ -14,7 +14,7 @@ import {
   PaginatedData,
 } from '../../shared/models/api.models';
 
-export type FileFilter = 'mine' | 'received' | 'favorites';
+export type FileFilter = 'all' | 'mine' | 'received' | 'favorites';
 
 @Injectable({ providedIn: 'root' })
 export class FilesApiService {
@@ -24,13 +24,25 @@ export class FilesApiService {
     filter: FileFilter = 'mine',
     page = 1,
     search?: string,
-    options?: { tag_id?: string; folder_id?: string; content_kind?: string }
+    options?: {
+      tag_id?: string;
+      folder_id?: string;
+      content_kind?: string;
+      file_type_group?: string;
+      sort_by?: string;
+      sort_order?: string;
+      per_page?: number;
+    }
   ): Observable<ApiResponse<PaginatedData<FileListItem>>> {
     const params: Record<string, string | number> = { filter, page };
-    if (search) params['search'] = search;
-    if (options?.tag_id)       params['tag_id']    = options.tag_id;
-    if (options?.folder_id)    params['folder_id'] = options.folder_id;
-    if (options?.content_kind) params['content_kind'] = options.content_kind;
+    if (search)                   params['search']          = search;
+    if (options?.tag_id)          params['tag_id']          = options.tag_id;
+    if (options?.folder_id)       params['folder_id']       = options.folder_id;
+    if (options?.content_kind)    params['content_kind']    = options.content_kind;
+    if (options?.file_type_group) params['file_type_group'] = options.file_type_group;
+    if (options?.sort_by)         params['sort_by']         = options.sort_by;
+    if (options?.sort_order)      params['sort_order']      = options.sort_order;
+    if (options?.per_page)        params['per_page']        = options.per_page;
     return this.api.get('/files', params);
   }
 

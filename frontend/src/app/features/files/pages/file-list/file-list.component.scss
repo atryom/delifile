@@ -61,6 +61,13 @@
 .filter-select { padding: 7px 12px; border: 1px solid #e5e7eb; border-radius: 7px; font-size: 0.87rem; background: #fff; outline: none; cursor: pointer; color: #374151; }
 .filter-select:focus { border-color: #6366f1; }
 
+.type-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.type-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border: 1px solid #e5e7eb; border-radius: 99px; background: #fff; font-size: 0.83rem; color: #374151; cursor: pointer; transition: all 0.15s; }
+.type-chip:hover { border-color: #6366f1; color: #6366f1; background: #f0f4ff; }
+.type-chip.active { border-color: #6366f1; background: #6366f1; color: #fff; }
+.type-chip--reset { border-color: #d1d5db; color: #9ca3af; }
+.type-chip--reset:hover { border-color: #ef4444; color: #ef4444; background: #fff5f5; }
+
 .loading-state, .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
 .empty-icon { font-size: 3rem; display: block; margin-bottom: 12px; }
 

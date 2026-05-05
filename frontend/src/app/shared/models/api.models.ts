@@ -16,10 +16,15 @@ export interface ApiError {
   };
 }
 
+export type FileTypeGroup = 'image' | 'video' | 'audio' | 'document' | 'archive' | 'link' | 'other';
+export type SortBy = 'date' | 'extension' | 'size';
+export type SortOrder = 'asc' | 'desc';
+
 export interface Pagination {
   page: number;
   per_page: number;
   total: number;
+  available_type_groups?: FileTypeGroup[];
 }
 
 export interface PaginatedData<T> {

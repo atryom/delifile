@@ -346,17 +346,26 @@ class FileService
     {
         $query = File::query()->whereNull('deleted_at');
 
-        match ($filter) {
-            'mine'      => $query->where('owner_id', $user->id),
-            'received'  => $query->whereHas('accesses', fn ($q) =>
-                                $q->where('user_id', $user->id)
-                                  ->whereIn('access_type', ['shared', 'saved'])
-                           ),
-            'favorites' => $query->whereHas('accesses', fn ($q) =>
-                                $q->where('user_id', $user->id)->where('is_favorite', true)
-                           ),
-            default     => $query->where('owner_id', $user->id),
-        };
+        if ($filter === 'mine') {
+            $query->where('owner_id', $user->id);
+        } elseif ($filter === 'received') {
+            $query->whereHas('accesses', fn ($q) =>
+                $q->where('user_id', $user->id)->whereIn('access_type', ['shared', 'saved'])
+            );
+        } elseif ($filter === 'favorites') {
+            $query->whereHas('accesses', fn ($q) =>
+                $q->where('user_id', $user->id)->where('is_favorite', true)
+            );
+        } elseif ($filter === 'all') {
+            $query->where(function ($q) use ($user) {
+                $q->where('owner_id', $user->id)
+                  ->orWhereHas('accesses', fn ($q2) =>
+                      $q2->where('user_id', $user->id)->whereIn('access_type', ['shared', 'saved'])
+                  );
+            });
+        } else {
+            $query->where('owner_id', $user->id);
+        }
 
         if ($search) {
             $query->where('original_name', 'like', "%{$search}%");
@@ -378,20 +387,130 @@ class FileService
             $query->where('content_kind', $options['content_kind']);
         }
 
+        $availableTypeGroups = $this->computeAvailableTypeGroups(clone $query);
+
+        if (!empty($options['file_type_group'])) {
+            $this->applyTypeGroupFilter($query, $options['file_type_group']);
+        }
+
+        $sortBy    = $options['sort_by'] ?? 'date';
+        $sortOrder = strtolower($options['sort_order'] ?? 'desc');
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+        $sortDir = strtoupper($sortOrder);
+
+        if ($sortBy === 'size') {
+            $query->orderBy('size', $sortOrder);
+        } elseif ($sortBy === 'extension') {
+            $query->orderByRaw("SUBSTRING_INDEX(original_name, '.', -1) {$sortDir}");
+        } else {
+            $query->orderBy('created_at', $sortOrder);
+        }
+
         $total = $query->count();
-        $items = $query->orderByDesc('created_at')
-                       ->offset(($page - 1) * $perPage)
-                       ->limit($perPage)
-                       ->get();
+        $items = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
 
         return [
             'items'      => $items->map(fn ($f) => $this->buildListItem($f)),
             'pagination' => [
-                'page'     => $page,
-                'per_page' => $perPage,
-                'total'    => $total,
+                'page'                  => $page,
+                'per_page'              => $perPage,
+                'total'                 => $total,
+                'available_type_groups' => $availableTypeGroups,
             ],
         ];
+    }
+
+    private function applyTypeGroupFilter($query, string $group): void
+    {
+        if ($group === 'image') {
+            $query->where('mime_type', 'like', 'image/%');
+        } elseif ($group === 'video') {
+            $query->where('mime_type', 'like', 'video/%');
+        } elseif ($group === 'audio') {
+            $query->where('mime_type', 'like', 'audio/%');
+        } elseif ($group === 'link') {
+            $query->where('content_kind', 'url_file');
+        } elseif ($group === 'document') {
+            $query->where('content_kind', 'binary_file')
+                  ->where(function ($q) {
+                      $q->where('mime_type', 'like', '%pdf%')
+                        ->orWhere('mime_type', 'like', '%msword%')
+                        ->orWhere('mime_type', 'like', '%wordprocessingml%')
+                        ->orWhere('mime_type', 'like', '%spreadsheetml%')
+                        ->orWhere('mime_type', 'like', '%presentationml%')
+                        ->orWhere('mime_type', 'like', '%opendocument%')
+                        ->orWhere('mime_type', 'like', '%ms-excel%')
+                        ->orWhere('mime_type', 'like', '%ms-powerpoint%')
+                        ->orWhere('mime_type', 'like', 'text/plain')
+                        ->orWhere('mime_type', 'like', 'text/csv')
+                        ->orWhere('mime_type', 'like', 'text/rtf');
+                  });
+        } elseif ($group === 'archive') {
+            $query->where('content_kind', 'binary_file')
+                  ->where(function ($q) {
+                      $q->where('mime_type', 'like', '%zip%')
+                        ->orWhere('mime_type', 'like', '%x-rar%')
+                        ->orWhere('mime_type', 'like', '%x-7z%')
+                        ->orWhere('mime_type', 'like', '%x-tar%')
+                        ->orWhere('mime_type', 'like', '%gzip%')
+                        ->orWhere('mime_type', 'like', '%bzip%');
+                  });
+        } elseif ($group === 'other') {
+            $query->where('content_kind', 'binary_file')
+                  ->where('mime_type', 'not like', 'image/%')
+                  ->where('mime_type', 'not like', 'video/%')
+                  ->where('mime_type', 'not like', 'audio/%')
+                  ->where(function ($q) {
+                      $q->where('mime_type', 'not like', '%pdf%')
+                        ->where('mime_type', 'not like', '%msword%')
+                        ->where('mime_type', 'not like', '%wordprocessingml%')
+                        ->where('mime_type', 'not like', '%spreadsheetml%')
+                        ->where('mime_type', 'not like', '%presentationml%')
+                        ->where('mime_type', 'not like', '%opendocument%')
+                        ->where('mime_type', 'not like', '%ms-excel%')
+                        ->where('mime_type', 'not like', '%ms-powerpoint%')
+                        ->where('mime_type', 'not like', 'text/plain')
+                        ->where('mime_type', 'not like', 'text/csv')
+                        ->where('mime_type', 'not like', 'text/rtf')
+                        ->where('mime_type', 'not like', '%zip%')
+                        ->where('mime_type', 'not like', '%x-rar%')
+                        ->where('mime_type', 'not like', '%x-7z%')
+                        ->where('mime_type', 'not like', '%x-tar%')
+                        ->where('mime_type', 'not like', '%gzip%')
+                        ->where('mime_type', 'not like', '%bzip%');
+                  });
+        }
+    }
+
+    private function computeAvailableTypeGroups($query): array
+    {
+        $rows = $query->select(['mime_type', 'content_kind'])->distinct()->get();
+        $groups = [];
+        foreach ($rows as $row) {
+            $g = $this->classifyMimeType($row->content_kind ?? 'binary_file', $row->mime_type ?? '');
+            $groups[$g] = true;
+        }
+        return array_keys($groups);
+    }
+
+    private function classifyMimeType(string $contentKind, string $mimeType): string
+    {
+        if ($contentKind === 'url_file') return 'link';
+        if (str_starts_with($mimeType, 'image/')) return 'image';
+        if (str_starts_with($mimeType, 'video/')) return 'video';
+        if (str_starts_with($mimeType, 'audio/')) return 'audio';
+
+        foreach (['pdf', 'msword', 'wordprocessingml', 'spreadsheetml', 'presentationml', 'opendocument', 'ms-excel', 'ms-powerpoint', 'text/plain', 'text/csv', 'text/rtf'] as $pat) {
+            if (str_contains($mimeType, $pat)) return 'document';
+        }
+
+        foreach (['zip', 'x-rar', 'x-7z', 'x-tar', 'gzip', 'bzip'] as $pat) {
+            if (str_contains($mimeType, $pat)) return 'archive';
+        }
+
+        return 'other';
     }
 
     private function buildListItem(File $f): array
