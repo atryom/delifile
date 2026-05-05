@@ -107,6 +107,14 @@ export const routes: Routes = [
       import('./features/tariffs/pages/tariffs/tariffs.component').then(m => m.TariffsComponent),
   },
 
+  // ─── Support ─────────────────────────────────────────────────────────────
+  {
+    path: 'support',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/support/pages/support/support.component').then(m => m.SupportComponent),
+  },
+
   // ─── Admin ───────────────────────────────────────────────────────────────
   {
     path: 'admin',

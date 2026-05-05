@@ -106,6 +106,26 @@ class AdminController extends Controller
     }
 
     /**
+     * POST /api/v1/admin/users/{id}/reset-sessions
+     */
+    public function resetSessions(string $userId): JsonResponse
+    {
+        $user = User::find($userId);
+        if (!$user) {
+            return $this->notFound('Пользователь не найден');
+        }
+
+        // Delete all device session records
+        $sessionIds = DeviceSession::where('user_id', $user->id)->pluck('token_id');
+        DeviceSession::where('user_id', $user->id)->delete();
+
+        // Revoke all Sanctum personal access tokens for this user
+        $user->tokens()->delete();
+
+        return $this->success('Все сессии пользователя сброшены');
+    }
+
+    /**
      * GET /api/v1/admin/stats
      */
     public function stats(): JsonResponse

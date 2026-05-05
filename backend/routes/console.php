@@ -17,3 +17,7 @@ Schedule::job(new CleanExpiredFilesJob)->hourly()
 Schedule::command('auth:block-unverified')->everyFifteenMinutes()
     ->name('block-unverified-accounts')
     ->withoutOverlapping();
+
+Schedule::command('support:auto-close-tickets')->hourly()
+    ->name('auto-close-tickets')
+    ->withoutOverlapping();

@@ -11,8 +11,15 @@
     <button class="tab-btn" [class.tab-btn--active]="activeTab() === 'users'" (click)="setTab('users')">
       Пользователи
     </button>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab() === 'support'" (click)="setTab('support')">
+      Техподдержка
+    </button>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab() === 'suggestions'" (click)="setTab('suggestions')">
+      Предложения
+    </button>
   </div>
 
+  <!-- ─── STATS ─────────────────────────────────────────────────────────────── -->
   @if (activeTab() === 'stats') {
     <section class="stats-section">
       @if (statsError()) {
@@ -43,6 +50,7 @@
     </section>
   }
 
+  <!-- ─── USERS ─────────────────────────────────────────────────────────────── -->
   @if (activeTab() === 'users') {
     <section class="users-section">
       <div class="section-toolbar">
@@ -67,7 +75,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (user of users(); track user.id) {
+              @for (user of users(); track trackById($index, user)) {
                 <tr [class.row--blocked]="user.account_status === 'blocked_unverified_email'">
                   <td class="cell-email">
                     <span class="email-text">{{ user.email }}</span>
@@ -120,6 +128,23 @@
                         (click)="generateResetLink(user.id)">
                         {{ resetLinkLoading()[user.id] ? '...' : 'Сброс пароля' }}
                       </button>
+
+                      <!-- Reset sessions button with confirmation -->
+                      @if (confirmReset() === user.id) {
+                        <div class="confirm-inline" role="alertdialog" aria-label="Подтверждение сброса сессий">
+                          <span class="confirm-text">Сбросить все сессии?</span>
+                          <button class="btn-action btn-danger-sm" (click)="confirmResetSessions(user.id)">Да</button>
+                          <button class="btn-action btn-neutral-sm" (click)="cancelResetSessions()">Нет</button>
+                        </div>
+                      } @else {
+                        <button
+                          class="btn-action btn-sessions"
+                          [disabled]="resetSessionsLoading()[user.id]"
+                          (click)="askResetSessions(user.id)">
+                          {{ resetSessionsLoading()[user.id] ? '...' : 'Сбросить сессии' }}
+                        </button>
+                      }
+
                       @if (resetLinkMap()[user.id]) {
                         <div class="reset-link-box">
                           <input
@@ -138,6 +163,319 @@
               }
             </tbody>
           </table>
+        </div>
+      }
+    </section>
+  }
+
+  <!-- ─── SUPPORT TICKETS ───────────────────────────────────────────────────── -->
+  @if (activeTab() === 'support') {
+    <section class="support-section">
+      @if (!activeTicket()) {
+        <div class="section-toolbar">
+          <div class="filter-group" role="group" aria-label="Фильтр по статусу">
+            <button class="btn-filter" [class.active]="supportStatusFilter() === ''" (click)="setSupportStatusFilter('')">Все</button>
+            <button class="btn-filter" [class.active]="supportStatusFilter() === 'new'" (click)="setSupportStatusFilter('new')">Новые</button>
+            <button class="btn-filter" [class.active]="supportStatusFilter() === 'in_progress'" (click)="setSupportStatusFilter('in_progress')">В работе</button>
+            <button class="btn-filter" [class.active]="supportStatusFilter() === 'awaiting_confirmation'" (click)="setSupportStatusFilter('awaiting_confirmation')">Ожидают</button>
+            <button class="btn-filter" [class.active]="supportStatusFilter() === 'completed'" (click)="setSupportStatusFilter('completed')">Выполнено</button>
+          </div>
+          <button class="btn-refresh" (click)="loadSupportTickets()">↺</button>
+        </div>
+
+        @if (supportTicketsLoading()) {
+          <p class="info-text">Загрузка...</p>
+        } @else if (supportTicketsError()) {
+          <p class="error-text">Не удалось загрузить обращения.</p>
+        } @else if (supportTickets().length === 0) {
+          <p class="info-text">Нет обращений.</p>
+        } @else {
+          <div class="table-wrap">
+            <table class="support-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Пользователь</th>
+                  <th>Статус</th>
+                  <th>Непрочитанных</th>
+                  <th>Дата</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (ticket of supportTickets(); track trackById($index, ticket)) {
+                  <tr>
+                    <td class="cell-id">#{{ ticket.id.slice(-6) }}</td>
+                    <td>{{ ticket.user?.email ?? '—' }}</td>
+                    <td>
+                      <span class="ticket-status-badge" [class]="'s-badge--' + ticket.status">
+                        {{ ticketStatusLabel(ticket.status) }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (ticket.unread_count > 0) {
+                        <span class="unread-dot">{{ ticket.unread_count }}</span>
+                      } @else {
+                        <span class="no-unread">0</span>
+                      }
+                    </td>
+                    <td class="cell-date">{{ formatDate(ticket.last_event_at) }}</td>
+                    <td>
+                      <button class="btn-view" (click)="openTicket(ticket.id)">Открыть</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if ((supportTicketsPagination()?.total ?? 0) > 20) {
+            <div class="pagination">
+              <button class="btn-page" [disabled]="supportTicketsPage() <= 1" (click)="loadSupportTickets(supportTicketsPage() - 1)" aria-label="Предыдущая страница">← Назад</button>
+              <span class="page-info">{{ supportTicketsPage() }} / {{ supportTicketTotalPages() }}</span>
+              <button class="btn-page" [disabled]="supportTicketsPage() >= supportTicketTotalPages()" (click)="loadSupportTickets(supportTicketsPage() + 1)" aria-label="Следующая страница">Вперёд →</button>
+            </div>
+          }
+        }
+      }
+
+      <!-- Ticket detail -->
+      @if (activeTicket()) {
+        <div class="ticket-detail-panel">
+          <div class="detail-header">
+            <button class="btn-ghost" (click)="closeTicket()" aria-label="Назад к списку">← Список</button>
+            <h2 class="detail-title">Обращение #{{ activeTicket()!.id.slice(-6) }}</h2>
+            <span class="ticket-status-badge" [class]="'s-badge--' + activeTicket()!.status">
+              {{ ticketStatusLabel(activeTicket()!.status) }}
+            </span>
+          </div>
+
+          <!-- Status actions -->
+          @if (activeTicket()!.status === 'new') {
+            <div class="action-row">
+              <button class="btn-take" [disabled]="changingStatus()" (click)="takeTicket(activeTicket()!.id)">
+                {{ changingStatus() ? '...' : 'Взять в работу' }}
+              </button>
+            </div>
+          }
+          @if (activeTicket()!.status === 'in_progress') {
+            <div class="action-row">
+              <button class="btn-await" [disabled]="changingStatus()" (click)="awaitConfirmation(activeTicket()!.id)">
+                {{ changingStatus() ? '...' : 'Ожидать подтверждения пользователя' }}
+              </button>
+            </div>
+          }
+
+          @if (ticketLoading()) {
+            <p class="info-text">Загрузка...</p>
+          } @else if (ticketError()) {
+            <p class="error-text">Не удалось загрузить обращение.</p>
+          } @else {
+            <div class="chat-history" role="log" aria-live="polite" aria-label="История переписки">
+              @for (msg of activeTicket()!.messages; track trackById($index, msg)) {
+                <div class="chat-msg" [class.chat-msg--admin]="msg.is_admin_message" [class.chat-msg--user]="!msg.is_admin_message">
+                  <div class="chat-bubble" [class.bubble--admin]="msg.is_admin_message" [class.bubble--user]="!msg.is_admin_message">
+                    <p class="chat-body">{{ msg.body }}</p>
+                    @if (msg.attachments.length > 0) {
+                      <ul class="attach-list" role="list">
+                        @for (att of msg.attachments; track att.id) {
+                          <li>
+                            <button class="attach-link" type="button" (click)="downloadAttachment(activeTicket()!.id, att.id, att.original_name)">
+                              📎 {{ att.original_name }} ({{ formatSize(att.size) }})
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+                    <span class="chat-meta">
+                      {{ msg.is_admin_message ? 'Поддержка' : 'Пользователь' }} · {{ formatDate(msg.created_at) }}
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+
+            @if (activeTicket()!.status !== 'completed') {
+              <form class="reply-form" [formGroup]="adminMessageForm" (ngSubmit)="sendAdminMessage()">
+                <textarea
+                  class="reply-input"
+                  formControlName="body"
+                  placeholder="Ответить пользователю..."
+                  rows="3"
+                  aria-label="Текст ответа поддержки">
+                </textarea>
+                <div class="reply-actions">
+                  <label class="btn-attach-sm" for="admin-msg-files">
+                    📎 Вложения
+                    <input
+                      id="admin-msg-files"
+                      type="file"
+                      multiple
+                      class="file-input-hidden"
+                      (change)="onAdminMsgFiles($event)"
+                      aria-label="Прикрепить файлы к ответу" />
+                  </label>
+                  @if (adminMsgAttachments().length > 0) {
+                    <span class="attach-count">{{ adminMsgAttachments().length }} файл(ов)</span>
+                  }
+                  <button class="btn-send" type="submit" [disabled]="sendingMessage()">
+                    {{ sendingMessage() ? '...' : 'Отправить' }}
+                  </button>
+                </div>
+                @if (adminMsgAttachError()) {
+                  <p class="error-text">{{ adminMsgAttachError() }}</p>
+                }
+                @if (messageSendError()) {
+                  <p class="error-text">{{ messageSendError() }}</p>
+                }
+              </form>
+            } @else {
+              <p class="closed-notice">Обращение закрыто. Причина: {{ activeTicket()!.completion_reason === 'auto_closed' ? 'автозакрытие через 24 ч' : 'подтверждено пользователем' }}.</p>
+            }
+          }
+        </div>
+      }
+    </section>
+  }
+
+  <!-- ─── SUGGESTIONS ───────────────────────────────────────────────────────── -->
+  @if (activeTab() === 'suggestions') {
+    <section class="suggestions-section">
+      @if (!activeSuggestion()) {
+        <div class="section-toolbar">
+          <div class="filter-group" role="group" aria-label="Фильтр по статусу">
+            <button class="btn-filter" [class.active]="suggestionsStatusFilter() === ''" (click)="setSuggestionsFilter('')">Все</button>
+            <button class="btn-filter" [class.active]="suggestionsStatusFilter() === 'new'" (click)="setSuggestionsFilter('new')">Новые</button>
+            <button class="btn-filter" [class.active]="suggestionsStatusFilter() === 'accepted'" (click)="setSuggestionsFilter('accepted')">Принятые</button>
+          </div>
+          <button class="btn-refresh" (click)="loadSuggestions()">↺</button>
+        </div>
+
+        @if (suggestionsLoading()) {
+          <p class="info-text">Загрузка...</p>
+        } @else if (suggestionsError()) {
+          <p class="error-text">Не удалось загрузить предложения.</p>
+        } @else if (adminSuggestions().length === 0) {
+          <p class="info-text">Нет предложений.</p>
+        } @else {
+          <div class="table-wrap">
+            <table class="support-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Пользователь</th>
+                  <th>Статус</th>
+                  <th>Текст</th>
+                  <th>Дата</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (s of adminSuggestions(); track trackById($index, s)) {
+                  <tr>
+                    <td class="cell-id">#{{ s.id.slice(-6) }}</td>
+                    <td>{{ s.user?.email ?? '—' }}</td>
+                    <td>
+                      <span class="sugg-badge" [class]="'sugg-badge--' + s.status">
+                        {{ suggestionStatusLabel(s.status) }}
+                      </span>
+                    </td>
+                    <td class="cell-body-preview">{{ s.body.slice(0, 60) }}{{ s.body.length > 60 ? '…' : '' }}</td>
+                    <td class="cell-date">{{ formatDate(s.created_at) }}</td>
+                    <td>
+                      <button class="btn-view" (click)="openSuggestion(s.id)">Открыть</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if ((suggestionsPagination()?.total ?? 0) > 20) {
+            <div class="pagination">
+              <button class="btn-page" [disabled]="suggestionsPage() <= 1" (click)="loadSuggestions(suggestionsPage() - 1)" aria-label="Предыдущая страница">← Назад</button>
+              <span class="page-info">{{ suggestionsPage() }} / {{ suggestionsTotalPages() }}</span>
+              <button class="btn-page" [disabled]="suggestionsPage() >= suggestionsTotalPages()" (click)="loadSuggestions(suggestionsPage() + 1)" aria-label="Следующая страница">Вперёд →</button>
+            </div>
+          }
+        }
+      }
+
+      <!-- Suggestion detail -->
+      @if (activeSuggestion()) {
+        <div class="suggestion-detail-panel">
+          <div class="detail-header">
+            <button class="btn-ghost" (click)="closeSuggestion()" aria-label="Назад к списку">← Список</button>
+            <h2 class="detail-title">Предложение #{{ activeSuggestion()!.id.slice(-6) }}</h2>
+            <button
+              class="btn-status-toggle"
+              [disabled]="updatingSuggStatus()"
+              (click)="toggleSuggestionStatus(activeSuggestion()!.id, activeSuggestion()!.status)">
+              {{ updatingSuggStatus() ? '...' : (activeSuggestion()!.status === 'accepted' ? 'Снять отметку «Принято»' : 'Отметить «Принято»') }}
+            </button>
+          </div>
+
+          @if (suggestionLoading()) {
+            <p class="info-text">Загрузка...</p>
+          } @else if (suggestionError()) {
+            <p class="error-text">Не удалось загрузить предложение.</p>
+          } @else {
+            <div class="suggestion-card">
+              <div class="suggestion-meta">
+                <span class="sugg-badge" [class]="'sugg-badge--' + activeSuggestion()!.status">
+                  {{ suggestionStatusLabel(activeSuggestion()!.status) }}
+                </span>
+                <span class="suggestion-author">{{ activeSuggestion()!.user?.email ?? '—' }}</span>
+                <span class="suggestion-date">{{ formatDate(activeSuggestion()!.created_at) }}</span>
+              </div>
+              <p class="suggestion-body">{{ activeSuggestion()!.body }}</p>
+
+              @if (activeSuggestion()!.attachments.length > 0) {
+                <ul class="attach-list" role="list">
+                  @for (att of activeSuggestion()!.attachments; track att.id) {
+                    <li>
+                      <button class="attach-link" type="button" (click)="downloadSuggestionAttachment(activeSuggestion()!.id, att.id)">
+                        📎 {{ att.original_name }} ({{ formatSize(att.size) }})
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+
+            <!-- Internal comments -->
+            <div class="comments-block">
+              <h3 class="comments-title">Внутренние комментарии</h3>
+              @if ((activeSuggestion()!.admin_comments?.length ?? 0) === 0) {
+                <p class="info-text">Комментариев нет.</p>
+              } @else {
+                <ul class="comments-list" role="list">
+                  @for (c of activeSuggestion()!.admin_comments ?? []; track c.id) {
+                    <li class="comment-item">
+                      <p class="comment-body">{{ c.body }}</p>
+                      <span class="comment-date">{{ formatDate(c.created_at) }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+
+              <form class="comment-form" [formGroup]="commentForm" (ngSubmit)="addSuggestionComment(activeSuggestion()!.id)">
+                <textarea
+                  class="reply-input"
+                  formControlName="body"
+                  placeholder="Добавить внутренний комментарий..."
+                  rows="3"
+                  aria-label="Текст внутреннего комментария">
+                </textarea>
+                @if (commentError()) {
+                  <p class="error-text">{{ commentError() }}</p>
+                }
+                <button class="btn-send" type="submit" [disabled]="addingComment()">
+                  {{ addingComment() ? '...' : 'Добавить комментарий' }}
+                </button>
+              </form>
+            </div>
+          }
         </div>
       }
     </section>

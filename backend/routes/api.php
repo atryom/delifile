@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\SupportAdminController;
+use App\Http\Controllers\Admin\SuggestionAdminController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Files\FileController;
 use App\Http\Controllers\Files\SharingController;
@@ -10,6 +12,8 @@ use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Activity\ActivityController;
 use App\Http\Controllers\Invitations\InvitationController;
 use App\Http\Controllers\Links\UrlFileController;
+use App\Http\Controllers\Support\SupportTicketController;
+use App\Http\Controllers\Support\SuggestionController;
 use App\Http\Controllers\Tariff\TariffController;
 use App\Http\Controllers\User\UserSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -152,6 +156,23 @@ Route::prefix('v1')->group(function () {
         Route::post('contact-requests/{id}/accept',         [ContactRequestController::class, 'accept']);
         Route::post('contact-requests/{id}/reject',         [ContactRequestController::class, 'reject']);
 
+        // Support (user-facing)
+        Route::prefix('support')->group(function () {
+            // Tickets
+            Route::get('tickets',                                             [SupportTicketController::class, 'index']);
+            Route::post('tickets',                                            [SupportTicketController::class, 'store']);
+            Route::get('tickets/{id}',                                        [SupportTicketController::class, 'show']);
+            Route::post('tickets/{id}/messages',                              [SupportTicketController::class, 'addMessage']);
+            Route::post('tickets/{id}/confirm',                               [SupportTicketController::class, 'confirm']);
+            Route::post('tickets/{id}/mark-read',                             [SupportTicketController::class, 'markRead']);
+            Route::get('tickets/{id}/attachments/{attachmentId}',             [SupportTicketController::class, 'downloadAttachment']);
+            // Suggestions
+            Route::get('suggestions',                                         [SuggestionController::class, 'index']);
+            Route::post('suggestions',                                        [SuggestionController::class, 'store']);
+            Route::get('suggestions/{id}',                                    [SuggestionController::class, 'show']);
+            Route::get('suggestions/{id}/attachments/{attachmentId}',         [SuggestionController::class, 'downloadAttachment']);
+        });
+
         // Admin (superuser only)
         Route::middleware(\App\Http\Middleware\SuperUserMiddleware::class)->prefix('admin')->group(function () {
             Route::get('stats',                           [AdminController::class, 'stats']);
@@ -159,6 +180,23 @@ Route::prefix('v1')->group(function () {
             Route::patch('users/{id}/plan',               [AdminController::class, 'updatePlan']);
             Route::post('users/{id}/block',               [AdminController::class, 'blockUser']);
             Route::post('users/{id}/reset-link',          [AdminController::class, 'generateResetLink']);
+            Route::post('users/{id}/reset-sessions',      [AdminController::class, 'resetSessions']);
+
+            // Support admin
+            Route::get('support/tickets',                                     [SupportAdminController::class, 'index']);
+            Route::get('support/tickets/{id}',                                [SupportAdminController::class, 'show']);
+            Route::post('support/tickets/{id}/take',                          [SupportAdminController::class, 'takeInWork']);
+            Route::post('support/tickets/{id}/await-confirmation',            [SupportAdminController::class, 'awaitConfirmation']);
+            Route::post('support/tickets/{id}/messages',                      [SupportAdminController::class, 'addMessage']);
+            Route::post('support/tickets/{id}/mark-read',                     [SupportAdminController::class, 'markRead']);
+            Route::get('support/tickets/{id}/attachments/{attachmentId}',     [SupportAdminController::class, 'downloadAttachment']);
+
+            // Suggestions admin
+            Route::get('suggestions',                                         [SuggestionAdminController::class, 'index']);
+            Route::get('suggestions/{id}',                                    [SuggestionAdminController::class, 'show']);
+            Route::patch('suggestions/{id}/status',                           [SuggestionAdminController::class, 'updateStatus']);
+            Route::post('suggestions/{id}/comments',                          [SuggestionAdminController::class, 'addComment']);
+            Route::get('suggestions/{id}/attachments/{attachmentId}',         [SuggestionAdminController::class, 'downloadAttachment']);
         });
     });
 });

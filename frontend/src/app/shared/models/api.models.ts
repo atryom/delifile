@@ -289,3 +289,65 @@ export interface UserSettings {
   notify_contacts_added?: boolean;
   allow_contacts_without_confirmation?: boolean;
 }
+
+// ─── Support Models ───────────────────────────────────────────────────────────
+
+export type SupportTicketStatus =
+  | 'new'
+  | 'in_progress'
+  | 'awaiting_confirmation'
+  | 'completed';
+
+export type SuggestionStatus = 'new' | 'accepted';
+
+export interface SupportAttachmentItem {
+  id: string;
+  original_name: string;
+  mime_type: string | null;
+  size: number;
+}
+
+export interface SupportMessageItem {
+  id: string;
+  is_admin_message: boolean;
+  body: string;
+  read_at: string | null;
+  created_at: string | null;
+  attachments: SupportAttachmentItem[];
+}
+
+export interface SupportTicketListItem {
+  id: string;
+  status: SupportTicketStatus;
+  unread_count: number;
+  created_at: string | null;
+  last_event_at: string | null;
+}
+
+export interface SupportTicketDetail {
+  id: string;
+  status: SupportTicketStatus;
+  completion_reason: string | null;
+  completed_at: string | null;
+  created_at: string | null;
+  messages: SupportMessageItem[];
+  // admin-only fields
+  user?: { id: number; email: string; name: string | null };
+  taken_at?: string | null;
+  awaiting_at?: string | null;
+  confirmed_at?: string | null;
+  auto_closed_at?: string | null;
+}
+
+export interface SuggestionItem {
+  id: string;
+  body: string;
+  status: SuggestionStatus;
+  created_at: string | null;
+  attachments: SupportAttachmentItem[];
+  user?: { id: number; email: string; name: string | null };
+}
+
+export interface SuggestionDetail extends SuggestionItem {
+  admin_comments?: { id: string; body: string; created_at: string | null }[];
+}

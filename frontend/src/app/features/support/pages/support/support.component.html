@@ -1,0 +1,327 @@
+<div class="support-page">
+  <div class="support-header">
+    <a routerLink="/files" class="btn-back">← Мои файлы</a>
+    <h1>Техподдержка</h1>
+  </div>
+
+  <div class="tabs">
+    <button
+      class="tab-btn"
+      [class.tab-btn--active]="activeTab() === 'tickets'"
+      (click)="setTab('tickets')">
+      Обращения в техподдержку
+    </button>
+    <button
+      class="tab-btn"
+      [class.tab-btn--active]="activeTab() === 'suggestions'"
+      (click)="setTab('suggestions')">
+      Предложения по улучшению
+    </button>
+  </div>
+
+  <!-- ─── TICKETS TAB ─────────────────────────────────────────────────────── -->
+  @if (activeTab() === 'tickets') {
+    <div class="tickets-layout">
+
+      <!-- Ticket list panel -->
+      @if (!activeTicket() && !showCreateTicket()) {
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Мои обращения</h2>
+            <button class="btn-primary" type="button" (click)="openCreateTicket()">+ Новое обращение</button>
+          </div>
+
+          @if (ticketsLoading()) {
+            <p class="info-text">Загрузка...</p>
+          } @else if (ticketsError()) {
+            <p class="error-text">Не удалось загрузить обращения.</p>
+          } @else if (tickets().length === 0) {
+            <p class="empty-text">У вас пока нет обращений.</p>
+          } @else {
+            <ul class="ticket-list" role="list">
+              @for (ticket of tickets(); track trackById($index, ticket)) {
+                <li
+                  class="ticket-item"
+                  [class.ticket-item--completed]="ticket.status === 'completed'"
+                  role="listitem">
+                  <button class="ticket-item-btn" type="button" (click)="openTicket(ticket.id)">
+                    <div class="ticket-row">
+                      <span class="ticket-status-badge" [class]="'status-badge--' + ticket.status">
+                        {{ statusLabel(ticket.status) }}
+                      </span>
+                      @if (ticket.unread_count > 0) {
+                        <span class="unread-badge" [attr.aria-label]="ticket.unread_count + ' непрочитанных'">
+                          {{ ticket.unread_count }}
+                        </span>
+                      }
+                    </div>
+                    <div class="ticket-meta">
+                      <span class="ticket-id">#{{ ticket.id.slice(-6) }}</span>
+                      <span class="ticket-date">{{ formatDate(ticket.last_event_at) }}</span>
+                    </div>
+                  </button>
+                </li>
+              }
+            </ul>
+
+            @if ((ticketsPagination()?.total ?? 0) > 5) {
+              <div class="pagination">
+                <button class="btn-page" type="button" [disabled]="ticketsPage() <= 1" (click)="loadTickets(ticketsPage() - 1)" aria-label="Предыдущая страница">← Назад</button>
+                <span class="page-info">{{ ticketsPage() }} / {{ totalPages() }}</span>
+                <button class="btn-page" type="button" [disabled]="ticketsPage() >= totalPages()" (click)="loadTickets(ticketsPage() + 1)" aria-label="Следующая страница">Вперёд →</button>
+              </div>
+            }
+          }
+        </section>
+      }
+
+      <!-- Create ticket form -->
+      @if (showCreateTicket()) {
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Новое обращение</h2>
+            <button class="btn-ghost" type="button" (click)="cancelCreateTicket()">Отмена</button>
+          </div>
+
+          <form class="message-form" [formGroup]="ticketForm" (ngSubmit)="submitTicket()">
+            <textarea
+              class="message-input"
+              formControlName="body"
+              placeholder="Опишите вашу проблему..."
+              rows="6"
+              aria-label="Текст обращения">
+            </textarea>
+            @if (ticketForm.get('body')?.touched && ticketForm.get('body')?.errors?.['required']) {
+              <p class="field-error">Текст обращения обязателен.</p>
+            }
+            @if (ticketForm.get('body')?.touched && ticketForm.get('body')?.errors?.['minlength']) {
+              <p class="field-error">Минимум 10 символов.</p>
+            }
+
+            <div class="attach-row">
+              <label class="btn-attach" for="ticket-files">
+                📎 Прикрепить изображения
+                <input
+                  id="ticket-files"
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                  multiple
+                  class="file-input-hidden"
+                  (change)="onTicketFiles($event)"
+                  aria-label="Прикрепить изображения к обращению" />
+              </label>
+              @if (ticketAttachments().length > 0) {
+                <span class="attach-count">{{ ticketAttachments().length }} файл(ов)</span>
+              }
+            </div>
+
+            @if (attachmentError()) {
+              <p class="error-text">{{ attachmentError() }}</p>
+            }
+
+            <button class="btn-primary" type="submit" [disabled]="creatingTicket()">
+              {{ creatingTicket() ? 'Отправка...' : 'Отправить обращение' }}
+            </button>
+          </form>
+        </section>
+      }
+
+      <!-- Ticket detail -->
+      @if (activeTicket()) {
+        <section class="panel ticket-detail">
+          <div class="panel-header">
+            <div class="detail-header-left">
+              <button class="btn-ghost" type="button" (click)="closeTicket()" aria-label="Назад к списку">← Назад</button>
+              <h2 class="panel-title">Обращение #{{ activeTicket()!.id.slice(-6) }}</h2>
+            </div>
+            <span class="ticket-status-badge" [class]="'status-badge--' + activeTicket()!.status">
+              {{ statusLabel(activeTicket()!.status) }}
+            </span>
+          </div>
+
+          @if (ticketLoading()) {
+            <p class="info-text">Загрузка...</p>
+          } @else if (ticketError()) {
+            <p class="error-text">Не удалось загрузить обращение.</p>
+          } @else {
+            <div class="chat-history" role="log" aria-live="polite" aria-label="История переписки">
+              @for (msg of activeTicket()!.messages; track trackById($index, msg)) {
+                <div class="chat-msg" [class.chat-msg--admin]="msg.is_admin_message" [class.chat-msg--user]="!msg.is_admin_message">
+                  <div class="chat-bubble">
+                    <p class="chat-body">{{ msg.body }}</p>
+                    @if (msg.attachments.length > 0) {
+                      <ul class="attach-list" role="list">
+                        @for (att of msg.attachments; track att.id) {
+                          <li>
+                            <button class="attach-link" type="button" (click)="downloadAttachment(activeTicket()!.id, att)">
+                              📎 {{ att.original_name }} ({{ formatSize(att.size) }})
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+                    <span class="chat-meta">
+                      {{ msg.is_admin_message ? 'Поддержка' : 'Вы' }} · {{ formatDate(msg.created_at) }}
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Awaiting confirmation: confirm button -->
+            @if (activeTicket()!.status === 'awaiting_confirmation') {
+              <div class="confirm-banner">
+                <p>Проблема решена? Нажмите «Подтвердить», чтобы закрыть обращение. Если не ответите в течение 24 часов — закроется автоматически.</p>
+                <button class="btn-confirm" type="button" [disabled]="confirmingTicket()" (click)="confirmTicket()">
+                  {{ confirmingTicket() ? '...' : 'Подтвердить решение' }}
+                </button>
+              </div>
+            }
+
+            <!-- Reply form -->
+            @if (activeTicket()!.status !== 'completed') {
+              <form class="reply-form" [formGroup]="messageForm" (ngSubmit)="sendMessage()">
+                <textarea
+                  class="message-input"
+                  formControlName="body"
+                  placeholder="Написать сообщение..."
+                  rows="3"
+                  aria-label="Текст ответа">
+                </textarea>
+
+                <div class="reply-row">
+                  <label class="btn-attach btn-attach--sm" for="msg-files">
+                    📎
+                    <input
+                      id="msg-files"
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                      multiple
+                      class="file-input-hidden"
+                      (change)="onMessageFiles($event)"
+                      aria-label="Прикрепить изображения к сообщению" />
+                  </label>
+                  @if (messageAttachments().length > 0) {
+                    <span class="attach-count">{{ messageAttachments().length }} файл(ов)</span>
+                  }
+                  <button class="btn-primary btn-sm" type="submit" [disabled]="sendingMessage()">
+                    {{ sendingMessage() ? '...' : 'Отправить' }}
+                  </button>
+                </div>
+
+                @if (messageError()) {
+                  <p class="error-text">{{ messageError() }}</p>
+                }
+              </form>
+            }
+
+            @if (activeTicket()!.status === 'completed') {
+              <p class="closed-notice">Обращение закрыто. Отправка новых сообщений недоступна.</p>
+            }
+          }
+        </section>
+      }
+    </div>
+  }
+
+  <!-- ─── SUGGESTIONS TAB ──────────────────────────────────────────────────── -->
+  @if (activeTab() === 'suggestions') {
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Мои предложения</h2>
+        <button class="btn-primary" type="button" (click)="openCreateSuggestion()">+ Новое предложение</button>
+      </div>
+
+      <!-- Create suggestion form -->
+      @if (showCreateSuggestion()) {
+        <div class="create-block">
+          <h3 class="create-title">Новое предложение по улучшению</h3>
+          <form [formGroup]="suggestionForm" (ngSubmit)="submitSuggestion()">
+            <textarea
+              class="message-input"
+              formControlName="body"
+              placeholder="Опишите вашу идею..."
+              rows="5"
+              aria-label="Текст предложения">
+            </textarea>
+            @if (suggestionForm.get('body')?.touched && suggestionForm.get('body')?.errors?.['required']) {
+              <p class="field-error">Текст предложения обязателен.</p>
+            }
+            @if (suggestionForm.get('body')?.touched && suggestionForm.get('body')?.errors?.['minlength']) {
+              <p class="field-error">Минимум 10 символов.</p>
+            }
+
+            <div class="attach-row">
+              <label class="btn-attach" for="sugg-files">
+                📎 Прикрепить изображения
+                <input
+                  id="sugg-files"
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                  multiple
+                  class="file-input-hidden"
+                  (change)="onSuggestionFiles($event)"
+                  aria-label="Прикрепить изображения к предложению" />
+              </label>
+              @if (suggestionAttachments().length > 0) {
+                <span class="attach-count">{{ suggestionAttachments().length }} файл(ов)</span>
+              }
+            </div>
+
+            @if (suggestionError()) {
+              <p class="error-text">{{ suggestionError() }}</p>
+            }
+
+            <div class="form-actions">
+              <button class="btn-primary" type="submit" [disabled]="creatingSuggestion()">
+                {{ creatingSuggestion() ? 'Отправка...' : 'Отправить предложение' }}
+              </button>
+              <button class="btn-ghost" type="button" (click)="cancelCreateSuggestion()">Отмена</button>
+            </div>
+          </form>
+        </div>
+      }
+
+      @if (suggestionsLoading()) {
+        <p class="info-text">Загрузка...</p>
+      } @else if (suggestionsError()) {
+        <p class="error-text">Не удалось загрузить предложения.</p>
+      } @else if (suggestions().length === 0 && !showCreateSuggestion()) {
+        <p class="empty-text">Вы ещё не отправляли предложений.</p>
+      } @else {
+        <ul class="suggestion-list" role="list">
+          @for (s of suggestions(); track trackById($index, s)) {
+            <li class="suggestion-item" role="listitem">
+              <div class="suggestion-row">
+                <span class="suggestion-status" [class]="'sugg-badge--' + s.status">
+                  {{ suggestionStatusLabel(s.status) }}
+                </span>
+                <span class="suggestion-date">{{ formatDate(s.created_at) }}</span>
+              </div>
+              <p class="suggestion-body">{{ s.body }}</p>
+              @if (s.attachments.length > 0) {
+                <ul class="attach-list" role="list">
+                  @for (att of s.attachments; track att.id) {
+                    <li>
+                      <button class="attach-link" type="button" (click)="downloadSuggestionAttachment(s.id, att)">
+                        📎 {{ att.original_name }} ({{ formatSize(att.size) }})
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+            </li>
+          }
+        </ul>
+
+        @if ((suggestionsPagination()?.total ?? 0) > 10) {
+          <div class="pagination">
+            <button class="btn-page" type="button" [disabled]="suggestionsPage() <= 1" (click)="loadSuggestions(suggestionsPage() - 1)" aria-label="Предыдущая страница">← Назад</button>
+            <span class="page-info">{{ suggestionsPage() }} / {{ suggestionTotalPages() }}</span>
+            <button class="btn-page" type="button" [disabled]="suggestionsPage() >= suggestionTotalPages()" (click)="loadSuggestions(suggestionsPage() + 1)" aria-label="Следующая страница">Вперёд →</button>
+          </div>
+        }
+      }
+    </section>
+  }
+</div>

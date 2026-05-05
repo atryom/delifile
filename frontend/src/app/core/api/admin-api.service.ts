@@ -27,4 +27,8 @@ export class AdminApiService {
   generateResetLink(userId: string): Observable<ApiResponse<{ url: string }>> {
     return this.http.post<ApiResponse<{ url: string }>>(`${this.base}/users/${userId}/reset-link`, {});
   }
+
+  resetSessions(userId: string): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.base}/users/${userId}/reset-sessions`, {});
+  }
 }
