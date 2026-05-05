@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+FRONTEND="$ROOT/frontend"
+PUBLIC="$ROOT/public"
+BACKEND="$ROOT/backend"
+DIST="$FRONTEND/dist/delifile/browser"
+
+# ── colours ───────────────────────────────────────────────────────────────────
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+ok()   { echo -e "${GREEN}✔${NC}  $*"; }
+info() { echo -e "${YELLOW}▸${NC}  $*"; }
+fail() { echo -e "${RED}✘${NC}  $*" >&2; exit 1; }
+
+echo ""
+echo "  DeliFile — deploy"
+echo "  ─────────────────────────────────"
+echo ""
+
+# ── 1. Backend: composer + migrate ───────────────────────────────────────────
+info "Backend: composer install..."
+cd "$BACKEND"
+composer install --no-interaction --prefer-dist --optimize-autoloader --quiet
+ok "Composer done"
+
+info "Backend: running migrations..."
+php artisan migrate --force --no-interaction
+ok "Migrations done"
+
+info "Backend: clearing caches..."
+php artisan config:clear   --quiet
+php artisan route:clear    --quiet
+php artisan view:clear     --quiet
+php artisan cache:clear    --quiet
+ok "Caches cleared"
+
+# ── 2. Frontend: npm ci + build ───────────────────────────────────────────────
+info "Frontend: npm ci..."
+cd "$FRONTEND"
+npm ci --silent
+ok "npm ci done"
+
+info "Frontend: building..."
+npm run build
+ok "Build done"
+
+# ── 3. Deploy: copy dist → public (preserve public/backend/) ─────────────────
+info "Deploying dist to public/..."
+
+if [ ! -d "$DIST" ]; then
+  fail "Build output not found: $DIST"
+fi
+
+# Remove everything in public/ except the backend/ subfolder
+find "$PUBLIC" -maxdepth 1 ! -name 'backend' ! -path "$PUBLIC" -exec rm -rf {} +
+
+cp -r "$DIST/." "$PUBLIC/"
+ok "Frontend deployed to public/"
+
+echo ""
+echo -e "${GREEN}  Deploy complete.${NC}"
+echo ""

@@ -132,48 +132,51 @@
 
       <!-- Tag/folder/sort filters -->
       <div class="secondary-filters">
-        <select class="filter-select" (change)="onTagFilter($event)">
-          <option value="">{{ 'files.list.filter_all_tags' | translate }}</option>
-          @for (tag of tags(); track tag.id) {
-            <option [value]="tag.id" [selected]="activeTagId() === tag.id">{{ tag.name }}</option>
-          }
-        </select>
+        <div class="custom-select">
+          <select (change)="onTagFilter($event)" [attr.aria-label]="'files.list.filter_all_tags' | translate">
+            <option value="">{{ 'files.list.filter_all_tags' | translate }}</option>
+            @for (tag of tags(); track tag.id) {
+              <option [value]="tag.id" [selected]="activeTagId() === tag.id">{{ tag.name }}</option>
+            }
+          </select>
+        </div>
 
-        <select class="filter-select" (change)="onFolderFilter($event)">
-          <option value="">{{ 'files.list.filter_all_folders' | translate }}</option>
-          @for (folder of flatFolders(); track folder.id) {
-            <option [value]="folder.id" [selected]="activeFolderId() === folder.id">{{ folder.name }}</option>
-          }
-        </select>
+        <div class="custom-select">
+          <select (change)="onFolderFilter($event)" [attr.aria-label]="'files.list.filter_all_folders' | translate">
+            <option value="">{{ 'files.list.filter_all_folders' | translate }}</option>
+            @for (folder of flatFolders(); track folder.id) {
+              <option [value]="folder.id" [selected]="activeFolderId() === folder.id">{{ folder.name }}</option>
+            }
+          </select>
+        </div>
 
-        <select class="filter-select" (change)="onSortByChange($event)">
-          <option value="date"      [selected]="sortBy() === 'date'">{{ 'files.list.sort_date' | translate }}</option>
-          <option value="extension" [selected]="sortBy() === 'extension'">{{ 'files.list.sort_extension' | translate }}</option>
-          <option value="size"      [selected]="sortBy() === 'size'">{{ 'files.list.sort_size' | translate }}</option>
-        </select>
+        <div class="custom-select custom-select--sort">
+          <select (change)="onSortByChange($event)" [attr.aria-label]="'files.list.sort_date' | translate">
+            <option value="date"      [selected]="sortBy() === 'date'">{{ 'files.list.sort_date' | translate }}</option>
+            <option value="extension" [selected]="sortBy() === 'extension'">{{ 'files.list.sort_extension' | translate }}</option>
+            <option value="size"      [selected]="sortBy() === 'size'">{{ 'files.list.sort_size' | translate }}</option>
+          </select>
+        </div>
 
-        <select class="filter-select" (change)="onSortOrderChange($event)">
-          <option value="desc" [selected]="sortOrder() === 'desc'">{{ 'files.list.sort_order_desc' | translate }}</option>
-          <option value="asc"  [selected]="sortOrder() === 'asc'">{{ 'files.list.sort_order_asc' | translate }}</option>
-        </select>
+        <div class="custom-select custom-select--order">
+          <select (change)="onSortOrderChange($event)" [attr.aria-label]="'files.list.sort_order_desc' | translate">
+            <option value="desc" [selected]="sortOrder() === 'desc'">{{ 'files.list.sort_order_desc' | translate }}</option>
+            <option value="asc"  [selected]="sortOrder() === 'asc'">{{ 'files.list.sort_order_asc' | translate }}</option>
+          </select>
+        </div>
       </div>
 
-      <!-- File type group chips (dynamic) -->
+      <!-- File type group button-group (dynamic, no icons) -->
       @if (visibleTypeGroups().length > 0) {
-        <div class="type-chips">
+        <div class="type-group" role="group" [attr.aria-label]="'files.list.type_filter' | translate">
           @for (g of visibleTypeGroups(); track g.key) {
             <button
-              class="type-chip"
-              [class.active]="activeTypeGroup() === g.key"
-              (click)="setTypeGroup(g.key)"
+              type="button"
+              class="type-group-btn"
+              [class.type-group-btn--active]="activeTypeGroup() === g.key"
+              (click)="setTypeGroup(activeTypeGroup() === g.key ? '' : g.key)"
             >
-              <span aria-hidden="true">{{ g.icon }}</span>
               {{ g.label | translate }}
-            </button>
-          }
-          @if (activeTypeGroup()) {
-            <button class="type-chip type-chip--reset" (click)="setTypeGroup('')">
-              {{ 'files.list.type_all' | translate }} ✕
             </button>
           }
         </div>
@@ -262,4 +265,3 @@
         </div>
       }
     </div>
-  

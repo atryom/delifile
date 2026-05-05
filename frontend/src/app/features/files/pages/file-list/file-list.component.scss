@@ -57,16 +57,103 @@
 .search-input { flex: 1; min-width: 180px; padding: 8px 14px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; }
 .search-input:focus { border-color: #6366f1; }
 
-.secondary-filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-.filter-select { padding: 7px 12px; border: 1px solid #e5e7eb; border-radius: 7px; font-size: 0.87rem; background: #fff; outline: none; cursor: pointer; color: #374151; }
-.filter-select:focus { border-color: #6366f1; }
+/* ── Secondary filters row ─────────────────────────────── */
+.secondary-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
 
-.type-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.type-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border: 1px solid #e5e7eb; border-radius: 99px; background: #fff; font-size: 0.83rem; color: #374151; cursor: pointer; transition: all 0.15s; }
-.type-chip:hover { border-color: #6366f1; color: #6366f1; background: #f0f4ff; }
-.type-chip.active { border-color: #6366f1; background: #6366f1; color: #fff; }
-.type-chip--reset { border-color: #d1d5db; color: #9ca3af; }
-.type-chip--reset:hover { border-color: #ef4444; color: #ef4444; background: #fff5f5; }
+/* ── Custom select ─────────────────────────────────────── */
+.custom-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 7px 30px 7px 11px;
+    border: 1px solid #e2e4e9;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: #fff;
+    color: #374151;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    height: 34px;
+    white-space: nowrap;
+
+    &:hover { border-color: #c4c8d4; }
+
+    &:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+    }
+  }
+
+  // SVG chevron
+  &::after {
+    content: '';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    width: 10px;
+    height: 6px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: contain;
+  }
+
+  &--sort select   { min-width: 120px; }
+  &--order select  { min-width: 90px; }
+}
+
+/* ── Type button-group ─────────────────────────────────── */
+.type-group {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  border: 1px solid #e2e4e9;
+  border-radius: 8px;
+  overflow: hidden;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.type-group-btn {
+  padding: 6px 14px;
+  border: none;
+  border-right: 1px solid #e2e4e9;
+  background: #fff;
+  color: #6b7280;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  height: 32px;
+  line-height: 1;
+
+  &:last-child { border-right: none; }
+
+  &:hover:not(.type-group-btn--active) {
+    background: #f5f6f8;
+    color: #374151;
+  }
+
+  &--active {
+    background: #6366f1;
+    color: #fff;
+    font-weight: 600;
+  }
+}
 
 .loading-state, .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
 .empty-icon { font-size: 3rem; display: block; margin-bottom: 12px; }
