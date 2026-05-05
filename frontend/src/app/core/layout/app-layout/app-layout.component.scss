@@ -49,6 +49,56 @@
   cursor: not-allowed;
 }
 
+/* ── Notification enable banner ─────────────────────────── */
+.notif-enable-banner {
+  position: fixed;
+  top: 0;
+  left: 240px;
+  right: 0;
+  z-index: 199;
+  background: #fef2f2;
+  border-bottom: 1px solid #f87171;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+  color: #991b1b;
+}
+
+.notif-enable-banner--offset {
+  top: 42px; /* push down when verify-banner is also visible */
+}
+
+.notif-enable-text {
+  flex: 1;
+}
+
+.btn-notif-enable {
+  white-space: nowrap;
+  background: #dc2626;
+  border: none;
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-notif-enable:hover { background: #b91c1c; }
+
+.btn-notif-close {
+  background: none;
+  border: none;
+  color: #b91c1c;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.btn-notif-close:hover { opacity: 0.7; }
+
 /* ── Sidebar ────────────────────────────────────────────── */
 .sidebar {
   width: 240px;
@@ -212,6 +262,10 @@
   padding-top: 42px;
 }
 
+.main-content.has-two-banners {
+  padding-top: 84px;
+}
+
 /* ── Mobile header ──────────────────────────────────────── */
 .mobile-header {
   display: none;
@@ -292,5 +346,19 @@
 
   .main-content.has-banner {
     padding-top: calc(56px + 42px);
+  }
+
+  .main-content.has-two-banners {
+    padding-top: calc(56px + 84px);
+  }
+
+  .verify-banner,
+  .notif-enable-banner {
+    left: 0;
+    top: 56px;
+  }
+
+  .notif-enable-banner--offset {
+    top: calc(56px + 42px);
   }
 }

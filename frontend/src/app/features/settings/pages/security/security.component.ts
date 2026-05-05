@@ -80,7 +80,14 @@ export class SecurityComponent implements OnInit {
   private _syncSettingsFromUser(): void {
     const user = this.authState.user();
     if (!user) return;
-    this.notificationsEnabled.set(user.notifications_enabled ?? true);
+
+    // "Global notifications" should reflect ACTUAL browser permission.
+    // Even if backend says enabled, the toggle stays OFF when browser hasn't granted permission.
+    const browserPermission = ('Notification' in window) ? Notification.permission : 'denied';
+    const backendEnabled    = user.notifications_enabled ?? true;
+    this.notificationsEnabled.set(browserPermission === 'granted' && backendEnabled);
+
+    // Sub-settings keep their backend-stored state regardless of browser permission
     this.notifyNewFiles.set(user.notify_new_files ?? true);
     this.notifyContactsAdded.set(user.notify_contacts_added ?? true);
     this.allowContactsWithout.set(user.allow_contacts_without_confirmation ?? true);
@@ -192,8 +199,16 @@ export class SecurityComponent implements OnInit {
   }
 
   async toggleGlobalNotifications(enabled: boolean): Promise<void> {
-    if (enabled && this.notifService.permission() === 'default') {
-      await this.notifService.requestPermission();
+    if (enabled) {
+      const perm = this.notifService.permission();
+      if (perm !== 'granted') {
+        // Must request browser permission — only enable toggle if browser grants it
+        const result = await this.notifService.requestPermission();
+        if (result !== 'granted') {
+          // Browser denied or dismissed — do not enable
+          return;
+        }
+      }
     }
     this.notificationsEnabled.set(enabled);
     this._saveSettings();

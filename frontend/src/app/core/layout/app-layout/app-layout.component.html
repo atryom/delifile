@@ -21,6 +21,19 @@
           </div>
         }
 
+        <!-- Notification enable banner (red, like verify but below it) -->
+        @if (showNotifBanner()) {
+          <div class="notif-enable-banner"
+               [class.notif-enable-banner--offset]="hasVerifyBanner()"
+               role="status">
+            <span class="notif-enable-text">🔔 {{ 'notifications.banner_text' | translate }}</span>
+            <button class="btn-notif-enable" (click)="enableNotifications()">
+              {{ 'notifications.banner_btn' | translate }}
+            </button>
+            <button class="btn-notif-close" (click)="notifService.dismissBanner()" aria-label="Закрыть">×</button>
+          </div>
+        }
+
         <!-- Mobile top bar -->
         <header class="mobile-header">
           <span class="mobile-brand">
@@ -160,7 +173,10 @@
       }
 
       <!-- Main content -->
-      <main class="main-content" [class.no-sidebar]="!isAuth()" [class.has-banner]="needsVerification() || resent()">
+      <main class="main-content"
+            [class.no-sidebar]="!isAuth()"
+            [class.has-banner]="hasVerifyBanner() || showNotifBanner()"
+            [class.has-two-banners]="hasVerifyBanner() && showNotifBanner()">
         <ng-content/>
       </main>
     </div>
