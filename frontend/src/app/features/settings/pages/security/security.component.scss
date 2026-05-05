@@ -117,3 +117,16 @@
   cursor: pointer;
 }
 .btn-accept:hover { background: #4f46e5; }
+
+@media (max-width: 600px) {
+  .page { padding: 16px 12px; }
+  .settings-section { padding: 16px; }
+  .section-header { flex-direction: column; gap: 10px; }
+  .btn-danger-outline { align-self: flex-start; }
+  .session-item { flex-wrap: wrap; }
+  .session-info { flex: 1 1 auto; min-width: 0; }
+  .btn-mini-danger { align-self: flex-start; }
+  .request-item { flex-wrap: wrap; }
+  .request-actions { flex-wrap: wrap; }
+  .form-row-actions { flex-wrap: wrap; }
+}

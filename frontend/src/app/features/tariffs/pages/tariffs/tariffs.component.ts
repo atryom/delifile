@@ -140,7 +140,7 @@ import { TariffPlanInfo, TariffUsage } from '../../../../shared/models/api.model
   `,
   styles: [`
     .tariffs-page { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
-    .tariffs-header { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+    .tariffs-header { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 32px; }
     .tariffs-header h1 { margin: 0; font-size: 1.6rem; color: #1a1a2e; }
     .btn-back { color: #6366f1; text-decoration: none; font-size: 0.9rem; }
     .btn-back:hover { text-decoration: underline; }
@@ -176,7 +176,7 @@ import { TariffPlanInfo, TariffUsage } from '../../../../shared/models/api.model
     .progress-bar--warn { background: #f59e0b; }
     .progress-bar--danger { background: #dc2626; }
 
-    .plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+    .plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
 
     .plan-card {
       background: #fff;
@@ -185,6 +185,8 @@ import { TariffPlanInfo, TariffUsage } from '../../../../shared/models/api.model
       padding: 28px 24px;
       position: relative;
       transition: border-color 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
     }
     .plan-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
     .plan-card--current { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
@@ -203,7 +205,7 @@ import { TariffPlanInfo, TariffUsage } from '../../../../shared/models/api.model
     .plan-price { margin-bottom: 20px; }
     .price-amount { font-size: 1.1rem; font-weight: 600; color: #1a1a2e; }
 
-    .plan-features { list-style: none; padding: 0; margin: 0 0 24px; display: flex; flex-direction: column; gap: 10px; }
+    .plan-features { list-style: none; padding: 0; margin: 0 0 24px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
     .plan-features li { font-size: 0.9rem; color: #374151; padding-left: 20px; position: relative; }
     .plan-features li::before { content: '✓'; position: absolute; left: 0; color: #10b981; font-weight: 700; }
 
@@ -222,6 +224,14 @@ import { TariffPlanInfo, TariffUsage } from '../../../../shared/models/api.model
       background: #d1fae5; color: #065f46; font-size: 0.9rem; font-weight: 600;
     }
     .info-text { color: #6b7280; }
+
+    @media (max-width: 600px) {
+      .tariffs-page { padding: 16px 12px; }
+      .usage-card { padding: 16px; }
+      .usage-meta { flex-wrap: wrap; gap: 4px; }
+      .usage-values { font-size: 0.78rem; }
+      .plans-grid { grid-template-columns: 1fr; }
+    }
   `],
 })
 export class TariffsComponent {

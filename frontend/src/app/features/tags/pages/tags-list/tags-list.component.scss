@@ -31,3 +31,14 @@
 .modal h3 { margin: 0 0 10px; font-size: 1.1rem; }
 .modal p { color: #374151; font-size: 0.93rem; margin: 0 0 20px; }
 .modal-actions { display: flex; gap: 10px; }
+
+@media (max-width: 600px) {
+  .page { padding: 16px 12px; }
+  .add-form { flex-wrap: wrap; }
+  .add-input { min-width: 0; width: 100%; }
+  .add-form .btn-primary { width: 100%; justify-content: center; }
+  .tag-row { flex-wrap: wrap; gap: 8px; }
+  .tag-actions { flex-wrap: wrap; gap: 4px; }
+  .edit-row { flex-wrap: wrap; }
+  .edit-input { min-width: 0; width: 100%; }
+}

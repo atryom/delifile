@@ -30,3 +30,15 @@
 .modal p { color: #374151; font-size: 0.93rem; margin: 0 0 20px; }
 .modal-actions { display: flex; gap: 10px; }
 .alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #dc2626; border-radius: 6px; padding: 10px 14px; font-size: 0.88rem; margin-bottom: 12px; }
+
+@media (max-width: 600px) {
+  .page { padding: 16px 12px; }
+  .page-header { flex-wrap: wrap; gap: 8px; }
+  .node-row { flex-wrap: wrap; gap: 6px; }
+  .folder-name { min-width: 0; word-break: break-word; }
+  .node-actions { flex-wrap: wrap; gap: 4px; }
+  .inline-create { flex-wrap: wrap; }
+  .create-input { min-width: 0; width: 100%; }
+  .edit-row { flex-wrap: wrap; }
+  .edit-input { min-width: 0; width: 100%; }
+}
