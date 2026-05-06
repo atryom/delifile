@@ -13,6 +13,7 @@ import { UserSettingsApiService } from '../../api/user-settings-api.service';
 import { FilesApiService } from '../../api/files-api.service';
 import { NotificationService } from '../../notifications/notification.service';
 import { FooterComponent } from '../../../shared/components/footer/footer.component';
+import { PwaInstallService } from '../../services/pwa-install.service';
 
 const POLL_INTERVAL_MS = 60_000; // 60 seconds
 
@@ -30,7 +31,8 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   private readonly router       = inject(Router);
   private readonly settingsApi  = inject(UserSettingsApiService);
   private readonly filesApi     = inject(FilesApiService);
-  readonly notifService = inject(NotificationService);
+  readonly notifService  = inject(NotificationService);
+  readonly pwaInstall    = inject(PwaInstallService);
   private readonly translate    = inject(TranslateService);
 
   readonly isAuth          = this.authState.isAuthenticated;

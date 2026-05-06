@@ -63,7 +63,8 @@ export class LoginComponent {
         if (res.data.user.account_status === 'blocked_unverified_email') {
           this.router.navigate(['/account-blocked']);
         } else {
-          this.router.navigate(['/files']);
+          const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+          this.router.navigateByUrl(returnUrl ?? '/files');
         }
       },
       error: (err: ApiError) => {

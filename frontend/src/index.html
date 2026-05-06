@@ -13,11 +13,17 @@
   <meta name="apple-mobile-web-app-title" content="DeliFile">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
-  <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
+  <link rel="icon" type="image/png" href="/assets/icons/icon100.png">
 </head>
 <body>
 <app-root></app-root>
 <script>
+  // Capture install prompt before Angular bootstraps
+  window.__pwaInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    window.__pwaInstallPrompt = e;
+  });
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js').catch(function (e) {
