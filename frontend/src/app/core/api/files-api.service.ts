@@ -58,8 +58,14 @@ export class FilesApiService {
     return this.api.post('/files/init-upload', data);
   }
 
-  completeUpload(fileId: string): Observable<ApiResponse<CompleteUploadResponse>> {
-    return this.api.post('/files/complete-upload', { file_id: fileId });
+  completeUpload(fileId: string, thumbnailKey?: string): Observable<ApiResponse<CompleteUploadResponse>> {
+    const body: Record<string, unknown> = { file_id: fileId };
+    if (thumbnailKey) body['thumbnail_key'] = thumbnailKey;
+    return this.api.post('/files/complete-upload', body);
+  }
+
+  updateDescription(id: string, description: string | null): Observable<ApiResponse<{ description: string | null }>> {
+    return this.api.patch(`/files/${id}/description`, { description });
   }
 
   cancelUpload(fileId: string): Observable<ApiResponse<Record<string, never>>> {

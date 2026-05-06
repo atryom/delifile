@@ -120,6 +120,7 @@
                 <span>{{ 'nav.contacts' | translate }}</span>
               </a>
             </li>
+            <!-- Activity link hidden for now, may be restored later
             <li>
               <a routerLink="/activity" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
                 <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
@@ -131,6 +132,7 @@
                 <span>{{ 'nav.activity' | translate }}</span>
               </a>
             </li>
+            -->
             <li>
               <a routerLink="/support" routerLinkActive="active" class="nav-link" (click)="closeSidebar()">
                 <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
@@ -169,7 +171,7 @@
             <div class="sidebar-plan">
               <span class="plan-badge plan-badge--{{ userPlan() ?? 'free' }}">{{ planLabel() }}</span>
               <a routerLink="/tariffs" class="btn-change-plan" (click)="closeSidebar()">
-                {{ 'layout.sidebar.change_plan' | translate }}
+                {{ 'layout.sidebar.tariff_usage' | translate }}
               </a>
             </div>
             <span class="user-email" [title]="userEmail()">{{ userEmail() }}</span>
@@ -187,6 +189,7 @@
             [class.has-banner]="hasVerifyBanner() || showNotifBanner()"
             [class.has-two-banners]="hasVerifyBanner() && showNotifBanner()">
         <ng-content/>
+        <app-footer/>
       </main>
     </div>
   

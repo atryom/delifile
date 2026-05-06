@@ -1,0 +1,82 @@
+    <div class="tariffs-page">
+      <div class="tariffs-header">
+        <a routerLink="/files" class="btn-back">{{ 'common.prev' | translate }}</a>
+        <h1>{{ 'tariffs.title' | translate }}</h1>
+      </div>
+
+      @if (loading()) {
+        <p class="info-text">{{ 'common.loading' | translate }}</p>
+      } @else {
+        @if (usage()) {
+          <div class="usage-card">
+            <h2 class="usage-title">{{ 'tariffs.usage.title' | translate }}</h2>
+            <div class="usage-rows">
+
+              <div class="usage-row">
+                <div class="usage-meta">
+                  <span class="usage-name">{{ 'tariffs.usage.storage' | translate }}</span>
+                  <span class="usage-values">
+                    {{ formatBytes(usage()!.storage_used_bytes) }}
+                    / {{ formatBytes(usage()!.storage_limit_bytes) }}
+                  </span>
+                </div>
+                <div class="progress-bar-wrap" role="progressbar"
+                     [attr.aria-valuenow]="storagePercent()"
+                     aria-valuemin="0" aria-valuemax="100">
+                  <div class="progress-bar" [style.width.%]="storagePercent()"
+                       [class.progress-bar--warn]="storagePercent() >= 80"
+                       [class.progress-bar--danger]="storagePercent() >= 95">
+                  </div>
+                </div>
+                <span class="usage-pct">{{ storagePercent() | number:'1.0-0' }}%</span>
+              </div>
+
+              <div class="usage-row">
+                <div class="usage-meta">
+                  <span class="usage-name">{{ 'tariffs.usage.devices' | translate }}</span>
+                  <span class="usage-values">
+                    {{ usage()!.device_count }}
+                    @if (usage()!.device_limit !== null) {
+                      / {{ usage()!.device_limit }}
+                    } @else {
+                      / {{ 'tariffs.devices_unlimited' | translate }}
+                    }
+                  </span>
+                </div>
+                @if (usage()!.device_limit !== null) {
+                  <div class="progress-bar-wrap" role="progressbar"
+                       [attr.aria-valuenow]="devicePercent()"
+                       aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar" [style.width.%]="devicePercent()"
+                         [class.progress-bar--warn]="devicePercent() >= 80"
+                         [class.progress-bar--danger]="devicePercent() >= 100">
+                    </div>
+                  </div>
+                  <span class="usage-pct">{{ devicePercent() | number:'1.0-0' }}%</span>
+                }
+              </div>
+
+              <div class="usage-row">
+                <div class="usage-meta">
+                  <span class="usage-name">{{ 'tariffs.usage.max_file' | translate }}</span>
+                  <span class="usage-values">
+                    {{ formatBytes(usage()!.max_file_size_bytes) }}
+                    / {{ formatBytes(usage()!.file_size_limit_bytes) }}
+                  </span>
+                </div>
+                <div class="progress-bar-wrap" role="progressbar"
+                     [attr.aria-valuenow]="maxFilePercent()"
+                     aria-valuemin="0" aria-valuemax="100">
+                  <div class="progress-bar" [style.width.%]="maxFilePercent()"
+                       [class.progress-bar--warn]="maxFilePercent() >= 80"
+                       [class.progress-bar--danger]="maxFilePercent() >= 100">
+                  </div>
+                </div>
+                <span class="usage-pct">{{ maxFilePercent() | number:'1.0-0' }}%</span>
+              </div>
+
+            </div>
+          </div>
+        }
+      }
+    </div>

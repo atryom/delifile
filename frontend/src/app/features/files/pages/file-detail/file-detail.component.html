@@ -69,6 +69,11 @@
                 <button class="btn-action btn-primary" (click)="download()" [disabled]="actionPending()">
                   {{ 'files.detail.download' | translate }}
                 </button>
+                @if (canViewInBrowser()) {
+                  <button class="btn-action btn-view" (click)="openInBrowser()">
+                    {{ 'files.detail.view_in_browser' | translate }}
+                  </button>
+                }
               }
               <button
                 class="btn-action"
@@ -88,17 +93,44 @@
               </button>
             </div>
 
-            <!-- Share actions (owner only) -->
-            @if (file()!.is_owner) {
-              <div class="share-actions">
-                <button class="btn-action btn-share" (click)="showShareDialog.set(true)">
-                  {{ 'files.detail.share' | translate }}
-                </button>
-                <button class="btn-action btn-share" (click)="showLinkDialog.set(true)">
-                  {{ 'files.detail.create_link' | translate }}
-                </button>
-              </div>
-            }
+            <!-- Share actions (available to anyone with access) -->
+            <div class="share-actions">
+              <button class="btn-action btn-share" (click)="showShareDialog.set(true)">
+                {{ 'files.detail.share' | translate }}
+              </button>
+              <button class="btn-action btn-share" (click)="showLinkDialog.set(true)">
+                {{ 'files.detail.create_link' | translate }}
+              </button>
+            </div>
+
+            <!-- Description -->
+            <div class="section">
+              <h3 class="section-title">{{ 'files.detail.description' | translate }}</h3>
+              @if (!editingDescription()) {
+                <div class="description-row">
+                  <span class="description-text">
+                    {{ file()!.description || ('files.detail.no_description' | translate) }}
+                  </span>
+                  <button class="btn-mini" (click)="openDescriptionEdit()">{{ 'common.edit' | translate }}</button>
+                </div>
+              } @else {
+                <div class="description-edit">
+                  <textarea
+                    class="description-textarea"
+                    [ngModel]="descriptionDraft"
+                    (ngModelChange)="descriptionDraft = $event"
+                    [attr.aria-label]="'files.detail.description' | translate"
+                    maxlength="500"
+                    rows="3"
+                    [placeholder]="'files.detail.description_placeholder' | translate"
+                  ></textarea>
+                  <div class="description-edit-actions">
+                    <button class="btn-mini btn-mini-primary" (click)="saveDescription()">{{ 'common.save' | translate }}</button>
+                    <button class="btn-mini" (click)="cancelDescriptionEdit()">{{ 'common.cancel' | translate }}</button>
+                  </div>
+                </div>
+              }
+            </div>
 
             <!-- Tags (editable for owner) -->
             <div class="section">

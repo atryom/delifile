@@ -34,7 +34,8 @@ class FileService
     public function initUpload(User $user, array $data): array
     {
         return DB::transaction(function () use ($user, $data) {
-            $storageKey = 'files/' . $user->id . '/' . Str::ulid() . '/' . $data['original_name'];
+            $ulid       = Str::ulid();
+            $storageKey = 'files/' . $user->id . '/' . $ulid . '/' . $data['original_name'];
 
             $file = File::create([
                 'owner_id'      => $user->id,
@@ -47,10 +48,9 @@ class FileService
                 'expires_at'    => now()->addHours(config('app.file_default_ttl_hours', 12)),
             ]);
 
-            // Generate S3 presigned upload URL
             $presignedUrl = $this->generatePresignedPutUrl($storageKey, $data['mime_type']);
 
-            return [
+            $result = [
                 'file'   => [
                     'id'     => $file->id,
                     'status' => $file->status->value,
@@ -58,11 +58,22 @@ class FileService
                 'upload' => [
                     'method'  => 'PUT',
                     'url'     => $presignedUrl,
-                    'headers' => [
-                        'Content-Type' => $data['mime_type'],
-                    ],
+                    'headers' => ['Content-Type' => $data['mime_type']],
                 ],
             ];
+
+            // Optional video thumbnail presigned URL
+            if (!empty($data['thumbnail_name']) && !empty($data['thumbnail_mime'])) {
+                $thumbKey = 'files/' . $user->id . '/' . $ulid . '/thumb_' . $data['thumbnail_name'];
+                $result['thumbnail'] = [
+                    'key'    => $thumbKey,
+                    'method' => 'PUT',
+                    'url'    => $this->generatePresignedPutUrl($thumbKey, $data['thumbnail_mime']),
+                    'headers' => ['Content-Type' => $data['thumbnail_mime']],
+                ];
+            }
+
+            return $result;
         });
     }
 
@@ -70,19 +81,21 @@ class FileService
      * Step 3 of upload flow.
      * Mark file as available, create owner access record, log activity.
      */
-    public function completeUpload(File $file, User $user): array
+    public function completeUpload(File $file, User $user, ?string $thumbnailKey = null): array
     {
-        return DB::transaction(function () use ($file, $user) {
-            $file->update(['status' => FileStatus::Available]);
+        return DB::transaction(function () use ($file, $user, $thumbnailKey) {
+            $update = ['status' => FileStatus::Available];
+            if ($thumbnailKey) {
+                $update['thumbnail_key'] = $thumbnailKey;
+            }
+            $file->update($update);
 
-            // Create owner access record
             FileUserAccess::firstOrCreate([
                 'file_id'     => $file->id,
                 'user_id'     => $user->id,
                 'access_type' => AccessType::Owner,
             ]);
 
-            // Log activity
             $this->activityService->log($file, $user, ActivityType::Uploaded);
 
             return [
@@ -307,6 +320,7 @@ class FileService
             'access_type'   => $access?->access_type?->value,
             'is_favorite'   => $access?->is_favorite ?? false,
             'is_pinned'     => $access?->pinned_at !== null,
+            'description'   => $access?->description,
             'folder_id'     => $file->folder_id,
             'tags'          => $file->tags->map(fn ($t) => ['id' => $t->id, 'name' => $t->name]),
             'owner'         => [
@@ -323,20 +337,47 @@ class FileService
             $base['link_image_url']   = $file->link_image_url;
             $base['link_site_name']   = $file->link_site_name;
             $base['preview_url']      = null;
-        } elseif ($file->storage_key && str_starts_with($file->mime_type ?? '', 'image/') && $file->isAvailable()) {
-            try {
-                $base['preview_url'] = Storage::disk('s3')->temporaryUrl(
-                    $file->storage_key,
-                    now()->addMinutes(60)
-                );
-            } catch (\Throwable) {
-                $base['preview_url'] = null;
-            }
+            $base['view_url']         = null;
+        } elseif ($file->storage_key && $file->isAvailable()) {
+            $mime = $file->mime_type ?? '';
+            [$previewUrl, $viewUrl] = $this->resolvePreviewAndViewUrls($file, $mime);
+            $base['preview_url'] = $previewUrl;
+            $base['view_url']    = $viewUrl;
         } else {
             $base['preview_url'] = null;
+            $base['view_url']    = null;
         }
 
         return $base;
+    }
+
+    private function resolvePreviewAndViewUrls(File $file, string $mime): array
+    {
+        $previewUrl = null;
+        $viewUrl    = null;
+
+        try {
+            $isImage = str_starts_with($mime, 'image/');
+            $isVideo = str_starts_with($mime, 'video/');
+            $isAudio = str_starts_with($mime, 'audio/');
+            $isPdf   = str_contains($mime, 'pdf');
+
+            if ($isImage) {
+                $previewUrl = Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addMinutes(60));
+                $viewUrl    = $previewUrl;
+            } elseif ($isVideo) {
+                if ($file->thumbnail_key) {
+                    $previewUrl = Storage::disk('s3')->temporaryUrl($file->thumbnail_key, now()->addMinutes(60));
+                }
+                $viewUrl = Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addHours(2));
+            } elseif ($isAudio || $isPdf) {
+                $viewUrl = Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addHours(2));
+            }
+        } catch (\Throwable) {
+            // ignore signing errors
+        }
+
+        return [$previewUrl, $viewUrl];
     }
 
     /**
@@ -409,10 +450,11 @@ class FileService
         }
 
         $total = $query->count();
-        $items = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
+        $items = $query->with(['accesses' => fn ($q) => $q->where('user_id', $user->id)])
+                       ->offset(($page - 1) * $perPage)->limit($perPage)->get();
 
         return [
-            'items'      => $items->map(fn ($f) => $this->buildListItem($f)),
+            'items'      => $items->map(fn ($f) => $this->buildListItem($f, $user)),
             'pagination' => [
                 'page'                  => $page,
                 'per_page'              => $perPage,
@@ -513,8 +555,13 @@ class FileService
         return 'other';
     }
 
-    private function buildListItem(File $f): array
+    private function buildListItem(File $f, ?User $user = null): array
     {
+        $access = $user ? $f->relationLoaded('accesses')
+            ? $f->accesses->firstWhere('user_id', $user->id)
+            : FileUserAccess::where('file_id', $f->id)->where('user_id', $user->id)->first()
+            : null;
+
         $item = [
             'id'            => $f->id,
             'content_kind'  => $f->content_kind ?? 'binary_file',
@@ -524,6 +571,7 @@ class FileService
             'status'        => $f->status->value,
             'expires_at'    => $f->expires_at?->toIso8601String(),
             'uploaded_at'   => $f->created_at?->toIso8601String(),
+            'description'   => $access?->description,
             'preview_url'   => null,
         ];
 
@@ -532,14 +580,16 @@ class FileService
             $item['link_title']     = $f->link_title;
             $item['link_image_url'] = $f->link_image_url;
             $item['link_site_name'] = $f->link_site_name;
-        } elseif ($f->storage_key && str_starts_with($f->mime_type ?? '', 'image/') && $f->isAvailable()) {
-            try {
-                $item['preview_url'] = Storage::disk('s3')->temporaryUrl(
-                    $f->storage_key,
-                    now()->addMinutes(60)
-                );
-            } catch (\Throwable) {
-                $item['preview_url'] = null;
+        } elseif ($f->storage_key && $f->isAvailable()) {
+            $mime = $f->mime_type ?? '';
+            if (str_starts_with($mime, 'image/')) {
+                try {
+                    $item['preview_url'] = Storage::disk('s3')->temporaryUrl($f->storage_key, now()->addMinutes(60));
+                } catch (\Throwable) {}
+            } elseif (str_starts_with($mime, 'video/') && $f->thumbnail_key) {
+                try {
+                    $item['preview_url'] = Storage::disk('s3')->temporaryUrl($f->thumbnail_key, now()->addMinutes(60));
+                } catch (\Throwable) {}
             }
         }
 

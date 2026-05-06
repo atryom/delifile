@@ -12,6 +12,7 @@ import { AuthApiService } from '../../api/auth-api.service';
 import { UserSettingsApiService } from '../../api/user-settings-api.service';
 import { FilesApiService } from '../../api/files-api.service';
 import { NotificationService } from '../../notifications/notification.service';
+import { FooterComponent } from '../../../shared/components/footer/footer.component';
 
 const POLL_INTERVAL_MS = 60_000; // 60 seconds
 
@@ -19,7 +20,7 @@ const POLL_INTERVAL_MS = 60_000; // 60 seconds
   selector: 'app-layout',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, TranslateModule],
+  imports: [RouterLink, RouterLinkActive, TranslateModule, FooterComponent],
   templateUrl: './app-layout.component.html',
   styleUrl: './app-layout.component.scss',
 })

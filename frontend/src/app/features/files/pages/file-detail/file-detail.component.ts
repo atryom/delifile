@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
@@ -12,7 +13,7 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
   selector: 'app-file-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, ShareContactDialogComponent, CreateLinkDialogComponent, TranslateModule],
+  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, TranslateModule],
   templateUrl: './file-detail.component.html',
   styleUrl: './file-detail.component.scss',
 })
@@ -31,6 +32,9 @@ export class FileDetailComponent implements OnInit {
   readonly links         = signal<ShareLink[]>([]);
   readonly accesses      = signal<FileAccess[]>([]);
   readonly activity      = signal<ActivityLog[]>([]);
+
+  readonly editingDescription = signal(false);
+  descriptionDraft = '';
   readonly showShareDialog = signal(false);
   readonly showLinkDialog  = signal(false);
 
@@ -103,6 +107,44 @@ export class FileDetailComponent implements OnInit {
     this.filesApi.download(this.id()).subscribe((res) => {
       window.open(res.data.url, '_blank');
     });
+  }
+
+  openInBrowser(): void {
+    const url = this.file()?.view_url;
+    if (url) window.open(url, '_blank');
+  }
+
+  canViewInBrowser(): boolean {
+    const f = this.file();
+    if (!f || f.content_kind === 'url_file') return false;
+    const mime = f.mime_type ?? '';
+    return !!f.view_url && (
+      mime.startsWith('image/') ||
+      mime.startsWith('video/') ||
+      mime.startsWith('audio/') ||
+      mime.includes('pdf')
+    );
+  }
+
+  openDescriptionEdit(): void {
+    this.descriptionDraft = this.file()?.description ?? '';
+    this.editingDescription.set(true);
+  }
+
+  saveDescription(): void {
+    const desc = this.descriptionDraft.trim() || null;
+    this.filesApi.updateDescription(this.id(), desc).subscribe({
+      next: (res) => {
+        this.file.update(f => f ? { ...f, description: res.data.description } : f);
+        this.editingDescription.set(false);
+        this.showFeedback(this.translate.instant('files.detail.description_saved'));
+      },
+      error: () => this.editingDescription.set(false),
+    });
+  }
+
+  cancelDescriptionEdit(): void {
+    this.editingDescription.set(false);
   }
 
   copyUrlLink(): void {

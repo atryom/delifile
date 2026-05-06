@@ -1,0 +1,45 @@
+.tariffs-page { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+.tariffs-header { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 32px; }
+.tariffs-header h1 { margin: 0; font-size: 1.6rem; color: #1a1a2e; }
+.btn-back { color: #6366f1; text-decoration: none; font-size: 0.9rem; }
+.btn-back:hover { text-decoration: underline; }
+
+.usage-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 24px 28px;
+  margin-bottom: 28px;
+}
+.usage-title { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin: 0 0 18px; }
+.usage-rows { display: flex; flex-direction: column; gap: 18px; }
+.usage-row { display: flex; flex-direction: column; gap: 6px; }
+.usage-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.usage-name { font-size: 0.85rem; font-weight: 600; color: #374151; }
+.usage-values { font-size: 0.8rem; color: #9ca3af; }
+.usage-pct { font-size: 0.78rem; color: #9ca3af; text-align: right; }
+
+.progress-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: #6366f1;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.progress-bar--warn { background: #f59e0b; }
+.progress-bar--danger { background: #dc2626; }
+
+.info-text { color: #6b7280; }
+
+@media (max-width: 600px) {
+  .tariffs-page { padding: 16px 12px; }
+  .usage-card { padding: 16px; }
+  .usage-meta { flex-wrap: wrap; gap: 4px; }
+  .usage-values { font-size: 0.78rem; }
+}

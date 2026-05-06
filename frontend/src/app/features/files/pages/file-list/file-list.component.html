@@ -239,6 +239,9 @@
                 }
                 <div class="file-info">
                   <p class="file-name" [title]="file.original_name">{{ file.original_name }}</p>
+                  @if (file.description) {
+                    <p class="file-desc" [title]="file.description">{{ file.description }}</p>
+                  }
                   <p class="file-meta">
                     {{ formatSize(file.size) }}
                     <span class="meta-sep">·</span>

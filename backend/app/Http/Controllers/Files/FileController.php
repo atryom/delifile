@@ -144,9 +144,39 @@ class FileController extends Controller
             return $this->forbidden();
         }
 
-        $result = $this->fileService->completeUpload($file, $request->user());
+        $result = $this->fileService->completeUpload(
+            $file,
+            $request->user(),
+            $request->input('thumbnail_key')
+        );
 
         return $this->success(__('messages.files.upload_completed'), $result);
+    }
+
+    /**
+     * PATCH /api/v1/files/{fileId}/description
+     * Update per-user description for a file.
+     */
+    public function updateDescription(Request $request, string $fileId): JsonResponse
+    {
+        $request->validate(['description' => 'nullable|string|max:500']);
+
+        $file = File::find($fileId);
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
+            return $this->notFound('File not found');
+        }
+
+        $access = \App\Models\FileUserAccess::where('file_id', $file->id)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (!$access) {
+            return $this->notFound('Access not found');
+        }
+
+        $access->update(['description' => $request->input('description')]);
+
+        return $this->success('Description updated', ['description' => $access->description]);
     }
 
     /**

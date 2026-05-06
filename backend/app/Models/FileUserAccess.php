@@ -20,6 +20,7 @@ class FileUserAccess extends Model
         'contact_id',
         'access_type',
         'is_favorite',
+        'description',
         'pinned_at',
         'saved_at',
     ];

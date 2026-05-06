@@ -77,6 +77,18 @@
 .btn-mini { padding: 3px 10px; font-size: 0.78rem; border: 1px solid #e5e7eb; border-radius: 5px; cursor: pointer; background: #fff; }
 .btn-mini:hover { background: #f9fafb; }
 .btn-mini-danger { color: #ef4444; border-color: #fca5a5; }
+.btn-mini-primary { background: #6366f1; color: #fff; border-color: #6366f1; }
+.btn-mini-primary:hover { background: #4f46e5; }
+
+.btn-action.btn-view { background: #f0f9ff; border-color: #7dd3fc; color: #0369a1; }
+.btn-action.btn-view:hover { background: #e0f2fe; }
+
+.description-row { display: flex; align-items: flex-start; gap: 10px; }
+.description-text { font-size: 0.88rem; color: #374151; flex: 1; line-height: 1.5; font-style: italic; }
+.description-edit { display: flex; flex-direction: column; gap: 8px; }
+.description-textarea { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.88rem; resize: vertical; outline: none; font-family: inherit; }
+.description-textarea:focus { border-color: #6366f1; }
+.description-edit-actions { display: flex; gap: 6px; }
 
 .access-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; font-size: 0.85rem; }
 .access-item:last-child { border: none; }

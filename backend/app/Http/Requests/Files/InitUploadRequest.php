@@ -17,10 +17,13 @@ class InitUploadRequest extends FormRequest
         $maxBytes = $user ? $user->getPlan()->fileSizeLimitBytes() : (100 * 1024 * 1024);
 
         return [
-            'original_name' => ['required', 'string', 'max:255'],
-            'size'          => ['required', 'integer', 'min:1', 'max:' . $maxBytes],
-            'mime_type'     => ['required', 'string', 'max:100'],
-            'checksum'      => ['nullable', 'string', 'max:64'],
+            'original_name'      => ['required', 'string', 'max:255'],
+            'size'               => ['required', 'integer', 'min:1', 'max:' . $maxBytes],
+            'mime_type'          => ['required', 'string', 'max:100'],
+            'checksum'           => ['nullable', 'string', 'max:64'],
+            'thumbnail_name'     => ['nullable', 'string', 'max:255'],
+            'thumbnail_size'     => ['nullable', 'integer', 'min:1'],
+            'thumbnail_mime'     => ['nullable', 'string', 'max:100'],
         ];
     }
 }

@@ -34,7 +34,7 @@ class SharingController extends Controller
         $request->validate(['contact_id' => 'required|string']);
 
         $file = File::find($fileId);
-        if (!$file || !$file->isOwnedBy($request->user())) {
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
             return $this->notFound('File not found');
         }
 
@@ -87,12 +87,18 @@ class SharingController extends Controller
         $recipientUser = $contact->resolvedUser;
 
         DB::transaction(function () use ($file, $contact, $request, $recipientUser) {
+            // Copy sharer's description so recipient starts with the same text
+            $sharerAccess = FileUserAccess::where('file_id', $file->id)
+                ->where('user_id', $request->user()->id)
+                ->first();
+
             FileUserAccess::firstOrCreate([
                 'file_id'     => $file->id,
                 'user_id'     => $contact->resolved_user_id,
                 'access_type' => AccessType::Shared,
             ], [
-                'contact_id' => $contact->id,
+                'contact_id'  => $contact->id,
+                'description' => $sharerAccess?->description,
             ]);
 
             $this->activityService->log($file, $request->user(), ActivityType::SharedToContact, [
@@ -158,7 +164,7 @@ class SharingController extends Controller
         ]);
 
         $file = File::find($fileId);
-        if (!$file || !$file->isOwnedBy($request->user())) {
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
             return $this->notFound('File not found');
         }
 
@@ -204,7 +210,7 @@ class SharingController extends Controller
     public function listLinks(Request $request, string $fileId): JsonResponse
     {
         $file = File::find($fileId);
-        if (!$file || !$file->isOwnedBy($request->user())) {
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
             return $this->notFound('File not found');
         }
 

@@ -2,6 +2,8 @@
   "common": {
     "loading": "Загрузка...",
     "cancel": "Отмена",
+    "edit": "Редактировать",
+    "save": "Сохранить",
     "required": "Это поле обязательно.",
     "min_length": "Минимум {{length}} символов.",
     "prev": "← Назад",
@@ -97,7 +99,8 @@
     },
     "sidebar": {
       "unverified": "Email не подтверждён",
-      "change_plan": "Сменить тарифный план"
+      "change_plan": "Сменить тарифный план",
+      "tariff_usage": "Использование тарифа"
     }
   },
   "nav": {
@@ -113,7 +116,7 @@
     "menu": "Меню"
   },
   "tariffs": {
-    "title": "Тарифные планы",
+    "title": "Использование текущего тарифа",
     "current": "Ваш тариф",
     "free_label": "Бесплатно",
     "per_month": "руб./мес.",
@@ -166,7 +169,8 @@
       "sort_extension": "По расширению",
       "sort_size": "По размеру",
       "sort_order_desc": "↓ Убывание",
-      "sort_order_asc": "↑ Возрастание"
+      "sort_order_asc": "↑ Возрастание",
+      "type_filter": "Фильтр по типу файла"
     },
     "upload": {
       "preparing": "Подготовка...",
@@ -193,8 +197,13 @@
       "expires": "Истекает {{date}}",
       "owner": "Владелец",
       "download": "⬇️ Скачать",
+      "view_in_browser": "👁 Просмотреть",
       "open_link": "🌐 Открыть ссылку",
       "copy_link": "📋 Скопировать ссылку",
+      "description": "Описание",
+      "no_description": "Нет описания",
+      "description_placeholder": "Краткое описание файла (до 500 символов)...",
+      "description_saved": "Описание сохранено",
       "favorited": "★ В избранном",
       "favorite": "☆ В избранное",
       "pinned": "📌 Закреплён",

@@ -54,6 +54,7 @@ export interface FileListItem {
   status: FileStatus;
   expires_at: string | null;
   uploaded_at: string | null;
+  description?: string | null;
   preview_url?: string | null;
   // url_file preview fields
   link_url?: string | null;
@@ -70,6 +71,7 @@ export interface FileCard extends FileListItem {
   folder_id: string | null;
   tags: Tag[];
   owner: UserRef;
+  view_url?: string | null;
   // url_file extended fields
   link_description?: string | null;
 }
@@ -89,11 +91,20 @@ export interface InitUploadRequest {
   size: number;
   mime_type: string;
   checksum?: string;
+  thumbnail_name?: string;
+  thumbnail_size?: number;
+  thumbnail_mime?: string;
 }
 
 export interface InitUploadResponse {
   file: { id: string; status: FileStatus };
   upload: {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+  };
+  thumbnail?: {
+    key: string;
     method: string;
     url: string;
     headers: Record<string, string>;

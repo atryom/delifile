@@ -93,6 +93,7 @@ Route::prefix('v1')->group(function () {
         Route::post('files/{id}/unfavorite',       [FileController::class, 'unfavorite']);
         Route::post('files/{id}/move-folder',      [FileController::class, 'moveFolder']);
         Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
+        Route::patch('files/{id}/description',     [FileController::class, 'updateDescription']);
         Route::get('files/{id}/activity',          [FileController::class, 'activity']);
         Route::get('files/{id}/accesses',          [FileController::class, 'accesses']);
 

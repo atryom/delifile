@@ -18,6 +18,7 @@ class File extends Model
         'owner_id',
         'original_name',
         'storage_key',
+        'thumbnail_key',
         'size',
         'mime_type',
         'checksum',
