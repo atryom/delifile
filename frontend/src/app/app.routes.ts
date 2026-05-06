@@ -123,6 +123,13 @@ export const routes: Routes = [
       import('./features/admin/pages/admin/admin.component').then(m => m.AdminComponent),
   },
 
+  // ─── PWA Share Target ────────────────────────────────────────────────────
+  {
+    path: 'share-target',
+    loadComponent: () =>
+      import('./features/share-target/share-target.component').then(m => m.ShareTargetComponent),
+  },
+
   // ─── Legal pages ─────────────────────────────────────────────────────────
   {
     path: 'privacy',

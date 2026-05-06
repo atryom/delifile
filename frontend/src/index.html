@@ -1,19 +1,30 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8">
   <title>DeliFile</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="DeliFile — personal file storage with secure sharing">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'
-  fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round'
-  stroke-linejoin='round'
-  class='lucide lucide-file-symlink-icon lucide-file-symlink'><path
-  d='M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7'/><path
-  d='M14 2v5a1 1 0 0 0 1 1h5'/><path d='m10 18 3-3-3-3'/></svg>">
+  <meta name="description" content="DeliFile — личное хранилище файлов с безопасным обменом">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DeliFile">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
 </head>
 <body>
 <app-root></app-root>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (e) {
+        console.warn('SW registration failed:', e);
+      });
+    });
+  }
+</script>
 </body>
 </html>
