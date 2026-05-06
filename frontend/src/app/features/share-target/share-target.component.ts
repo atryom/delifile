@@ -2,10 +2,12 @@ import {
   ChangeDetectionStrategy, Component, OnInit, inject, signal, computed,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { switchMap, of } from 'rxjs';
 import { TranslateModule } from '@ngx-translate/core';
 import { AuthStateService } from '../../core/auth/auth-state.service';
 import { FileUploadService } from '../files/services/file-upload.service';
 import { UrlFilesApiService } from '../../core/api/url-files-api.service';
+import { FilesApiService } from '../../core/api/files-api.service';
 
 interface ShareMeta {
   title: string;
@@ -69,9 +71,18 @@ const SHARE_CACHE = 'share-target-v1';
 
         @if (phase() === 'url') {
           <h2 class="st-title">{{ 'share_target.title_url' | translate }}</h2>
+
+          @if (sharedDescription()) {
+            <div class="st-desc-preview">
+              <span class="st-desc-label">{{ 'share_target.description_label' | translate }}</span>
+              <p class="st-desc-text">{{ sharedDescription() }}</p>
+            </div>
+          }
+
           <div class="st-url-box">
             <span class="st-url-text">{{ sharedUrl() }}</span>
           </div>
+
           <div class="st-actions">
             <button class="st-btn st-btn--primary" (click)="saveUrl()">
               {{ 'share_target.save_url' | translate }}
@@ -183,6 +194,13 @@ const SHARE_CACHE = 'share-target-v1';
     @keyframes spin { to { transform: rotate(360deg); } }
     .st-hint { font-size: .85rem; color: #9ca3af; margin: 0; }
 
+    .st-desc-preview {
+      background: #f0f4ff; border: 1px solid #c7d2fe;
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+    }
+    .st-desc-label { font-size: .72rem; font-weight: 600; color: #6366f1; text-transform: uppercase; letter-spacing: .04em; display: block; margin-bottom: 4px; }
+    .st-desc-text  { font-size: .85rem; color: #374151; margin: 0; line-height: 1.4; }
+
     .st-file-list { list-style: none; margin: 0 0 24px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
     .st-file-item {
       display: flex; align-items: center; gap: 12px;
@@ -222,14 +240,15 @@ export class ShareTargetComponent implements OnInit {
   private readonly authState    = inject(AuthStateService);
   private readonly uploadSvc    = inject(FileUploadService);
   private readonly urlFilesApi  = inject(UrlFilesApiService);
+  private readonly filesApi     = inject(FilesApiService);
 
-  readonly phase       = signal<Phase>('loading');
-  readonly sharedFiles = signal<File[]>([]);
-  readonly sharedUrl   = signal<string>('');
-  readonly sharedTitle = signal<string>('');
-  readonly uploadIndex = signal(0);
-  readonly copied      = signal(false);
-  readonly uploadState = this.uploadSvc.state;
+  readonly phase              = signal<Phase>('loading');
+  readonly sharedFiles        = signal<File[]>([]);
+  readonly sharedUrl          = signal<string>('');
+  readonly sharedDescription  = signal<string>('');
+  readonly uploadIndex        = signal(0);
+  readonly copied             = signal(false);
+  readonly uploadState        = this.uploadSvc.state;
 
   readonly isDeliFileLink = computed(() =>
     /delifile\.ru\/link\/|\/link\/[a-zA-Z0-9]/.test(this.sharedUrl())
@@ -252,7 +271,6 @@ export class ShareTargetComponent implements OnInit {
       if (!metaResp) { this.phase.set('empty'); return; }
 
       const meta: ShareMeta = await metaResp.json();
-      this.sharedTitle.set(meta.title || '');
 
       if (meta.fileCount > 0) {
         const files: File[] = [];
@@ -269,8 +287,29 @@ export class ShareTargetComponent implements OnInit {
         return;
       }
 
-      const url = meta.url || meta.text || '';
-      if (url) { this.sharedUrl.set(url); this.phase.set('url'); return; }
+      // ── URL / text parsing ──────────────────────────────────────────────
+      const rawUrl  = (meta.url  || '').trim();
+      const rawText = (meta.text || '').trim();
+
+      if (rawUrl && this.isValidUrl(rawUrl)) {
+        // Clean URL in url field; text might be a description
+        this.sharedUrl.set(rawUrl);
+        this.sharedDescription.set(rawText);
+        this.phase.set('url');
+        return;
+      }
+
+      // URL is missing or not valid — try to extract from combined text
+      const combined = rawUrl || rawText;
+      if (combined) {
+        const { url, description } = this.extractUrlFromText(combined);
+        if (url) {
+          this.sharedUrl.set(url);
+          this.sharedDescription.set(description);
+          this.phase.set('url');
+          return;
+        }
+      }
 
       this.phase.set('empty');
     } catch {
@@ -278,7 +317,7 @@ export class ShareTargetComponent implements OnInit {
     }
   }
 
-  // ── Files upload ────────────────────────────────────────────────────────
+  // ── Files upload ─────────────────────────────────────────────────────────
 
   upload(): void {
     const files = this.sharedFiles();
@@ -302,13 +341,26 @@ export class ShareTargetComponent implements OnInit {
     });
   }
 
-  // ── URL handling ─────────────────────────────────────────────────────────
+  // ── URL saving ───────────────────────────────────────────────────────────
 
   saveUrl(): void {
     this.phase.set('saving');
-    this.urlFilesApi.create(this.sharedUrl()).subscribe({
-      next: () => { this.clearCache(); this.phase.set('done'); },
-      error: () => this.phase.set('error'),
+    const description = this.sharedDescription();
+
+    this.urlFilesApi.create(this.sharedUrl()).pipe(
+      switchMap(res => {
+        const fileId = res.data?.file?.id;
+        if (fileId && description) {
+          return this.filesApi.updateDescription(fileId, description);
+        }
+        return of(null);
+      }),
+    ).subscribe({
+      next:  () => { this.clearCache(); this.phase.set('done'); },
+      error: (err) => {
+        console.error('[ShareTarget] save URL error:', err);
+        this.phase.set('error');
+      },
     });
   }
 
@@ -335,15 +387,34 @@ export class ShareTargetComponent implements OnInit {
     this.router.navigate(['/login'], { queryParams: { returnUrl: '/share-target' } });
   }
 
-  cancel(): void   { this.clearCache(); this.router.navigate(['/files']); }
+  cancel():    void { this.clearCache(); this.router.navigate(['/files']); }
   goToFiles(): void { this.router.navigate(['/files']); }
 
   // ── Utilities ────────────────────────────────────────────────────────────
 
   formatSize(bytes: number): string {
-    if (bytes < 1024)        return `${bytes} Б`;
-    if (bytes < 1_048_576)   return `${(bytes / 1024).toFixed(1)} КБ`;
+    if (bytes < 1024)       return `${bytes} Б`;
+    if (bytes < 1_048_576)  return `${(bytes / 1024).toFixed(1)} КБ`;
     return `${(bytes / 1_048_576).toFixed(1)} МБ`;
+  }
+
+  private isValidUrl(s: string): boolean {
+    try { return /^https?:\/\//.test(new URL(s).href); } catch { return false; }
+  }
+
+  /**
+   * Extracts the last http(s) URL from a mixed text string.
+   * Text before the URL becomes the description.
+   * Handles cases like: "Заголовок страницы https://example.com/path"
+   */
+  private extractUrlFromText(text: string): { url: string; description: string } {
+    const matches = [...text.matchAll(/https?:\/\/[^\s]+/g)];
+    if (!matches.length) return { url: '', description: text };
+
+    const last        = matches[matches.length - 1];
+    const url         = last[0].replace(/[.,;!?'"»]+$/, ''); // strip trailing punctuation
+    const description = text.slice(0, last.index).trim();
+    return { url, description };
   }
 
   private clearCache(): void {
