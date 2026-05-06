@@ -10,8 +10,19 @@ export class PwaInstallService {
     window.matchMedia('(display-mode: standalone)').matches
   );
 
-  /** True when the native install prompt is available and app is not yet installed. */
+  /** iOS Safari — no beforeinstallprompt, needs manual instruction */
+  readonly isIos = typeof window !== 'undefined' &&
+    /iphone|ipad|ipod/i.test(navigator.userAgent) &&
+    !('MSStream' in window);
+
+  /** True when Chrome-style native install prompt is available */
   readonly canInstall = computed(() => this._prompt() !== null && !this._installed());
+
+  /** Show iOS "how to install" hint when not already installed */
+  readonly showIosHint = computed(() => this.isIos && !this._installed());
+
+  /** True when either prompt or iOS hint is relevant */
+  readonly showInstallUI = computed(() => this.canInstall() || this.showIosHint());
 
   private readonly _onBeforeInstall = (e: Event) => {
     e.preventDefault();
@@ -26,7 +37,6 @@ export class PwaInstallService {
   constructor() {
     if (typeof window === 'undefined') return;
 
-    // Pick up prompt captured before Angular bootstrapped (see index.html)
     const early = (window as any).__pwaInstallPrompt as BeforeInstallPromptEvent | undefined;
     if (early) {
       this._prompt.set(early);
@@ -54,7 +64,6 @@ export class PwaInstallService {
   }
 }
 
-// Browser-native type not yet in all TS lib versions
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;

@@ -214,6 +214,24 @@
   background: rgba(99, 102, 241, 0.24);
 }
 
+.ios-install-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  background: rgba(99, 102, 241, 0.10);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.ios-install-hint svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 .sidebar-plan {
   display: flex;
   align-items: center;
