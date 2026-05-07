@@ -1,19 +1,21 @@
-import { Component, inject, signal, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, inject, signal, computed, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
+import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { FileCard, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode } from '../../../../shared/models/api.models';
 import { ShareContactDialogComponent } from '../../dialogs/share-contact/share-contact-dialog.component';
 import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link-dialog.component';
+import { AddToSharedFolderDialogComponent } from '../../dialogs/add-to-shared-folder/add-to-shared-folder-dialog.component';
 
 @Component({
   selector: 'app-file-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, TranslateModule],
+  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, AddToSharedFolderDialogComponent, TranslateModule],
   templateUrl: './file-detail.component.html',
   styleUrl: './file-detail.component.scss',
 })
@@ -22,8 +24,13 @@ export class FileDetailComponent implements OnInit {
 
   private readonly filesApi  = inject(FilesApiService);
   private readonly orgApi    = inject(OrganizationApiService);
+  private readonly sfApi     = inject(SharedFoldersApiService);
   private readonly router    = inject(Router);
+  private readonly route     = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
+
+  private backFolderId: string | null = null;
+  readonly backLink = signal<{ commands: string[]; queryParams?: Record<string,string> }>({ commands: ['/files'] });
 
   readonly file          = signal<FileCard | null>(null);
   readonly loading       = signal(false);
@@ -35,8 +42,10 @@ export class FileDetailComponent implements OnInit {
 
   readonly editingDescription = signal(false);
   descriptionDraft = '';
-  readonly showShareDialog = signal(false);
-  readonly showLinkDialog  = signal(false);
+  readonly showShareDialog           = signal(false);
+  readonly showLinkDialog            = signal(false);
+  readonly showAddToSharedFolderDialog = signal(false);
+  readonly addToMyFilesLoading       = signal(false);
 
   readonly allTags         = signal<Tag[]>([]);
   readonly tagSearch       = signal('');
@@ -53,6 +62,13 @@ export class FileDetailComponent implements OnInit {
   readonly currentFolderName = signal<string | null>(null);
 
   ngOnInit(): void {
+    const fromParam = this.route.snapshot.queryParamMap.get('from');
+    const folderIdParam = this.route.snapshot.queryParamMap.get('folder_id');
+    if (fromParam === 'shared-folder' && folderIdParam) {
+      this.backFolderId = folderIdParam;
+      this.backLink.set({ commands: ['/shared-folders'], queryParams: { folder_id: folderIdParam } });
+    }
+
     this.loadFile();
     this.orgApi.getTags().subscribe((r) => this.allTags.set(r.data.items));
     this.orgApi.getFolderTree().subscribe((r) => {
@@ -355,7 +371,7 @@ export class FileDetailComponent implements OnInit {
     this.loadSidePanels();
   }
 
-  private showFeedback(msg: string): void {
+  showFeedback(msg: string): void {
     this.feedback.set(msg);
     setTimeout(() => this.feedback.set(null), 3000);
   }
@@ -373,5 +389,22 @@ export class FileDetailComponent implements OnInit {
     if (mime?.startsWith('audio/')) return '🎵';
     if (mime?.includes('pdf'))      return '📄';
     return '📎';
+  }
+
+  isSharedFolderOnly(): boolean {
+    return !!(this.file()?.is_owner && this.file()?.shared_folder_only);
+  }
+
+  addToMyFiles(): void {
+    if (this.addToMyFilesLoading()) return;
+    this.addToMyFilesLoading.set(true);
+    this.sfApi.addFileToMyFiles(this.id()).subscribe({
+      next: () => {
+        this.addToMyFilesLoading.set(false);
+        this.file.update(f => f ? { ...f, shared_folder_only: false } as typeof f : f);
+        this.showFeedback(this.translate.instant('shared_folders.add_to_my_files_done'));
+      },
+      error: () => this.addToMyFilesLoading.set(false),
+    });
   }
 }

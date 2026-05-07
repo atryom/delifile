@@ -28,8 +28,11 @@ export const authInterceptor: HttpInterceptorFn = (
   return next(cloned).pipe(
     catchError((error) => {
       if (error.status === 401) {
+        const wasAuthenticated = authState.isAuthenticated();
         authState.clearUser();
-        router.navigate(['/login']);
+        if (wasAuthenticated) {
+          router.navigate(['/login']);
+        }
       }
       return throwError(() => error);
     })

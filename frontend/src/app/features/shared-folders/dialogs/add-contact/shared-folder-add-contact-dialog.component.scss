@@ -1,0 +1,55 @@
+.dialog-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 300;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.dialog {
+  background: #fff; border-radius: 16px; width: 100%; max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.18); display: flex; flex-direction: column; max-height: 90vh;
+}
+.dialog-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px; border-bottom: 1px solid #f3f4f6;
+}
+.dialog-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; color: #111; }
+.dialog-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #9ca3af; padding: 4px 8px; }
+.dialog-close:hover { color: #374151; }
+.dialog-body { padding: 16px 24px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.dialog-footer { padding: 16px 24px; border-top: 1px solid #f3f4f6; display: flex; gap: 10px; justify-content: flex-end; }
+.search-input { width: 100%; padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box; }
+.search-input:focus { outline: none; border-color: #a5b4fc; }
+.contacts-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+.contact-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: all .15s;
+}
+.contact-item:hover { border-color: #a5b4fc; background: #f5f3ff; }
+.contact-item.selected { border-color: #6366f1; background: #ede9fe; }
+.contact-avatar {
+  width: 36px; height: 36px; border-radius: 50%; background: #6366f1;
+  color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 700; flex-shrink: 0;
+}
+.contact-info { flex: 1; min-width: 0; }
+.contact-name { margin: 0; font-size: 0.9rem; font-weight: 600; color: #111; }
+.contact-sub { margin: 0; font-size: 0.78rem; color: #6b7280; }
+.reg-badge { font-size: 0.7rem; padding: 2px 7px; border-radius: 99px; flex-shrink: 0; }
+.reg-badge.registered { background: #dcfce7; color: #15803d; }
+.reg-badge.pending { background: #fef9c3; color: #92400e; }
+.empty-contacts, .loading-contacts { color: #9ca3af; font-size: 0.88rem; text-align: center; padding: 16px; }
+
+.access-type-group { display: flex; flex-direction: column; gap: 8px; }
+.access-type-label { font-size: 0.82rem; font-weight: 600; color: #6b7280; }
+.btn-group { display: flex; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+.btn-group-item {
+  flex: 1; padding: 8px 12px; background: #fff; border: none; border-right: 1px solid #e5e7eb;
+  font-size: 0.88rem; cursor: pointer; transition: all .15s;
+}
+.btn-group-item:last-child { border-right: none; }
+.btn-group-item:hover { background: #f9fafb; }
+.btn-group-item.active { background: #6366f1; color: #fff; }
+
+.btn-primary { background: #6366f1; color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.btn-primary:hover:not(:disabled) { background: #4f46e5; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-secondary { background: #f3f4f6; color: #374151; border: none; padding: 9px 16px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; }
+.btn-secondary:hover { background: #e5e7eb; }
+.error-msg { color: #dc2626; font-size: 0.85rem; flex: 1; }

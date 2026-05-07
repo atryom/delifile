@@ -1,0 +1,91 @@
+.page { max-width: 900px; padding: 28px 24px; }
+
+.page-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.page-title { font-size: 1.5rem; font-weight: 700; margin: 0; flex-shrink: 0; }
+.header-controls { display: flex; align-items: center; gap: 10px; flex: 1; flex-wrap: wrap; }
+.folder-select {
+  flex: 1; min-width: 180px; max-width: 360px;
+  padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem;
+  background: #fff; cursor: pointer;
+}
+.folder-select:focus { outline: none; border-color: #a5b4fc; }
+.btn-add-folder {
+  padding: 8px 16px; background: #6366f1; color: #fff; border: none; border-radius: 8px;
+  font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.btn-add-folder:hover { background: #4f46e5; }
+
+.upload-toggle-row { margin-bottom: 12px; }
+.btn-toggle-upload {
+  padding: 7px 16px; border: 1px solid #c7d2fe; border-radius: 8px;
+  background: #f5f3ff; color: #6366f1; font-size: 0.88rem; cursor: pointer;
+}
+.btn-toggle-upload:hover { background: #ede9fe; }
+
+/* Upload zone */
+.upload-zone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 2px dashed #c7d2fe; border-radius: 14px; padding: 32px; margin-bottom: 16px;
+  background: #f9f8ff; cursor: pointer; transition: all .15s;
+}
+.upload-zone.drag-over { border-color: #6366f1; background: #ede9fe; }
+.upload-icon { font-size: 2rem; margin-bottom: 8px; }
+.upload-zone p { margin: 0 0 8px; color: #6b7280; font-size: 0.9rem; }
+.btn-upload-label { padding: 8px 18px; background: #6366f1; color: #fff; border-radius: 8px; font-size: 0.88rem; font-weight: 600; }
+
+.upload-error-card { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #dc2626; font-size: 0.9rem; }
+.btn-retry { background: none; border: 1px solid #fca5a5; color: #dc2626; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+
+.upload-progress-card { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+.progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.progress-fill { height: 100%; background: #6366f1; transition: width .2s; }
+.upload-done-card { background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; color: #15803d; font-weight: 600; }
+
+.add-link-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.add-link-card h3 { font-size: 0.95rem; font-weight: 700; margin: 0 0 12px; }
+.link-form { display: flex; flex-direction: column; gap: 10px; }
+.link-input { width: 100%; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box; }
+.link-input:focus { outline: none; border-color: #a5b4fc; }
+.link-actions { display: flex; gap: 8px; }
+.btn-primary-sm { padding: 7px 14px; background: #6366f1; color: #fff; border: none; border-radius: 7px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.btn-primary-sm:hover:not(:disabled) { background: #4f46e5; }
+.btn-primary-sm:disabled { opacity: .5; cursor: not-allowed; }
+.btn-secondary-sm { padding: 7px 14px; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; border-radius: 7px; font-size: 0.85rem; cursor: pointer; }
+.btn-secondary-sm:disabled { opacity: .5; cursor: not-allowed; }
+.link-preview-card { display: flex; gap: 12px; margin-top: 10px; background: #f9fafb; border-radius: 8px; padding: 10px; }
+.preview-img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.preview-title { margin: 0 0 4px; font-weight: 600; font-size: 0.88rem; }
+.preview-site { margin: 0; font-size: 0.78rem; color: #9ca3af; }
+.field-error { color: #dc2626; font-size: 0.82rem; margin: 4px 0 0; }
+
+.no-edit-hint { color: #9ca3af; font-size: 0.88rem; padding: 12px 0; margin-bottom: 12px; }
+
+/* File list */
+.file-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.file-item {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;
+  display: grid; grid-template-columns: 1fr auto; align-items: stretch;
+  transition: background .15s;
+}
+.file-item:hover { background: #f9f8ff; }
+.file-link { display: flex; align-items: center; gap: 14px; padding: 12px 16px; text-decoration: none; color: inherit; min-width: 0; }
+.file-actions { display: flex; align-items: center; gap: 2px; padding: 0 8px; }
+.btn-file-action {
+  width: 30px; height: 30px; border: none; background: transparent; border-radius: 6px;
+  cursor: pointer; font-size: 0.95rem; display: flex; align-items: center; justify-content: center;
+  color: #6b7280; transition: background .15s; text-decoration: none;
+}
+.btn-file-action:hover { background: #e5e7eb; color: #374151; }
+.file-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.file-icon { width: 48px; height: 48px; border-radius: 6px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
+.file-info { flex: 1; min-width: 0; }
+.file-name { display: block; font-weight: 600; font-size: 0.92rem; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-meta { display: block; font-size: 0.78rem; color: #6b7280; margin-top: 2px; }
+
+.loading-text, .empty-text, .no-folder-hint { color: #9ca3af; text-align: center; padding: 40px 0; font-size: 0.95rem; }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px 0; }
+.btn-page { padding: 7px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; cursor: pointer; font-size: 0.88rem; }
+.btn-page:disabled { opacity: .4; cursor: not-allowed; }
+.page-info { font-size: 0.88rem; color: #6b7280; }
+.btn-mini { padding: 5px 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.82rem; }

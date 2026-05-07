@@ -1,0 +1,107 @@
+<div class="dialog-overlay" (click)="closed.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()" role="dialog" aria-label="Настройка доступа">
+    <div class="dialog-header">
+      <h2>{{ 'shared_folders.access_title' | translate }} — {{ folderName() }}</h2>
+      <button class="dialog-close" (click)="closed.emit()" aria-label="Закрыть">✕</button>
+    </div>
+
+    <div class="dialog-body">
+
+      <!-- Contacts section -->
+      <section class="section">
+        <h3 class="section-title">{{ 'shared_folders.access_contacts' | translate }}</h3>
+        @if (loadingAccesses()) {
+          <div class="loading-text">{{ 'common.loading' | translate }}</div>
+        } @else if (accesses().length === 0) {
+          <div class="empty-list">{{ 'shared_folders.access_no_contacts' | translate }}</div>
+        } @else {
+          <div class="access-list">
+            @for (a of accesses(); track a.id) {
+              <div class="access-item">
+                <div class="access-avatar" aria-hidden="true">
+                  {{ (a.user?.name ?? a.user?.email ?? '?')[0].toUpperCase() }}
+                </div>
+                <div class="access-info">
+                  <span class="access-name">{{ a.user?.name ?? a.user?.email ?? '—' }}</span>
+                  <span class="access-sub">{{ a.user?.email ?? '' }}</span>
+                </div>
+                <span class="access-badge" [class.badge-view]="a.access_type === 'view'" [class.badge-edit]="a.access_type === 'edit'">
+                  {{ accessTypeLabel(a.access_type) }}
+                </span>
+                <button class="btn-icon-danger" (click)="removeAccess(a.id)" [attr.aria-label]="'shared_folders.access_remove' | translate">✕</button>
+              </div>
+            }
+          </div>
+        }
+        <button class="btn-add" (click)="showAddContact.set(true)">
+          + {{ 'shared_folders.access_add_contact_btn' | translate }}
+        </button>
+      </section>
+
+      <!-- Links section -->
+      <section class="section">
+        <h3 class="section-title">{{ 'shared_folders.access_links' | translate }}</h3>
+        @if (loadingLinks()) {
+          <div class="loading-text">{{ 'common.loading' | translate }}</div>
+        } @else if (links().length === 0) {
+          <div class="empty-list">{{ 'shared_folders.access_no_links' | translate }}</div>
+        } @else {
+          <div class="links-list">
+            @for (link of links(); track link.id) {
+              <div class="link-item">
+                <div class="link-url-row">
+                  <span class="link-url" [title]="link.url">{{ link.url }}</span>
+                </div>
+                <div class="link-meta-row">
+                  <span class="access-badge" [class.badge-view]="link.access_type === 'view'" [class.badge-edit]="link.access_type === 'edit'">
+                    {{ accessTypeLabel(link.access_type) }}
+                  </span>
+                  <span class="link-status badge-{{ link.status }}">{{ link.status }}</span>
+                  @if (link.expires_at) {
+                    <span class="link-expires">{{ 'shared_folders.access_expires' | translate:{date: (link.expires_at | date:'d MMM, HH:mm')} }}</span>
+                  }
+                  @if (link.allow_save) {
+                    <span class="save-badge" title="Разрешено добавление в аккаунт">💾</span>
+                  }
+                </div>
+                <div class="link-actions">
+                  <button class="btn-mini" (click)="copyLink(link.url, link.id)">
+                    {{ copiedLinkId() === link.id ? ('shared_folders.access_copy' | translate) + '!' : ('shared_folders.access_copy' | translate) }}
+                  </button>
+                  @if (link.status === 'active') {
+                    <button class="btn-mini btn-mini-danger" (click)="disableLink(link.id)">
+                      {{ 'shared_folders.access_disable' | translate }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+        <button class="btn-add" (click)="showCreateLink.set(true)">
+          + {{ 'shared_folders.access_create_link_btn' | translate }}
+        </button>
+      </section>
+    </div>
+
+    <div class="dialog-footer">
+      <button class="btn-secondary" (click)="closed.emit()">{{ 'common.cancel' | translate }}</button>
+    </div>
+  </div>
+</div>
+
+@if (showAddContact()) {
+  <app-shared-folder-add-contact-dialog
+    [folderId]="folderId()"
+    (closed)="showAddContact.set(false)"
+    (added)="onContactAdded()"
+  />
+}
+
+@if (showCreateLink()) {
+  <app-shared-folder-create-link-dialog
+    [folderId]="folderId()"
+    (closed)="showCreateLink.set(false)"
+    (created)="onLinkCreated()"
+  />
+}

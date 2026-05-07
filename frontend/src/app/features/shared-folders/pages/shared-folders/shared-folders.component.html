@@ -1,0 +1,181 @@
+<div class="page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1 class="page-title">{{ 'shared_folders.title' | translate }}</h1>
+    <div class="header-controls">
+      <select
+        class="folder-select"
+        [value]="selectedFolder()?.id ?? ''"
+        (change)="onFolderSelect($event)"
+        [attr.aria-label]="'shared_folders.select_placeholder' | translate"
+      >
+        <option value="">{{ 'shared_folders.select_placeholder' | translate }}</option>
+        @for (f of folders(); track f.id) {
+          <option [value]="f.id">{{ f.name }}</option>
+        }
+      </select>
+      @if (selectedFolder()) {
+        <button class="btn-add-folder" (click)="openAccessDialog()">
+          {{ 'shared_folders.configure_access_btn' | translate }}
+        </button>
+      } @else {
+        <a routerLink="/folders" [queryParams]="{tab:'shared'}" class="btn-add-folder">
+          {{ 'shared_folders.add_btn' | translate }}
+        </a>
+      }
+    </div>
+  </div>
+
+  @if (selectedFolder()) {
+
+    <!-- Toggle upload section -->
+    <div class="upload-toggle-row">
+      <button class="btn-toggle-upload" (click)="toggleUpload()">
+        {{ uploadExpanded() ? ('shared_folders.hide_upload_btn' | translate) : ('shared_folders.attach_files_btn' | translate) }}
+      </button>
+    </div>
+
+    <!-- Upload section -->
+    @if (uploadExpanded() && canEdit()) {
+
+      @if (uploadPhase() === 'idle' || uploadPhase() === 'error') {
+
+        <label
+          class="upload-zone"
+          [class.drag-over]="isDragOver()"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave()"
+          (drop)="onDrop($event)"
+        >
+          <input type="file" (change)="onFileSelected($event)" style="display:none" />
+          <span class="upload-icon">☁️</span>
+          <p>{{ 'shared_folders.drop_hint' | translate }}</p>
+          <span class="btn-upload-label">{{ 'shared_folders.upload_btn' | translate }}</span>
+        </label>
+
+        @if (uploadPhase() === 'error') {
+          <div class="upload-error-card">
+            <span>⚠️ {{ uploadError() }}</span>
+            <button class="btn-retry" (click)="resetUpload()">Повторить</button>
+          </div>
+        }
+
+        <!-- Add link form -->
+        <div class="add-link-card">
+          <h3>{{ 'shared_folders.add_link_title' | translate }}</h3>
+          <form [formGroup]="linkForm" (ngSubmit)="saveLink()" class="link-form">
+            <input
+              formControlName="url"
+              type="url"
+              [placeholder]="'shared_folders.url_placeholder' | translate"
+              class="link-input"
+            />
+            <div class="link-actions">
+              <button type="button" class="btn-secondary-sm" (click)="previewLink()" [disabled]="linkForm.invalid || previewing()">
+                {{ previewing() ? '...' : ('shared_folders.preview_btn' | translate) }}
+              </button>
+              <button type="submit" class="btn-primary-sm" [disabled]="linkForm.invalid || savingLink()">
+                {{ savingLink() ? ('shared_folders.saving_link' | translate) : ('shared_folders.save_link_btn' | translate) }}
+              </button>
+            </div>
+          </form>
+
+          @if (linkPreview()) {
+            <div class="link-preview-card">
+              @if (linkPreview()!.image_url) {
+                <img [src]="linkPreview()!.image_url" alt="" class="preview-img" />
+              }
+              <div class="preview-body">
+                <p class="preview-title">{{ linkPreview()!.title }}</p>
+                <p class="preview-site">{{ linkPreview()!.site_name }}</p>
+              </div>
+            </div>
+          }
+          @if (linkError()) { <p class="field-error">{{ linkError() }}</p> }
+        </div>
+      }
+
+      @if (uploadPhase() === 'uploading') {
+        <div class="upload-progress-card">
+          <p>Загрузка... {{ uploadProgress() }}%</p>
+          <div class="progress-bar"><div class="progress-fill" [style.width.%]="uploadProgress()"></div></div>
+        </div>
+      }
+
+      @if (uploadPhase() === 'done') {
+        <div class="upload-done-card">
+          ✅ Файл загружен!
+          <button class="btn-mini" (click)="resetUpload()">Загрузить ещё</button>
+        </div>
+      }
+    }
+
+    @if (uploadExpanded() && !canEdit()) {
+      <div class="no-edit-hint">У вас нет прав на добавление файлов в эту папку</div>
+    }
+
+    <!-- Files -->
+    @if (filesLoading()) {
+      <p class="loading-text">{{ 'shared_folders.files_loading' | translate }}</p>
+    } @else if (files().length === 0) {
+      <p class="empty-text">{{ 'shared_folders.files_empty' | translate }}</p>
+    } @else {
+      <ul class="file-list" role="list">
+        @for (file of files(); track file.id) {
+          <li class="file-item">
+            <a [routerLink]="fileDetailLink(file.id)" [queryParams]="fileDetailQueryParams()" class="file-link">
+              @if (file.preview_url) {
+                <img [src]="file.preview_url" alt="" class="file-thumb" loading="lazy" />
+              } @else if (file.link_image_url) {
+                <img [src]="file.link_image_url" alt="" class="file-thumb" loading="lazy" />
+              } @else {
+                <div class="file-icon" aria-hidden="true">{{ mimeIcon(file.mime_type ?? '') }}</div>
+              }
+              <div class="file-info">
+                <span class="file-name">{{ file.original_name }}</span>
+                <span class="file-meta">
+                  @if (file.content_kind !== 'url_file') {
+                    {{ formatSize(file.size) }} ·
+                  }
+                  {{ file.uploaded_at | date:'d MMM y' }}
+                </span>
+              </div>
+            </a>
+            <div class="file-actions">
+              @if (file.content_kind === 'url_file' && file.link_url) {
+                <a class="btn-file-action" [href]="file.link_url" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()" title="Перейти по ссылке" aria-label="Перейти по ссылке">🔗</a>
+              }
+              @if (canViewInBrowser(file)) {
+                <button class="btn-file-action" (click)="$event.stopPropagation(); openInBrowser(file)" title="{{ 'files.detail.open_browser' | translate }}" [attr.aria-label]="'files.detail.open_browser' | translate">👁</button>
+              }
+              @if (file.content_kind !== 'url_file') {
+                <button class="btn-file-action" (click)="$event.stopPropagation(); downloadFile(file.id)" title="{{ 'files.detail.download' | translate }}" [attr.aria-label]="'files.detail.download' | translate">⬇</button>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <button class="btn-page" [disabled]="page() === 1" (click)="prevPage()">{{ 'common.prev' | translate }}</button>
+          <span class="page-info">{{ 'common.page_of' | translate:{page: page(), total: totalPages()} }}</span>
+          <button class="btn-page" [disabled]="page() === totalPages()" (click)="nextPage()">{{ 'common.next' | translate }}</button>
+        </div>
+      }
+    }
+
+  } @else {
+    <div class="no-folder-hint">{{ 'shared_folders.no_folder_selected' | translate }}</div>
+  }
+
+</div>
+
+@if (accessDialogOpen()) {
+  <app-shared-folder-access-dialog
+    [folderId]="selectedFolder()!.id"
+    [folderName]="selectedFolder()!.name"
+    (closed)="closeAccessDialog()"
+  />
+}

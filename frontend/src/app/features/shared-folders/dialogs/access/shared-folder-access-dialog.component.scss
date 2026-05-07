@@ -1,0 +1,64 @@
+.dialog-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 300;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.dialog {
+  background: #fff; border-radius: 16px; width: 100%; max-width: 560px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.18); display: flex; flex-direction: column; max-height: 90vh;
+}
+.dialog-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px; border-bottom: 1px solid #f3f4f6; flex-shrink: 0;
+}
+.dialog-header h2 { margin: 0; font-size: 1.1rem; font-weight: 700; color: #111; }
+.dialog-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #9ca3af; padding: 4px 8px; }
+.dialog-close:hover { color: #374151; }
+.dialog-body { padding: 20px 24px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
+.dialog-footer { padding: 16px 24px; border-top: 1px solid #f3f4f6; display: flex; gap: 10px; justify-content: flex-end; flex-shrink: 0; }
+
+.section { display: flex; flex-direction: column; gap: 10px; }
+.section-title { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #9ca3af; margin: 0; }
+.loading-text { font-size: 0.88rem; color: #9ca3af; }
+.empty-list { font-size: 0.88rem; color: #9ca3af; padding: 8px 0; }
+
+.access-list { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; }
+.access-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f9fafb; border-radius: 8px; }
+.access-avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: #6366f1;
+  color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 700; flex-shrink: 0;
+}
+.access-info { flex: 1; min-width: 0; }
+.access-name { display: block; font-size: 0.88rem; font-weight: 600; color: #111; }
+.access-sub { display: block; font-size: 0.75rem; color: #6b7280; }
+.access-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 99px; flex-shrink: 0; font-weight: 600; }
+.badge-view { background: #dbeafe; color: #1d4ed8; }
+.badge-edit { background: #dcfce7; color: #15803d; }
+.btn-icon-danger { background: none; border: none; color: #f87171; cursor: pointer; font-size: 1rem; padding: 4px; border-radius: 4px; }
+.btn-icon-danger:hover { background: #fee2e2; }
+
+.links-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+.link-item { background: #f9fafb; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.link-url-row { overflow: hidden; }
+.link-url { font-size: 0.78rem; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.link-meta-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.link-status { font-size: 0.72rem; padding: 2px 7px; border-radius: 99px; background: #f3f4f6; color: #6b7280; }
+.link-status.badge-active { background: #dcfce7; color: #15803d; }
+.link-status.badge-disabled { background: #f3f4f6; color: #9ca3af; }
+.link-status.badge-expired { background: #fee2e2; color: #dc2626; }
+.link-expires { font-size: 0.72rem; color: #9ca3af; }
+.save-badge { font-size: 0.82rem; }
+.link-actions { display: flex; gap: 6px; }
+
+.btn-add {
+  align-self: flex-start; padding: 7px 14px; border: 1px dashed #c7d2fe; border-radius: 8px;
+  background: #f5f3ff; color: #6366f1; font-size: 0.85rem; cursor: pointer; transition: all .15s;
+}
+.btn-add:hover { background: #ede9fe; border-color: #a5b4fc; }
+
+.btn-mini { padding: 4px 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; font-size: 0.78rem; cursor: pointer; }
+.btn-mini:hover { background: #f9fafb; }
+.btn-mini-danger { border-color: #fca5a5; color: #dc2626; }
+.btn-mini-danger:hover { background: #fee2e2; }
+
+.btn-secondary { background: #f3f4f6; color: #374151; border: none; padding: 9px 16px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; }
+.btn-secondary:hover { background: #e5e7eb; }

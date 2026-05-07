@@ -137,12 +137,31 @@ export const routes: Routes = [
       import('./features/legal/pages/privacy/privacy.component').then(m => m.PrivacyComponent),
   },
 
+  // ─── Shared folders ──────────────────────────────────────────────────────
+  {
+    path: 'shared-folders',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/shared-folders/pages/shared-folders/shared-folders.component').then(
+        m => m.SharedFoldersComponent
+      ),
+  },
+
   // ─── Public link flow ────────────────────────────────────────────────────
   {
     path: 'link/:token',
     loadComponent: () =>
       import('./features/files/pages/public-link/public-link.component').then(
         m => m.PublicLinkComponent
+      ),
+  },
+
+  // ─── Public shared folder link ───────────────────────────────────────────
+  {
+    path: 'shared-link/:token',
+    loadComponent: () =>
+      import('./features/shared-folders/pages/public-shared-link/public-shared-link.component').then(
+        m => m.PublicSharedLinkComponent
       ),
   },
 

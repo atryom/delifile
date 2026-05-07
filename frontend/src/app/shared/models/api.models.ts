@@ -69,6 +69,7 @@ export interface FileCard extends FileListItem {
   is_favorite: boolean;
   is_pinned: boolean;
   folder_id: string | null;
+  shared_folder_only?: boolean;
   tags: Tag[];
   owner: UserRef;
   view_url?: string | null;
@@ -238,6 +239,59 @@ export interface Tag {
   id: string;
   name: string;
   files_count?: number;
+}
+
+// ─── Shared Folder Models ────────────────────────────────────────────────────
+
+export type SharedFolderAccessType = 'view' | 'edit';
+
+export interface SharedFolder {
+  id: string;
+  name: string;
+  owner_id: number;
+  files_count: number;
+  is_owner: boolean;
+  my_access_type: SharedFolderAccessType | null;
+  created_at: string | null;
+}
+
+export interface SharedFolderAccess {
+  id: string;
+  user_id: number | null;
+  contact_id: string | null;
+  access_type: SharedFolderAccessType;
+  user: { id: number; email: string; name: string | null } | null;
+}
+
+export interface SharedFolderLink {
+  id: string;
+  url: string;
+  status: ShareLinkStatus;
+  access_type: SharedFolderAccessType;
+  allow_save: boolean;
+  ttl_hours: number;
+  expires_at: string | null;
+  created_at: string | null;
+}
+
+export interface SharedFolderFileItem {
+  id: string;
+  original_name: string;
+  content_kind: ContentKind;
+  size: number;
+  mime_type: string | null;
+  status: FileStatus;
+  expires_at: string | null;
+  uploaded_at: string | null;
+  preview_url: string | null;
+  view_url?: string | null;
+  link_url: string | null;
+  link_title: string | null;
+  link_image_url: string | null;
+  link_site_name: string | null;
+  is_owner?: boolean;
+  added_by?: number;
+  shared_folder_only?: boolean;
 }
 
 // ─── Invitation Models ───────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
     <div class="page">
-      <a routerLink="/files" class="back-link">{{ 'files.detail.back' | translate }}</a>
+      <a [routerLink]="backLink().commands" [queryParams]="backLink().queryParams ?? {}" class="back-link">{{ 'files.detail.back' | translate }}</a>
 
       @if (loading()) {
         <div class="loading-state">{{ 'files.detail.loading' | translate }}</div>
@@ -101,6 +101,16 @@
               <button class="btn-action btn-share" (click)="showLinkDialog.set(true)">
                 {{ 'files.detail.create_link' | translate }}
               </button>
+              @if (file()!.is_owner && isSharedFolderOnly()) {
+                <button class="btn-action btn-shared-folder" (click)="addToMyFiles()" [disabled]="addToMyFilesLoading()">
+                  {{ 'shared_folders.add_to_my_files_btn' | translate }}
+                </button>
+              }
+              @if (file()!.is_owner && !isSharedFolderOnly()) {
+                <button class="btn-action btn-shared-folder" (click)="showAddToSharedFolderDialog.set(true)">
+                  {{ 'shared_folders.add_to_shared_folder_btn' | translate }}
+                </button>
+              }
             </div>
 
             <!-- Description -->
@@ -305,5 +315,13 @@
           (created)="onLinkCreated()"
         />
       }
+
+      <!-- Add to shared folder dialog -->
+      @if (showAddToSharedFolderDialog()) {
+        <app-add-to-shared-folder-dialog
+          [fileId]="id()"
+          (closed)="showAddToSharedFolderDialog.set(false)"
+          (saved)="showFeedback('Сохранено')"
+        />
+      }
     </div>
-  

@@ -24,6 +24,7 @@ class File extends Model
         'checksum',
         'status',
         'folder_id',
+        'shared_folder_only',
         'expires_at',
         'content_kind',
         'link_url',
@@ -37,10 +38,11 @@ class File extends Model
     protected function casts(): array
     {
         return [
-            'status'          => FileStatus::class,
-            'expires_at'      => 'datetime',
-            'link_fetched_at' => 'datetime',
-            'size'            => 'integer',
+            'status'             => FileStatus::class,
+            'expires_at'         => 'datetime',
+            'link_fetched_at'    => 'datetime',
+            'size'               => 'integer',
+            'shared_folder_only' => 'boolean',
         ];
     }
 
@@ -78,6 +80,11 @@ class File extends Model
     public function tags(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'file_tags');
+    }
+
+    public function sharedFolderFiles(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SharedFolderFile::class);
     }
 
     // Helpers

@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\SuggestionAdminController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Files\FileController;
 use App\Http\Controllers\Files\SharingController;
+use App\Http\Controllers\Files\SharedFolderFileController;
 use App\Http\Controllers\Contacts\ContactController;
 use App\Http\Controllers\Contacts\ContactRequestController;
 use App\Http\Controllers\Organization\OrganizationController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Support\SuggestionController;
 use App\Http\Controllers\Tariff\TariffController;
 use App\Http\Controllers\Push\PushController;
 use App\Http\Controllers\User\UserSettingsController;
+use App\Http\Controllers\SharedFolders\SharedFolderController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -73,6 +75,10 @@ Route::prefix('v1')->group(function () {
         Route::post('{token}/resolve',  [SharingController::class, 'resolveLink']);
         Route::post('{token}/download', [SharingController::class, 'downloadViaLink']);
     });
+
+    // ─── Public Shared Folder Link Flow ───────────────────────────────────────
+    Route::post('shared-links/{token}/resolve', [SharedFolderController::class, 'resolveSharedLink']);
+    Route::get('shared-links/{token}/files',    [SharedFolderController::class, 'publicFiles']);
 
     // ─── Save via link (requires auth) ────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {
@@ -181,6 +187,29 @@ Route::prefix('v1')->group(function () {
             Route::get('suggestions/{id}',                                    [SuggestionController::class, 'show']);
             Route::get('suggestions/{id}/attachments/{attachmentId}',         [SuggestionController::class, 'downloadAttachment']);
         });
+
+        // Shared Folders
+        Route::prefix('shared-folders')->group(function () {
+            Route::get('',                               [SharedFolderController::class, 'index']);
+            Route::post('',                              [SharedFolderController::class, 'store']);
+            Route::patch('{id}',                         [SharedFolderController::class, 'update']);
+            Route::delete('{id}',                        [SharedFolderController::class, 'destroy']);
+            Route::get('{id}/files',                     [SharedFolderController::class, 'files']);
+            Route::post('{id}/init-upload',              [SharedFolderController::class, 'initUpload']);
+            Route::post('{id}/complete-upload',          [SharedFolderController::class, 'completeUpload']);
+            Route::post('{id}/url-file',                 [SharedFolderController::class, 'addUrlFile']);
+            Route::get('{id}/accesses',                  [SharedFolderController::class, 'listAccesses']);
+            Route::post('{id}/accesses',                 [SharedFolderController::class, 'addAccess']);
+            Route::delete('{id}/accesses/{accessId}',    [SharedFolderController::class, 'removeAccess']);
+            Route::get('{id}/links',                     [SharedFolderController::class, 'listLinks']);
+            Route::post('{id}/links',                    [SharedFolderController::class, 'createLink']);
+            Route::post('{id}/links/{linkId}/disable',   [SharedFolderController::class, 'disableLink']);
+        });
+
+        // File shared folder operations
+        Route::post('files/{id}/add-to-my-files',  [SharedFolderFileController::class, 'addToMyFiles']);
+        Route::post('files/{id}/shared-folders',   [SharedFolderFileController::class, 'updateSharedFolders']);
+        Route::get('files/{id}/shared-folders',    [SharedFolderFileController::class, 'getSharedFolders']);
 
         // Admin (superuser only)
         Route::middleware(\App\Http\Middleware\SuperUserMiddleware::class)->prefix('admin')->group(function () {

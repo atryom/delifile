@@ -321,7 +321,8 @@ class FileService
             'is_favorite'   => $access?->is_favorite ?? false,
             'is_pinned'     => $access?->pinned_at !== null,
             'description'   => $access?->description,
-            'folder_id'     => $file->folder_id,
+            'folder_id'           => $file->folder_id,
+            'shared_folder_only'  => (bool) $file->shared_folder_only,
             'tags'          => $file->tags->map(fn ($t) => ['id' => $t->id, 'name' => $t->name]),
             'owner'         => [
                 'id'    => $file->owner->id,
@@ -351,7 +352,7 @@ class FileService
         return $base;
     }
 
-    private function resolvePreviewAndViewUrls(File $file, string $mime): array
+    public function resolvePreviewAndViewUrls(File $file, string $mime): array
     {
         $previewUrl = null;
         $viewUrl    = null;
@@ -388,7 +389,7 @@ class FileService
         $query = File::query()->whereNull('deleted_at');
 
         if ($filter === 'mine') {
-            $query->where('owner_id', $user->id);
+            $query->where('owner_id', $user->id)->where('shared_folder_only', false);
         } elseif ($filter === 'received') {
             $query->whereHas('accesses', fn ($q) =>
                 $q->where('user_id', $user->id)->whereIn('access_type', ['shared', 'saved'])
@@ -399,13 +400,13 @@ class FileService
             );
         } elseif ($filter === 'all') {
             $query->where(function ($q) use ($user) {
-                $q->where('owner_id', $user->id)
+                $q->where(fn ($q2) => $q2->where('owner_id', $user->id)->where('shared_folder_only', false))
                   ->orWhereHas('accesses', fn ($q2) =>
                       $q2->where('user_id', $user->id)->whereIn('access_type', ['shared', 'saved'])
                   );
             });
         } else {
-            $query->where('owner_id', $user->id);
+            $query->where('owner_id', $user->id)->where('shared_folder_only', false);
         }
 
         if ($search) {

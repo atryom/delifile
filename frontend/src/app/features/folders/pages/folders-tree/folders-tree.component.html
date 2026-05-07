@@ -1,6 +1,30 @@
-    <div class="page">
-      <div class="page-header">
-        <h1>{{ 'folders.title' | translate }}</h1>
+<div class="page">
+  <div class="page-header">
+    <h1>{{ 'folders.title' | translate }}</h1>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" role="tablist">
+    <button
+      role="tab"
+      class="tab-btn"
+      [class.active]="activeTab() === 'local'"
+      [attr.aria-selected]="activeTab() === 'local'"
+      (click)="setTab('local')"
+    >{{ 'shared_folders.tab_local' | translate }}</button>
+    <button
+      role="tab"
+      class="tab-btn"
+      [class.active]="activeTab() === 'shared'"
+      [attr.aria-selected]="activeTab() === 'shared'"
+      (click)="setTab('shared')"
+    >{{ 'shared_folders.tab_shared' | translate }}</button>
+  </div>
+
+  <!-- ── LOCAL TAB ──────────────────────────────────────────────────── -->
+  @if (activeTab() === 'local') {
+    <div role="tabpanel">
+      <div class="tab-toolbar">
         <button class="btn-primary" (click)="startCreate(null)">
           + {{ 'folders.create_btn' | translate }}
         </button>
@@ -36,111 +60,215 @@
         </ul>
       }
     </div>
+  }
 
-    <ng-template #nodeTemplate let-node let-depth="depth">
-      <li class="tree-node" role="treeitem" [style.padding-left.px]="depth * 20">
-        @if (editingId() === node.id) {
-          <div class="edit-row">
-            <input
-              type="text"
-              [value]="editName()"
-              (input)="editName.set($any($event.target).value)"
-              class="edit-input"
-              maxlength="100"
-              (keydown.enter)="saveEdit(node)"
-              (keydown.escape)="cancelEdit()"
-            />
-            <button class="btn-sm btn-save" (click)="saveEdit(node)">{{ 'folders.save' | translate }}</button>
-            <button class="btn-sm btn-cancel" (click)="cancelEdit()">{{ 'common.cancel' | translate }}</button>
-          </div>
-        } @else {
-          <div class="node-row">
-            <button class="expand-btn" (click)="toggleExpand(node.id)" aria-label="toggle">
-              @if (node.children?.length) {
-                {{ expanded().has(node.id) ? '▾' : '▸' }}
+  <!-- ── SHARED TAB ─────────────────────────────────────────────────── -->
+  @if (activeTab() === 'shared') {
+    <div role="tabpanel">
+      <div class="tab-toolbar">
+        <button class="btn-primary" (click)="sfStartCreate()">
+          + {{ 'shared_folders.create_btn' | translate }}
+        </button>
+      </div>
+
+      @if (sfCreating()) {
+        <div class="inline-create">
+          <input
+            type="text"
+            [placeholder]="'shared_folders.folder_name_placeholder' | translate"
+            [value]="sfCreateName()"
+            (input)="sfCreateName.set($any($event.target).value)"
+            class="create-input"
+            (keydown.enter)="sfSaveCreate()"
+            (keydown.escape)="sfCancelCreate()"
+            maxlength="100"
+          />
+          <button class="btn-sm btn-save" (click)="sfSaveCreate()">{{ 'shared_folders.save' | translate }}</button>
+          <button class="btn-sm btn-cancel" (click)="sfCancelCreate()">{{ 'common.cancel' | translate }}</button>
+        </div>
+      }
+
+      @if (sfLoading()) {
+        <p class="loading-text">{{ 'shared_folders.loading' | translate }}</p>
+      } @else if (sharedFolders().length === 0) {
+        <p class="empty-text">{{ 'shared_folders.empty' | translate }}</p>
+      } @else {
+        <ul class="sf-list" role="list">
+          @for (f of sharedFolders(); track f.id) {
+            <li class="sf-item">
+              @if (sfEditingId() === f.id) {
+                <div class="edit-row">
+                  <input
+                    type="text"
+                    [value]="sfEditName()"
+                    (input)="sfEditName.set($any($event.target).value)"
+                    class="edit-input"
+                    maxlength="100"
+                    (keydown.enter)="sfSaveEdit(f)"
+                    (keydown.escape)="sfCancelEdit()"
+                  />
+                  <button class="btn-sm btn-save" (click)="sfSaveEdit(f)">{{ 'shared_folders.save' | translate }}</button>
+                  <button class="btn-sm btn-cancel" (click)="sfCancelEdit()">{{ 'common.cancel' | translate }}</button>
+                </div>
               } @else {
-                <span style="opacity:0">▸</span>
+                <div class="sf-row">
+                  <span class="folder-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/></svg>
+                  </span>
+                  <button class="sf-name-link" (click)="navigateToSharedFolder(f)" [title]="'Открыть в Общих папках'">
+                    {{ f.name }}
+                  </button>
+                  <span class="sf-count">{{ f.files_count }}</span>
+                  @if (!f.is_owner) {
+                    <span class="sf-role-badge">{{ f.my_access_type === 'edit' ? 'Редактор' : 'Просматривающий' }}</span>
+                  }
+                  <div class="sf-actions">
+                    @if (f.is_owner) {
+                      <button class="btn-sm btn-access" (click)="openAccessDialog(f)">
+                        {{ 'shared_folders.manage_access_btn' | translate }}
+                      </button>
+                      <button class="btn-sm btn-edit" (click)="sfStartEdit(f)">{{ 'shared_folders.rename' | translate }}</button>
+                      <button class="btn-sm btn-delete" (click)="sfConfirmDelete(f)">{{ 'shared_folders.delete' | translate }}</button>
+                    }
+                  </div>
+                </div>
               }
-            </button>
-            <span class="folder-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                           stroke-linejoin="round"
-                                           class="lucide lucide-folder-bookmark-icon lucide-folder-bookmark"><path
-              d="M12 6v8l3-3 3 3V6"/><path
-              d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg></span>
-            <span class="folder-name">{{ node.name }}</span>
-            <span class="folder-count">{{ node.files_count }}</span>
-            <div class="node-actions">
-              <a [routerLink]="['/files']" [queryParams]="{ folder_id: node.id }" class="btn-sm btn-view">
-                {{ 'folders.view_files' | translate }}
-              </a>
-              <button class="btn-sm btn-add-child" (click)="startCreate(node.id)">+</button>
-              <button class="btn-sm btn-edit" (click)="startEdit(node)">{{ 'folders.rename' | translate }}</button>
-              <button class="btn-sm btn-delete" (click)="confirmDelete(node)">{{ 'folders.delete' | translate }}
-              </button>
-            </div>
-          </div>
-        }
-
-        @if (creating() && createParentId() === node.id) {
-          <div class="inline-create" [style.padding-left.px]="(depth + 1) * 20">
-            <input
-              type="text"
-              [placeholder]="'folders.folder_name_placeholder' | translate"
-              [value]="createName()"
-              (input)="createName.set($any($event.target).value)"
-              class="create-input"
-              (keydown.enter)="saveCreate()"
-              (keydown.escape)="cancelCreate()"
-              maxlength="100"
-            />
-            <button class="btn-sm btn-save" (click)="saveCreate()">{{ 'folders.save' | translate }}</button>
-            <button class="btn-sm btn-cancel" (click)="cancelCreate()">{{ 'common.cancel' | translate }}</button>
-          </div>
-        }
-
-        @if (expanded().has(node.id) && node.children?.length) {
-          <ul class="tree-children" role="group">
-            @for (child of node.children; track child.id) {
-              <ng-container *ngTemplateOutlet="nodeTemplate; context: { $implicit: child, depth: depth + 1 }">
-              </ng-container>
-            }
-          </ul>
-        }
-      </li>
-    </ng-template>
-
-    @if (deleteTarget()) {
-      <div class="modal-backdrop" (click)="cancelDelete()">
-        <div class="modal" (click)="$event.stopPropagation()">
-          <h3>{{ 'folders.confirm_delete_title' | translate }}</h3>
-          <p>{{ 'folders.confirm_delete_desc' | translate : {name: deleteTarget()!.name} }}</p>
-          @if (deleteError()) {
-            <div class="alert-error">{{ deleteError() }}</div>
+            </li>
           }
-          <div class="modal-actions">
-            <button class="btn-primary btn-danger" (click)="deleteFolder(false)" [disabled]="deleting()">
-              {{ 'folders.delete_btn' | translate }}
-            </button>
-            <button class="btn-secondary" (click)="cancelDelete()">{{ 'common.cancel' | translate }}</button>
-          </div>
+        </ul>
+      }
+    </div>
+  }
+</div>
+
+<!-- ── Local folder node template ─────────────────────────────────────── -->
+<ng-template #nodeTemplate let-node let-depth="depth">
+  <li class="tree-node" role="treeitem" [style.padding-left.px]="depth * 20">
+    @if (editingId() === node.id) {
+      <div class="edit-row">
+        <input
+          type="text"
+          [value]="editName()"
+          (input)="editName.set($any($event.target).value)"
+          class="edit-input"
+          maxlength="100"
+          (keydown.enter)="saveEdit(node)"
+          (keydown.escape)="cancelEdit()"
+        />
+        <button class="btn-sm btn-save" (click)="saveEdit(node)">{{ 'folders.save' | translate }}</button>
+        <button class="btn-sm btn-cancel" (click)="cancelEdit()">{{ 'common.cancel' | translate }}</button>
+      </div>
+    } @else {
+      <div class="node-row">
+        <button class="expand-btn" (click)="toggleExpand(node.id)" aria-label="toggle">
+          @if (node.children?.length) {
+            {{ expanded().has(node.id) ? '▾' : '▸' }}
+          } @else {
+            <span style="opacity:0">▸</span>
+          }
+        </button>
+        <span class="folder-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round"
+                                         class="lucide lucide-folder-bookmark-icon lucide-folder-bookmark"><path
+          d="M12 6v8l3-3 3 3V6"/><path
+          d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg></span>
+        <span class="folder-name">{{ node.name }}</span>
+        <span class="folder-count">{{ node.files_count }}</span>
+        <div class="node-actions">
+          <a [routerLink]="['/files']" [queryParams]="{ folder_id: node.id }" class="btn-sm btn-view">
+            {{ 'folders.view_files' | translate }}
+          </a>
+          <button class="btn-sm btn-add-child" (click)="startCreate(node.id)">+</button>
+          <button class="btn-sm btn-edit" (click)="startEdit(node)">{{ 'folders.rename' | translate }}</button>
+          <button class="btn-sm btn-delete" (click)="confirmDelete(node)">{{ 'folders.delete' | translate }}</button>
         </div>
       </div>
     }
 
-    @if (forceDeleteTarget()) {
-      <div class="modal-backdrop" (click)="forceDeleteTarget.set(null)">
-        <div class="modal" (click)="$event.stopPropagation()">
-          <h3>{{ 'folders.force_delete_title' | translate }}</h3>
-          <p>{{ 'folders.force_delete_desc' | translate }}</p>
-          <div class="modal-actions">
-            <button class="btn-primary btn-danger" (click)="deleteFolder(true)" [disabled]="deleting()">
-              {{ 'folders.force_delete_btn' | translate }}
-            </button>
-            <button class="btn-secondary" (click)="forceDeleteTarget.set(null)">{{ 'common.cancel' | translate }}
-            </button>
-          </div>
-        </div>
+    @if (creating() && createParentId() === node.id) {
+      <div class="inline-create" [style.padding-left.px]="(depth + 1) * 20">
+        <input
+          type="text"
+          [placeholder]="'folders.folder_name_placeholder' | translate"
+          [value]="createName()"
+          (input)="createName.set($any($event.target).value)"
+          class="create-input"
+          (keydown.enter)="saveCreate()"
+          (keydown.escape)="cancelCreate()"
+          maxlength="100"
+        />
+        <button class="btn-sm btn-save" (click)="saveCreate()">{{ 'folders.save' | translate }}</button>
+        <button class="btn-sm btn-cancel" (click)="cancelCreate()">{{ 'common.cancel' | translate }}</button>
       </div>
     }
-  
+
+    @if (expanded().has(node.id) && node.children?.length) {
+      <ul class="tree-children" role="group">
+        @for (child of node.children; track child.id) {
+          <ng-container *ngTemplateOutlet="nodeTemplate; context: { $implicit: child, depth: depth + 1 }">
+          </ng-container>
+        }
+      </ul>
+    }
+  </li>
+</ng-template>
+
+<!-- ── Local delete modals ─────────────────────────────────────────────── -->
+@if (deleteTarget()) {
+  <div class="modal-backdrop" (click)="cancelDelete()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>{{ 'folders.confirm_delete_title' | translate }}</h3>
+      <p>{{ 'folders.confirm_delete_desc' | translate : {name: deleteTarget()!.name} }}</p>
+      @if (deleteError()) {
+        <div class="alert-error">{{ deleteError() }}</div>
+      }
+      <div class="modal-actions">
+        <button class="btn-primary btn-danger" (click)="deleteFolder(false)" [disabled]="deleting()">
+          {{ 'folders.delete_btn' | translate }}
+        </button>
+        <button class="btn-secondary" (click)="cancelDelete()">{{ 'common.cancel' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (forceDeleteTarget()) {
+  <div class="modal-backdrop" (click)="forceDeleteTarget.set(null)">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>{{ 'folders.force_delete_title' | translate }}</h3>
+      <p>{{ 'folders.force_delete_desc' | translate }}</p>
+      <div class="modal-actions">
+        <button class="btn-primary btn-danger" (click)="deleteFolder(true)" [disabled]="deleting()">
+          {{ 'folders.force_delete_btn' | translate }}
+        </button>
+        <button class="btn-secondary" (click)="forceDeleteTarget.set(null)">{{ 'common.cancel' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Shared folder delete modal ─────────────────────────────────────── -->
+@if (sfDeleteTarget()) {
+  <div class="modal-backdrop" (click)="sfCancelDelete()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>{{ 'shared_folders.confirm_delete_title' | translate }}</h3>
+      <p>{{ 'shared_folders.confirm_delete_desc' | translate:{name: sfDeleteTarget()!.name} }}</p>
+      <div class="modal-actions">
+        <button class="btn-primary btn-danger" (click)="sfDelete()" [disabled]="sfDeleting()">
+          {{ 'shared_folders.delete_btn' | translate }}
+        </button>
+        <button class="btn-secondary" (click)="sfCancelDelete()">{{ 'common.cancel' | translate }}</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ── Access dialog ────────────────────────────────────────────────────── -->
+@if (sfAccessFolderId()) {
+  <app-shared-folder-access-dialog
+    [folderId]="sfAccessFolderId()!"
+    [folderName]="sfAccessFolderName()"
+    (closed)="closeAccessDialog()"
+  />
+}
