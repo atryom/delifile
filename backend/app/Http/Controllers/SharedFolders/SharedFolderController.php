@@ -15,6 +15,7 @@ use App\Models\SharedFolderLink;
 use App\Models\User;
 use App\Services\FileService;
 use App\Services\LinkPreviewService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,8 +24,9 @@ use Illuminate\Support\Facades\DB;
 class SharedFolderController extends Controller
 {
     public function __construct(
-        private readonly FileService        $fileService,
-        private readonly LinkPreviewService $previewService,
+        private readonly FileService             $fileService,
+        private readonly LinkPreviewService      $previewService,
+        private readonly PushNotificationService $pushService,
     ) {}
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -453,6 +455,17 @@ class SharedFolderController extends Controller
         ]);
 
         $access->load('user:id,email,name');
+
+        if ($access->user) {
+            $senderName = $request->user()->name ?? $request->user()->email;
+            $accessLabel = $data['access_type'] === 'edit' ? 'редактирование' : 'просмотр';
+            $this->pushService->sendToUser(
+                $access->user,
+                'Доступ к общей папке',
+                "{$senderName} открыл вам доступ ({$accessLabel}) к папке «{$folder->name}»",
+                config('app.url') . '/shared-folders?folder_id=' . $folder->id,
+            );
+        }
 
         return $this->success('Access granted', [
             'access' => [
