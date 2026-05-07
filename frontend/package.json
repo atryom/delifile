@@ -5,8 +5,8 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json",
-    "build": "ng build",
-    "build:prod": "ng build --configuration production",
+    "build": "ng build && node scripts/postbuild.js",
+    "build:prod": "ng build --configuration production && node scripts/postbuild.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint"

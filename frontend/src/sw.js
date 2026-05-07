@@ -6,7 +6,16 @@
 const SHARE_CACHE = 'share-target-v1';
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    self.clients.claim().then(() =>
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+        list.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+      })
+    )
+  );
+});
 
 self.addEventListener('fetch', event => {
   const req = event.request;
