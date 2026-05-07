@@ -14,15 +14,19 @@ use App\Models\ShareLink;
 use App\Models\User;
 use App\Services\ActivityService;
 use App\Services\FileService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class SharingController extends Controller
 {
     public function __construct(
-        private readonly FileService     $fileService,
-        private readonly ActivityService $activityService
+        private readonly FileService             $fileService,
+        private readonly ActivityService         $activityService,
+        private readonly PushNotificationService $pushService,
     ) {}
 
     /**
@@ -111,6 +115,14 @@ class SharingController extends Controller
                 $this->activityService->log($file, $recipientUser, ActivityType::FileReceived, [
                     'shared_by' => $request->user()->email,
                 ]);
+
+                $senderName = $request->user()->name ?? $request->user()->email;
+                $this->pushService->sendToUser(
+                    $recipientUser,
+                    __('notifications.new_file_title'),
+                    $file->original_name . ' — от ' . $senderName,
+                    config('app.url') . '/files/' . $file->id,
+                );
             }
         });
 
@@ -269,12 +281,22 @@ class SharingController extends Controller
         }
 
         $previewUrl = null;
-        if ($link->file->storage_key && str_starts_with($link->file->mime_type ?? '', 'image/') && $link->file->isAvailable()) {
+        $viewUrl    = null;
+        $mime       = $link->file->mime_type ?? '';
+
+        if ($link->file->storage_key && $link->file->isAvailable()) {
             try {
-                $previewUrl = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
-                    $link->file->storage_key,
-                    now()->addMinutes(60)
-                );
+                if (str_starts_with($mime, 'image/')) {
+                    $previewUrl = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
+                        $link->file->storage_key,
+                        now()->addMinutes(60)
+                    );
+                } elseif (str_starts_with($mime, 'video/') || str_starts_with($mime, 'audio/')) {
+                    $viewUrl = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
+                        $link->file->storage_key,
+                        now()->addMinutes(60)
+                    );
+                }
             } catch (\Throwable) {}
         }
 
@@ -285,6 +307,7 @@ class SharingController extends Controller
             'size'          => $link->file->size,
             'mime_type'     => $link->file->mime_type,
             'preview_url'   => $previewUrl,
+            'view_url'      => $viewUrl,
         ];
 
         if ($link->file->content_kind === 'url_file') {
@@ -380,5 +403,117 @@ class SharingController extends Controller
         return $this->success('Файл сохранён в ваш аккаунт.', [
             'file_id' => $link->file->id,
         ]);
+    }
+
+    /**
+     * GET /link/{token}
+     * Public SPA page with injected OG meta tags for social sharing previews.
+     */
+    public function publicLinkPage(string $token): Response
+    {
+        $link = ShareLink::where('token', $token)->with('file')->first();
+
+        $ogTags = '';
+
+        if ($link && $link->isValid()) {
+            $file = $link->file;
+            $mime = $file->mime_type ?? '';
+            $url  = config('app.url') . '/link/' . $token;
+
+            if ($file->content_kind === 'url_file') {
+                $title       = $file->link_title ?: $file->original_name;
+                $description = $file->link_description ?? 'Файл из DeliFile';
+                $image       = $file->link_image_url ?? '';
+            } else {
+                $title       = $file->original_name;
+                $description = $this->buildOgDescription($mime, $file->size);
+                $image       = $this->buildOgImage($file, $mime);
+            }
+
+            $ogTags = $this->renderOgTags(
+                e($title),
+                e($description),
+                e($image),
+                e($url),
+            );
+        }
+
+        $indexPath = base_path('../public/index.html');
+        $html = file_exists($indexPath)
+            ? file_get_contents($indexPath)
+            : '<!doctype html><html><head></head><body><app-root></app-root></body></html>';
+
+        $html = str_replace('</head>', $ogTags . '</head>', $html);
+
+        return response($html, 200, ['Content-Type' => 'text/html; charset=utf-8']);
+    }
+
+    private function buildOgDescription(string $mime, int $size): string
+    {
+        $category = match(true) {
+            str_starts_with($mime, 'image/')       => 'Изображение',
+            str_starts_with($mime, 'video/')       => 'Видео',
+            str_starts_with($mime, 'audio/')       => 'Аудио',
+            str_contains($mime, 'pdf')             => 'PDF-документ',
+            str_contains($mime, 'spreadsheet') ||
+            str_contains($mime, 'excel')           => 'Таблица',
+            str_contains($mime, 'word') ||
+            str_contains($mime, 'document')        => 'Документ',
+            str_contains($mime, 'zip') ||
+            str_contains($mime, 'archive') ||
+            str_contains($mime, 'rar')             => 'Архив',
+            default                                => 'Файл',
+        };
+
+        $sizeStr = match(true) {
+            $size >= 1024 ** 3 => round($size / 1024 ** 3, 1) . ' ГБ',
+            $size >= 1024 ** 2 => round($size / 1024 ** 2, 1) . ' МБ',
+            $size >= 1024      => round($size / 1024, 1) . ' КБ',
+            default            => $size . ' Б',
+        };
+
+        return "{$category}, {$sizeStr} — поделились через DeliFile";
+    }
+
+    private function buildOgImage(File $file, string $mime): string
+    {
+        if (!$file->isAvailable()) return '';
+
+        // Prefer thumbnail; fall back to original only for images
+        $key = $file->thumbnail_key
+            ?? (str_starts_with($mime, 'image/') ? $file->storage_key : null);
+
+        if (!$key) return '';
+
+        try {
+            return Storage::disk('s3')->temporaryUrl($key, now()->addMinutes(60));
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    private function renderOgTags(string $title, string $description, string $image, string $url): string
+    {
+        $hasImage = $image !== '';
+        $card     = $hasImage ? 'summary_large_image' : 'summary';
+
+        $tags  = "\n";
+        $tags .= "  <meta property=\"og:type\"        content=\"website\">\n";
+        $tags .= "  <meta property=\"og:site_name\"   content=\"DeliFile\">\n";
+        $tags .= "  <meta property=\"og:url\"         content=\"{$url}\">\n";
+        $tags .= "  <meta property=\"og:title\"       content=\"{$title}\">\n";
+        $tags .= "  <meta property=\"og:description\" content=\"{$description}\">\n";
+        if ($hasImage) {
+            $tags .= "  <meta property=\"og:image\"       content=\"{$image}\">\n";
+        }
+        $tags .= "  <meta name=\"twitter:card\"        content=\"{$card}\">\n";
+        $tags .= "  <meta name=\"twitter:title\"       content=\"{$title}\">\n";
+        $tags .= "  <meta name=\"twitter:description\" content=\"{$description}\">\n";
+        if ($hasImage) {
+            $tags .= "  <meta name=\"twitter:image\"      content=\"{$image}\">\n";
+        }
+        $tags .= "  ";
+
+        return $tags;
     }
 }

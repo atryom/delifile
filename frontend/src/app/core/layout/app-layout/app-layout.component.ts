@@ -12,6 +12,7 @@ import { AuthApiService } from '../../api/auth-api.service';
 import { UserSettingsApiService } from '../../api/user-settings-api.service';
 import { FilesApiService } from '../../api/files-api.service';
 import { NotificationService } from '../../notifications/notification.service';
+import { PushService } from '../../notifications/push.service';
 import { FooterComponent } from '../../../shared/components/footer/footer.component';
 import { PwaInstallService } from '../../services/pwa-install.service';
 
@@ -33,6 +34,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   private readonly filesApi     = inject(FilesApiService);
   readonly notifService  = inject(NotificationService);
   readonly pwaInstall    = inject(PwaInstallService);
+  private readonly pushService = inject(PushService);
   private readonly translate    = inject(TranslateService);
 
   readonly isAuth          = this.authState.isAuthenticated;
@@ -69,6 +71,10 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     if (this.isAuth()) {
       this._startPolling();
+      // Restore push subscription if permission was granted in a previous session
+      if (this.notifService.isGranted()) {
+        this.pushService.subscribe().catch(() => { /* ignore */ });
+      }
     }
 
     // Clear relevant toasts when user navigates to the page that triggered them
@@ -148,6 +154,8 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
           if (res.result === 'success') this.authState.updateUser(res.data.user);
         });
       }
+      // Register PWA push subscription
+      this.pushService.subscribe().catch(() => { /* ignore push errors */ });
     }
   }
 

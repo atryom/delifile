@@ -113,4 +113,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Invitation::class, 'sender_user_id');
     }
+
+    public function pushSubscriptions(): HasMany
+    {
+        return $this->hasMany(PushSubscription::class);
+    }
 }

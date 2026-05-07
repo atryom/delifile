@@ -7,13 +7,17 @@ use App\Models\Contact;
 use App\Models\ContactRequest;
 use App\Models\User;
 use App\Services\InvitationService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ContactController extends Controller
 {
-    public function __construct(private readonly InvitationService $invitationService) {}
+    public function __construct(
+        private readonly InvitationService       $invitationService,
+        private readonly PushNotificationService $pushService,
+    ) {}
 
     /**
      * GET /api/v1/contacts
@@ -104,6 +108,14 @@ class ContactController extends Controller
                         'contact_id' => $contact->id,
                         'status'     => 'pending',
                     ]
+                );
+
+                $senderName = $request->user()->name ?? $request->user()->email;
+                $this->pushService->sendToUser(
+                    $resolved,
+                    'Запрос на добавление в контакты',
+                    $senderName . ' хочет добавить вас в контакты',
+                    config('app.url') . '/settings/security',
                 );
             }
 

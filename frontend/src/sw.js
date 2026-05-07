@@ -1,7 +1,6 @@
 /**
  * DeliFile Service Worker
- * Handles Web Share Target API — intercepts POST /share-target,
- * stores shared files/URLs in Cache API, then redirects to the SPA route.
+ * Handles Web Share Target API and PWA Push Notifications.
  */
 
 const SHARE_CACHE = 'share-target-v1';
@@ -55,3 +54,40 @@ async function handleShareTarget(request) {
     return Response.redirect('/share-target?sw_error=1', 303);
   }
 }
+
+// ─── PWA Push Notifications ───────────────────────────────────────────────────
+
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data?.json() ?? {}; } catch { /* ignore */ }
+
+  const title   = data.title  ?? 'DeliFile';
+  const options = {
+    body:  data.body  ?? '',
+    icon:  data.icon  ?? '/assets/icons/icon-192.png',
+    badge: data.badge ?? '/assets/icons/icon-72.png',
+    data:  { url: data.url ?? '/' },
+    vibrate: [200, 100, 200],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url ?? '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // Focus existing tab if open
+      for (const client of clientList) {
+        if ('focus' in client) {
+          client.focus();
+          if ('navigate' in client) client.navigate(targetUrl);
+          return;
+        }
+      }
+      return clients.openWindow(targetUrl);
+    })
+  );
+});

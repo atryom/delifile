@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
@@ -26,12 +26,16 @@ export class PublicLinkComponent implements OnInit {
     size: number;
     mime_type: string;
     preview_url?: string | null;
+    view_url?: string | null;
     link_url?: string | null;
     link_title?: string | null;
     link_description?: string | null;
     link_image_url?: string | null;
     link_site_name?: string | null;
   } | null>(null);
+
+  readonly isVideo = computed(() => (this.fileInfo()?.mime_type ?? '').startsWith('video/'));
+  readonly isAudio = computed(() => (this.fileInfo()?.mime_type ?? '').startsWith('audio/'));
   readonly expiresAt   = signal<string | null>(null);
   readonly allowSave   = signal(false);
   readonly downloading = signal(false);

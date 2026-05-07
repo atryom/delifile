@@ -1,5 +1,5 @@
     <div class="link-page">
-      <div class="link-card">
+      <div class="link-card" [class.link-card--video]="isVideo() && !!fileInfo()?.view_url">
         <div class="brand">
           <span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -46,7 +46,24 @@
               </div>
             } @else {
               <!-- Обычный файл -->
-              @if (fileInfo()?.preview_url) {
+              @if (isVideo() && fileInfo()?.view_url) {
+                <video
+                  [src]="fileInfo()!.view_url!"
+                  controls
+                  preload="metadata"
+                  class="file-preview-video"
+                  [attr.aria-label]="fileInfo()!.original_name">
+                </video>
+              } @else if (isAudio() && fileInfo()?.view_url) {
+                <div class="file-icon">{{ fileIcon() }}</div>
+                <audio
+                  [src]="fileInfo()!.view_url!"
+                  controls
+                  preload="metadata"
+                  class="file-preview-audio"
+                  [attr.aria-label]="fileInfo()!.original_name">
+                </audio>
+              } @else if (fileInfo()?.preview_url) {
                 <img [src]="fileInfo()!.preview_url!" alt="" class="file-preview-img" loading="lazy" />
               } @else {
                 <div class="file-icon">{{ fileIcon() }}</div>

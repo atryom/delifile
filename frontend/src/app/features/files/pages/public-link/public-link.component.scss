@@ -15,6 +15,11 @@
   max-width: 100%;
   text-align: center;
   box-shadow: 0 8px 40px rgba(99,102,241,0.12);
+
+  &--video {
+    width: min(760px, 95vw);
+    padding: 28px 28px 36px;
+  }
 }
 .brand { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 1.1rem; margin-bottom: 28px; color: #1a1a2e; }
 .brand span:first-child { font-size: 1.5rem; }
@@ -36,6 +41,8 @@
 .url-open-btn:hover { background: #4f46e5; }
 
 .file-preview-img { width: 120px; height: 120px; object-fit: cover; border-radius: 14px; margin-bottom: 14px; }
+.file-preview-video { width: 100%; max-height: min(65vh, 520px); border-radius: 12px; margin-bottom: 14px; background: #000; display: block; }
+.file-preview-audio { width: 100%; margin-bottom: 14px; }
 .file-icon { font-size: 3.5rem; margin-bottom: 14px; }
 .file-name { font-size: 1.1rem; font-weight: 700; margin: 0 0 8px; word-break: break-all; }
 .file-meta { font-size: 0.85rem; color: #9ca3af; margin: 0 0 12px; }

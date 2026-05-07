@@ -15,6 +15,7 @@ use App\Http\Controllers\Links\UrlFileController;
 use App\Http\Controllers\Support\SupportTicketController;
 use App\Http\Controllers\Support\SuggestionController;
 use App\Http\Controllers\Tariff\TariffController;
+use App\Http\Controllers\Push\PushController;
 use App\Http\Controllers\User\UserSettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,6 +59,13 @@ Route::prefix('v1')->group(function () {
             Route::post('email/resend-verification', [AuthController::class, 'resendVerification']);
             Route::post('email/change',              [AuthController::class, 'changeEmail']);
         });
+    });
+
+    // ─── Push Notifications ───────────────────────────────────────────────────
+    Route::get('push/vapid-key', [PushController::class, 'vapidKey']);
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('push/subscribe',   [PushController::class, 'subscribe']);
+        Route::delete('push/unsubscribe', [PushController::class, 'unsubscribe']);
     });
 
     // ─── Public Link Flow ──────────────────────────────────────────────────────
