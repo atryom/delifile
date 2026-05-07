@@ -30,6 +30,10 @@
   gap: 4px;
   margin-bottom: 24px;
   border-bottom: 2px solid #e5e7eb;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
 }
 
 .tab-btn {
@@ -42,9 +46,16 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &:hover { color: #1a1a2e; }
   &--active { color: #6366f1; border-bottom-color: #6366f1; font-weight: 600; }
+}
+
+@media (max-width: 600px) {
+  .admin-page { padding: 16px; }
+  .tab-btn { padding: 10px 14px; font-size: 0.85rem; }
 }
 
 /* ── Stats ── */

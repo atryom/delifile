@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Support;
 use App\Http\Controllers\Controller;
 use App\Models\SupportMessage;
 use App\Models\SupportTicket;
+use App\Models\User;
+use App\Services\PushNotificationService;
 use App\Services\SupportAttachmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +15,8 @@ use Illuminate\Support\Facades\DB;
 class SupportTicketController extends Controller
 {
     public function __construct(
-        private readonly SupportAttachmentService $attachmentService
+        private readonly SupportAttachmentService $attachmentService,
+        private readonly PushNotificationService  $pushService,
     ) {}
 
     /**
@@ -85,6 +88,12 @@ class SupportTicketController extends Controller
                 $this->attachmentService->storeSupportAttachments($message->id, $files);
             }
         });
+
+        $this->notifyAdmins(
+            'Новое обращение в поддержку',
+            ($request->user()->name ?? $request->user()->email) . ': ' . mb_substr($request->input('body'), 0, 80),
+            config('app.url') . '/admin',
+        );
 
         return $this->success('Обращение создано', ['ticket' => $this->formatTicketDetail($ticket->fresh(['messages.attachments']))], 201);
     }
@@ -158,6 +167,12 @@ class SupportTicketController extends Controller
         });
 
         $message->load('attachments');
+
+        $this->notifyAdmins(
+            'Новое сообщение в обращении #' . $ticket->id,
+            ($request->user()->name ?? $request->user()->email) . ': ' . mb_substr($request->input('body'), 0, 80),
+            config('app.url') . '/admin',
+        );
 
         return $this->success('Сообщение отправлено', ['message' => $this->formatMessage($message)]);
     }
@@ -281,6 +296,12 @@ class SupportTicketController extends Controller
                 ? $message->attachments->map(fn($a) => $this->formatAttachment($a))->values()
                 : [],
         ];
+    }
+
+    private function notifyAdmins(string $title, string $body, string $url): void
+    {
+        User::where('is_superuser', true)->with('pushSubscriptions')->get()
+            ->each(fn(User $admin) => $this->pushService->sendToUser($admin, $title, $body, $url));
     }
 
     private function formatAttachment(\App\Models\SupportAttachment $a): array

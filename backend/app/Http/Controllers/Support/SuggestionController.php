@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Support;
 
 use App\Http\Controllers\Controller;
 use App\Models\SuggestionTicket;
+use App\Models\User;
+use App\Services\PushNotificationService;
 use App\Services\SupportAttachmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +14,8 @@ use Illuminate\Support\Facades\DB;
 class SuggestionController extends Controller
 {
     public function __construct(
-        private readonly SupportAttachmentService $attachmentService
+        private readonly SupportAttachmentService $attachmentService,
+        private readonly PushNotificationService  $pushService,
     ) {}
 
     /**
@@ -71,6 +74,14 @@ class SuggestionController extends Controller
         });
 
         $suggestion->load('attachments');
+
+        User::where('is_superuser', true)->with('pushSubscriptions')->get()
+            ->each(fn(User $admin) => $this->pushService->sendToUser(
+                $admin,
+                'Новое предложение по продукту',
+                ($request->user()->name ?? $request->user()->email) . ': ' . mb_substr($request->input('body'), 0, 80),
+                config('app.url') . '/admin',
+            ));
 
         return $this->success('Предложение отправлено', ['suggestion' => $this->formatSuggestion($suggestion)], 201);
     }

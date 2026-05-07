@@ -112,3 +112,16 @@
 @media (max-width: 768px) {
   .file-detail-layout { grid-template-columns: 1fr; }
 }
+
+@media (max-width: 600px) {
+  .page { padding: 14px 16px; }
+  .file-header-card { flex-direction: column; gap: 12px; }
+  .file-preview-thumb { width: 64px; height: 64px; }
+  .file-big-icon { font-size: 2.4rem; }
+  .file-title { font-size: 1.1rem; }
+  .file-meta-row { gap: 8px; font-size: 0.8rem; }
+  .actions-bar, .share-actions, .danger-actions { gap: 6px; }
+  .btn-action { padding: 8px 12px; font-size: 0.83rem; }
+  .btn-danger  { padding: 7px 11px; font-size: 0.83rem; }
+  .sidebar-section { padding: 14px; }
+}

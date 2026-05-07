@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SupportAttachment;
 use App\Models\SupportMessage;
 use App\Models\SupportTicket;
+use App\Services\PushNotificationService;
 use App\Services\SupportAttachmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\DB;
 class SupportAdminController extends Controller
 {
     public function __construct(
-        private readonly SupportAttachmentService $attachmentService
+        private readonly SupportAttachmentService $attachmentService,
+        private readonly PushNotificationService  $pushService,
     ) {}
 
     /**
@@ -107,8 +109,12 @@ class SupportAdminController extends Controller
         $now = now();
         $ticket->update(['status' => 'awaiting_confirmation', 'awaiting_at' => $now]);
 
-        // Notify user via notification service if enabled
-        $this->_notifyUser($ticket);
+        $this->pushService->sendToUser(
+            $ticket->user,
+            'Ваше обращение #' . $ticket->id . ' ожидает подтверждения',
+            'Поддержка считает вопрос решённым. Подтвердите закрытие или напишите, если проблема осталась.',
+            config('app.url') . '/support/' . $ticket->id,
+        );
 
         return $this->success('Ожидает подтверждения пользователя', ['status' => 'awaiting_confirmation']);
     }
@@ -156,6 +162,14 @@ class SupportAdminController extends Controller
         });
 
         $message->load('attachments');
+
+        $ticket->loadMissing('user');
+        $this->pushService->sendToUser(
+            $ticket->user,
+            'Ответ поддержки по обращению #' . $ticket->id,
+            mb_substr($request->input('body'), 0, 80),
+            config('app.url') . '/support/' . $ticket->id,
+        );
 
         return $this->success('Сообщение отправлено', ['message' => $this->formatMessage($message)]);
     }
@@ -255,9 +269,5 @@ class SupportAdminController extends Controller
         ];
     }
 
-    private function _notifyUser(SupportTicket $ticket): void
-    {
-        // Placeholder for future push notification delivery
-        // The notification system is client-side; user will see status change on next poll/refresh
-    }
+
 }
