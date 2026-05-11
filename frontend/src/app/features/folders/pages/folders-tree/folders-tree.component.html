@@ -1,270 +1,678 @@
-<div class="page">
-  <div class="page-header">
-    <h1>{{ 'folders.title' | translate }}</h1>
-  </div>
+<div class="explorer-app" (click)="closeMenu()">
 
-  <!-- Tabs -->
-  <div class="tabs" role="tablist">
-    <button
-      role="tab"
-      class="tab-btn"
-      [class.active]="activeTab() === 'local'"
-      [attr.aria-selected]="activeTab() === 'local'"
-      (click)="setTab('local')"
-    >{{ 'shared_folders.tab_local' | translate }}</button>
-    <button
-      role="tab"
-      class="tab-btn"
-      [class.active]="activeTab() === 'shared'"
-      [attr.aria-selected]="activeTab() === 'shared'"
-      (click)="setTab('shared')"
-    >{{ 'shared_folders.tab_shared' | translate }}</button>
-  </div>
+  <!-- ──────────────────────────────────────────────────────── SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section-label">Тип Папки</div>
 
-  <!-- ── LOCAL TAB ──────────────────────────────────────────────────── -->
-  @if (activeTab() === 'local') {
-    <div role="tabpanel">
-      <div class="tab-toolbar">
-        <button class="btn-primary" (click)="startCreate(null)">
-          + {{ 'folders.create_btn' | translate }}
-        </button>
-      </div>
-
-      @if (creating() && createParentId() === null) {
-        <div class="inline-create">
-          <input
-            type="text"
-            [placeholder]="'folders.folder_name_placeholder' | translate"
-            [value]="createName()"
-            (input)="createName.set($any($event.target).value)"
-            class="create-input"
-            (keydown.enter)="saveCreate()"
-            (keydown.escape)="cancelCreate()"
-            maxlength="100"
-          />
-          <button class="btn-sm btn-save" (click)="saveCreate()">{{ 'folders.save' | translate }}</button>
-          <button class="btn-sm btn-cancel" (click)="cancelCreate()">{{ 'common.cancel' | translate }}</button>
+    <div class="source-list">
+      <div class="source-item" [class.active]="activeTab() === 'local'"
+           (click)="setTab('local'); $event.stopPropagation()" role="button" tabindex="0"
+           (keydown.enter)="setTab('local')" (keydown.space)="setTab('local')">
+        <div class="source-info">
+          <span class="source-name">Локальные</span>
         </div>
-      }
-
-      @if (loading()) {
-        <p class="loading-text">{{ 'folders.loading' | translate }}</p>
-      } @else if (tree().length === 0) {
-        <p class="empty-text">{{ 'folders.empty' | translate }}</p>
-      } @else {
-        <ul class="tree-root" role="tree">
-          @for (node of tree(); track node.id) {
-            <ng-container *ngTemplateOutlet="nodeTemplate; context: { $implicit: node, depth: 0 }">
-            </ng-container>
-          }
-        </ul>
-      }
+      </div>
+      <div class="source-item" [class.active]="activeTab() === 'shared'"
+           (click)="setTab('shared'); $event.stopPropagation()" role="button" tabindex="0"
+           (keydown.enter)="setTab('shared')" (keydown.space)="setTab('shared')">
+        <div class="source-info">
+          <span class="source-name">Общие</span>
+        </div>
+      </div>
     </div>
-  }
 
-  <!-- ── SHARED TAB ─────────────────────────────────────────────────── -->
-  @if (activeTab() === 'shared') {
-    <div role="tabpanel">
-      <div class="tab-toolbar">
-        <button class="btn-primary" (click)="sfStartCreate()">
-          + {{ 'shared_folders.create_btn' | translate }}
-        </button>
-      </div>
-
-      @if (sfCreating()) {
-        <div class="inline-create">
-          <input
-            type="text"
-            [placeholder]="'shared_folders.folder_name_placeholder' | translate"
-            [value]="sfCreateName()"
-            (input)="sfCreateName.set($any($event.target).value)"
-            class="create-input"
-            (keydown.enter)="sfSaveCreate()"
-            (keydown.escape)="sfCancelCreate()"
-            maxlength="100"
-          />
-          <button class="btn-sm btn-save" (click)="sfSaveCreate()">{{ 'shared_folders.save' | translate }}</button>
-          <button class="btn-sm btn-cancel" (click)="sfCancelCreate()">{{ 'common.cancel' | translate }}</button>
-        </div>
-      }
-
-      @if (sfLoading()) {
-        <p class="loading-text">{{ 'shared_folders.loading' | translate }}</p>
-      } @else if (sharedFolders().length === 0) {
-        <p class="empty-text">{{ 'shared_folders.empty' | translate }}</p>
-      } @else {
-        <ul class="sf-list" role="list">
-          @for (f of sharedFolders(); track f.id) {
-            <li class="sf-item">
-              @if (sfEditingId() === f.id) {
-                <div class="edit-row">
-                  <input
-                    type="text"
-                    [value]="sfEditName()"
-                    (input)="sfEditName.set($any($event.target).value)"
-                    class="edit-input"
-                    maxlength="100"
-                    (keydown.enter)="sfSaveEdit(f)"
-                    (keydown.escape)="sfCancelEdit()"
-                  />
-                  <button class="btn-sm btn-save" (click)="sfSaveEdit(f)">{{ 'shared_folders.save' | translate }}</button>
-                  <button class="btn-sm btn-cancel" (click)="sfCancelEdit()">{{ 'common.cancel' | translate }}</button>
-                </div>
-              } @else {
-                <div class="sf-row">
-                  <span class="folder-icon" aria-hidden="true">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/></svg>
-                  </span>
-                  <button class="sf-name-link" (click)="navigateToSharedFolder(f)" [title]="'Открыть в Общих папках'">
-                    {{ f.name }}
-                  </button>
-                  <span class="sf-count">{{ f.files_count }}</span>
-                  @if (!f.is_owner) {
-                    <span class="sf-role-badge">{{ f.my_access_type === 'edit' ? 'Редактор' : 'Просматривающий' }}</span>
-                  }
-                  <div class="sf-actions">
-                    @if (f.is_owner) {
-                      <button class="btn-sm btn-access" (click)="openAccessDialog(f)">
-                        {{ 'shared_folders.manage_access_btn' | translate }}
-                      </button>
-                      <button class="btn-sm btn-edit" (click)="sfStartEdit(f)">{{ 'shared_folders.rename' | translate }}</button>
-                      <button class="btn-sm btn-delete" (click)="sfConfirmDelete(f)">{{ 'shared_folders.delete' | translate }}</button>
-                    }
-                  </div>
-                </div>
-              }
-            </li>
-          }
-        </ul>
-      }
+    <div class="sidebar-footer">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+        <path d="M3 5v14a9 3 0 0 0 18 0V5"/>
+        <path d="M3 12a9 3 0 0 0 18 0"/>
+      </svg>
+      <span class="footer-label">Использование, Гб</span>
+      <span class="footer-size">{{ storageText() }}</span>
     </div>
-  }
-</div>
+  </aside>
 
-<!-- ── Local folder node template ─────────────────────────────────────── -->
-<ng-template #nodeTemplate let-node let-depth="depth">
-  <li class="tree-node" role="treeitem" [style.padding-left.px]="depth * 20">
-    @if (editingId() === node.id) {
-      <div class="edit-row">
-        <input
-          type="text"
-          [value]="editName()"
-          (input)="editName.set($any($event.target).value)"
-          class="edit-input"
-          maxlength="100"
-          (keydown.enter)="saveEdit(node)"
-          (keydown.escape)="cancelEdit()"
-        />
-        <button class="btn-sm btn-save" (click)="saveEdit(node)">{{ 'folders.save' | translate }}</button>
-        <button class="btn-sm btn-cancel" (click)="cancelEdit()">{{ 'common.cancel' | translate }}</button>
-      </div>
-    } @else {
-      <div class="node-row">
-        <button class="expand-btn" (click)="toggleExpand(node.id)" aria-label="toggle">
-          @if (node.children?.length) {
-            {{ expanded().has(node.id) ? '▾' : '▸' }}
-          } @else {
-            <span style="opacity:0">▸</span>
-          }
-        </button>
-        <span class="folder-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                         stroke-linejoin="round"
-                                         class="lucide lucide-folder-bookmark-icon lucide-folder-bookmark"><path
-          d="M12 6v8l3-3 3 3V6"/><path
-          d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg></span>
-        <span class="folder-name">{{ node.name }}</span>
-        <span class="folder-count">{{ node.files_count }}</span>
-        <div class="node-actions">
-          <a [routerLink]="['/files']" [queryParams]="{ folder_id: node.id }" class="btn-sm btn-view">
-            {{ 'folders.view_files' | translate }}
-          </a>
-          <button class="btn-sm btn-add-child" (click)="startCreate(node.id)">+</button>
-          <button class="btn-sm btn-edit" (click)="startEdit(node)">{{ 'folders.rename' | translate }}</button>
-          <button class="btn-sm btn-delete" (click)="confirmDelete(node)">{{ 'folders.delete' | translate }}</button>
-        </div>
-      </div>
-    }
+  <!-- ──────────────────────────────────────────────────────── MAIN -->
+  <div class="main">
 
-    @if (creating() && createParentId() === node.id) {
-      <div class="inline-create" [style.padding-left.px]="(depth + 1) * 20">
-        <input
-          type="text"
-          [placeholder]="'folders.folder_name_placeholder' | translate"
-          [value]="createName()"
-          (input)="createName.set($any($event.target).value)"
-          class="create-input"
-          (keydown.enter)="saveCreate()"
-          (keydown.escape)="cancelCreate()"
-          maxlength="100"
-        />
-        <button class="btn-sm btn-save" (click)="saveCreate()">{{ 'folders.save' | translate }}</button>
-        <button class="btn-sm btn-cancel" (click)="cancelCreate()">{{ 'common.cancel' | translate }}</button>
-      </div>
-    }
+    <!-- ── TOPBAR ─────────────────────────────────────────────────────── -->
+    <header class="topbar">
 
-    @if (expanded().has(node.id) && node.children?.length) {
-      <ul class="tree-children" role="group">
-        @for (child of node.children; track child.id) {
-          <ng-container *ngTemplateOutlet="nodeTemplate; context: { $implicit: child, depth: depth + 1 }">
-          </ng-container>
+      <!-- Filter tabs -->
+      <div class="filter-tabs" role="tablist">
+        @for (f of currentFilters(); track f.key) {
+          <button type="button" role="tab" class="filter-tab"
+                  [class.active]="activeFilter() === f.key"
+                  [attr.aria-selected]="activeFilter() === f.key"
+                  (click)="setFilter(f.key); $event.stopPropagation()">
+            {{ f.label }}
+          </button>
         }
-      </ul>
-    }
-  </li>
-</ng-template>
+      </div>
 
-<!-- ── Local delete modals ─────────────────────────────────────────────── -->
+      <!-- Search -->
+      <div class="search-wrap">
+        <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input class="search-input" type="search" placeholder="Поиск..."
+               [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange($event)"
+               aria-label="Поиск файлов и папок" />
+      </div>
+
+      <!-- Action buttons -->
+      <div class="topbar-actions">
+        <button type="button" class="btn-action" (click)="startCreate($event)" title="Новая папка">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+          </svg>
+          <span>Новая папка</span>
+        </button>
+
+        <button type="button" class="btn-action" (click)="openAddModal($event)" title="Добавить файл или ссылку">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>Добавить</span>
+        </button>
+
+        <div class="topbar-divider" aria-hidden="true"></div>
+
+        <button type="button" class="topbar-btn" [class.active]="viewMode() === 'table'"
+                (click)="viewMode.set('table')" title="Табличный вид" aria-label="Табличный вид"
+                [attr.aria-pressed]="viewMode() === 'table'">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+            <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
+        </button>
+        <button type="button" class="topbar-btn" [class.active]="viewMode() === 'grid'"
+                (click)="viewMode.set('grid')" title="Сетка" aria-label="Сетка"
+                [attr.aria-pressed]="viewMode() === 'grid'">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+        </button>
+        <!-- Settings and More Options hidden but kept in DOM -->
+        <button type="button" class="topbar-btn" style="display:none" title="Настройки" aria-label="Настройки">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <button type="button" class="topbar-btn" style="display:none" title="Дополнительные параметры" aria-label="Дополнительные параметры">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── SECONDARY FILTERS ───────────────────────────────────────────── -->
+    <div class="secondary-filters">
+      @if (tags().length > 0) {
+        <div class="custom-select">
+          <select (change)="onTagFilter($event)" aria-label="Фильтр по тегам">
+            <option value="">Все теги</option>
+            @for (tag of tags(); track tag.id) {
+              <option [value]="tag.id" [selected]="activeTagId() === tag.id">{{ tag.name }}</option>
+            }
+          </select>
+        </div>
+      }
+      @if (showFilesArea()) {
+        <div class="custom-select">
+          <select (change)="onSortByChange($event)" aria-label="Сортировка">
+            <option value="date"      [selected]="sortBy() === 'date'">По дате</option>
+            <option value="extension" [selected]="sortBy() === 'extension'">По типу</option>
+            <option value="size"      [selected]="sortBy() === 'size'">По размеру</option>
+          </select>
+        </div>
+        <div class="custom-select">
+          <select (change)="onSortOrderChange($event)" aria-label="Порядок сортировки">
+            <option value="desc" [selected]="sortOrder() === 'desc'">↓ По убыванию</option>
+            <option value="asc"  [selected]="sortOrder() === 'asc'">↑ По возрастанию</option>
+          </select>
+        </div>
+      }
+    </div>
+
+    <!-- ── TYPE GROUP FILTERS ──────────────────────────────────────────── -->
+    @if (visibleTypeGroups().length > 0 && showFilesArea()) {
+      <div class="type-group" role="group" aria-label="Фильтр по типу файлов">
+        @for (g of visibleTypeGroups(); track g.key) {
+          <button type="button" class="type-group-btn"
+                  [class.active]="activeTypeGroup() === g.key"
+                  (click)="setTypeGroup(g.key); $event.stopPropagation()">
+            {{ g.label }}
+          </button>
+        }
+      </div>
+    }
+
+    <!-- ── UPLOAD PROGRESS ─────────────────────────────────────────────── -->
+    @if (uploadState().phase !== 'idle' && uploadState().phase !== 'done' && uploadState().phase !== 'error') {
+      <div class="upload-progress" role="status" aria-live="polite">
+        <span>Загрузка... {{ uploadState().progress }}%</span>
+        <div class="progress-track">
+          <div class="progress-fill" [style.width]="uploadState().progress + '%'"></div>
+        </div>
+      </div>
+    }
+    @if (uploadState().phase === 'error') {
+      <div class="upload-error" role="alert">{{ uploadState().error }}</div>
+    }
+
+    <!-- ── BREADCRUMB ──────────────────────────────────────────────────── -->
+    <nav class="breadcrumb" aria-label="Навигация по папкам">
+      @for (crumb of breadcrumbs(); track crumb.label; let i = $index) {
+        @if (i < breadcrumbs().length - 1) {
+          <button type="button" class="breadcrumb-root" (click)="navigateToBreadcrumb(i); $event.stopPropagation()">
+            {{ crumb.label }}
+          </button>
+          <span class="breadcrumb-sep" aria-hidden="true">/</span>
+        } @else {
+          <span class="breadcrumb-current" aria-current="page">{{ crumb.label }}</span>
+        }
+      }
+    </nav>
+
+    <!-- ── CREATE FOLDER BAR ───────────────────────────────────────────── -->
+    @if (creating()) {
+      <div class="inline-create-bar" (click)="$event.stopPropagation()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <input type="text" [(ngModel)]="createNameValue" placeholder="Название новой папки"
+               class="create-input" maxlength="100"
+               (keydown.enter)="saveCreate()" (keydown.escape)="cancelCreate()"
+               aria-label="Название новой папки" />
+        <button type="button" class="btn-sm btn-save" (click)="saveCreate()">Создать</button>
+        <button type="button" class="btn-sm btn-cancel" (click)="cancelCreate()">Отмена</button>
+      </div>
+    }
+
+    <!-- ── LOADING ────────────────────────────────────────────────────── -->
+    @if (isLoading()) {
+      <div class="loading-state" role="status" aria-live="polite">Загрузка...</div>
+    }
+
+    <!-- ── TABLE VIEW ─────────────────────────────────────────────────── -->
+    @if (!isLoading() && viewMode() === 'table') {
+      <div class="table-container">
+        @if (isEmpty()) {
+          <div class="empty-state">
+            <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24" aria-hidden="true" class="empty-icon">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <p>Нет элементов</p>
+          </div>
+        } @else {
+          <table>
+            <thead>
+              <tr>
+                <th class="col-name" scope="col">Наименование</th>
+                <th class="col-mod" scope="col">Дата изменения</th>
+                <th class="col-size" scope="col">Размер / Вместимость</th>
+                <th class="col-open" scope="col"><span class="visually-hidden">Открыть</span></th>
+                <th class="col-action" scope="col">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+
+              <!-- ── Local sub-folders ──────────────────────────────────── -->
+              @if (activeTab() === 'local') {
+                @for (folder of currentSubFolders(); track folder.id) {
+                  <tr (click)="navigateIntoLocalFolder(folder)">
+                    <td>
+                      <div class="file-cell">
+                        <div class="file-icon icon-folder" aria-hidden="true">
+                          <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+                          </svg>
+                        </div>
+                        <div class="file-info">
+                          @if (renamingId() === folder.id && renameType() === 'local') {
+                            <input type="text" class="rename-input" [(ngModel)]="renameNameValue"
+                                   maxlength="100" aria-label="Новое название"
+                                   (keydown.enter)="saveRename(folder.id, 'local')"
+                                   (keydown.escape)="cancelRename()"
+                                   (click)="$event.stopPropagation()" />
+                          } @else {
+                            <div class="file-name">{{ folder.name }}</div>
+                          }
+                          <div class="file-meta-mobile">{{ folder.files_count }} файлов</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="col-mod-cell">—</td>
+                    <td class="col-size-cell">{{ folder.files_count }} файлов</td>
+                    <td class="col-open-cell">
+                      <button type="button" class="open-btn"
+                              (click)="navigateIntoLocalFolder(folder); $event.stopPropagation()"
+                              title="Открыть папку" aria-label="Открыть папку {{ folder.name }}">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/>
+                          <path d="M2 13h10"/><path d="m9 16 3-3-3-3"/>
+                        </svg>
+                      </button>
+                    </td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button type="button" class="action-dots"
+                              (click)="toggleMenu(folder.id, $event)"
+                              [attr.aria-expanded]="openMenuId() === folder.id"
+                              aria-label="Действия с папкой {{ folder.name }}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                        </svg>
+                      </button>
+                      @if (openMenuId() === folder.id) {
+                        <div class="dropdown-menu" role="menu">
+                          <button type="button" role="menuitem" (click)="navigateIntoLocalFolder(folder); closeMenu()">Открыть</button>
+                          <button type="button" role="menuitem" (click)="startRename(folder.id, 'local', folder.name)">Переименовать</button>
+                          <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteLocalFolder(folder)">Удалить</button>
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                }
+              }
+
+              <!-- ── Shared folders at root ──────────────────────────────── -->
+              @if (activeTab() === 'shared' && currentSharedFolderId() === null) {
+                @for (folder of filteredSharedFolders(); track folder.id) {
+                  <tr (click)="navigateIntoSharedFolder(folder)">
+                    <td>
+                      <div class="file-cell">
+                        <div class="file-icon icon-folder" aria-hidden="true">
+                          <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/>
+                            <path d="M2 13h10"/><path d="m9 16 3-3-3-3"/>
+                          </svg>
+                        </div>
+                        <div class="file-info">
+                          @if (renamingId() === folder.id && renameType() === 'shared') {
+                            <input type="text" class="rename-input" [(ngModel)]="renameNameValue"
+                                   maxlength="100" aria-label="Новое название"
+                                   (keydown.enter)="saveRename(folder.id, 'shared')"
+                                   (keydown.escape)="cancelRename()"
+                                   (click)="$event.stopPropagation()" />
+                          } @else {
+                            <div class="file-name">{{ folder.name }}</div>
+                          }
+                          @if (!folder.is_owner) {
+                            <div class="role-badge">{{ folder.my_access_type === 'edit' ? 'Редактор' : 'Просматривающий' }}</div>
+                          }
+                          <div class="file-meta-mobile">{{ folder.files_count }} файлов</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="col-mod-cell">{{ folder.created_at | date:'d MMM y' }}</td>
+                    <td class="col-size-cell">{{ folder.files_count }} файлов</td>
+                    <td class="col-open-cell">
+                      <button type="button" class="open-btn"
+                              (click)="navigateIntoSharedFolder(folder); $event.stopPropagation()"
+                              title="Открыть папку" aria-label="Открыть папку {{ folder.name }}">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/>
+                          <path d="M2 13h10"/><path d="m9 16 3-3-3-3"/>
+                        </svg>
+                      </button>
+                    </td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button type="button" class="action-dots"
+                              (click)="toggleMenu(folder.id, $event)"
+                              [attr.aria-expanded]="openMenuId() === folder.id"
+                              aria-label="Действия с папкой {{ folder.name }}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                        </svg>
+                      </button>
+                      @if (openMenuId() === folder.id) {
+                        <div class="dropdown-menu" role="menu">
+                          <button type="button" role="menuitem" (click)="navigateIntoSharedFolder(folder); closeMenu()">Открыть</button>
+                          @if (folder.is_owner) {
+                            <button type="button" role="menuitem" (click)="startRename(folder.id, 'shared', folder.name)">Переименовать</button>
+                            <button type="button" role="menuitem" (click)="openAccessDialog(folder)">Управление доступом</button>
+                            <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteSharedFolder(folder)">Удалить</button>
+                          }
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                }
+              }
+
+              <!-- ── Files ─────────────────────────────────────────────── -->
+              @if (showFilesArea()) {
+                @for (file of files(); track file.id) {
+                  <tr (click)="openFileDetail(file)">
+                    <td>
+                      <div class="file-cell">
+                        <div class="file-icon" [class]="'icon-' + fileIconType(file)" aria-hidden="true">
+                          @switch (fileIconType(file)) {
+                            @case ('pdf') {
+                              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                              </svg>
+                            }
+                            @case ('link') {
+                              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                              </svg>
+                            }
+                            @default {
+                              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                              </svg>
+                            }
+                          }
+                        </div>
+                        <div class="file-info">
+                          <div class="file-name">{{ fileDisplayName(file) }}</div>
+                          <div class="file-meta-mobile">{{ file.uploaded_at | date:'d MMM y' }} · {{ formatSize(file.size) }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="col-mod-cell">{{ file.uploaded_at | date:'d MMM y' }}</td>
+                    <td class="col-size-cell">{{ formatSize(file.size) }}</td>
+                    <td class="col-open-cell">
+                      @if (file.content_kind === 'url_file') {
+                        <button type="button" class="open-btn"
+                                (click)="downloadFile(file); $event.stopPropagation()"
+                                title="Открыть ссылку" aria-label="Открыть ссылку">
+                          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                          </svg>
+                        </button>
+                      } @else {
+                        <button type="button" class="open-btn"
+                                (click)="downloadFile(file); $event.stopPropagation()"
+                                title="Скачать" aria-label="Скачать файл {{ file.original_name }}">
+                          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                          </svg>
+                        </button>
+                      }
+                    </td>
+                    <td class="actions-cell" (click)="$event.stopPropagation()">
+                      <button type="button" class="action-dots"
+                              (click)="toggleMenu(file.id, $event)"
+                              [attr.aria-expanded]="openMenuId() === file.id"
+                              aria-label="Действия с файлом {{ file.original_name }}">
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                        </svg>
+                      </button>
+                      @if (openMenuId() === file.id) {
+                        <div class="dropdown-menu" role="menu">
+                          <button type="button" role="menuitem" (click)="openFileDetail(file)">Открыть</button>
+                          <button type="button" role="menuitem" (click)="downloadFile(file)">Скачать</button>
+                          <button type="button" role="menuitem" (click)="favoriteFile(file)">В избранное</button>
+                          <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteFile(file)">Удалить</button>
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                }
+              }
+
+            </tbody>
+          </table>
+        }
+      </div>
+    }
+
+    <!-- ── GRID VIEW ──────────────────────────────────────────────────── -->
+    @if (!isLoading() && viewMode() === 'grid') {
+      <div class="grid-container">
+        @if (isEmpty()) {
+          <div class="empty-state">
+            <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24" aria-hidden="true" class="empty-icon">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <p>Нет элементов</p>
+          </div>
+        } @else {
+          <!-- Local sub-folders -->
+          @if (activeTab() === 'local') {
+            @for (folder of currentSubFolders(); track folder.id) {
+              <div class="grid-card" (click)="navigateIntoLocalFolder(folder)" role="button" tabindex="0"
+                   (keydown.enter)="navigateIntoLocalFolder(folder)" aria-label="Открыть папку {{ folder.name }}">
+                <div class="grid-icon folder-grid-icon" aria-hidden="true">
+                  <svg width="36" height="36" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+                  </svg>
+                </div>
+                <div class="grid-name">{{ folder.name }}</div>
+                <div class="grid-meta">{{ folder.files_count }} файлов</div>
+              </div>
+            }
+          }
+
+          <!-- Shared folders at root -->
+          @if (activeTab() === 'shared' && currentSharedFolderId() === null) {
+            @for (folder of filteredSharedFolders(); track folder.id) {
+              <div class="grid-card" (click)="navigateIntoSharedFolder(folder)" role="button" tabindex="0"
+                   (keydown.enter)="navigateIntoSharedFolder(folder)" aria-label="Открыть папку {{ folder.name }}">
+                <div class="grid-icon folder-grid-icon" aria-hidden="true">
+                  <svg width="36" height="36" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/>
+                    <path d="M2 13h10"/><path d="m9 16 3-3-3-3"/>
+                  </svg>
+                </div>
+                <div class="grid-name">{{ folder.name }}</div>
+                <div class="grid-meta">{{ folder.files_count }} файлов</div>
+              </div>
+            }
+          }
+
+          <!-- Files -->
+          @if (showFilesArea()) {
+            @for (file of files(); track file.id) {
+              <div class="grid-card" (click)="openFileDetail(file)" role="button" tabindex="0"
+                   (keydown.enter)="openFileDetail(file)" aria-label="{{ fileDisplayName(file) }}">
+                @if (file.preview_url) {
+                  <img [src]="file.preview_url" alt="" class="grid-preview" loading="lazy" />
+                } @else {
+                  <div class="grid-icon file-grid-icon" [class]="'icon-' + fileIconType(file)" aria-hidden="true">
+                    <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  </div>
+                }
+                <div class="grid-name">{{ fileDisplayName(file) }}</div>
+                <div class="grid-meta">{{ formatSize(file.size) }}</div>
+              </div>
+            }
+          }
+        }
+      </div>
+    }
+
+    <!-- ── PAGINATION ─────────────────────────────────────────────────── -->
+    @if (totalPages() > 1) {
+      <div class="pagination">
+        <button type="button" [disabled]="page() === 1" (click)="goToPage(page() - 1)" aria-label="Предыдущая страница">←</button>
+        <span>{{ page() }} / {{ totalPages() }}</span>
+        <button type="button" [disabled]="page() === totalPages()" (click)="goToPage(page() + 1)" aria-label="Следующая страница">→</button>
+      </div>
+    }
+
+  </div><!-- /main -->
+</div><!-- /explorer-app -->
+
+
+<!-- ══════════════════════════════════════════════════════ ADD MODAL -->
+
+@if (addModalOpen()) {
+  <div class="modal-backdrop" (click)="closeAddModal()" role="dialog" aria-modal="true" aria-labelledby="add-modal-title">
+    <div class="add-modal" (click)="$event.stopPropagation()">
+
+      <div class="add-modal-header">
+        <h2 id="add-modal-title">Добавить</h2>
+        <button type="button" class="add-modal-close" (click)="closeAddModal()" aria-label="Закрыть">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="add-modal-tabs" role="tablist">
+        <button type="button" role="tab" class="add-tab"
+                [class.active]="addModalTab() === 'file'"
+                [attr.aria-selected]="addModalTab() === 'file'"
+                (click)="addModalTab.set('file')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          Файл
+        </button>
+        <button type="button" role="tab" class="add-tab"
+                [class.active]="addModalTab() === 'link'"
+                [attr.aria-selected]="addModalTab() === 'link'"
+                (click)="addModalTab.set('link')">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          Ссылка
+        </button>
+      </div>
+
+      <!-- ── Tab: Файл ──────────────────────────────────────────── -->
+      @if (addModalTab() === 'file') {
+        <div class="add-modal-body" role="tabpanel">
+
+          @if (uploadState().phase !== 'idle' && uploadState().phase !== 'done' && uploadState().phase !== 'error') {
+            <div class="modal-upload-progress">
+              <div class="modal-upload-info">
+                <span>Загрузка файла…</span>
+                <span class="modal-upload-pct">{{ uploadState().progress }}%</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" [style.width]="uploadState().progress + '%'"></div>
+              </div>
+            </div>
+          } @else {
+            <label class="drop-zone" [class.drag-over]="isDragOver()"
+                   (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
+              <input type="file" (change)="onFileSelected($event)" style="display:none" aria-label="Выбрать файл" />
+              <div class="drop-zone-icon" aria-hidden="true">
+                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <polyline points="16 16 12 12 8 16"/>
+                  <line x1="12" y1="12" x2="12" y2="21"/>
+                  <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                </svg>
+              </div>
+              <p class="drop-zone-hint">Перетащите файл сюда</p>
+              <span class="drop-zone-or">или</span>
+              <span class="drop-zone-btn">Выбрать файл</span>
+            </label>
+          }
+
+          @if (uploadState().phase === 'error') {
+            <div class="modal-alert-error" role="alert">{{ uploadState().error }}</div>
+          }
+          @if (uploadState().phase === 'done') {
+            <div class="modal-alert-success" role="status">Файл загружен успешно</div>
+          }
+        </div>
+      }
+
+      <!-- ── Tab: Ссылка ────────────────────────────────────────── -->
+      @if (addModalTab() === 'link') {
+        <div class="add-modal-body" role="tabpanel">
+          <form [formGroup]="linkForm" (ngSubmit)="saveLink()">
+
+            <div class="link-field">
+              <label class="link-label" for="link-url-input">URL адрес</label>
+              <input id="link-url-input" formControlName="url" type="url"
+                     placeholder="https://example.com/document"
+                     class="link-url-input" autocomplete="url" />
+            </div>
+
+            @if (linkPreview()) {
+              <div class="link-preview-card">
+                @if (linkPreview()!.image_url) {
+                  <img [src]="linkPreview()!.image_url" alt="" class="link-preview-img" />
+                }
+                <div class="link-preview-body">
+                  <p class="link-preview-title">{{ linkPreview()!.title }}</p>
+                  <p class="link-preview-site">{{ linkPreview()!.site_name }}</p>
+                  @if (linkPreview()!.description) {
+                    <p class="link-preview-desc">{{ linkPreview()!.description }}</p>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (linkError()) {
+              <div class="modal-alert-error" role="alert">{{ linkError() }}</div>
+            }
+
+            <div class="link-actions">
+              <button type="button" class="btn-link-preview"
+                      (click)="previewLink()" [disabled]="linkForm.invalid || previewing()">
+                @if (previewing()) { Загрузка… } @else { Предпросмотр }
+              </button>
+              <button type="submit" class="btn-link-save"
+                      [disabled]="linkForm.invalid || savingLink()">
+                @if (savingLink()) { Сохранение… } @else { Добавить ссылку }
+              </button>
+            </div>
+
+          </form>
+        </div>
+      }
+
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ DELETE MODALS -->
+
 @if (deleteTarget()) {
-  <div class="modal-backdrop" (click)="cancelDelete()">
+  <div class="modal-backdrop" (click)="cancelDelete()" role="dialog" aria-modal="true" aria-labelledby="del-title">
     <div class="modal" (click)="$event.stopPropagation()">
-      <h3>{{ 'folders.confirm_delete_title' | translate }}</h3>
-      <p>{{ 'folders.confirm_delete_desc' | translate : {name: deleteTarget()!.name} }}</p>
+      <h3 id="del-title">Удалить {{ deleteTarget()!.kind === 'file' ? 'файл' : 'папку' }}?</h3>
+      <p>Вы уверены, что хотите удалить «{{ deleteTarget()!.name }}»?</p>
       @if (deleteError()) {
-        <div class="alert-error">{{ deleteError() }}</div>
+        <div class="alert-error" role="alert">{{ deleteError() }}</div>
       }
       <div class="modal-actions">
-        <button class="btn-primary btn-danger" (click)="deleteFolder(false)" [disabled]="deleting()">
-          {{ 'folders.delete_btn' | translate }}
-        </button>
-        <button class="btn-secondary" (click)="cancelDelete()">{{ 'common.cancel' | translate }}</button>
+        <button type="button" class="btn-danger" (click)="executeDelete()" [disabled]="deleting()">Удалить</button>
+        <button type="button" class="btn-secondary" (click)="cancelDelete()">Отмена</button>
       </div>
     </div>
   </div>
 }
 
 @if (forceDeleteTarget()) {
-  <div class="modal-backdrop" (click)="forceDeleteTarget.set(null)">
+  <div class="modal-backdrop" (click)="forceDeleteTarget.set(null)" role="dialog" aria-modal="true" aria-labelledby="force-del-title">
     <div class="modal" (click)="$event.stopPropagation()">
-      <h3>{{ 'folders.force_delete_title' | translate }}</h3>
-      <p>{{ 'folders.force_delete_desc' | translate }}</p>
+      <h3 id="force-del-title">В папке есть файлы</h3>
+      <p>Папка «{{ forceDeleteTarget()!.name }}» содержит файлы. Удалить вместе со всем содержимым?</p>
       <div class="modal-actions">
-        <button class="btn-primary btn-danger" (click)="deleteFolder(true)" [disabled]="deleting()">
-          {{ 'folders.force_delete_btn' | translate }}
-        </button>
-        <button class="btn-secondary" (click)="forceDeleteTarget.set(null)">{{ 'common.cancel' | translate }}</button>
+        <button type="button" class="btn-danger" (click)="forceDeleteLocalFolder()" [disabled]="deleting()">Удалить всё</button>
+        <button type="button" class="btn-secondary" (click)="forceDeleteTarget.set(null)">Отмена</button>
       </div>
     </div>
   </div>
 }
 
-<!-- ── Shared folder delete modal ─────────────────────────────────────── -->
-@if (sfDeleteTarget()) {
-  <div class="modal-backdrop" (click)="sfCancelDelete()">
-    <div class="modal" (click)="$event.stopPropagation()">
-      <h3>{{ 'shared_folders.confirm_delete_title' | translate }}</h3>
-      <p>{{ 'shared_folders.confirm_delete_desc' | translate:{name: sfDeleteTarget()!.name} }}</p>
-      <div class="modal-actions">
-        <button class="btn-primary btn-danger" (click)="sfDelete()" [disabled]="sfDeleting()">
-          {{ 'shared_folders.delete_btn' | translate }}
-        </button>
-        <button class="btn-secondary" (click)="sfCancelDelete()">{{ 'common.cancel' | translate }}</button>
-      </div>
-    </div>
-  </div>
-}
+<!-- ══════════════════════════════════════════════════════ ACCESS DIALOG -->
 
-<!-- ── Access dialog ────────────────────────────────────────────────────── -->
 @if (sfAccessFolderId()) {
   <app-shared-folder-access-dialog
     [folderId]="sfAccessFolderId()!"
