@@ -151,7 +151,7 @@ export class PublicSharedLinkComponent implements OnInit {
         this.linkAllowSave.set(res.data.link.allow_save);
 
         if (this.isAuthenticated()) {
-          this.router.navigate(['/shared-folders'], { queryParams: { folder_id: res.data.folder.id } });
+          this.router.navigate(['/folders'], { queryParams: { tab: 'shared', shared_folder_id: res.data.folder.id } });
           return;
         }
 

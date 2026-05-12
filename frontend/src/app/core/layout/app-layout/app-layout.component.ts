@@ -15,6 +15,7 @@ import { NotificationService } from '../../notifications/notification.service';
 import { PushService } from '../../notifications/push.service';
 import { FooterComponent } from '../../../shared/components/footer/footer.component';
 import { PwaInstallService } from '../../services/pwa-install.service';
+import { ThemeService } from '../../services/theme.service';
 
 const POLL_INTERVAL_MS = 60_000; // 60 seconds
 
@@ -34,8 +35,12 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   private readonly filesApi     = inject(FilesApiService);
   readonly notifService  = inject(NotificationService);
   readonly pwaInstall    = inject(PwaInstallService);
-  private readonly pushService = inject(PushService);
+  private readonly pushService  = inject(PushService);
   private readonly translate    = inject(TranslateService);
+  readonly themeService  = inject(ThemeService);
+
+  readonly isDark = this.themeService.isDark;
+  toggleTheme(): void { this.themeService.toggle(); }
 
   readonly isAuth          = this.authState.isAuthenticated;
   readonly needsVerification = this.authState.needsEmailVerification;

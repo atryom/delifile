@@ -101,8 +101,8 @@
     }
   },
   "nav": {
-    "files": "My Files",
-    "folders": "Folders",
+    "files": "Home",
+    "folders": "Files & Folders",
     "tags": "Tags",
     "contacts": "Contacts",
     "activity": "Activity",

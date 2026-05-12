@@ -31,7 +31,7 @@ type AnyFile = FileListItem | SharedFolderFileItem;
   imports: [DatePipe, FormsModule, ReactiveFormsModule, SharedFolderAccessDialogComponent],
   templateUrl: './folders-tree.component.html',
   styleUrl: './folders-tree.component.scss',
-  host: { '[class.theme-dark]': 'theme() === "dark"' },
+  host: {},
 })
 export class FoldersTreeComponent implements OnInit {
   private readonly orgApi      = inject(OrganizationApiService);
@@ -43,9 +43,6 @@ export class FoldersTreeComponent implements OnInit {
   private readonly router      = inject(Router);
   private readonly route       = inject(ActivatedRoute);
   private readonly fb          = inject(FormBuilder);
-
-  // ── Theme ─────────────────────────────────────────────────────────────────
-  readonly theme = signal<'light' | 'dark'>('light');
 
   // ── Tab & navigation ─────────────────────────────────────────────────────
   readonly activeTab             = signal<'local' | 'shared'>('local');
@@ -248,8 +245,10 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
-    const tab: 'local' | 'shared' =
-      this.route.snapshot.queryParamMap.get('tab') === 'shared' ? 'shared' : 'local';
+    const qp  = this.route.snapshot.queryParamMap;
+    const tab: 'local' | 'shared' = qp.get('tab') === 'shared' ? 'shared' : 'local';
+    const deepSharedId = qp.get('shared_folder_id');
+
     this.activeTab.set(tab);
     this.breadcrumbs.set([{
       label: tab === 'local' ? 'Локальные' : 'Общие',
@@ -257,10 +256,24 @@ export class FoldersTreeComponent implements OnInit {
       sharedFolderId: null,
     }]);
     this.loadLocal();
-    this.loadShared();
     this.loadTags();
     this.loadUsage();
-    if (tab === 'local') this.loadFiles();
+
+    if (tab === 'shared' && deepSharedId) {
+      this.sfLoading.set(true);
+      this.sfApi.list().subscribe({
+        next: (res) => {
+          this.sharedFolders.set(res.data.items);
+          this.sfLoading.set(false);
+          const target = res.data.items.find(f => f.id === deepSharedId);
+          if (target) this.navigateIntoSharedFolder(target);
+        },
+        error: () => this.sfLoading.set(false),
+      });
+    } else {
+      this.loadShared();
+      if (tab === 'local') this.loadFiles();
+    }
   }
 
   // ── Tab switch ────────────────────────────────────────────────────────────
