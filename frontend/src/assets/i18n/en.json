@@ -188,7 +188,7 @@
       "error": "Failed to save link"
     },
     "detail": {
-      "back": "← My Files",
+      "back": "My Files",
       "loading": "Loading file…",
       "uploaded": "Uploaded {{date}}",
       "expires": "Expires {{date}}",
