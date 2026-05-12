@@ -24,15 +24,15 @@ import { RouterLink } from '@angular/router';
       justify-content: center;
       gap: 20px;
       padding: 10px 24px;
-      background: #f8f9fa;
-      border-top: 1px solid #e5e7eb;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
       font-size: 0.78rem;
-      color: #9ca3af;
+      color: var(--text-muted);
       flex-wrap: wrap;
     }
-    .footer-copy { color: #9ca3af; }
-    .footer-link { color: #6b7280; text-decoration: none; }
-    .footer-link:hover { color: #6366f1; text-decoration: underline; }
+    .footer-copy { color: var(--text-muted); }
+    .footer-link { color: var(--text-dim); text-decoration: none; }
+    .footer-link:hover { color: var(--accent-text); text-decoration: underline; }
 
     @media (max-width: 768px) {
       .app-footer { left: 0; }

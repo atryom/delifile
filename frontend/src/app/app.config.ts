@@ -39,6 +39,9 @@ export const appConfig: ApplicationConfig = {
       multi: true,
     },
     provideTranslateService({ fallbackLang: 'ru' }),
-    provideTranslateHttpLoader({ prefix: '/assets/i18n/', suffix: '.json' }),
+    provideTranslateHttpLoader({
+      prefix: '/assets/i18n/',
+      suffix: `.json?v=${(window as any).__BUILD_HASH__ ?? '0'}`,
+    }),
   ],
 };
