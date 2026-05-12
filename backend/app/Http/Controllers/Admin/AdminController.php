@@ -8,12 +8,16 @@ use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\PasswordResetCode;
 use App\Models\User;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
+    public function __construct(
+        private readonly PushNotificationService $pushService,
+    ) {}
     /**
      * GET /api/v1/admin/users
      */
@@ -103,6 +107,43 @@ class AdminController extends Controller
         $url = rtrim(config('app.url'), '/') . '/reset-password?token=' . $token;
 
         return $this->success('Ссылка сгенерирована', ['url' => $url]);
+    }
+
+    /**
+     * POST /api/v1/admin/users/{id}/notify
+     */
+    public function notifyUser(Request $request, string $userId): JsonResponse
+    {
+        $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'body'  => ['required', 'string', 'max:1000'],
+        ]);
+
+        $user = User::with('pushSubscriptions')->find($userId);
+        if (!$user) {
+            return $this->notFound('Пользователь не найден');
+        }
+
+        $this->pushService->sendToUser($user, $request->title, $request->body);
+
+        return $this->success('Сообщение отправлено');
+    }
+
+    /**
+     * POST /api/v1/admin/notify-all
+     */
+    public function notifyAll(Request $request): JsonResponse
+    {
+        $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'body'  => ['required', 'string', 'max:1000'],
+        ]);
+
+        User::with('pushSubscriptions')->each(function (User $user) use ($request) {
+            $this->pushService->sendToUser($user, $request->title, $request->body);
+        });
+
+        return $this->success('Сообщение разослано всем пользователям');
     }
 
     /**

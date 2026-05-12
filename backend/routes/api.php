@@ -215,10 +215,12 @@ Route::prefix('v1')->group(function () {
         Route::middleware(\App\Http\Middleware\SuperUserMiddleware::class)->prefix('admin')->group(function () {
             Route::get('stats',                           [AdminController::class, 'stats']);
             Route::get('users',                           [AdminController::class, 'users']);
+            Route::post('notify-all',                     [AdminController::class, 'notifyAll']);
             Route::patch('users/{id}/plan',               [AdminController::class, 'updatePlan']);
             Route::post('users/{id}/block',               [AdminController::class, 'blockUser']);
             Route::post('users/{id}/reset-link',          [AdminController::class, 'generateResetLink']);
             Route::post('users/{id}/reset-sessions',      [AdminController::class, 'resetSessions']);
+            Route::post('users/{id}/notify',              [AdminController::class, 'notifyUser']);
 
             // Support admin
             Route::get('support/tickets',                                     [SupportAdminController::class, 'index']);

@@ -215,7 +215,24 @@
 }
 
 // ─── Recent files ─────────────────────────────────────────────────────────
-.recent-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0 0 14px; }
+.recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.recent-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0; }
+.recent-all-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--accent-text);
+  text-decoration: none;
+  svg { flex-shrink: 0; }
+  &:hover { text-decoration: underline; }
+}
 .recent-state { color: var(--text-muted); font-size: 0.9rem; }
 
 .recent-list { display: flex; flex-direction: column; gap: 6px; }

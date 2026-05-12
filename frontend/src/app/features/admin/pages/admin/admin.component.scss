@@ -80,18 +80,61 @@
 .stat-sub   { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
 
 /* ── Users table ── */
-.section-toolbar { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+.section-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
 
 .btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: none;
   border: 1px solid var(--border2);
   border-radius: 6px;
-  padding: 6px 14px;
+  padding: 6px 12px;
   font-size: 0.85rem;
   cursor: pointer;
   color: var(--text-dim);
   font-family: inherit;
+  svg { flex-shrink: 0; }
   &:hover { background: var(--surface2); }
+}
+
+.btn-broadcast {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(99,102,241,.08);
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: 7px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--accent-text);
+  font-family: inherit;
+  svg { flex-shrink: 0; }
+  &:hover { background: rgba(99,102,241,.16); }
+}
+
+.btn-notify {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(99,102,241,.06);
+  border: 1px solid rgba(99,102,241,.25);
+  border-radius: 5px;
+  padding: 4px 9px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: var(--accent-text);
+  font-family: inherit;
+  svg { flex-shrink: 0; }
+  &:hover { background: rgba(99,102,241,.14); }
 }
 
 .table-wrap {
@@ -158,8 +201,12 @@
 }
 
 .verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.85rem;
   font-weight: 600;
+  svg { flex-shrink: 0; }
   &.yes { color: #059669; }
   &.no  { color: #dc2626; }
 }
@@ -591,3 +638,134 @@
 }
 
 .page-info { font-size: 0.82rem; color: var(--text-muted); }
+
+// ─── Notify Dialog ────────────────────────────────────────────────────────────
+.notify-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.notify-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 28px 24px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+
+.notify-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.notify-dialog-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.notify-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px;
+  display: flex;
+  border-radius: 5px;
+  &:hover { background: var(--surface2); color: var(--text); }
+}
+
+.notify-form { display: flex; flex-direction: column; gap: 14px; }
+
+.notify-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.notify-input, .notify-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: var(--surface2);
+  color: var(--text);
+  outline: none;
+  &:focus { border-color: var(--accent); }
+  &::placeholder { color: var(--text-muted); }
+}
+
+.notify-textarea { resize: vertical; min-height: 90px; }
+
+.notify-error {
+  font-size: 0.83rem;
+  color: #dc2626;
+  background: rgba(239,68,68,.08);
+  border: 1px solid #fca5a5;
+  border-radius: 7px;
+  padding: 7px 11px;
+  margin: 0;
+}
+
+.notify-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn-notify-send {
+  flex: 1;
+  padding: 9px 18px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  &:hover:not(:disabled) { background: var(--accent-hover); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.btn-notify-cancel {
+  padding: 9px 18px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  &:hover { background: var(--surface); }
+}
+
+.notify-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 0 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #16a34a;
+}

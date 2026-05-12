@@ -43,6 +43,14 @@ export class AdminComponent {
   readonly resetSessionsLoading = signal<Record<string, boolean>>({});
   readonly confirmReset      = signal<string | null>(null);
 
+  // ─── Notify dialog ────────────────────────────────────────────────────────
+  readonly notifyTarget  = signal<{ userId: string; email: string } | 'all' | null>(null);
+  readonly notifyTitle   = signal('');
+  readonly notifyBody    = signal('');
+  readonly notifySending = signal(false);
+  readonly notifyError   = signal<string | null>(null);
+  readonly notifyDone    = signal(false);
+
   // ─── Admin Support Tickets ────────────────────────────────────────────────
   readonly supportTickets       = signal<(SupportTicketListItem & { user: { id: number; email: string; name: string | null } | null })[]>([]);
   readonly supportTicketsPagination = signal<PaginatedData<any>['pagination'] | null>(null);
@@ -439,6 +447,54 @@ export class AdminComponent {
         a.download = res.data.original_name;
         a.target = '_blank';
         a.click();
+      },
+    });
+  }
+
+  // ─── Notify ───────────────────────────────────────────────────────────────
+
+  openNotifyDialog(user: AdminUser): void {
+    this.notifyTarget.set({ userId: user.id, email: user.email });
+    this.notifyTitle.set('');
+    this.notifyBody.set('');
+    this.notifyError.set(null);
+    this.notifyDone.set(false);
+  }
+
+  openBroadcastDialog(): void {
+    this.notifyTarget.set('all');
+    this.notifyTitle.set('');
+    this.notifyBody.set('');
+    this.notifyError.set(null);
+    this.notifyDone.set(false);
+  }
+
+  closeNotifyDialog(): void {
+    this.notifyTarget.set(null);
+  }
+
+  sendNotify(): void {
+    const title = this.notifyTitle().trim();
+    const body  = this.notifyBody().trim();
+    if (!title || !body || this.notifySending()) return;
+
+    this.notifyError.set(null);
+    this.notifySending.set(true);
+
+    const target = this.notifyTarget();
+    const req = target === 'all'
+      ? this.adminApi.notifyAll(title, body)
+      : this.adminApi.notifyUser((target as { userId: string }).userId, title, body);
+
+    req.subscribe({
+      next: () => {
+        this.notifySending.set(false);
+        this.notifyDone.set(true);
+        setTimeout(() => this.closeNotifyDialog(), 1500);
+      },
+      error: (err) => {
+        this.notifyError.set(err?.message ?? 'Ошибка отправки');
+        this.notifySending.set(false);
       },
     });
   }

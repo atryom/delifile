@@ -31,4 +31,12 @@ export class AdminApiService {
   resetSessions(userId: string): Observable<ApiResponse> {
     return this.http.post<ApiResponse>(`${this.base}/users/${userId}/reset-sessions`, {});
   }
+
+  notifyUser(userId: string, title: string, body: string): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.base}/users/${userId}/notify`, { title, body });
+  }
+
+  notifyAll(title: string, body: string): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.base}/notify-all`, { title, body });
+  }
 }

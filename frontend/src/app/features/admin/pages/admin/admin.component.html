@@ -49,7 +49,14 @@
   @if (activeTab() === 'users') {
     <section class="users-section">
       <div class="section-toolbar">
-        <button class="btn-refresh" (click)="loadUsers()">↺ Обновить</button>
+        <button class="btn-refresh" (click)="loadUsers()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+          Обновить
+        </button>
+        <button class="btn-broadcast" (click)="openBroadcastDialog()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.68 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          Сообщение всем
+        </button>
       </div>
 
       @if (usersError()) {
@@ -85,9 +92,15 @@
                   </td>
                   <td>
                     @if (user.email_verified) {
-                      <span class="verified yes">✓ Да</span>
+                      <span class="verified yes">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        Да
+                      </span>
                     } @else {
-                      <span class="verified no">✗ Нет</span>
+                      <span class="verified no">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        Нет
+                      </span>
                     }
                   </td>
                   <td class="cell-date">{{ formatDate(user.last_login_at) }}</td>
@@ -140,6 +153,13 @@
                         </button>
                       }
 
+                      <button
+                        class="btn-action btn-notify"
+                        (click)="openNotifyDialog(user)">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.68 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        Сообщение
+                      </button>
+
                       @if (resetLinkMap()[user.id]) {
                         <div class="reset-link-box">
                           <input
@@ -175,7 +195,9 @@
             <button class="btn-filter" [class.active]="supportStatusFilter() === 'awaiting_confirmation'" (click)="setSupportStatusFilter('awaiting_confirmation')">Ожидают</button>
             <button class="btn-filter" [class.active]="supportStatusFilter() === 'completed'" (click)="setSupportStatusFilter('completed')">Выполнено</button>
           </div>
-          <button class="btn-refresh" (click)="loadSupportTickets()">↺</button>
+          <button class="btn-refresh" (click)="loadSupportTickets()" aria-label="Обновить">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+          </button>
         </div>
 
         @if (supportTicketsLoading()) {
@@ -343,7 +365,9 @@
             <button class="btn-filter" [class.active]="suggestionsStatusFilter() === 'new'" (click)="setSuggestionsFilter('new')">Новые</button>
             <button class="btn-filter" [class.active]="suggestionsStatusFilter() === 'accepted'" (click)="setSuggestionsFilter('accepted')">Принятые</button>
           </div>
-          <button class="btn-refresh" (click)="loadSuggestions()">↺</button>
+          <button class="btn-refresh" (click)="loadSuggestions()" aria-label="Обновить">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+          </button>
         </div>
 
         @if (suggestionsLoading()) {
@@ -474,5 +498,68 @@
         </div>
       }
     </section>
+  }
+
+  <!-- ─── NOTIFY DIALOG ────────────────────────────────────────────────────── -->
+  @if (notifyTarget()) {
+    <div class="notify-overlay" (click)="closeNotifyDialog()" role="dialog" aria-modal="true" aria-label="Отправка сообщения">
+      <div class="notify-dialog" (click)="$event.stopPropagation()">
+        <div class="notify-dialog-header">
+          <h3 class="notify-dialog-title">
+            @if (notifyTarget() === 'all') {
+              Сообщение всем пользователям
+            } @else {
+              Сообщение: {{ $any(notifyTarget()).email }}
+            }
+          </h3>
+          <button class="notify-close" (click)="closeNotifyDialog()" aria-label="Закрыть">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        @if (notifyDone()) {
+          <div class="notify-done">
+            <svg width="32" height="32" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>Отправлено</span>
+          </div>
+        } @else {
+          <div class="notify-form">
+            <label class="notify-label">
+              Заголовок
+              <input
+                class="notify-input"
+                type="text"
+                maxlength="255"
+                placeholder="Тема сообщения"
+                [value]="notifyTitle()"
+                (input)="notifyTitle.set($any($event.target).value)"
+              />
+            </label>
+            <label class="notify-label">
+              Текст
+              <textarea
+                class="notify-textarea"
+                rows="4"
+                maxlength="1000"
+                placeholder="Текст уведомления..."
+                [value]="notifyBody()"
+                (input)="notifyBody.set($any($event.target).value)"
+              ></textarea>
+            </label>
+
+            @if (notifyError()) {
+              <p class="notify-error">{{ notifyError() }}</p>
+            }
+
+            <div class="notify-actions">
+              <button class="btn-notify-send" (click)="sendNotify()" [disabled]="notifySending() || !notifyTitle().trim() || !notifyBody().trim()">
+                @if (notifySending()) { Отправка... } @else { Отправить }
+              </button>
+              <button class="btn-notify-cancel" (click)="closeNotifyDialog()">Отмена</button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
   }
 </div>
