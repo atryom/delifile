@@ -19,14 +19,15 @@ export class PushService {
     if (!vapidKey) return;
 
     const registration = await navigator.serviceWorker.ready;
-    let subscription = await registration.pushManager.getSubscription();
 
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: this.urlB64ToUint8Array(vapidKey),
-      });
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) {
+      await existing.unsubscribe();
     }
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: this.urlB64ToUint8Array(vapidKey),
+    });
 
     const json = subscription.toJSON();
     await firstValueFrom(
