@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\FileUserAccess;
 
 class Folder extends Model
 {
@@ -38,6 +39,11 @@ class Folder extends Model
     public function files(): HasMany
     {
         return $this->hasMany(File::class);
+    }
+
+    public function userAccesses(): HasMany
+    {
+        return $this->hasMany(FileUserAccess::class, 'folder_id');
     }
 
     public function hasChildren(): bool

@@ -232,22 +232,44 @@ class FileService
     }
 
     /**
-     * Move file to a folder.
+     * Move file to a folder (per-user: stored on file_user_access record).
      */
     public function moveToFolder(File $file, User $user, ?string $folderId): void
     {
-        $file->update(['folder_id' => $folderId]);
+        FileUserAccess::where('file_id', $file->id)
+            ->where('user_id', $user->id)
+            ->update(['folder_id' => $folderId]);
+
         $this->activityService->log($file, $user, ActivityType::MovedToFolder, [
             'folder_id' => $folderId,
         ]);
     }
 
     /**
-     * Sync tags for a file.
+     * Sync tags for a file (per-user: stored with user_id in file_tags).
      */
     public function setTags(File $file, User $user, array $tagIds): void
     {
-        $file->tags()->sync($tagIds);
+        DB::table('file_tags')
+            ->where('file_id', $file->id)
+            ->where('user_id', $user->id)
+            ->whereNotIn('tag_id', $tagIds)
+            ->delete();
+
+        $existing = DB::table('file_tags')
+            ->where('file_id', $file->id)
+            ->where('user_id', $user->id)
+            ->pluck('tag_id')
+            ->toArray();
+
+        foreach (array_diff($tagIds, $existing) as $tagId) {
+            DB::table('file_tags')->insert([
+                'file_id' => $file->id,
+                'tag_id'  => $tagId,
+                'user_id' => $user->id,
+            ]);
+        }
+
         $this->activityService->log($file, $user, ActivityType::TagUpdated, [
             'tag_ids' => $tagIds,
         ]);
@@ -320,10 +342,17 @@ class FileService
             'access_type'   => $access?->access_type?->value,
             'is_favorite'   => $access?->is_favorite ?? false,
             'is_pinned'     => $access?->pinned_at !== null,
-            'description'   => $access?->description,
-            'folder_id'           => $file->folder_id,
+            'description'         => $access?->description,
+            'folder_id'           => $access?->folder_id,
             'shared_folder_only'  => (bool) $file->shared_folder_only,
-            'tags'          => $file->tags->map(fn ($t) => ['id' => $t->id, 'name' => $t->name]),
+            'tags'                => DB::table('file_tags')
+                ->join('tags', 'tags.id', '=', 'file_tags.tag_id')
+                ->where('file_tags.file_id', $file->id)
+                ->where('file_tags.user_id', $user->id)
+                ->select('tags.id', 'tags.name')
+                ->get()
+                ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])
+                ->values(),
             'owner'         => [
                 'id'    => $file->owner->id,
                 'email' => $file->owner->email,
@@ -414,14 +443,33 @@ class FileService
         }
 
         if (!empty($options['tag_id'])) {
-            $query->whereHas('tags', fn ($q) => $q->where('tags.id', $options['tag_id']));
+            $tagId  = $options['tag_id'];
+            $userId = $user->id;
+            $query->whereExists(function ($q) use ($tagId, $userId) {
+                $q->from('file_tags')
+                  ->whereColumn('file_tags.file_id', 'files.id')
+                  ->where('file_tags.user_id', $userId)
+                  ->where('file_tags.tag_id', $tagId);
+            });
         }
 
         if (array_key_exists('folder_id', $options)) {
+            $userId = $user->id;
             if ($options['folder_id'] === null) {
-                $query->whereNull('folder_id');
+                $query->whereExists(function ($q) use ($userId) {
+                    $q->from('file_user_access')
+                      ->whereColumn('file_user_access.file_id', 'files.id')
+                      ->where('file_user_access.user_id', $userId)
+                      ->whereNull('file_user_access.folder_id');
+                });
             } else {
-                $query->where('folder_id', $options['folder_id']);
+                $folderId = $options['folder_id'];
+                $query->whereExists(function ($q) use ($userId, $folderId) {
+                    $q->from('file_user_access')
+                      ->whereColumn('file_user_access.file_id', 'files.id')
+                      ->where('file_user_access.user_id', $userId)
+                      ->where('file_user_access.folder_id', $folderId);
+                });
             }
         }
 

@@ -26,7 +26,7 @@ export class OrganizationApiService {
   }
 
   deleteFolder(id: string, force = false): Observable<ApiResponse<Record<string, never>>> {
-    return this.api.delete(`/folders/${id}${force ? '?force=true' : ''}`);
+    return this.api.delete(`/folders/${id}${force ? '?force=1' : ''}`);
   }
 
   // ── Tags ──────────────────────────────────────────────────────────────────

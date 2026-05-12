@@ -30,7 +30,7 @@ export class FileDetailComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   private backFolderId: string | null = null;
-  readonly backLink = signal<{ commands: string[]; queryParams?: Record<string,string> }>({ commands: ['/files'] });
+  readonly backLink = signal<{ commands: string[]; queryParams?: Record<string,string> }>({ commands: ['/folders'] });
 
   readonly file          = signal<FileCard | null>(null);
   readonly loading       = signal(false);
@@ -208,7 +208,7 @@ export class FileDetailComponent implements OnInit {
     if (!confirm(this.translate.instant('files.detail.confirm_delete', { name: this.file()?.original_name }))) return;
     this.actionPending.set(true);
     this.filesApi.delete(this.id()).subscribe({
-      next: () => this.router.navigate(['/files']),
+      next: () => this.router.navigate(['/folders']),
       error: () => this.actionPending.set(false),
     });
   }

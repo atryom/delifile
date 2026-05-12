@@ -305,7 +305,7 @@ class FileController extends Controller
         $request->validate(['folder_id' => 'nullable|string']);
 
         $file = File::find($fileId);
-        if (!$file || !$file->isOwnedBy($request->user())) {
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
             return $this->notFound('File not found');
         }
 
@@ -322,7 +322,7 @@ class FileController extends Controller
         $request->validate(['tag_ids' => 'required|array']);
 
         $file = File::find($fileId);
-        if (!$file || !$file->isOwnedBy($request->user())) {
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
             return $this->notFound('File not found');
         }
 

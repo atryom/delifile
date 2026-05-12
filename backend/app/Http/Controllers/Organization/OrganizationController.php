@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Organization;
 
 use App\Http\Controllers\Controller;
 use App\Models\File;
+use App\Models\FileUserAccess;
 use App\Models\Folder;
 use App\Models\Tag;
 use Illuminate\Http\JsonResponse;
@@ -19,8 +20,9 @@ class OrganizationController extends Controller
      */
     public function folderTree(Request $request): JsonResponse
     {
-        $folders = Folder::where('user_id', $request->user()->id)
-            ->withCount('files')
+        $userId = $request->user()->id;
+        $folders = Folder::where('user_id', $userId)
+            ->withCount(['userAccesses as files_count' => fn($q) => $q->where('user_id', $userId)])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -136,12 +138,10 @@ class OrganizationController extends Controller
      */
     public function deleteFolder(Request $request, string $folderId): JsonResponse
     {
-        $data = $request->validate([
-            'force' => 'nullable|boolean',
-        ]);
+        $userId = $request->user()->id;
 
         $folder = Folder::where('id', $folderId)
-            ->where('user_id', $request->user()->id)
+            ->where('user_id', $userId)
             ->first();
 
         if (!$folder) {
@@ -157,19 +157,25 @@ class OrganizationController extends Controller
             );
         }
 
-        $force = $data['force'] ?? false;
+        $force = filter_var($request->query('force', $request->input('force', false)), FILTER_VALIDATE_BOOLEAN);
 
-        if (!$force && $folder->files()->count() > 0) {
+        $filesCount = FileUserAccess::where('folder_id', $folder->id)
+            ->where('user_id', $userId)
+            ->count();
+
+        if (!$force && $filesCount > 0) {
             return $this->error(
                 'В папке есть файлы. Передайте force=true для подтверждения снятия привязки файлов.',
                 'HAS_FILES',
-                ['files_count' => $folder->files()->count()],
+                ['files_count' => $filesCount],
                 422
             );
         }
 
-        DB::transaction(function () use ($folder) {
-            $folder->files()->update(['folder_id' => null]);
+        DB::transaction(function () use ($folder, $userId) {
+            FileUserAccess::where('folder_id', $folder->id)
+                ->where('user_id', $userId)
+                ->update(['folder_id' => null]);
             $folder->delete();
         });
 
@@ -185,8 +191,9 @@ class OrganizationController extends Controller
     {
         $search = $request->query('search');
 
-        $query = Tag::where('user_id', $request->user()->id)
-            ->withCount('files')
+        $userId = $request->user()->id;
+        $query = Tag::where('user_id', $userId)
+            ->withCount(['files' => fn($q) => $q->where('file_tags.user_id', $userId)])
             ->orderBy('name');
 
         if ($search) {
@@ -288,16 +295,34 @@ class OrganizationController extends Controller
     {
         $request->validate(['tag_ids' => 'required|array', 'tag_ids.*' => 'string']);
 
-        $file = File::where('id', $fileId)->where('owner_id', $request->user()->id)->first();
-        if (!$file) {
+        $user = $request->user();
+        $file = File::find($fileId);
+        if (!$file || !$file->hasAccessFor($user)) {
             return $this->notFound('File not found');
         }
 
-        $file->tags()->syncWithoutDetaching($request->tag_ids);
+        $existing = DB::table('file_tags')
+            ->where('file_id', $file->id)
+            ->where('user_id', $user->id)
+            ->pluck('tag_id')
+            ->toArray();
 
-        return $this->success('Tags attached', [
-            'tags' => $file->fresh()->tags->map(fn ($t) => ['id' => $t->id, 'name' => $t->name]),
-        ]);
+        foreach (array_diff($request->tag_ids, $existing) as $tagId) {
+            DB::table('file_tags')->insert([
+                'file_id' => $file->id,
+                'tag_id'  => $tagId,
+                'user_id' => $user->id,
+            ]);
+        }
+
+        $tags = DB::table('file_tags')
+            ->join('tags', 'tags.id', '=', 'file_tags.tag_id')
+            ->where('file_tags.file_id', $file->id)
+            ->where('file_tags.user_id', $user->id)
+            ->select('tags.id', 'tags.name')
+            ->get();
+
+        return $this->success('Tags attached', ['tags' => $tags]);
     }
 
     /**
@@ -307,16 +332,26 @@ class OrganizationController extends Controller
     {
         $request->validate(['tag_ids' => 'required|array', 'tag_ids.*' => 'string']);
 
-        $file = File::where('id', $fileId)->where('owner_id', $request->user()->id)->first();
-        if (!$file) {
+        $user = $request->user();
+        $file = File::find($fileId);
+        if (!$file || !$file->hasAccessFor($user)) {
             return $this->notFound('File not found');
         }
 
-        $file->tags()->detach($request->tag_ids);
+        DB::table('file_tags')
+            ->where('file_id', $file->id)
+            ->where('user_id', $user->id)
+            ->whereIn('tag_id', $request->tag_ids)
+            ->delete();
 
-        return $this->success('Tags detached', [
-            'tags' => $file->fresh()->tags->map(fn ($t) => ['id' => $t->id, 'name' => $t->name]),
-        ]);
+        $tags = DB::table('file_tags')
+            ->join('tags', 'tags.id', '=', 'file_tags.tag_id')
+            ->where('file_tags.file_id', $file->id)
+            ->where('file_tags.user_id', $user->id)
+            ->select('tags.id', 'tags.name')
+            ->get();
+
+        return $this->success('Tags detached', ['tags' => $tags]);
     }
 
     /**

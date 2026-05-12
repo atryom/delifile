@@ -23,6 +23,7 @@ class FileUserAccess extends Model
         'description',
         'pinned_at',
         'saved_at',
+        'folder_id',
     ];
 
     protected function casts(): array
