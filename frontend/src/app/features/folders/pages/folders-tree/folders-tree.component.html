@@ -706,7 +706,10 @@
 
 @if (selectedCount() > 0) {
   <div class="selection-bar" role="toolbar" aria-label="Групповые действия над файлами">
-    <span class="selection-count">{{ selectedCountLabel() }}</span>
+    <div class="selection-row1">
+      <span class="selection-count">{{ selectedCountLabel() }}</span>
+      <button type="button" class="btn-bulk-cancel" (click)="clearSelection()">Снять выделение</button>
+    </div>
     <div class="selection-actions">
       <select class="bulk-action-select" (change)="onBulkActionChange($event)" aria-label="Выберите действие">
         <option value="">— действие —</option>
@@ -718,7 +721,6 @@
               [disabled]="!bulkAction()"
               (click)="openBulkAction()">Выполнить</button>
     </div>
-    <button type="button" class="btn-bulk-cancel" (click)="clearSelection()">Снять выделение</button>
   </div>
 }
 

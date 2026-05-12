@@ -252,6 +252,8 @@
   flex-direction: column;
   min-width: 0;
   padding-bottom: 50px;
+
+  @media (max-width: #{v.$bp-desktop - 1px}) { padding-bottom: 110px; }
 }
 .main-content.no-sidebar { margin-left: 0; }
 .main-content.has-banner { padding-top: 42px; }

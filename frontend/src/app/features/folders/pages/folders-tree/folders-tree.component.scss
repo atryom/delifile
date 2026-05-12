@@ -1021,6 +1021,11 @@ tbody tr.row-selected:hover { background: var(--accent-dim); }
   box-shadow: 0 -4px 20px var(--shadow);
 }
 
+/* On desktop the wrapper is transparent — children become direct flex items */
+.selection-row1 {
+  display: contents;
+}
+
 .selection-count {
   font-size: 13px;
   font-weight: 600;
@@ -1029,6 +1034,7 @@ tbody tr.row-selected:hover { background: var(--accent-dim); }
   flex-shrink: 0;
 }
 
+/* On desktop: cancel sits after actions, pushed right by margin-left: auto on actions */
 .selection-actions {
   display: flex;
   align-items: center;
@@ -1076,7 +1082,6 @@ tbody tr.row-selected:hover { background: var(--accent-dim); }
 }
 
 .btn-bulk-cancel {
-  margin-left: auto;
   padding: 7px 14px;
   background: transparent;
   border: 1px solid var(--border2);
@@ -1235,6 +1240,44 @@ tbody tr.row-selected:hover { background: var(--accent-dim); }
 
   .grid-container { padding: 12px; gap: 8px; }
   .grid-card { width: calc(50% - 4px); }
+
+  /* ── Selection bar: two-row layout on mobile ── */
+  .selection-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px 14px;
+    gap: 8px;
+  }
+
+  /* Row 1: make the wrapper a real flex row */
+  .selection-row1 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .selection-count {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .btn-bulk-cancel {
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+
+  /* Row 2: actions stretch full width */
+  .selection-actions {
+    flex: none;
+    width: 100%;
+  }
+
+  .bulk-action-select {
+    flex: 1;
+    min-width: 0;
+    width: 0; /* let flex-grow control the width */
+  }
 }
 
 @media (max-width: 380px) {
