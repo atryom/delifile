@@ -665,7 +665,11 @@
   <div class="modal-backdrop" (click)="cancelDelete()" role="dialog" aria-modal="true" aria-labelledby="del-title">
     <div class="modal" (click)="$event.stopPropagation()">
       <h3 id="del-title">Удалить {{ deleteTarget()!.kind === 'file' ? 'файл' : 'папку' }}?</h3>
-      <p>Вы уверены, что хотите удалить «{{ deleteTarget()!.name }}»?</p>
+      @if (deleteTarget()!.kind === 'file') {
+        <p>«{{ deleteTarget()!.name }}» будет удалён. Если файл ваш — удалится навсегда, если получен — уберётся из вашего списка.</p>
+      } @else {
+        <p>Вы уверены, что хотите удалить «{{ deleteTarget()!.name }}»?</p>
+      }
       @if (deleteError()) {
         <div class="alert-error" role="alert">{{ deleteError() }}</div>
       }
@@ -814,7 +818,7 @@
   <div class="modal-backdrop" (click)="bulkDeleteDialogOpen.set(false)" role="dialog" aria-modal="true" aria-labelledby="bulk-del-title">
     <div class="modal" (click)="$event.stopPropagation()">
       <h3 id="bulk-del-title">Удалить файлы?</h3>
-      <p>{{ selectedCountLabel() }} будут удалены без возможности восстановления.</p>
+      <p>{{ selectedCountLabel() }} будут удалены. Ваши файлы удалятся навсегда, полученные — только уберутся из вашего списка.</p>
       <div class="modal-actions">
         <button type="button" class="btn-danger" [disabled]="deletingBulk()" (click)="executeBulkDelete()">
           {{ deletingBulk() ? 'Удаление…' : 'Удалить' }}

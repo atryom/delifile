@@ -83,21 +83,29 @@ class FileController extends Controller
 
     /**
      * DELETE /api/v1/files/{fileId}
-     * Logical delete by owner.
+     * Owner: logical delete. Non-owner: detach (remove access record).
      */
     public function destroy(Request $request, string $fileId): JsonResponse
     {
+        $user = $request->user();
         $file = File::find($fileId);
 
         if (!$file) {
             return $this->notFound('File not found');
         }
 
-        if (!$file->isOwnedBy($request->user())) {
-            return $this->forbidden(__('messages.files.delete_forbidden'));
+        if ($file->isOwnedBy($user)) {
+            $this->fileService->deleteFile($file, $user);
+            return $this->success(__('messages.files.deleted'));
         }
 
-        $this->fileService->deleteFile($file, $request->user());
+        $detached = FileUserAccess::where('file_id', $file->id)
+            ->where('user_id', $user->id)
+            ->delete();
+
+        if (!$detached) {
+            return $this->notFound('File not found');
+        }
 
         return $this->success(__('messages.files.deleted'));
     }

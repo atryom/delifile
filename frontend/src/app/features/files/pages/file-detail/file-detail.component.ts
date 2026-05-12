@@ -205,7 +205,11 @@ export class FileDetailComponent implements OnInit {
   }
 
   deleteFile(): void {
-    if (!confirm(this.translate.instant('files.detail.confirm_delete', { name: this.file()?.original_name }))) return;
+    const f = this.file();
+    const confirmMsg = f?.is_owner
+      ? this.translate.instant('files.detail.confirm_delete', { name: f.original_name })
+      : `Убрать «${f?.original_name}» из ваших файлов?`;
+    if (!confirm(confirmMsg)) return;
     this.actionPending.set(true);
     this.filesApi.delete(this.id()).subscribe({
       next: () => this.router.navigate(['/folders']),

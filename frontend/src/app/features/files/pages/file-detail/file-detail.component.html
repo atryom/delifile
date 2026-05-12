@@ -215,13 +215,15 @@
             </div>
 
             <!-- Danger actions (owner only) -->
-            @if (file()!.is_owner) {
-              <div class="danger-actions">
-                <button class="btn-danger" (click)="deleteFile()" [disabled]="actionPending()">
+            <div class="danger-actions">
+              <button class="btn-danger" (click)="deleteFile()" [disabled]="actionPending()">
+                @if (file()!.is_owner) {
                   {{ 'files.detail.delete' | translate }}
-                </button>
-              </div>
-            }
+                } @else {
+                  Убрать из моих файлов
+                }
+              </button>
+            </div>
 
             <!-- Action feedback -->
             @if (feedback()) {
