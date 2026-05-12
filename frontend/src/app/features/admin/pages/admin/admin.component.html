@@ -40,11 +40,6 @@
             <div class="stat-label">Общий объём</div>
             <div class="stat-value">{{ formatSize(stats()!.total_size) }}</div>
           </div>
-          <div class="stat-card stat-card--pinned">
-            <div class="stat-label">Закреплённых файлов</div>
-            <div class="stat-value">{{ stats()!.pinned_files }}</div>
-            <div class="stat-sub">{{ formatSize(stats()!.pinned_size) }}</div>
-          </div>
         </div>
       }
     </section>

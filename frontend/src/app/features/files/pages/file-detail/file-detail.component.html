@@ -1,5 +1,8 @@
     <div class="page">
-      <a [routerLink]="backLink().commands" [queryParams]="backLink().queryParams ?? {}" class="back-link">{{ 'files.detail.back' | translate }}</a>
+      <a [routerLink]="backLink().commands" [queryParams]="backLink().queryParams ?? {}" class="back-link">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        {{ 'files.detail.back' | translate }}
+      </a>
 
       @if (loading()) {
         <div class="loading-state">{{ 'files.detail.loading' | translate }}</div>
@@ -45,10 +48,7 @@
                     }
                   </div>
                   <div class="file-meta-row">
-                    <span class="meta-item">{{ 'files.detail.uploaded' | translate:{date: (file()!.uploaded_at | date:'MMM d, y, HH:mm')} }}</span>
-                    @if (file()!.expires_at && !file()!.is_pinned) {
-                      <span class="meta-item">{{ 'files.detail.expires' | translate:{date: (file()!.expires_at | date:'MMM d, y, HH:mm')} }}</span>
-                    }
+                    <span class="meta-item">{{ 'files.detail.uploaded' | translate:{date: (file()!.uploaded_at | date:'d MMM y, HH:mm')} }}</span>
                   </div>
                   @if (file()!.is_owner) {
                     <div class="file-meta-row">
@@ -59,170 +59,150 @@
               </div>
             }
 
-            <!-- Primary actions -->
+            <!-- Unified action bar -->
             <div class="actions-bar">
+
               @if (file()!.content_kind === 'url_file') {
                 <button class="btn-action btn-primary" (click)="copyUrlLink()">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                   {{ 'files.detail.copy_link' | translate }}
                 </button>
               } @else {
                 <button class="btn-action btn-primary" (click)="download()" [disabled]="actionPending()">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
                   {{ 'files.detail.download' | translate }}
                 </button>
                 @if (canViewInBrowser()) {
-                  <button class="btn-action btn-view" (click)="openInBrowser()">
+                  <button class="btn-action" (click)="openInBrowser()">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7"/><circle cx="12" cy="12" r="3"/></svg>
                     {{ 'files.detail.view_in_browser' | translate }}
                   </button>
                 }
               }
-              <button
-                class="btn-action"
-                [class.btn-active]="file()!.is_favorite"
-                (click)="toggleFavorite()"
-                [disabled]="actionPending()"
-              >
+
+              <button class="btn-action" [class.btn-active]="file()!.is_favorite" (click)="toggleFavorite()" [disabled]="actionPending()">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 {{ file()!.is_favorite ? ('files.detail.favorited' | translate) : ('files.detail.favorite' | translate) }}
               </button>
-              <button
-                class="btn-action"
-                [class.btn-active]="file()!.is_pinned"
-                (click)="togglePin()"
-                [disabled]="actionPending()"
-              >
-                {{ file()!.is_pinned ? ('files.detail.pinned' | translate) : ('files.detail.pin' | translate) }}
-              </button>
-            </div>
 
-            <!-- Share actions (available to anyone with access) -->
-            <div class="share-actions">
-              <button class="btn-action btn-share" (click)="showShareDialog.set(true)">
+              <button class="btn-action" (click)="showShareDialog.set(true)">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
                 {{ 'files.detail.share' | translate }}
               </button>
-              <button class="btn-action btn-share" (click)="showLinkDialog.set(true)">
+
+              <button class="btn-action" (click)="showLinkDialog.set(true)">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                 {{ 'files.detail.create_link' | translate }}
               </button>
+
               @if (file()!.is_owner && isSharedFolderOnly()) {
-                <button class="btn-action btn-shared-folder" (click)="addToMyFiles()" [disabled]="addToMyFilesLoading()">
+                <button class="btn-action" (click)="addToMyFiles()" [disabled]="addToMyFilesLoading()">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="m12 11 0 6"/><path d="m9 14 3 3 3-3"/></svg>
                   {{ 'shared_folders.add_to_my_files_btn' | translate }}
                 </button>
               }
               @if (file()!.is_owner && !isSharedFolderOnly()) {
-                <button class="btn-action btn-shared-folder" (click)="showAddToSharedFolderDialog.set(true)">
+                <button class="btn-action" (click)="showAddToSharedFolderDialog.set(true)">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>
                   {{ 'shared_folders.add_to_shared_folder_btn' | translate }}
                 </button>
               }
-            </div>
 
-            <!-- Description -->
-            <div class="section">
-              <h3 class="section-title">{{ 'files.detail.description' | translate }}</h3>
-              @if (!editingDescription()) {
-                <div class="description-row">
-                  <span class="description-text">
-                    {{ file()!.description || ('files.detail.no_description' | translate) }}
-                  </span>
-                  <button class="btn-mini" (click)="openDescriptionEdit()">{{ 'common.edit' | translate }}</button>
-                </div>
-              } @else {
-                <div class="description-edit">
-                  <textarea
-                    class="description-textarea"
-                    [ngModel]="descriptionDraft"
-                    (ngModelChange)="descriptionDraft = $event"
-                    [attr.aria-label]="'files.detail.description' | translate"
-                    maxlength="500"
-                    rows="3"
-                    [placeholder]="'files.detail.description_placeholder' | translate"
-                  ></textarea>
-                  <div class="description-edit-actions">
-                    <button class="btn-mini btn-mini-primary" (click)="saveDescription()">{{ 'common.save' | translate }}</button>
-                    <button class="btn-mini" (click)="cancelDescriptionEdit()">{{ 'common.cancel' | translate }}</button>
-                  </div>
-                </div>
-              }
-            </div>
-
-            <!-- Tags (editable for owner) -->
-            <div class="section">
-              <h3 class="section-title">{{ 'files.detail.tags' | translate }}</h3>
-              <div class="tags-row">
-                @for (t of file()!.tags; track t.id) {
-                  <span class="tag">
-                    {{ t.name }}
-                    <button class="tag-remove" (click)="removeTag(t)" aria-label="Удалить тег">×</button>
-                  </span>
-                }
-                @if (!showTagPicker()) {
-                    <button class="tag-add-btn" (click)="openTagPicker()">+ тег</button>
-                  } @else {
-                    <div class="tag-picker" (mouseleave)="onTagPickerMouseLeave()">
-                      <input
-                        #tagInput
-                        class="tag-search"
-                        type="text"
-                        [placeholder]="'files.detail.tag_search_placeholder' | translate"
-                        (input)="onTagSearch($event)"
-                        (keydown.escape)="closeTagPicker()"
-                        (blur)="onTagInputBlur()"
-                        [attr.aria-label]="'files.detail.tag_search_placeholder' | translate"
-                      />
-                      <div class="tag-dropdown">
-                        @for (tag of filteredTags(); track tag.id) {
-                          <button class="tag-option" (mousedown)="$event.preventDefault()" (click)="addTag(tag)">{{ tag.name }}</button>
-                        }
-                        @if (tagSearchQuery() && !tagExactMatch()) {
-                          <button class="tag-option tag-create" (mousedown)="$event.preventDefault()" (click)="createAndAddTag()">
-                            {{ 'files.detail.create_tag' | translate:{name: tagSearchQuery()} }}
-                          </button>
-                        }
-                        @if (!tagSearchQuery() && filteredTags().length === 0) {
-                          <span class="tag-empty">{{ 'files.detail.no_tags' | translate }}</span>
-                        }
-                      </div>
-                    </div>
-                  }
-              </div>
-            </div>
-
-            <!-- Folder -->
-            <div class="section">
-              <h3 class="section-title">{{ 'files.detail.folder' | translate }}</h3>
-              @if (!showFolderPicker()) {
-                <div class="folder-row">
-                  <span class="folder-name">
-                    {{ currentFolderName() ?? ('files.detail.no_folder' | translate) }}
-                  </span>
-                  <button class="btn-mini" (click)="openFolderPicker()">Изменить</button>
-                  @if (file()!.folder_id) {
-                    <button class="btn-mini btn-mini-danger" (click)="removeFromFolder()">
-                      {{ 'files.detail.remove_from_folder' | translate }}
-                    </button>
-                  }
-                </div>
-              } @else {
-                <div class="folder-picker">
-                  <select class="folder-select" (change)="onFolderSelect($event)">
-                    <option value="">{{ 'files.detail.no_folder' | translate }}</option>
-                    @for (node of flatFolders(); track node.id) {
-                      <option [value]="node.id" [selected]="node.id === file()!.folder_id">
-                        {{ node.indent }}{{ node.name }}
-                      </option>
-                    }
-                  </select>
-                  <button class="btn-mini" (click)="showFolderPicker.set(false)">{{ 'common.cancel' | translate }}</button>
-                </div>
-              }
-            </div>
-
-            <!-- Danger actions (owner only) -->
-            <div class="danger-actions">
-              <button class="btn-danger" (click)="deleteFile()" [disabled]="actionPending()">
+              <button class="btn-action btn-danger" (click)="deleteFile()" [disabled]="actionPending()">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
                 @if (file()!.is_owner) {
                   {{ 'files.detail.delete' | translate }}
                 } @else {
                   Убрать из моих файлов
                 }
               </button>
+
+            </div>
+
+            <!-- Description -->
+            <div class="section">
+              <h3 class="section-title">{{ 'files.detail.description' | translate }}</h3>
+              <div class="description-block">
+                <textarea
+                  class="description-textarea"
+                  [ngModel]="descriptionDraft"
+                  (ngModelChange)="descriptionDraft = $event"
+                  [attr.aria-label]="'files.detail.description' | translate"
+                  maxlength="500"
+                  rows="3"
+                  [placeholder]="'files.detail.description_placeholder' | translate"
+                ></textarea>
+                <button class="btn-save" (click)="saveDescription()" [disabled]="savingDescription()">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                  {{ 'common.save' | translate }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Tags -->
+            <div class="section">
+              <h3 class="section-title">{{ 'files.detail.tags' | translate }}</h3>
+              <div class="tags-row">
+                @for (t of file()!.tags; track t.id) {
+                  <span class="tag">
+                    {{ t.name }}
+                    <button class="tag-remove" (click)="removeTag(t)" [attr.aria-label]="'Удалить тег ' + t.name">
+                      <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                  </span>
+                }
+                @if (!showTagPicker()) {
+                  <button class="tag-add-btn" (click)="openTagPicker()">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                    {{ 'files.detail.add_tag' | translate }}
+                  </button>
+                } @else {
+                  <div class="tag-picker" (mouseleave)="onTagPickerMouseLeave()">
+                    <input
+                      #tagInput
+                      class="tag-search"
+                      type="text"
+                      [placeholder]="'files.detail.tag_search_placeholder' | translate"
+                      (input)="onTagSearch($event)"
+                      (keydown.escape)="closeTagPicker()"
+                      (blur)="onTagInputBlur()"
+                      [attr.aria-label]="'files.detail.tag_search_placeholder' | translate"
+                    />
+                    <div class="tag-dropdown">
+                      @for (tag of filteredTags(); track tag.id) {
+                        <button class="tag-option" (mousedown)="$event.preventDefault()" (click)="addTag(tag)">{{ tag.name }}</button>
+                      }
+                      @if (tagSearchQuery() && !tagExactMatch()) {
+                        <button class="tag-option tag-create" (mousedown)="$event.preventDefault()" (click)="createAndAddTag()">
+                          {{ 'files.detail.create_tag' | translate:{name: tagSearchQuery()} }}
+                        </button>
+                      }
+                      @if (!tagSearchQuery() && filteredTags().length === 0) {
+                        <span class="tag-empty">{{ 'files.detail.no_tags' | translate }}</span>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Folder -->
+            <div class="section">
+              <h3 class="section-title">{{ 'files.detail.folder' | translate }}</h3>
+              <div class="folder-block">
+                <select class="folder-select" (change)="onFolderSelect($event)">
+                  <option value="">{{ 'files.detail.no_folder' | translate }}</option>
+                  @for (node of flatFolders(); track node.id) {
+                    <option [value]="node.id" [selected]="node.id === pendingFolderId()">
+                      {{ node.indent }}{{ node.name }}
+                    </option>
+                  }
+                </select>
+                <button class="btn-save" (click)="saveFolderSelection()" [disabled]="savingFolder()">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                  {{ 'common.save' | translate }}
+                </button>
+              </div>
             </div>
 
             <!-- Action feedback -->
@@ -244,16 +224,20 @@
                 <div class="link-item">
                   <div class="link-url" [title]="link.url">{{ link.url }}</div>
                   <div class="link-meta">
-                    {{ 'files.detail.link_expires' | translate:{date: (link.expires_at | date:'MMM d, HH:mm')} }}
+                    {{ 'files.detail.link_expires' | translate:{date: (link.expires_at | date:'d MMM, HH:mm')} }}
                     · <span class="badge badge-{{ link.status }}">{{ link.status }}</span>
                     @if (link.allow_save) {
                       · <span class="badge badge-save">💾</span>
                     }
                   </div>
                   <div class="link-actions">
-                    <button class="btn-mini" (click)="copyLink(link.url)">{{ 'files.detail.copy' | translate }}</button>
+                    <button class="btn-mini" (click)="copyLink(link.url)">
+                      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                      {{ 'files.detail.copy' | translate }}
+                    </button>
                     @if (link.status === 'active') {
                       <button class="btn-mini btn-mini-danger" (click)="disableLink(link)">
+                        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
                         {{ 'files.detail.disable' | translate }}
                       </button>
                     }
@@ -285,7 +269,7 @@
               @for (log of activity(); track log.id) {
                 <div class="activity-item">
                   <span class="activity-label">{{ log.label }}</span>
-                  <span class="activity-meta">{{ log.created_at | date:'MMM d, HH:mm' }}</span>
+                  <span class="activity-meta">{{ log.created_at | date:'d MMM, HH:mm' }}</span>
                 </div>
               }
             </div>

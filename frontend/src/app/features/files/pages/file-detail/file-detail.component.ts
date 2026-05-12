@@ -40,12 +40,13 @@ export class FileDetailComponent implements OnInit {
   readonly accesses      = signal<FileAccess[]>([]);
   readonly activity      = signal<ActivityLog[]>([]);
 
-  readonly editingDescription = signal(false);
   descriptionDraft = '';
-  readonly showShareDialog           = signal(false);
-  readonly showLinkDialog            = signal(false);
+  readonly showShareDialog             = signal(false);
+  readonly showLinkDialog              = signal(false);
   readonly showAddToSharedFolderDialog = signal(false);
-  readonly addToMyFilesLoading       = signal(false);
+  readonly addToMyFilesLoading         = signal(false);
+  readonly savingDescription           = signal(false);
+  readonly savingFolder                = signal(false);
 
   readonly allTags         = signal<Tag[]>([]);
   readonly tagSearch       = signal('');
@@ -57,7 +58,7 @@ export class FileDetailComponent implements OnInit {
 
   readonly allFolders    = signal<FolderTreeNode[]>([]);
   readonly flatFolders   = signal<{ id: string; name: string; indent: string }[]>([]);
-  readonly showFolderPicker = signal(false);
+  readonly pendingFolderId = signal<string | null>(null);
 
   readonly currentFolderName = signal<string | null>(null);
 
@@ -82,6 +83,8 @@ export class FileDetailComponent implements OnInit {
     this.filesApi.get(this.id()).subscribe({
       next: (res) => {
         this.file.set(res.data.file);
+        this.descriptionDraft = res.data.file.description ?? '';
+        this.pendingFolderId.set(res.data.file.folder_id ?? null);
         this.loading.set(false);
         this.loadSidePanels();
         this.updateFolderName(res.data.file.folder_id);
@@ -142,25 +145,18 @@ export class FileDetailComponent implements OnInit {
     );
   }
 
-  openDescriptionEdit(): void {
-    this.descriptionDraft = this.file()?.description ?? '';
-    this.editingDescription.set(true);
-  }
-
   saveDescription(): void {
+    if (this.savingDescription()) return;
     const desc = this.descriptionDraft.trim() || null;
+    this.savingDescription.set(true);
     this.filesApi.updateDescription(this.id(), desc).subscribe({
       next: (res) => {
         this.file.update(f => f ? { ...f, description: res.data.description } : f);
-        this.editingDescription.set(false);
+        this.savingDescription.set(false);
         this.showFeedback(this.translate.instant('files.detail.description_saved'));
       },
-      error: () => this.editingDescription.set(false),
+      error: () => this.savingDescription.set(false),
     });
-  }
-
-  cancelDescriptionEdit(): void {
-    this.editingDescription.set(false);
   }
 
   copyUrlLink(): void {
@@ -181,23 +177,6 @@ export class FileDetailComponent implements OnInit {
         this.showFeedback(isFav
           ? this.translate.instant('files.detail.removed_favorite')
           : this.translate.instant('files.detail.added_favorite'));
-        this.actionPending.set(false);
-      },
-      error: () => this.actionPending.set(false),
-    });
-  }
-
-  togglePin(): void {
-    if (!this.file()) return;
-    this.actionPending.set(true);
-    const isPinned = this.file()!.is_pinned;
-    const req = isPinned ? this.filesApi.unpin(this.id()) : this.filesApi.pin(this.id());
-    req.subscribe({
-      next: () => {
-        this.file.update((f) => f ? { ...f, is_pinned: !isPinned } : f);
-        this.showFeedback(isPinned
-          ? this.translate.instant('files.detail.unpinned')
-          : this.translate.instant('files.detail.file_pinned'));
         this.actionPending.set(false);
       },
       error: () => this.actionPending.set(false),
@@ -294,33 +273,25 @@ export class FileDetailComponent implements OnInit {
     });
   }
 
-  openFolderPicker(): void {
-    this.showFolderPicker.set(true);
-  }
-
   onFolderSelect(e: Event): void {
     const folderId = (e.target as HTMLSelectElement).value || null;
-    this.showFolderPicker.set(false);
+    this.pendingFolderId.set(folderId);
+  }
+
+  saveFolderSelection(): void {
+    if (this.savingFolder()) return;
+    const folderId = this.pendingFolderId();
+    this.savingFolder.set(true);
     this.filesApi.moveFolder(this.id(), folderId).subscribe({
       next: () => {
         this.file.update((f) => f ? { ...f, folder_id: folderId } : f);
         this.currentFolderName.set(
           folderId ? (this.flatFolders().find((f) => f.id === folderId)?.name ?? null) : null
         );
-        this.showFeedback(this.translate.instant('files.detail.folder'));
+        this.savingFolder.set(false);
+        this.showFeedback(this.translate.instant('files.detail.folder_saved'));
       },
-      error: () => {},
-    });
-  }
-
-  removeFromFolder(): void {
-    this.filesApi.moveFolder(this.id(), null).subscribe({
-      next: () => {
-        this.file.update((f) => f ? { ...f, folder_id: null } : f);
-        this.currentFolderName.set(null);
-        this.showFeedback(this.translate.instant('files.detail.remove_from_folder'));
-      },
-      error: () => {},
+      error: () => this.savingFolder.set(false),
     });
   }
 

@@ -45,7 +45,7 @@ class FileService
                 'mime_type'     => $data['mime_type'],
                 'checksum'      => $data['checksum'] ?? null,
                 'status'        => FileStatus::Uploading,
-                'expires_at'    => now()->addHours(config('app.file_default_ttl_hours', 12)),
+                'expires_at'    => null,
             ]);
 
             $presignedUrl = $this->generatePresignedPutUrl($storageKey, $data['mime_type']);
@@ -337,11 +337,11 @@ class FileService
             'mime_type'     => $file->mime_type,
             'status'        => $file->status->value,
             'uploaded_at'   => $file->created_at?->toIso8601String(),
-            'expires_at'    => $file->expires_at?->toIso8601String(),
+            'expires_at'    => null,
             'is_owner'      => $file->isOwnedBy($user),
             'access_type'   => $access?->access_type?->value,
             'is_favorite'   => $access?->is_favorite ?? false,
-            'is_pinned'     => $access?->pinned_at !== null,
+            'is_pinned'     => false,
             'description'         => $access?->description,
             'folder_id'           => $access?->folder_id,
             'shared_folder_only'  => (bool) $file->shared_folder_only,
