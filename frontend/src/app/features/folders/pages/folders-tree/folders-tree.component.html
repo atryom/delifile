@@ -214,6 +214,15 @@
           <table>
             <thead>
               <tr>
+                <th class="col-check" scope="col">
+                  @if (showFilesArea() && files().length > 0) {
+                    <input type="checkbox" class="row-checkbox"
+                           [checked]="allFilesSelected()"
+                           [indeterminate]="someFilesSelected()"
+                           (change)="toggleAllFiles()"
+                           aria-label="Выбрать все файлы" />
+                  }
+                </th>
                 <th class="col-name" scope="col">Наименование</th>
                 <th class="col-mod" scope="col">Дата изменения</th>
                 <th class="col-size" scope="col">Размер / Вместимость</th>
@@ -227,6 +236,7 @@
               @if (activeTab() === 'local') {
                 @for (folder of currentSubFolders(); track folder.id) {
                   <tr (click)="navigateIntoLocalFolder(folder)">
+                    <td class="col-check"></td>
                     <td>
                       <div class="file-cell">
                         <div class="file-icon icon-folder" aria-hidden="true">
@@ -285,6 +295,7 @@
               @if (activeTab() === 'shared' && currentSharedFolderId() === null) {
                 @for (folder of filteredSharedFolders(); track folder.id) {
                   <tr (click)="navigateIntoSharedFolder(folder)">
+                    <td class="col-check"></td>
                     <td>
                       <div class="file-cell">
                         <div class="file-icon icon-folder" aria-hidden="true">
@@ -349,7 +360,13 @@
               <!-- ── Files ─────────────────────────────────────────────── -->
               @if (showFilesArea()) {
                 @for (file of files(); track file.id) {
-                  <tr (click)="openFileDetail(file)">
+                  <tr (click)="openFileDetail(file)" [class.row-selected]="selectedFileIds().has(file.id)">
+                    <td class="check-cell" (click)="$event.stopPropagation()">
+                      <input type="checkbox" class="row-checkbox"
+                             [checked]="selectedFileIds().has(file.id)"
+                             (change)="toggleFileSelection(file.id)"
+                             [attr.aria-label]="'Выбрать ' + fileDisplayName(file)" />
+                    </td>
                     <td>
                       <div class="file-cell">
                         <div class="file-icon" [class]="'icon-' + fileIconType(file)" aria-hidden="true">
@@ -417,6 +434,10 @@
                           <button type="button" role="menuitem" (click)="openFileDetail(file)">Открыть</button>
                           <button type="button" role="menuitem" (click)="downloadFile(file)">Скачать</button>
                           <button type="button" role="menuitem" (click)="favoriteFile(file)">В избранное</button>
+                          <button type="button" role="menuitem" (click)="openTagDialogForFile(file)">Добавить тег</button>
+                          @if (activeTab() === 'local') {
+                            <button type="button" role="menuitem" (click)="openMoveDialogForFile(file)">Переместить в папку</button>
+                          }
                           <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteFile(file)">Удалить</button>
                         </div>
                       }
@@ -679,4 +700,127 @@
     [folderName]="sfAccessFolderName()"
     (closed)="closeAccessDialog()"
   />
+}
+
+<!-- ══════════════════════════════════════════════════════ SELECTION BAR -->
+
+@if (selectedCount() > 0) {
+  <div class="selection-bar" role="toolbar" aria-label="Групповые действия над файлами">
+    <span class="selection-count">{{ selectedCountLabel() }}</span>
+    <div class="selection-actions">
+      <select class="bulk-action-select" (change)="onBulkActionChange($event)" aria-label="Выберите действие">
+        <option value="">— действие —</option>
+        <option value="tag">Назначить тег</option>
+        <option value="move">Переместить в папку</option>
+        <option value="delete">Удалить</option>
+      </select>
+      <button type="button" class="btn-bulk-execute"
+              [disabled]="!bulkAction()"
+              (click)="openBulkAction()">Выполнить</button>
+    </div>
+    <button type="button" class="btn-bulk-cancel" (click)="clearSelection()">Снять выделение</button>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ TAG DIALOG -->
+
+@if (tagDialogOpen()) {
+  <div class="modal-backdrop" (click)="tagDialogOpen.set(false)" role="dialog" aria-modal="true" aria-labelledby="tag-dialog-title">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3 id="tag-dialog-title">Добавить тег</h3>
+      <p>Выберите или создайте тег для {{ tagDialogCountText() }}</p>
+
+      @if (tags().length > 0) {
+        <div class="custom-select tag-select-wrap">
+          <select (change)="onTagDialogChange($event)" aria-label="Тег">
+            <option value="">— Выберите тег —</option>
+            @for (tag of tags(); track tag.id) {
+              <option [value]="tag.id" [selected]="tagDialogTagId() === tag.id">{{ tag.name }}</option>
+            }
+          </select>
+        </div>
+      }
+
+      <div class="new-tag-section">
+        <div class="new-tag-label">
+          @if (tags().length === 0) { Тегов нет — создайте первый: } @else { или создайте новый: }
+        </div>
+        <div class="new-tag-row">
+          <input type="text" class="create-input"
+                 [(ngModel)]="newTagInputValue"
+                 placeholder="Название тега"
+                 maxlength="50"
+                 (keydown.enter)="createAndAssignTag()"
+                 aria-label="Название нового тега" />
+          <button type="button" class="btn-sm btn-save"
+                  [disabled]="!newTagInputValue.trim() || creatingTag()"
+                  (click)="createAndAssignTag()">
+            {{ creatingTag() ? '…' : 'Создать' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-primary"
+                [disabled]="!tagDialogTagId() || applyingTag()"
+                (click)="executeBulkTag()">
+          {{ applyingTag() ? 'Применяется…' : 'Применить' }}
+        </button>
+        <button type="button" class="btn-secondary" (click)="tagDialogOpen.set(false)">Отмена</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ MOVE DIALOG -->
+
+@if (moveDialogOpen()) {
+  <div class="modal-backdrop" (click)="moveDialogOpen.set(false)" role="dialog" aria-modal="true" aria-labelledby="move-dialog-title">
+    <div class="modal modal-lg" (click)="$event.stopPropagation()">
+      <h3 id="move-dialog-title">Переместить в папку</h3>
+      <p>Выберите папку для {{ moveDialogCountText() }}</p>
+      <div class="folder-list" role="listbox" aria-label="Список папок">
+        @if (flattenedFolders().length === 0) {
+          <div class="folder-list-empty">Нет локальных папок</div>
+        }
+        @for (item of flattenedFolders(); track item.folder.id) {
+          <button type="button" role="option" class="folder-list-item"
+                  [class.selected]="moveDialogFolderId() === item.folder.id"
+                  [attr.aria-selected]="moveDialogFolderId() === item.folder.id"
+                  [style.padding-left.px]="item.depth * 16 + 12"
+                  (click)="moveDialogFolderId.set(item.folder.id)">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+            </svg>
+            {{ item.folder.name }}
+          </button>
+        }
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-primary"
+                [disabled]="!moveDialogFolderId() || movingFiles()"
+                (click)="executeBulkMove()">
+          {{ movingFiles() ? 'Перемещается…' : 'Переместить' }}
+        </button>
+        <button type="button" class="btn-secondary" (click)="moveDialogOpen.set(false)">Отмена</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ BULK DELETE DIALOG -->
+
+@if (bulkDeleteDialogOpen()) {
+  <div class="modal-backdrop" (click)="bulkDeleteDialogOpen.set(false)" role="dialog" aria-modal="true" aria-labelledby="bulk-del-title">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3 id="bulk-del-title">Удалить файлы?</h3>
+      <p>{{ selectedCountLabel() }} будут удалены без возможности восстановления.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-danger" [disabled]="deletingBulk()" (click)="executeBulkDelete()">
+          {{ deletingBulk() ? 'Удаление…' : 'Удалить' }}
+        </button>
+        <button type="button" class="btn-secondary" (click)="bulkDeleteDialogOpen.set(false)">Отмена</button>
+      </div>
+    </div>
+  </div>
 }

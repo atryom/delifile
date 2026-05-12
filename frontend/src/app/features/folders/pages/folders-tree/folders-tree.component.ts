@@ -1,6 +1,7 @@
 import {
   Component, inject, signal, computed, OnInit, ChangeDetectionStrategy,
 } from '@angular/core';
+import { forkJoin } from 'rxjs';
 import { DatePipe } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -113,6 +114,55 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── Upload state ──────────────────────────────────────────────────────────
   readonly uploadState = this.uploadSvc.state;
+
+  // ── Multi-select ──────────────────────────────────────────────────────────
+  readonly selectedFileIds   = signal<ReadonlySet<string>>(new Set<string>());
+  readonly selectedCount     = computed(() => this.selectedFileIds().size);
+  readonly allFilesSelected  = computed(() => {
+    const files = this.files();
+    if (files.length === 0) return false;
+    return files.every(f => this.selectedFileIds().has(f.id));
+  });
+  readonly someFilesSelected = computed(
+    () => this.selectedCount() > 0 && !this.allFilesSelected()
+  );
+  readonly selectedCountLabel = computed(() => {
+    const n = this.selectedCount();
+    const word = n === 1 ? 'файл' : n >= 2 && n <= 4 ? 'файла' : 'файлов';
+    return `Выделено ${n} ${word}`;
+  });
+
+  // ── Bulk action ───────────────────────────────────────────────────────────
+  readonly bulkAction = signal<'tag' | 'move' | 'delete' | ''>('');
+
+  // ── Tag dialog ────────────────────────────────────────────────────────────
+  readonly tagDialogOpen      = signal(false);
+  readonly tagDialogTargetIds = signal<string[]>([]);
+  readonly tagDialogTagId     = signal<string>('');
+  readonly applyingTag        = signal(false);
+  readonly creatingTag        = signal(false);
+  newTagInputValue            = '';
+  readonly tagDialogCountText = computed(() => {
+    const n = this.tagDialogTargetIds().length;
+    return n === 1 ? '1 файл' : n >= 2 && n <= 4 ? `${n} файла` : `${n} файлов`;
+  });
+
+  // ── Move dialog ───────────────────────────────────────────────────────────
+  readonly moveDialogOpen      = signal(false);
+  readonly moveDialogTargetIds = signal<string[]>([]);
+  readonly moveDialogFolderId  = signal<string | null>(null);
+  readonly movingFiles         = signal(false);
+  readonly moveDialogCountText = computed(() => {
+    const n = this.moveDialogTargetIds().length;
+    return n === 1 ? '1 файл' : n >= 2 && n <= 4 ? `${n} файла` : `${n} файлов`;
+  });
+
+  // ── Bulk delete ───────────────────────────────────────────────────────────
+  readonly bulkDeleteDialogOpen = signal(false);
+  readonly deletingBulk         = signal(false);
+
+  // ── Flattened local folder tree (for move dialog) ─────────────────────────
+  readonly flattenedFolders = computed(() => this.flattenTree(this.fullTree(), 0));
 
   // ── Add modal ─────────────────────────────────────────────────────────────
   readonly addModalOpen = signal(false);
@@ -309,7 +359,7 @@ export class FoldersTreeComponent implements OnInit {
       this.searchQuery || undefined,
       {
         tag_id:          this.activeTagId()          || undefined,
-        folder_id:       this.currentLocalFolderId() || undefined,
+        folder_id:       this.currentLocalFolderId(),
         file_type_group: this.activeTypeGroup()      || undefined,
         sort_by:         this.sortBy(),
         sort_order:      this.sortOrder(),
@@ -386,10 +436,12 @@ export class FoldersTreeComponent implements OnInit {
     this.page.set(1);
     this.totalPages.set(1);
     this.availableTypeGroups.set([]);
+    this.clearSelection();
   }
 
   goToPage(p: number): void {
     this.page.set(p);
+    this.clearSelection();
     this.loadFiles();
   }
 
@@ -681,6 +733,142 @@ export class FoldersTreeComponent implements OnInit {
   }
 
   closeAccessDialog(): void { this.sfAccessFolderId.set(null); }
+
+  // ── Multi-select ──────────────────────────────────────────────────────────
+  toggleFileSelection(id: string): void {
+    const next = new Set(this.selectedFileIds());
+    if (next.has(id)) next.delete(id); else next.add(id);
+    this.selectedFileIds.set(next);
+  }
+
+  toggleAllFiles(): void {
+    const files = this.files();
+    if (files.every(f => this.selectedFileIds().has(f.id))) {
+      this.selectedFileIds.set(new Set());
+    } else {
+      this.selectedFileIds.set(new Set(files.map(f => f.id)));
+    }
+  }
+
+  clearSelection(): void { this.selectedFileIds.set(new Set()); }
+
+  // ── Bulk action ───────────────────────────────────────────────────────────
+  onBulkActionChange(event: Event): void {
+    this.bulkAction.set((event.target as HTMLSelectElement).value as 'tag' | 'move' | 'delete' | '');
+  }
+
+  openBulkAction(): void {
+    const action = this.bulkAction();
+    const ids = [...this.selectedFileIds()];
+    if (!action || ids.length === 0) return;
+    if (action === 'tag') {
+      this.tagDialogTargetIds.set(ids);
+      this.tagDialogTagId.set('');
+      this.tagDialogOpen.set(true);
+    } else if (action === 'move') {
+      this.moveDialogTargetIds.set(ids);
+      this.moveDialogFolderId.set(null);
+      this.moveDialogOpen.set(true);
+    } else {
+      this.bulkDeleteDialogOpen.set(true);
+    }
+  }
+
+  // ── Tag dialog ────────────────────────────────────────────────────────────
+  openTagDialogForFile(file: AnyFile): void {
+    this.tagDialogTargetIds.set([file.id]);
+    this.tagDialogTagId.set('');
+    this.tagDialogOpen.set(true);
+    this.closeMenu();
+  }
+
+  onTagDialogChange(event: Event): void {
+    this.tagDialogTagId.set((event.target as HTMLSelectElement).value);
+  }
+
+  executeBulkTag(): void {
+    const tagId = this.tagDialogTagId();
+    const ids   = this.tagDialogTargetIds();
+    if (!tagId || ids.length === 0 || this.applyingTag()) return;
+    this.applyingTag.set(true);
+    forkJoin(ids.map(id => this.orgApi.attachTags(id, [tagId]))).subscribe({
+      next: () => {
+        this.applyingTag.set(false);
+        this.tagDialogOpen.set(false);
+        this.clearSelection();
+        this.loadFiles();
+      },
+      error: () => { this.applyingTag.set(false); },
+    });
+  }
+
+  createAndAssignTag(): void {
+    const name = this.newTagInputValue.trim();
+    if (!name || this.creatingTag()) return;
+    this.creatingTag.set(true);
+    this.orgApi.createTag(name).subscribe({
+      next: (res) => {
+        const newTag = res.data.tag;
+        this.tags.update(tags => [...tags, newTag]);
+        this.tagDialogTagId.set(newTag.id);
+        this.newTagInputValue = '';
+        this.creatingTag.set(false);
+      },
+      error: () => { this.creatingTag.set(false); },
+    });
+  }
+
+  // ── Move dialog ───────────────────────────────────────────────────────────
+  openMoveDialogForFile(file: AnyFile): void {
+    this.moveDialogTargetIds.set([file.id]);
+    this.moveDialogFolderId.set(null);
+    this.moveDialogOpen.set(true);
+    this.closeMenu();
+  }
+
+  executeBulkMove(): void {
+    const folderId = this.moveDialogFolderId();
+    const ids      = this.moveDialogTargetIds();
+    if (ids.length === 0 || this.movingFiles()) return;
+    this.movingFiles.set(true);
+    forkJoin(ids.map(id => this.filesApi.moveFolder(id, folderId))).subscribe({
+      next: () => {
+        this.movingFiles.set(false);
+        this.moveDialogOpen.set(false);
+        const movedSet = new Set(ids);
+        this.files.update(fs => fs.filter(f => !movedSet.has(f.id)));
+        this.clearSelection();
+        this.loadLocal();
+      },
+      error: () => { this.movingFiles.set(false); },
+    });
+  }
+
+  // ── Bulk delete ───────────────────────────────────────────────────────────
+  executeBulkDelete(): void {
+    const ids = [...this.selectedFileIds()];
+    if (ids.length === 0 || this.deletingBulk()) return;
+    this.deletingBulk.set(true);
+    forkJoin(ids.map(id => this.filesApi.delete(id))).subscribe({
+      next: () => {
+        this.deletingBulk.set(false);
+        this.bulkDeleteDialogOpen.set(false);
+        this.clearSelection();
+        this.loadFiles();
+      },
+      error: () => { this.deletingBulk.set(false); },
+    });
+  }
+
+  // ── Flatten folder tree ───────────────────────────────────────────────────
+  private flattenTree(nodes: FolderTreeNode[], depth: number): { folder: FolderTreeNode; depth: number }[] {
+    const result: { folder: FolderTreeNode; depth: number }[] = [];
+    for (const node of nodes) {
+      result.push({ folder: node, depth });
+      result.push(...this.flattenTree(node.children, depth + 1));
+    }
+    return result;
+  }
 
   // ── Utilities ─────────────────────────────────────────────────────────────
   formatSize(bytes: number): string {

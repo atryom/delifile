@@ -54,6 +54,7 @@ export interface FileListItem {
   status: FileStatus;
   expires_at: string | null;
   uploaded_at: string | null;
+  folder_id?: string | null;
   description?: string | null;
   preview_url?: string | null;
   // url_file preview fields

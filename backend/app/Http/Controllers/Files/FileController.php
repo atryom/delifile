@@ -41,8 +41,10 @@ class FileController extends Controller
         ]);
 
         // folder_id can be explicitly null (no-folder filter)
+        // empty string sent from client means "root only" → treat as null
         if ($request->has('folder_id')) {
-            $options['folder_id'] = $request->get('folder_id');
+            $raw = $request->get('folder_id');
+            $options['folder_id'] = ($raw === '' || $raw === null) ? null : $raw;
         }
 
         $result = $this->fileService->listFiles(
