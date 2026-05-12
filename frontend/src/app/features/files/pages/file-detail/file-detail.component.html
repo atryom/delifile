@@ -149,13 +149,10 @@
                 @for (t of file()!.tags; track t.id) {
                   <span class="tag">
                     {{ t.name }}
-                    @if (file()!.is_owner) {
-                      <button class="tag-remove" (click)="removeTag(t)" aria-label="Удалить тег">×</button>
-                    }
+                    <button class="tag-remove" (click)="removeTag(t)" aria-label="Удалить тег">×</button>
                   </span>
                 }
-                @if (file()!.is_owner) {
-                  @if (!showTagPicker()) {
+                @if (!showTagPicker()) {
                     <button class="tag-add-btn" (click)="openTagPicker()">+ тег</button>
                   } @else {
                     <div class="tag-picker" (mouseleave)="onTagPickerMouseLeave()">
@@ -184,41 +181,38 @@
                       </div>
                     </div>
                   }
-                }
               </div>
             </div>
 
-            <!-- Folder (owner only) -->
-            @if (file()!.is_owner) {
-              <div class="section">
-                <h3 class="section-title">{{ 'files.detail.folder' | translate }}</h3>
-                @if (!showFolderPicker()) {
-                  <div class="folder-row">
-                    <span class="folder-name">
-                      {{ currentFolderName() ?? ('files.detail.no_folder' | translate) }}
-                    </span>
-                    <button class="btn-mini" (click)="openFolderPicker()">Изменить</button>
-                    @if (file()!.folder_id) {
-                      <button class="btn-mini btn-mini-danger" (click)="removeFromFolder()">
-                        {{ 'files.detail.remove_from_folder' | translate }}
-                      </button>
+            <!-- Folder -->
+            <div class="section">
+              <h3 class="section-title">{{ 'files.detail.folder' | translate }}</h3>
+              @if (!showFolderPicker()) {
+                <div class="folder-row">
+                  <span class="folder-name">
+                    {{ currentFolderName() ?? ('files.detail.no_folder' | translate) }}
+                  </span>
+                  <button class="btn-mini" (click)="openFolderPicker()">Изменить</button>
+                  @if (file()!.folder_id) {
+                    <button class="btn-mini btn-mini-danger" (click)="removeFromFolder()">
+                      {{ 'files.detail.remove_from_folder' | translate }}
+                    </button>
+                  }
+                </div>
+              } @else {
+                <div class="folder-picker">
+                  <select class="folder-select" (change)="onFolderSelect($event)">
+                    <option value="">{{ 'files.detail.no_folder' | translate }}</option>
+                    @for (node of flatFolders(); track node.id) {
+                      <option [value]="node.id" [selected]="node.id === file()!.folder_id">
+                        {{ node.indent }}{{ node.name }}
+                      </option>
                     }
-                  </div>
-                } @else {
-                  <div class="folder-picker">
-                    <select class="folder-select" (change)="onFolderSelect($event)">
-                      <option value="">{{ 'files.detail.no_folder' | translate }}</option>
-                      @for (node of flatFolders(); track node.id) {
-                        <option [value]="node.id" [selected]="node.id === file()!.folder_id">
-                          {{ node.indent }}{{ node.name }}
-                        </option>
-                      }
-                    </select>
-                    <button class="btn-mini" (click)="showFolderPicker.set(false)">{{ 'common.cancel' | translate }}</button>
-                  </div>
-                }
-              </div>
-            }
+                  </select>
+                  <button class="btn-mini" (click)="showFolderPicker.set(false)">{{ 'common.cancel' | translate }}</button>
+                </div>
+              }
+            </div>
 
             <!-- Danger actions (owner only) -->
             @if (file()!.is_owner) {

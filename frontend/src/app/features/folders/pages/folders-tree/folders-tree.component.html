@@ -435,9 +435,7 @@
                           <button type="button" role="menuitem" (click)="downloadFile(file)">Скачать</button>
                           <button type="button" role="menuitem" (click)="favoriteFile(file)">В избранное</button>
                           <button type="button" role="menuitem" (click)="openTagDialogForFile(file)">Добавить тег</button>
-                          @if (activeTab() === 'local') {
-                            <button type="button" role="menuitem" (click)="openMoveDialogForFile(file)">Переместить в папку</button>
-                          }
+                          <button type="button" role="menuitem" (click)="openMoveDialogForFile(file)">Переместить в папку</button>
                           <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteFile(file)">Удалить</button>
                         </div>
                       }
