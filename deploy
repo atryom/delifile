@@ -41,8 +41,12 @@ cd "$FRONTEND"
 npm ci --silent
 ok "npm ci done"
 
-info "Frontend: building..."
-npm run build
+info "Frontend: bumping version..."
+node scripts/bump-version.js
+ok "Version bumped"
+
+info "Frontend: building (production)..."
+npm run build:prod
 ok "Build done"
 
 # ── 3. Deploy: copy dist → public (preserve public/backend/) ─────────────────

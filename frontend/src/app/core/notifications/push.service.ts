@@ -13,30 +13,54 @@ export class PushService {
   }
 
   async subscribe(): Promise<void> {
-    if (!this.isSupported) return;
+    if (!this.isSupported) {
+      console.warn('[Push] Not supported: serviceWorker or PushManager missing');
+      return;
+    }
 
     const vapidKey = await this.fetchVapidKey();
-    if (!vapidKey) return;
+    if (!vapidKey) {
+      console.warn('[Push] Could not fetch VAPID key');
+      return;
+    }
 
-    const registration = await navigator.serviceWorker.ready;
+    let registration: ServiceWorkerRegistration;
+    try {
+      registration = await navigator.serviceWorker.ready;
+    } catch (e) {
+      console.error('[Push] serviceWorker.ready failed:', e);
+      return;
+    }
 
     const existing = await registration.pushManager.getSubscription();
     if (existing) {
       await existing.unsubscribe();
     }
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: this.urlB64ToUint8Array(vapidKey),
-    });
+
+    let subscription: PushSubscription;
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: this.urlB64ToUint8Array(vapidKey),
+      });
+    } catch (e) {
+      console.error('[Push] pushManager.subscribe() failed:', e);
+      return;
+    }
 
     const json = subscription.toJSON();
-    await firstValueFrom(
-      this.http.post(`${this.base}/push/subscribe`, {
-        endpoint: subscription.endpoint,
-        p256dh:   json.keys?.['p256dh'],
-        auth:     json.keys?.['auth'],
-      })
-    );
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.base}/push/subscribe`, {
+          endpoint: subscription.endpoint,
+          p256dh:   json.keys?.['p256dh'],
+          auth:     json.keys?.['auth'],
+        })
+      );
+      console.info('[Push] Subscription saved to server');
+    } catch (e) {
+      console.error('[Push] POST /push/subscribe failed:', e);
+    }
   }
 
   async unsubscribe(): Promise<void> {

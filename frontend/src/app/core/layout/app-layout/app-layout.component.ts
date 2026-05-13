@@ -78,7 +78,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
       this._startPolling();
       // Restore push subscription if permission was granted in a previous session
       if (this.notifService.isGranted()) {
-        this.pushService.subscribe().catch(() => { /* ignore */ });
+        this.pushService.subscribe().catch(e => console.error('[Push] subscribe error:', e));
       }
     }
 
@@ -160,7 +160,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
         });
       }
       // Register PWA push subscription
-      this.pushService.subscribe().catch(() => { /* ignore push errors */ });
+      this.pushService.subscribe().catch(e => console.error('[Push] subscribe error:', e));
     }
   }
 
