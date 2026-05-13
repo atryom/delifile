@@ -248,6 +248,9 @@ export class FoldersTreeComponent implements OnInit {
     const qp  = this.route.snapshot.queryParamMap;
     const tab: 'local' | 'shared' = qp.get('tab') === 'shared' ? 'shared' : 'local';
     const deepSharedId = qp.get('shared_folder_id');
+    const tagId = qp.get('tag_id');
+
+    if (tagId) this.activeTagId.set(tagId);
 
     this.activeTab.set(tab);
     this.breadcrumbs.set([{
@@ -298,7 +301,7 @@ export class FoldersTreeComponent implements OnInit {
     this.breadcrumbs.set(this.breadcrumbs().slice(0, index + 1));
     this.currentLocalFolderId.set(crumb.localFolderId);
     this.currentSharedFolderId.set(crumb.sharedFolderId);
-    this.resetFilters();
+    this.resetFiltersKeepTag();
     this.loadFiles();
   }
 
@@ -311,7 +314,7 @@ export class FoldersTreeComponent implements OnInit {
       sharedFolderId: null,
     }]);
     this.closeMenu();
-    this.resetFilters();
+    this.resetFiltersKeepTag();
     this.loadFiles();
   }
 
@@ -323,7 +326,7 @@ export class FoldersTreeComponent implements OnInit {
       sharedFolderId: folder.id,
     }]);
     this.closeMenu();
-    this.resetFilters();
+    this.resetFiltersKeepTag();
     this.loadSharedFolderFiles(folder.id);
   }
 
@@ -442,6 +445,18 @@ export class FoldersTreeComponent implements OnInit {
   private resetFilters(): void {
     this.activeFilter.set('all');
     this.activeTagId.set('');
+    this.activeTypeGroup.set('');
+    this.sortBy.set('date');
+    this.sortOrder.set('desc');
+    this.searchQuery = '';
+    this.page.set(1);
+    this.totalPages.set(1);
+    this.availableTypeGroups.set([]);
+    this.clearSelection();
+  }
+
+  private resetFiltersKeepTag(): void {
+    this.activeFilter.set('all');
     this.activeTypeGroup.set('');
     this.sortBy.set('date');
     this.sortOrder.set('desc');

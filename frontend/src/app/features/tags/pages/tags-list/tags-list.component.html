@@ -62,7 +62,7 @@
                   <span class="tag-count">{{ tag.files_count ?? 0 }}</span>
                   <div class="tag-actions">
                     <a
-                      [routerLink]="['/files']"
+                      [routerLink]="['/folders']"
                       [queryParams]="{ tag_id: tag.id }"
                       class="btn-sm btn-view"
                     >{{ 'tags.view_files' | translate }}</a>
