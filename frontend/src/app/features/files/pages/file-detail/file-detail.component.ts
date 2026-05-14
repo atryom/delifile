@@ -68,6 +68,7 @@ export class FileDetailComponent implements OnInit {
 
   readonly showComments           = signal(true);
   readonly showActivity           = signal(false);
+  readonly showVersions           = signal(false);
   readonly contextSharedFolderId  = signal<string | null>(null);
   readonly descriptionEditorOpen  = signal(false);
 

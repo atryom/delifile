@@ -11,24 +11,32 @@
       @if (!loading() && file()) {
         <div class="file-detail-layout">
 
-          <!-- Left: Metadata + Actions -->
+          <!-- Left: Metadata -->
           <div class="file-main">
 
-            <!-- Version selector (when has_versions) -->
-            @if (file()!.has_versions && file()!.versions.length > 0) {
+            <!-- Version selector bar (versions + add button) -->
+            @if ((file()!.has_versions && file()!.versions.length > 0) || canAddVersion()) {
               <div class="versions-selector-bar" role="group" [attr.aria-label]="'files.versions.selector_label' | translate">
-                @for (v of file()!.versions; track v.id) {
-                  <button
-                    class="version-chip"
-                    [class.active]="selectedVersionId() === v.id"
-                    [class.inactive]="!v.is_active"
-                    (click)="selectVersion(v.id)"
-                    [title]="v.original_name"
-                  >
-                    {{ versionDisplayLabel(v) }}
-                    @if (!v.is_active) {
-                      <span class="version-inactive-dot" title="{{ 'files.versions.inactive' | translate }}">●</span>
-                    }
+                @if (file()!.has_versions && file()!.versions.length > 0) {
+                  @for (v of file()!.versions; track v.id) {
+                    <button
+                      class="version-chip"
+                      [class.active]="selectedVersionId() === v.id"
+                      [class.inactive]="!v.is_active"
+                      (click)="selectVersion(v.id)"
+                      [title]="v.original_name"
+                    >
+                      {{ versionDisplayLabel(v) }}
+                      @if (!v.is_active) {
+                        <span class="version-inactive-dot" title="{{ 'files.versions.inactive' | translate }}">●</span>
+                      }
+                    </button>
+                  }
+                }
+                @if (canAddVersion()) {
+                  <button class="version-chip version-add-chip" (click)="showAddVersionDialog.set(true)">
+                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                    {{ 'files.versions.add_version_btn' | translate }}
                   </button>
                 }
               </div>
@@ -41,23 +49,76 @@
                   <img [src]="file()!.link_image_url" alt="" class="url-card-img" loading="lazy" />
                 }
                 <div class="url-card-body">
-                  <p class="url-site">{{ file()!.link_site_name ?? file()!.link_url }}</p>
-                  <h2 class="url-card-title">{{ file()!.original_name }}</h2>
-                  @if (file()!.link_description) {
-                    <p class="url-card-desc">{{ file()!.link_description }}</p>
-                  }
-                  <a [href]="file()!.link_url" target="_blank" rel="noopener noreferrer" class="url-open-btn">
-                    {{ 'files.detail.open_link' | translate }}
-                  </a>
+                  <div class="url-card-content">
+                    <p class="url-site">{{ file()!.link_site_name ?? file()!.link_url }}</p>
+                    <h2 class="url-card-title">{{ file()!.original_name }}</h2>
+                    @if (file()!.link_description) {
+                      <p class="url-card-desc">{{ file()!.link_description }}</p>
+                    }
+                    <div class="card-inline-btns">
+                      <a [href]="file()!.link_url" target="_blank" rel="noopener noreferrer" class="card-link-btn card-link-btn-primary">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                        {{ 'files.detail.open_link' | translate }}
+                      </a>
+                      <button class="card-link-btn" (click)="copyUrlLink()">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                        {{ 'files.detail.copy_link' | translate }}
+                      </button>
+                    </div>
+                  </div>
+                  <div class="file-card-actions">
+                    <button
+                      class="btn-card-icon btn-card-fav"
+                      [class.btn-card-fav-active]="file()!.is_favorite"
+                      (click)="toggleFavorite()"
+                      [disabled]="actionPending()"
+                      [attr.aria-label]="(file()!.is_favorite ? ('files.detail.favorited' | translate) : ('files.detail.favorite' | translate))"
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      <span class="btn-card-label">{{ file()!.is_favorite ? ('files.detail.favorited' | translate) : ('files.detail.favorite' | translate) }}</span>
+                    </button>
+                    <div class="card-actions-middle">
+                      @if (file()!.is_owner && isSharedFolderOnly()) {
+                        <button class="btn-card-icon" (click)="addToMyFiles()" [disabled]="addToMyFilesLoading()" [attr.aria-label]="'shared_folders.add_to_my_files_btn' | translate">
+                          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="m12 11 0 6"/><path d="m9 14 3 3 3-3"/></svg>
+                          <span class="btn-card-label">{{ 'shared_folders.add_to_my_files_btn' | translate }}</span>
+                        </button>
+                      }
+                      @if (file()!.is_owner && !isSharedFolderOnly()) {
+                        <button class="btn-card-icon" (click)="showAddToSharedFolderDialog.set(true)" [attr.aria-label]="'shared_folders.add_to_shared_folder_btn' | translate">
+                          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>
+                          <span class="btn-card-label">{{ 'shared_folders.add_to_shared_folder_btn' | translate }}</span>
+                        </button>
+                      }
+                    </div>
+                    <button
+                      class="btn-card-icon btn-card-delete"
+                      (click)="deleteFile()"
+                      [disabled]="actionPending()"
+                      [attr.aria-label]="file()!.is_owner ? ('files.detail.delete' | translate) : 'Убрать из моих файлов'"
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                      <span class="btn-card-label">
+                        @if (file()!.is_owner) {
+                          {{ 'files.detail.delete' | translate }}
+                        } @else {
+                          Убрать из моих файлов
+                        }
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
             } @else {
+              <!-- Regular file header card -->
               <div class="file-header-card">
-                @if (displayPreviewUrl()) {
-                  <img [src]="displayPreviewUrl()!" alt="" class="file-preview-thumb" loading="lazy" />
-                } @else {
-                  <div class="file-big-icon" aria-hidden="true">{{ mimeIcon(file()!.mime_type ?? '') }}</div>
-                }
+                <div class="file-card-left">
+                  @if (displayPreviewUrl()) {
+                    <img [src]="displayPreviewUrl()!" alt="" class="file-preview-thumb" loading="lazy" />
+                  } @else {
+                    <div class="file-big-icon" aria-hidden="true">{{ mimeIcon(file()!.mime_type ?? '') }}</div>
+                  }
+                </div>
                 <div class="file-header-info">
                   <h1 class="file-title">
                     {{ displayTitle() }}
@@ -80,146 +141,59 @@
                       <span class="owner-badge">{{ 'files.detail.owner' | translate }}</span>
                     </div>
                   }
-                </div>
-              </div>
-            }
-
-            <!-- Action buttons -->
-            <div class="actions-area">
-
-              @if (file()!.content_kind === 'url_file') {
-                <button class="btn-action btn-primary" (click)="copyUrlLink()">
-                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                  {{ 'files.detail.copy_link' | translate }}
-                </button>
-              } @else {
-                <button class="btn-action btn-primary" (click)="download()" [disabled]="actionPending()">
-                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                  {{ 'files.detail.download' | translate }}
-                </button>
-                @if (canViewInBrowser()) {
-                  <button class="btn-action" (click)="openInBrowser()">
-                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7"/><circle cx="12" cy="12" r="3"/></svg>
-                    {{ 'files.detail.view_in_browser' | translate }}
-                  </button>
-                }
-                @if (canAddVersion()) {
-                  <button class="btn-action" (click)="showAddVersionDialog.set(true)">
-                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                    {{ 'files.versions.add_version_btn' | translate }}
-                  </button>
-                }
-              }
-
-              <button class="btn-action" [class.btn-active]="file()!.is_favorite" (click)="toggleFavorite()" [disabled]="actionPending()">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                {{ file()!.is_favorite ? ('files.detail.favorited' | translate) : ('files.detail.favorite' | translate) }}
-              </button>
-
-              @if (file()!.is_owner && isSharedFolderOnly()) {
-                <button class="btn-action" (click)="addToMyFiles()" [disabled]="addToMyFilesLoading()">
-                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="m12 11 0 6"/><path d="m9 14 3 3 3-3"/></svg>
-                  {{ 'shared_folders.add_to_my_files_btn' | translate }}
-                </button>
-              }
-              @if (file()!.is_owner && !isSharedFolderOnly()) {
-                <button class="btn-action" (click)="showAddToSharedFolderDialog.set(true)">
-                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>
-                  {{ 'shared_folders.add_to_shared_folder_btn' | translate }}
-                </button>
-              }
-
-              <button class="btn-action btn-danger" (click)="deleteFile()" [disabled]="actionPending()">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                @if (file()!.is_owner) {
-                  {{ 'files.detail.delete' | translate }}
-                } @else {
-                  Убрать из моих файлов
-                }
-              </button>
-
-            </div>
-
-            <!-- Versions panel (owner only, when has_versions) -->
-            @if (file()!.has_versions && file()!.is_owner) {
-              <div class="section">
-                <h3 class="section-title">{{ 'files.versions.section_title' | translate }}</h3>
-
-                <!-- Display name editor -->
-                <div class="display-name-block">
-                  <label class="field-label" for="displayNameInput">{{ 'files.versions.display_name_label' | translate }}</label>
-                  <div class="inline-edit-row">
-                    <input
-                      id="displayNameInput"
-                      class="field-input"
-                      type="text"
-                      [(ngModel)]="displayNameDraft"
-                      [placeholder]="'files.versions.display_name_placeholder' | translate"
-                      maxlength="255"
-                    />
-                    <button class="btn-save" (click)="saveDisplayName()" [disabled]="savingDisplayName()">
-                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-                      {{ 'common.save' | translate }}
+                  <div class="card-inline-btns">
+                    <button class="card-link-btn card-link-btn-primary" (click)="download()" [disabled]="actionPending()">
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                      {{ 'files.detail.download' | translate }}
                     </button>
+                    @if (canViewInBrowser()) {
+                      <button class="card-link-btn" (click)="openInBrowser()">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7"/><circle cx="12" cy="12" r="3"/></svg>
+                        {{ 'files.detail.view_in_browser' | translate }}
+                      </button>
+                    }
                   </div>
                 </div>
-
-                <!-- Versions list -->
-                <div class="versions-list">
-                  @for (v of file()!.versions; track v.id) {
-                    <div class="version-item" [class.version-selected]="selectedVersionId() === v.id" [class.version-inactive]="!v.is_active">
-                      <div class="version-item-header">
-                        <button class="version-select-btn" (click)="selectVersion(v.id)" [attr.aria-pressed]="selectedVersionId() === v.id">
-                          <span class="version-num">{{ versionDisplayLabel(v) }}</span>
-                          @if (!v.is_active) {
-                            <span class="inactive-label">{{ 'files.versions.inactive' | translate }}</span>
-                          }
-                        </button>
-                        <span class="version-meta">{{ v.original_name }} · {{ formatSize(v.size) }} · {{ v.created_at | date:'d MMM y' }}</span>
-                        <div class="version-actions">
-                          <button class="btn-mini" (click)="startEditVersion(v)" [attr.aria-label]="'files.versions.edit_btn' | translate">
-                            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                          </button>
-                          <button class="btn-mini" (click)="toggleVersionActive(v)" [attr.aria-label]="(v.is_active ? 'files.versions.deactivate_btn' : 'files.versions.activate_btn') | translate">
-                            @if (v.is_active) {
-                              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
-                            } @else {
-                              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M20 6 9 17l-5-5"/></svg>
-                            }
-                          </button>
-                          @if (selectedVersionId() === v.id) {
-                            <button class="btn-mini btn-mini-primary" (click)="download()" [attr.aria-label]="'files.detail.download' | translate">
-                              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            </button>
-                          }
-                        </div>
-                      </div>
-
-                      @if (v.comment) {
-                        <p class="version-comment">{{ v.comment }}</p>
+                <div class="file-card-actions">
+                  <button
+                    class="btn-card-icon btn-card-fav"
+                    [class.btn-card-fav-active]="file()!.is_favorite"
+                    (click)="toggleFavorite()"
+                    [disabled]="actionPending()"
+                    [attr.aria-label]="(file()!.is_favorite ? ('files.detail.favorited' | translate) : ('files.detail.favorite' | translate))"
+                  >
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span class="btn-card-label">{{ file()!.is_favorite ? ('files.detail.favorited' | translate) : ('files.detail.favorite' | translate) }}</span>
+                  </button>
+                  <div class="card-actions-middle">
+                    @if (file()!.is_owner && isSharedFolderOnly()) {
+                      <button class="btn-card-icon" (click)="addToMyFiles()" [disabled]="addToMyFilesLoading()" [attr.aria-label]="'shared_folders.add_to_my_files_btn' | translate">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="m12 11 0 6"/><path d="m9 14 3 3 3-3"/></svg>
+                        <span class="btn-card-label">{{ 'shared_folders.add_to_my_files_btn' | translate }}</span>
+                      </button>
+                    }
+                    @if (file()!.is_owner && !isSharedFolderOnly()) {
+                      <button class="btn-card-icon" (click)="showAddToSharedFolderDialog.set(true)" [attr.aria-label]="'shared_folders.add_to_shared_folder_btn' | translate">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>
+                        <span class="btn-card-label">{{ 'shared_folders.add_to_shared_folder_btn' | translate }}</span>
+                      </button>
+                    }
+                  </div>
+                  <button
+                    class="btn-card-icon btn-card-delete"
+                    (click)="deleteFile()"
+                    [disabled]="actionPending()"
+                    [attr.aria-label]="file()!.is_owner ? ('files.detail.delete' | translate) : 'Убрать из моих файлов'"
+                  >
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                    <span class="btn-card-label">
+                      @if (file()!.is_owner) {
+                        {{ 'files.detail.delete' | translate }}
+                      } @else {
+                        Убрать из моих файлов
                       }
-
-                      @if (editingVersionId() === v.id) {
-                        <div class="version-edit-form">
-                          <div class="edit-row">
-                            <label class="field-label" [for]="'vLabel-' + v.id">{{ 'files.versions.label_field' | translate }}</label>
-                            <input [id]="'vLabel-' + v.id" class="field-input field-input-sm" type="text" [(ngModel)]="versionLabelDraft" maxlength="50" [placeholder]="'files.versions.label_placeholder' | translate" />
-                          </div>
-                          <div class="edit-row">
-                            <label class="field-label" [for]="'vComment-' + v.id">{{ 'files.versions.comment_field' | translate }}</label>
-                            <textarea [id]="'vComment-' + v.id" class="field-input" rows="2" [(ngModel)]="versionCommentDraft" maxlength="500" [placeholder]="'files.versions.comment_placeholder' | translate"></textarea>
-                          </div>
-                          <div class="edit-btns">
-                            <button class="btn-save" (click)="saveVersion(v)" [disabled]="savingVersion()">
-                              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-                              {{ 'common.save' | translate }}
-                            </button>
-                            <button class="btn-cancel-sm" (click)="cancelEditVersion()">{{ 'common.cancel' | translate }}</button>
-                          </div>
-                        </div>
-                      }
-                    </div>
-                  }
+                    </span>
+                  </button>
                 </div>
               </div>
             }
@@ -270,6 +244,91 @@
                 </div>
               }
             </div>
+
+            <!-- Versions panel — after comments, collapsed by default -->
+            @if (file()!.has_versions && file()!.is_owner) {
+              <div class="section">
+                <div class="section-header-row">
+                  <h3 class="section-title">{{ 'files.versions.section_title' | translate }}</h3>
+                  <button class="btn-section-action" (click)="showVersions.set(!showVersions())">
+                    {{ showVersions() ? ('common.hide' | translate) : ('common.show' | translate) }}
+                  </button>
+                </div>
+                @if (showVersions()) {
+                  <div class="display-name-block">
+                    <label class="field-label" for="displayNameInput">{{ 'files.versions.display_name_label' | translate }}</label>
+                    <div class="inline-edit-row">
+                      <input
+                        id="displayNameInput"
+                        class="field-input"
+                        type="text"
+                        [(ngModel)]="displayNameDraft"
+                        [placeholder]="'files.versions.display_name_placeholder' | translate"
+                        maxlength="255"
+                      />
+                      <button class="btn-save" (click)="saveDisplayName()" [disabled]="savingDisplayName()">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        {{ 'common.save' | translate }}
+                      </button>
+                    </div>
+                  </div>
+                  <div class="versions-list">
+                    @for (v of file()!.versions; track v.id) {
+                      <div class="version-item" [class.version-selected]="selectedVersionId() === v.id" [class.version-inactive]="!v.is_active">
+                        <div class="version-item-header">
+                          <button class="version-select-btn" (click)="selectVersion(v.id)" [attr.aria-pressed]="selectedVersionId() === v.id">
+                            <span class="version-num">{{ versionDisplayLabel(v) }}</span>
+                            @if (!v.is_active) {
+                              <span class="inactive-label">{{ 'files.versions.inactive' | translate }}</span>
+                            }
+                          </button>
+                          <span class="version-meta">{{ v.original_name }} · {{ formatSize(v.size) }} · {{ v.created_at | date:'d MMM y' }}</span>
+                          <div class="version-actions">
+                            <button class="btn-mini" (click)="startEditVersion(v)" [attr.aria-label]="'files.versions.edit_btn' | translate">
+                              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button class="btn-mini" (click)="toggleVersionActive(v)" [attr.aria-label]="(v.is_active ? 'files.versions.deactivate_btn' : 'files.versions.activate_btn') | translate">
+                              @if (v.is_active) {
+                                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
+                              } @else {
+                                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M20 6 9 17l-5-5"/></svg>
+                              }
+                            </button>
+                            @if (selectedVersionId() === v.id) {
+                              <button class="btn-mini btn-mini-primary" (click)="download()" [attr.aria-label]="'files.detail.download' | translate">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                              </button>
+                            }
+                          </div>
+                        </div>
+                        @if (v.comment) {
+                          <p class="version-comment">{{ v.comment }}</p>
+                        }
+                        @if (editingVersionId() === v.id) {
+                          <div class="version-edit-form">
+                            <div class="edit-row">
+                              <label class="field-label" [for]="'vLabel-' + v.id">{{ 'files.versions.label_field' | translate }}</label>
+                              <input [id]="'vLabel-' + v.id" class="field-input field-input-sm" type="text" [(ngModel)]="versionLabelDraft" maxlength="50" [placeholder]="'files.versions.label_placeholder' | translate" />
+                            </div>
+                            <div class="edit-row">
+                              <label class="field-label" [for]="'vComment-' + v.id">{{ 'files.versions.comment_field' | translate }}</label>
+                              <textarea [id]="'vComment-' + v.id" class="field-input" rows="2" [(ngModel)]="versionCommentDraft" maxlength="500" [placeholder]="'files.versions.comment_placeholder' | translate"></textarea>
+                            </div>
+                            <div class="edit-btns">
+                              <button class="btn-save" (click)="saveVersion(v)" [disabled]="savingVersion()">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                                {{ 'common.save' | translate }}
+                              </button>
+                              <button class="btn-cancel-sm" (click)="cancelEditVersion()">{{ 'common.cancel' | translate }}</button>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
 
             <!-- Action feedback -->
             @if (feedback()) {
