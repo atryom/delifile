@@ -7,6 +7,7 @@ use App\Enums\ActivityType;
 use App\Enums\FileStatus;
 use App\Models\File;
 use App\Models\FileUserAccess;
+use App\Models\FileVersion;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -333,6 +334,8 @@ class FileService
             'id'            => $file->id,
             'content_kind'  => $file->content_kind ?? 'binary_file',
             'original_name' => $file->original_name,
+            'display_name'  => $file->display_name,
+            'has_versions'  => (bool) $file->has_versions,
             'size'          => $file->size,
             'mime_type'     => $file->mime_type,
             'status'        => $file->status->value,
@@ -358,6 +361,7 @@ class FileService
                 'email' => $file->owner->email,
                 'name'  => $file->owner->name,
             ],
+            'versions'      => $file->has_versions ? $this->buildVersionsList($file) : [],
         ];
 
         if ($file->isUrlFile()) {
@@ -615,6 +619,8 @@ class FileService
             'id'            => $f->id,
             'content_kind'  => $f->content_kind ?? 'binary_file',
             'original_name' => $f->original_name,
+            'display_name'  => $f->display_name,
+            'has_versions'  => (bool) $f->has_versions,
             'size'          => $f->size,
             'mime_type'     => $f->mime_type,
             'status'        => $f->status->value,
@@ -646,9 +652,49 @@ class FileService
     }
 
     /**
+     * Build a list of available versions for a file.
+     */
+    public function buildVersionsList(File $file): array
+    {
+        return FileVersion::where('file_id', $file->id)
+            ->where('status', 'available')
+            ->orderBy('version_number')
+            ->get()
+            ->map(fn ($v) => $this->buildVersionItem($v))
+            ->values()
+            ->toArray();
+    }
+
+    public function buildVersionItem(FileVersion $version): array
+    {
+        $previewUrl = null;
+        try {
+            $mime = $version->mime_type ?? '';
+            if (str_starts_with($mime, 'image/') && $version->storage_key) {
+                $previewUrl = Storage::disk('s3')->temporaryUrl($version->storage_key, now()->addMinutes(60));
+            } elseif (str_starts_with($mime, 'video/') && $version->thumbnail_key) {
+                $previewUrl = Storage::disk('s3')->temporaryUrl($version->thumbnail_key, now()->addMinutes(60));
+            }
+        } catch (\Throwable) {}
+
+        return [
+            'id'             => $version->id,
+            'version_number' => $version->version_number,
+            'version_label'  => $version->version_label,
+            'comment'        => $version->comment,
+            'original_name'  => $version->original_name,
+            'size'           => $version->size,
+            'mime_type'      => $version->mime_type,
+            'is_active'      => $version->is_active,
+            'preview_url'    => $previewUrl,
+            'created_at'     => $version->created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
      * Generate a presigned S3 PUT URL for direct upload.
      */
-    private function generatePresignedPutUrl(string $key, string $mimeType): string
+    public function generatePresignedPutUrl(string $key, string $mimeType): string
     {
         // Uses AWS SDK via Storage facade
         $client = Storage::disk('s3')->getClient();

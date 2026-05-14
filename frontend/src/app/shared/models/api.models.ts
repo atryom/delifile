@@ -45,10 +45,25 @@ export type AccessType = 'owner' | 'shared' | 'saved';
 
 export type ContentKind = 'binary_file' | 'url_file';
 
+export interface FileVersion {
+  id: string;
+  version_number: number;
+  version_label: string | null;
+  comment: string | null;
+  original_name: string;
+  size: number;
+  mime_type: string;
+  is_active: boolean;
+  preview_url: string | null;
+  created_at: string | null;
+}
+
 export interface FileListItem {
   id: string;
   content_kind: ContentKind;
   original_name: string;
+  display_name: string | null;
+  has_versions: boolean;
   size: number;
   mime_type: string | null;
   status: FileStatus;
@@ -74,6 +89,7 @@ export interface FileCard extends FileListItem {
   tags: Tag[];
   owner: UserRef;
   view_url?: string | null;
+  versions: FileVersion[];
   // url_file extended fields
   link_description?: string | null;
 }
@@ -278,6 +294,8 @@ export interface SharedFolderLink {
 export interface SharedFolderFileItem {
   id: string;
   original_name: string;
+  display_name?: string | null;
+  has_versions?: boolean;
   content_kind: ContentKind;
   size: number;
   mime_type: string | null;

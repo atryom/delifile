@@ -922,7 +922,7 @@ export class FoldersTreeComponent implements OnInit {
 
   fileDisplayName(file: AnyFile): string {
     if (file.content_kind === 'url_file') return file.link_title || file.original_name;
-    return file.original_name;
+    return (file as { display_name?: string | null }).display_name || file.original_name;
   }
 
   private findNodeById(nodes: FolderTreeNode[], id: string): FolderTreeNode | null {

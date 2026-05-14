@@ -5,6 +5,7 @@ import {
   ApiResponse,
   FileListItem,
   FileCard,
+  FileVersion,
   FileAccess,
   ShareLink,
   ActivityLog,
@@ -13,6 +14,12 @@ import {
   CompleteUploadResponse,
   PaginatedData,
 } from '../../shared/models/api.models';
+
+export interface VersionInitResponse {
+  version: { id: string; status: string };
+  upload: { method: string; url: string; headers: Record<string, string> };
+  thumbnail?: { key: string; method: string; url: string; headers: Record<string, string> };
+}
 
 export type FileFilter = 'all' | 'mine' | 'received' | 'favorites';
 
@@ -140,5 +147,29 @@ export class FilesApiService {
 
   saveViaLink(token: string): Observable<ApiResponse<{ file_id: string }>> {
     return this.api.post(`/links/${token}/save`);
+  }
+
+  // ─── Versioning ──────────────────────────────────────────────────────────────
+
+  initVersionUpload(fileId: string, data: InitUploadRequest): Observable<ApiResponse<VersionInitResponse>> {
+    return this.api.post(`/files/${fileId}/versions/init-upload`, data);
+  }
+
+  completeVersionUpload(fileId: string, versionId: string, thumbnailKey?: string): Observable<ApiResponse<{ version: { id: string; version_number: number }; file: { id: string; has_versions: boolean } }>> {
+    const body: Record<string, unknown> = { version_id: versionId };
+    if (thumbnailKey) body['thumbnail_key'] = thumbnailKey;
+    return this.api.post(`/files/${fileId}/versions/complete-upload`, body);
+  }
+
+  updateVersion(fileId: string, versionId: string, patch: { version_label?: string | null; comment?: string | null; is_active?: boolean; version_number?: number }): Observable<ApiResponse<{ version: FileVersion }>> {
+    return this.api.patch(`/files/${fileId}/versions/${versionId}`, patch);
+  }
+
+  downloadVersion(fileId: string, versionId: string): Observable<ApiResponse<{ url: string; expires_in: number }>> {
+    return this.api.post(`/files/${fileId}/versions/${versionId}/download`);
+  }
+
+  updateDisplayName(fileId: string, displayName: string | null): Observable<ApiResponse<{ display_name: string | null }>> {
+    return this.api.patch(`/files/${fileId}/display-name`, { display_name: displayName });
   }
 }

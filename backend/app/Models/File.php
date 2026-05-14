@@ -25,6 +25,8 @@ class File extends Model
         'status',
         'folder_id',
         'shared_folder_only',
+        'has_versions',
+        'display_name',
         'expires_at',
         'content_kind',
         'link_url',
@@ -43,6 +45,7 @@ class File extends Model
             'link_fetched_at'    => 'datetime',
             'size'               => 'integer',
             'shared_folder_only' => 'boolean',
+            'has_versions'       => 'boolean',
         ];
     }
 
@@ -85,6 +88,11 @@ class File extends Model
     public function sharedFolderFiles(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(SharedFolderFile::class);
+    }
+
+    public function versions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(FileVersion::class)->orderBy('version_number');
     }
 
     // Helpers

@@ -392,7 +392,12 @@
                           }
                         </div>
                         <div class="file-info">
-                          <div class="file-name">{{ fileDisplayName(file) }}</div>
+                          <div class="file-name">
+                            {{ fileDisplayName(file) }}
+                            @if (file.has_versions) {
+                              <span class="version-badge-v" title="Имеет версии">V</span>
+                            }
+                          </div>
                           <div class="file-meta-mobile">{{ file.uploaded_at | date:'d MMM y' }} · {{ formatSize(file.size) }}</div>
                         </div>
                       </div>

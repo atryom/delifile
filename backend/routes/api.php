@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\SupportAdminController;
 use App\Http\Controllers\Admin\SuggestionAdminController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Files\FileController;
+use App\Http\Controllers\Files\FileVersionController;
 use App\Http\Controllers\Files\SharingController;
 use App\Http\Controllers\Files\SharedFolderFileController;
 use App\Http\Controllers\Contacts\ContactController;
@@ -110,6 +111,13 @@ Route::prefix('v1')->group(function () {
         Route::patch('files/{id}/description',     [FileController::class, 'updateDescription']);
         Route::get('files/{id}/activity',          [FileController::class, 'activity']);
         Route::get('files/{id}/accesses',          [FileController::class, 'accesses']);
+
+        // Files — versioning
+        Route::post('files/{id}/versions/init-upload',      [FileVersionController::class, 'initUpload']);
+        Route::post('files/{id}/versions/complete-upload',  [FileVersionController::class, 'completeUpload']);
+        Route::patch('files/{id}/versions/{vid}',           [FileVersionController::class, 'update']);
+        Route::post('files/{id}/versions/{vid}/download',   [FileVersionController::class, 'download']);
+        Route::patch('files/{id}/display-name',             [FileVersionController::class, 'updateDisplayName']);
 
         // Files — new tag/folder actions
         Route::post('files/{id}/attach-tags',  [OrganizationController::class, 'attachTags']);

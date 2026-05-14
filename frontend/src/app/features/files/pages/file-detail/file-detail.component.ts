@@ -6,16 +6,17 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
-import { FileCard, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode } from '../../../../shared/models/api.models';
+import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode } from '../../../../shared/models/api.models';
 import { ShareContactDialogComponent } from '../../dialogs/share-contact/share-contact-dialog.component';
 import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link-dialog.component';
 import { AddToSharedFolderDialogComponent } from '../../dialogs/add-to-shared-folder/add-to-shared-folder-dialog.component';
+import { AddVersionDialogComponent } from '../../dialogs/add-version/add-version-dialog.component';
 
 @Component({
   selector: 'app-file-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, AddToSharedFolderDialogComponent, TranslateModule],
+  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, AddToSharedFolderDialogComponent, AddVersionDialogComponent, TranslateModule],
   templateUrl: './file-detail.component.html',
   styleUrl: './file-detail.component.scss',
 })
@@ -44,6 +45,7 @@ export class FileDetailComponent implements OnInit {
   readonly showShareDialog             = signal(false);
   readonly showLinkDialog              = signal(false);
   readonly showAddToSharedFolderDialog = signal(false);
+  readonly showAddVersionDialog        = signal(false);
   readonly addToMyFilesLoading         = signal(false);
   readonly savingDescription           = signal(false);
   readonly savingFolder                = signal(false);
@@ -61,6 +63,45 @@ export class FileDetailComponent implements OnInit {
   readonly pendingFolderId = signal<string | null>(null);
 
   readonly currentFolderName = signal<string | null>(null);
+
+  // ─── Versioning state ────────────────────────────────────────────────────────
+
+  readonly selectedVersionId = signal<string | null>(null);
+
+  readonly selectedVersion = computed<FileVersion | null>(() => {
+    const versions = this.file()?.versions ?? [];
+    const id = this.selectedVersionId();
+    if (!id || versions.length === 0) return null;
+    return versions.find(v => v.id === id) ?? null;
+  });
+
+  readonly displayTitle = computed<string>(() => {
+    const f = this.file();
+    if (!f) return '';
+    const v = this.selectedVersion();
+    if (v) return v.original_name;
+    return f.display_name ?? f.original_name;
+  });
+
+  readonly displaySize = computed<number>(() => {
+    return this.selectedVersion()?.size ?? this.file()?.size ?? 0;
+  });
+
+  readonly displayPreviewUrl = computed<string | null>(() => {
+    const v = this.selectedVersion();
+    if (v?.preview_url) return v.preview_url;
+    return this.file()?.preview_url ?? null;
+  });
+
+  // Per-version edit state
+  readonly editingVersionId = signal<string | null>(null);
+  versionLabelDraft   = '';
+  versionCommentDraft = '';
+  readonly savingVersion = signal(false);
+
+  // Display name edit
+  displayNameDraft = '';
+  readonly savingDisplayName = signal(false);
 
   ngOnInit(): void {
     const fromParam = this.route.snapshot.queryParamMap.get('from');
@@ -85,7 +126,19 @@ export class FileDetailComponent implements OnInit {
         this.file.set(res.data.file);
         this.descriptionDraft = res.data.file.description ?? '';
         this.pendingFolderId.set(res.data.file.folder_id ?? null);
+        this.displayNameDraft = res.data.file.display_name ?? '';
         this.loading.set(false);
+        // Select last active version by default; fall back to first inactive if none active
+        const versions = res.data.file.versions ?? [];
+        if (versions.length > 0) {
+          const activeVersions = versions.filter(v => v.is_active);
+          const defaultVersion = activeVersions.length > 0
+            ? activeVersions[activeVersions.length - 1]
+            : versions[0];
+          this.selectedVersionId.set(defaultVersion.id);
+        } else {
+          this.selectedVersionId.set(null);
+        }
         this.loadSidePanels();
         this.updateFolderName(res.data.file.folder_id);
       },
@@ -123,6 +176,20 @@ export class FileDetailComponent implements OnInit {
   }
 
   download(): void {
+    const selectedId = this.selectedVersionId();
+    const versions   = this.file()?.versions ?? [];
+    const hasVersions = this.file()?.has_versions;
+
+    if (hasVersions && selectedId && versions.length > 0) {
+      const latest = versions[versions.length - 1];
+      if (selectedId !== latest.id) {
+        this.filesApi.downloadVersion(this.id(), selectedId).subscribe((res) => {
+          window.open(res.data.url, '_blank');
+        });
+        return;
+      }
+    }
+
     this.filesApi.download(this.id()).subscribe((res) => {
       window.open(res.data.url, '_blank');
     });
@@ -346,6 +413,73 @@ export class FileDetailComponent implements OnInit {
     this.loadSidePanels();
   }
 
+  onVersionUploaded(): void {
+    this.showAddVersionDialog.set(false);
+    this.loadFile();
+    this.showFeedback(this.translate.instant('files.versions.version_added'));
+  }
+
+  selectVersion(versionId: string): void {
+    this.selectedVersionId.set(versionId);
+  }
+
+  startEditVersion(version: FileVersion): void {
+    this.editingVersionId.set(version.id);
+    this.versionLabelDraft   = version.version_label ?? '';
+    this.versionCommentDraft = version.comment ?? '';
+  }
+
+  cancelEditVersion(): void {
+    this.editingVersionId.set(null);
+  }
+
+  saveVersion(version: FileVersion): void {
+    if (this.savingVersion()) return;
+    this.savingVersion.set(true);
+    const patch = {
+      version_label: this.versionLabelDraft.trim() || null,
+      comment: this.versionCommentDraft.trim() || null,
+    };
+    this.filesApi.updateVersion(this.id(), version.id, patch).subscribe({
+      next: (res) => {
+        this.file.update(f => f ? {
+          ...f,
+          versions: f.versions.map(v => v.id === version.id ? res.data.version : v),
+        } : f);
+        this.savingVersion.set(false);
+        this.editingVersionId.set(null);
+        this.showFeedback(this.translate.instant('files.versions.version_saved'));
+      },
+      error: () => this.savingVersion.set(false),
+    });
+  }
+
+  toggleVersionActive(version: FileVersion): void {
+    this.filesApi.updateVersion(this.id(), version.id, { is_active: !version.is_active }).subscribe({
+      next: (res) => {
+        this.file.update(f => f ? {
+          ...f,
+          versions: f.versions.map(v => v.id === version.id ? res.data.version : v),
+        } : f);
+      },
+      error: () => {},
+    });
+  }
+
+  saveDisplayName(): void {
+    if (this.savingDisplayName()) return;
+    this.savingDisplayName.set(true);
+    const name = this.displayNameDraft.trim() || null;
+    this.filesApi.updateDisplayName(this.id(), name).subscribe({
+      next: (res) => {
+        this.file.update(f => f ? { ...f, display_name: res.data.display_name } : f);
+        this.savingDisplayName.set(false);
+        this.showFeedback(this.translate.instant('files.versions.display_name_saved'));
+      },
+      error: () => this.savingDisplayName.set(false),
+    });
+  }
+
   showFeedback(msg: string): void {
     this.feedback.set(msg);
     setTimeout(() => this.feedback.set(null), 3000);
@@ -368,6 +502,15 @@ export class FileDetailComponent implements OnInit {
 
   isSharedFolderOnly(): boolean {
     return !!(this.file()?.is_owner && this.file()?.shared_folder_only);
+  }
+
+  canAddVersion(): boolean {
+    const f = this.file();
+    return !!(f?.is_owner && f?.content_kind !== 'url_file');
+  }
+
+  versionDisplayLabel(v: FileVersion): string {
+    return v.version_label ? `v${v.version_label}` : `v${v.version_number}`;
   }
 
   addToMyFiles(): void {

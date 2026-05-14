@@ -1284,3 +1284,19 @@ tbody tr.row-selected:hover { background: var(--accent-dim); }
   .sidebar-footer { display: none; }
   .filter-tabs { display: none; }
 }
+
+.version-badge-v {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--accent, #6366f1);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  margin-left: 4px;
+  vertical-align: middle;
+  line-height: 1;
+}
