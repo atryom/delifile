@@ -93,6 +93,14 @@ export class ThreadCommentsComponent implements OnInit {
           this.sharedEnabled.set(data.policy.shared_comments_enabled ?? true);
           this.overrideValue.set(data.policy.file_override ?? 'inherit');
         }
+
+        // Auto-load active tab thread
+        const tab = this.activeTab();
+        if (tab === 'shared' && data.threads.shared && !this.sharedThread()) {
+          this.loadThread('shared');
+        } else if (tab === 'private' && data.threads.private && !this.privateThread()) {
+          this.loadThread('private');
+        }
       },
       complete: () => this.loading.set(false),
     });
@@ -100,14 +108,11 @@ export class ThreadCommentsComponent implements OnInit {
 
   selectTab(tab: 'shared' | 'private'): void {
     this.activeTab.set(tab);
-    if (tab === 'shared' && !this.sharedThread() && this.sharedSummary()) {
-      this.loadThread('shared');
+    if (tab === 'shared' && !this.sharedThread()) {
+      if (this.sharedSummary()) this.loadThread('shared');
     }
     if (tab === 'private' && !this.privateThread()) {
-      const summary = this.privateSummary();
-      if (summary) {
-        this.loadThread('private');
-      }
+      if (this.privateSummary()) this.loadThread('private');
     }
   }
 
@@ -158,40 +163,38 @@ export class ThreadCommentsComponent implements OnInit {
     const body = this.composerBody().trim();
     if (!body || this.submitting()) return;
 
-    const thread = this.getActiveThread();
     const summary = this.getActiveSummary();
-
-    if (!summary) {
-      // Need to create thread first — POST a comment and we get the thread from response
-      // The backend creates thread via getOrCreate on first comment; we post directly
-      this.postNewComment(body, null);
-      return;
-    }
-
-    this.postNewComment(body, summary.id);
-  }
-
-  private postNewComment(body: string, threadId: string | null): void {
-    // When no thread yet, we need to create one first
-    if (!threadId) {
-      // Not supported without a thread ID; reload to get/create thread implicitly
-      // We use a workaround: reload threads which will lazily create the thread
-      // Actually, first we call getThreads to ensure threads are created, then post
-      // For simplicity: reload then retry
-      this.loadThreads();
-      return;
-    }
+    const scope: 'shared' | 'private' = this.activeTab();
 
     this.submitting.set(true);
-    this.commentsApi.createComment({
-      threadId,
-      body,
-      parentCommentId: this.replyingTo()?.id ?? null,
-      contextSharedFolderId: this.contextSharedFolderId(),
-    }).subscribe({
+
+    const payload = summary
+      ? {
+          threadId: summary.id,
+          body,
+          parentCommentId: this.replyingTo()?.id ?? null,
+          contextSharedFolderId: this.contextSharedFolderId(),
+        }
+      : {
+          targetType: this.targetType(),
+          targetId: this.targetId(),
+          scope,
+          body,
+          parentCommentId: this.replyingTo()?.id ?? null,
+          contextSharedFolderId: this.contextSharedFolderId(),
+        };
+
+    this.commentsApi.createComment(payload).subscribe({
       next: res => {
         const newComment = res.data.comment;
-        this.addCommentToThread(newComment);
+        // If this was first comment, reload threads to get the new summary
+        if (!summary) {
+          this.loadThreads();
+          // Then also load the thread to show the comment
+          setTimeout(() => this.loadThread(scope), 300);
+        } else {
+          this.addCommentToThread(newComment);
+        }
         this.composerBody.set('');
         this.replyingTo.set(null);
         this.submitting.set(false);

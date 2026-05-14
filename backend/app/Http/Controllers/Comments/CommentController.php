@@ -20,11 +20,18 @@ class CommentController extends Controller
 
     /**
      * POST /api/v1/comments
+     *
+     * Accepts either:
+     *   - threadId (existing thread)
+     *   - targetType + targetId + scope (auto-create thread on first comment)
      */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'threadId'              => 'required|string',
+            'threadId'              => 'nullable|string',
+            'targetType'            => 'nullable|in:file,shared_folder,local_folder',
+            'targetId'              => 'nullable|string',
+            'scope'                 => 'nullable|in:shared,private',
             'body'                  => 'required|string|max:5000',
             'parentCommentId'       => 'nullable|string',
             'mentions'              => 'nullable|array',
@@ -32,13 +39,35 @@ class CommentController extends Controller
             'contextSharedFolderId' => 'nullable|string',
         ]);
 
-        $thread = CommentThread::find($data['threadId']);
-        if (!$thread) {
-            return $this->notFound('Thread not found');
+        if (empty($data['threadId']) && (empty($data['targetType']) || empty($data['targetId']))) {
+            return $this->error('Необходимо указать threadId или targetType+targetId', 'VALIDATION_ERROR', [], 422);
         }
 
         $user = $request->user();
-        $type = $thread->target_type;
+
+        // Resolve or create thread
+        if (!empty($data['threadId'])) {
+            $thread = CommentThread::find($data['threadId']);
+            if (!$thread) {
+                return $this->notFound('Thread not found');
+            }
+        } else {
+            $type      = CommentTargetType::from($data['targetType']);
+            $targetId  = $data['targetId'];
+            $scope     = CommentScope::from($data['scope'] ?? 'shared');
+
+            if (!$this->commentService->canAccessTarget($user, $type, $targetId, $data['contextSharedFolderId'] ?? null)) {
+                return $this->forbidden();
+            }
+
+            if ($scope === CommentScope::Shared) {
+                $thread = $this->commentService->getOrCreateSharedThread($type, $targetId, $user);
+            } else {
+                $thread = $this->commentService->getOrCreatePrivateThread($type, $targetId, $user);
+            }
+        }
+
+        $type      = $thread->target_type;
         $ctxFolder = $data['contextSharedFolderId'] ?? $thread->context_shared_folder_id;
 
         // Access check

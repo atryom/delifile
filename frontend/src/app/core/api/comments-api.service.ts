@@ -40,7 +40,10 @@ export class CommentsApiService {
   }
 
   createComment(body: {
-    threadId: string;
+    threadId?: string | null;
+    targetType?: CommentTargetType;
+    targetId?: string;
+    scope?: CommentScope;
     body: string;
     parentCommentId?: string | null;
     mentions?: number[];

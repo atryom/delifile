@@ -207,6 +207,32 @@
       </div>
     }
 
+    <!-- ── SHARED FOLDER DISCUSSION ──────────────────────────────────────── -->
+    @if (activeTab() === 'shared' && currentSharedFolderId()) {
+      <div class="folder-notes-bar">
+        <button
+          class="btn-notes-toggle"
+          (click)="folderNotesOpen.set(!folderNotesOpen())"
+          [attr.aria-expanded]="folderNotesOpen()"
+        >
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          {{ 'comments.discussion_btn' | translate }}
+        </button>
+      </div>
+    }
+
+    @if (folderNotesOpen() && activeTab() === 'shared' && currentSharedFolderId()) {
+      <div class="folder-notes-panel">
+        <app-thread-comments
+          [targetType]="'shared_folder'"
+          [targetId]="currentSharedFolderId()!"
+          [isOwner]="isSharedFolderOwner()"
+        />
+      </div>
+    }
+
     <!-- ── CREATE FOLDER BAR ───────────────────────────────────────────── -->
     @if (creating()) {
       <div class="inline-create-bar" (click)="$event.stopPropagation()">
@@ -605,14 +631,14 @@
       @if (addModalTab() === 'file') {
         <div class="add-modal-body" role="tabpanel">
 
-          @if (uploadState().phase !== 'idle' && uploadState().phase !== 'done' && uploadState().phase !== 'error') {
+          @if (uploadState().phase === 'uploading' || uploadState().phase === 'init' || uploadState().phase === 'completing' || sfUploadPhase() === 'uploading') {
             <div class="modal-upload-progress">
               <div class="modal-upload-info">
                 <span>Загрузка файла…</span>
-                <span class="modal-upload-pct">{{ uploadState().progress }}%</span>
+                <span class="modal-upload-pct">{{ sfUploadPhase() === 'uploading' ? sfUploadProgress() : uploadState().progress }}%</span>
               </div>
               <div class="progress-track">
-                <div class="progress-fill" [style.width]="uploadState().progress + '%'"></div>
+                <div class="progress-fill" [style.width]="(sfUploadPhase() === 'uploading' ? sfUploadProgress() : uploadState().progress) + '%'"></div>
               </div>
             </div>
           } @else {
@@ -635,7 +661,10 @@
           @if (uploadState().phase === 'error') {
             <div class="modal-alert-error" role="alert">{{ uploadState().error }}</div>
           }
-          @if (uploadState().phase === 'done') {
+          @if (sfUploadPhase() === 'error') {
+            <div class="modal-alert-error" role="alert">{{ sfUploadError() }}</div>
+          }
+          @if (uploadState().phase === 'done' || sfUploadPhase() === 'done') {
             <div class="modal-alert-success" role="status">Файл загружен успешно</div>
           }
         </div>

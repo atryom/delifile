@@ -10,6 +10,8 @@ class CommentAuditLog extends Model
 {
     use HasUlids;
 
+    protected $table = 'comment_audit_log';
+
     public $timestamps = false;
 
     protected $fillable = [

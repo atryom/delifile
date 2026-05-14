@@ -113,7 +113,7 @@ export class FileDetailComponent implements OnInit {
     const folderIdParam = this.route.snapshot.queryParamMap.get('folder_id');
     if (fromParam === 'shared-folder' && folderIdParam) {
       this.backFolderId = folderIdParam;
-      this.backLink.set({ commands: ['/shared-folders'], queryParams: { folder_id: folderIdParam } });
+      this.backLink.set({ commands: ['/folders'], queryParams: { tab: 'shared', shared_folder_id: folderIdParam } });
       this.contextSharedFolderId.set(folderIdParam);
     }
 
