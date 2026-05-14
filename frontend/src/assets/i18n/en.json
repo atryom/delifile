@@ -9,7 +9,9 @@
     "page_of": "Page {{page}} of {{total}}",
     "email_format_error": "Please enter a valid email address.",
     "phone_format_error": "Enter phone in format +7 (999) 888-77-66",
-    "close": "Close"
+    "close": "Close",
+    "show": "Expand",
+    "hide": "Collapse"
   },
   "auth": {
     "login": {
@@ -227,6 +229,8 @@
       "link_copied": "Link copied to clipboard",
       "access_granted": "Access granted successfully",
       "link_created": "Public link created",
+      "add_description": "Add description",
+      "folders": "Folders",
       "add_tag": "Tag",
       "tag_search_placeholder": "Search tags…",
       "create_tag": "Create tag \"{{name}}\"",

@@ -84,8 +84,8 @@
               </div>
             }
 
-            <!-- Unified action bar -->
-            <div class="actions-bar">
+            <!-- Action buttons -->
+            <div class="actions-area">
 
               @if (file()!.content_kind === 'url_file') {
                 <button class="btn-action btn-primary" (click)="copyUrlLink()">
@@ -114,16 +114,6 @@
               <button class="btn-action" [class.btn-active]="file()!.is_favorite" (click)="toggleFavorite()" [disabled]="actionPending()">
                 <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                 {{ file()!.is_favorite ? ('files.detail.favorited' | translate) : ('files.detail.favorite' | translate) }}
-              </button>
-
-              <button class="btn-action" (click)="showShareDialog.set(true)">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
-                {{ 'files.detail.share' | translate }}
-              </button>
-
-              <button class="btn-action" (click)="showLinkDialog.set(true)">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                {{ 'files.detail.create_link' | translate }}
               </button>
 
               @if (file()!.is_owner && isSharedFolderOnly()) {
@@ -236,26 +226,62 @@
 
             <!-- Description -->
             <div class="section">
-              <h3 class="section-title">{{ 'files.detail.description' | translate }}</h3>
-              <div class="description-block">
-                <textarea
-                  class="description-textarea"
-                  [ngModel]="descriptionDraft"
-                  (ngModelChange)="descriptionDraft = $event"
-                  [attr.aria-label]="'files.detail.description' | translate"
-                  maxlength="500"
-                  rows="3"
-                  [placeholder]="'files.detail.description_placeholder' | translate"
-                ></textarea>
-                <button class="btn-save" (click)="saveDescription()" [disabled]="savingDescription()">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-                  {{ 'common.save' | translate }}
+              <div class="section-header-row">
+                <h3 class="section-title">{{ 'files.detail.description' | translate }}</h3>
+                <button class="btn-section-action" (click)="descriptionEditorOpen.set(!descriptionEditorOpen())">
+                  {{ descriptionEditorOpen() ? ('common.hide' | translate) : ('common.show' | translate) }}
                 </button>
               </div>
+              @if (descriptionEditorOpen()) {
+                <div class="description-block">
+                  <textarea
+                    class="description-textarea"
+                    [ngModel]="descriptionDraft"
+                    (ngModelChange)="descriptionDraft = $event"
+                    [attr.aria-label]="'files.detail.description' | translate"
+                    maxlength="500"
+                    rows="3"
+                    [placeholder]="'files.detail.description_placeholder' | translate"
+                  ></textarea>
+                  <button class="btn-save" (click)="saveDescription()" [disabled]="savingDescription()">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                    {{ 'common.save' | translate }}
+                  </button>
+                </div>
+              }
             </div>
 
-            <!-- Tags -->
+            <!-- Comments -->
             <div class="section">
+              <div class="section-header-row">
+                <h3 class="section-title">{{ 'comments.section_title' | translate }}</h3>
+                <button class="btn-section-action" (click)="showComments.set(!showComments())">
+                  {{ showComments() ? ('common.hide' | translate) : ('common.show' | translate) }}
+                </button>
+              </div>
+              @if (showComments()) {
+                <div class="comments-section-body">
+                  <app-thread-comments
+                    [targetType]="'file'"
+                    [targetId]="id()"
+                    [isOwner]="file()!.is_owner"
+                    [contextSharedFolderId]="contextSharedFolderId()"
+                  />
+                </div>
+              }
+            </div>
+
+            <!-- Action feedback -->
+            @if (feedback()) {
+              <div class="feedback" role="status">{{ feedback() }}</div>
+            }
+          </div>
+
+          <!-- Right: Sidebar panels -->
+          <aside class="file-sidebar">
+
+            <!-- Tags -->
+            <div class="sidebar-section">
               <h3 class="section-title">{{ 'files.detail.tags' | translate }}</h3>
               <div class="tags-row">
                 @for (t of file()!.tags; track t.id) {
@@ -301,9 +327,9 @@
               </div>
             </div>
 
-            <!-- Folder -->
-            <div class="section">
-              <h3 class="section-title">{{ 'files.detail.folder' | translate }}</h3>
+            <!-- Folders -->
+            <div class="sidebar-section">
+              <h3 class="section-title">{{ 'files.detail.folders' | translate }}</h3>
               <div class="folder-block">
                 <select class="folder-select" (change)="onFolderSelect($event)">
                   <option value="">{{ 'files.detail.no_folder' | translate }}</option>
@@ -320,43 +346,15 @@
               </div>
             </div>
 
-            <!-- Comments -->
-            <div class="section">
-              <button class="section-toggle" (click)="showComments.set(!showComments())">
-                <h3 class="section-title" style="margin:0">{{ 'comments.section_title' | translate }}</h3>
-                <svg
-                  width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"
-                  [style.transform]="showComments() ? 'rotate(180deg)' : 'rotate(0deg)'"
-                  aria-hidden="true"
-                >
-                  <path d="m6 9 6 6 6-6"/>
-                </svg>
-              </button>
-              @if (showComments()) {
-                <div class="comments-section-body">
-                  <app-thread-comments
-                    [targetType]="'file'"
-                    [targetId]="id()"
-                    [isOwner]="file()!.is_owner"
-                    [contextSharedFolderId]="contextSharedFolderId()"
-                  />
-                </div>
-              }
-            </div>
-
-            <!-- Action feedback -->
-            @if (feedback()) {
-              <div class="feedback" role="status">{{ feedback() }}</div>
-            }
-          </div>
-
-          <!-- Right: Sidebar panels -->
-          <aside class="file-sidebar">
-
             <!-- Active share links -->
             <div class="sidebar-section">
-              <h3 class="section-title">{{ 'files.detail.active_links' | translate }}</h3>
+              <div class="section-header-row">
+                <h3 class="section-title">{{ 'files.detail.active_links' | translate }}</h3>
+                <button class="btn-section-action" (click)="showLinkDialog.set(true)">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  {{ 'files.detail.create_link' | translate }}
+                </button>
+              </div>
               @if (!links().length) {
                 <div class="empty-panel">{{ 'files.detail.no_links' | translate }}</div>
               }
@@ -388,7 +386,13 @@
 
             <!-- Who has access -->
             <div class="sidebar-section">
-              <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>
+              <div class="section-header-row">
+                <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>
+                <button class="btn-section-action" (click)="showShareDialog.set(true)">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+                  {{ 'files.detail.share' | translate }}
+                </button>
+              </div>
               @if (!accesses().length) {
                 <div class="empty-panel">{{ 'files.detail.only_you' | translate }}</div>
               }
@@ -402,15 +406,22 @@
 
             <!-- Activity -->
             <div class="sidebar-section">
-              <h3 class="section-title">{{ 'files.detail.activity_section' | translate }}</h3>
-              @if (!activity().length) {
-                <div class="empty-panel">{{ 'files.detail.no_activity' | translate }}</div>
-              }
-              @for (log of activity(); track log.id) {
-                <div class="activity-item">
-                  <span class="activity-label">{{ log.label }}</span>
-                  <span class="activity-meta">{{ log.created_at | date:'d MMM, HH:mm' }}</span>
-                </div>
+              <div class="section-header-row">
+                <h3 class="section-title">{{ 'files.detail.activity_section' | translate }}</h3>
+                <button class="btn-section-action" (click)="showActivity.set(!showActivity())">
+                  {{ showActivity() ? ('common.hide' | translate) : ('common.show' | translate) }}
+                </button>
+              </div>
+              @if (showActivity()) {
+                @if (!activity().length) {
+                  <div class="empty-panel">{{ 'files.detail.no_activity' | translate }}</div>
+                }
+                @for (log of activity(); track log.id) {
+                  <div class="activity-item">
+                    <span class="activity-label">{{ log.label }}</span>
+                    <span class="activity-meta">{{ log.created_at | date:'d MMM, HH:mm' }}</span>
+                  </div>
+                }
               }
             </div>
 

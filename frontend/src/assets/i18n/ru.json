@@ -11,7 +11,9 @@
     "page_of": "Страница {{page}} из {{total}}",
     "email_format_error": "Введите корректный email-адрес.",
     "phone_format_error": "Введите номер в формате +7 (999) 888-77-66",
-    "close": "Закрыть"
+    "close": "Закрыть",
+    "show": "Раскрыть",
+    "hide": "Скрыть"
   },
   "auth": {
     "login": {
@@ -240,7 +242,9 @@
       "confirm_delete": "Удалить \"{{name}}\"? Это действие необратимо.",
       "link_copied": "Ссылка скопирована",
       "access_granted": "Доступ успешно предоставлен",
-      "link_created": "Публичная ссылка создана"
+      "link_created": "Публичная ссылка создана",
+      "add_description": "Добавить описание",
+      "folders": "Папки"
     },
     "versions": {
       "add_version_btn": "Добавить версию",

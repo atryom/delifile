@@ -66,8 +66,10 @@ export class FileDetailComponent implements OnInit {
 
   // ─── Comments state ───────────────────────────────────────────────────────────
 
-  readonly showComments           = signal(false);
+  readonly showComments           = signal(true);
+  readonly showActivity           = signal(false);
   readonly contextSharedFolderId  = signal<string | null>(null);
+  readonly descriptionEditorOpen  = signal(false);
 
   // ─── Versioning state ────────────────────────────────────────────────────────
 
@@ -131,6 +133,7 @@ export class FileDetailComponent implements OnInit {
       next: (res) => {
         this.file.set(res.data.file);
         this.descriptionDraft = res.data.file.description ?? '';
+        this.descriptionEditorOpen.set(!!(res.data.file.description));
         this.pendingFolderId.set(res.data.file.folder_id ?? null);
         this.displayNameDraft = res.data.file.display_name ?? '';
         this.loading.set(false);
@@ -225,6 +228,7 @@ export class FileDetailComponent implements OnInit {
     this.filesApi.updateDescription(this.id(), desc).subscribe({
       next: (res) => {
         this.file.update(f => f ? { ...f, description: res.data.description } : f);
+        if (!res.data.description) this.descriptionEditorOpen.set(false);
         this.savingDescription.set(false);
         this.showFeedback(this.translate.instant('files.detail.description_saved'));
       },

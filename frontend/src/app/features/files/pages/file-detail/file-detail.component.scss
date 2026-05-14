@@ -82,13 +82,15 @@
   font-weight: 600;
 }
 
-// ─── Unified action bar ───────────────────────────────────────────────────────
-.actions-bar {
+// ─── Action rows ─────────────────────────────────────────────────────────────
+.actions-area {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 20px;
+  align-items: center;
 }
+
 
 // ─── Action buttons (all uniform size) ───────────────────────────────────────
 .btn-action {
@@ -126,7 +128,6 @@
     background: rgba(239,68,68,.07);
     border-color: #fca5a5;
     color: #dc2626;
-    margin-left: auto;
     &:hover:not(:disabled) { background: rgba(239,68,68,.15); }
   }
 }
@@ -181,6 +182,36 @@
   letter-spacing: 0.08em;
   color: var(--text-muted);
   margin: 0 0 10px;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+
+  .section-title { margin: 0; }
+}
+
+.btn-section-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface2);
+  color: var(--accent-text);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: v.$transition-fast;
+  svg { flex-shrink: 0; }
+  &:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 }
 
 // ─── Description ──────────────────────────────────────────────────────────────
@@ -548,20 +579,10 @@
 }
 
 // ─── Comments section ─────────────────────────────────────────────────────────
-.section-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  margin-bottom: 10px;
-  svg { transition: transform 0.2s ease; flex-shrink: 0; }
-}
 .comments-section-body {
   margin-top: 4px;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 @media (max-width: #{v.$bp-mobile}) {
@@ -571,9 +592,8 @@
   .file-big-icon { font-size: 2.4rem; }
   .file-title { font-size: 1.1rem; }
   .file-meta-row { gap: 8px; font-size: 0.8rem; }
-  .actions-bar { gap: 6px; }
+  .actions-area { gap: 6px; }
   .btn-action { padding: 8px 12px; font-size: 0.83rem; }
-  .btn-action.btn-danger { margin-left: 0; }
   .sidebar-section { padding: 14px; }
   .folder-select { max-width: 100%; width: 100%; }
   .tag-search { width: 100%; }
