@@ -385,17 +385,28 @@ class CommentService
         if (!$file) return false;
         if ($file->owner_id === $user->id) return true;
 
-        // In shared folder context: check shared folder role
+        // In explicit shared folder context: check shared folder role
         if ($contextSharedFolderId) {
-            $access = SharedFolderAccess::where('shared_folder_id', $contextSharedFolderId)
+            return SharedFolderAccess::where('shared_folder_id', $contextSharedFolderId)
                 ->where('user_id', $user->id)
-                ->first();
-            return $access !== null; // view and edit both can comment (if policy allows)
+                ->exists();
         }
 
         // Direct file access
         $access = $file->accesses()->where('user_id', $user->id)->first();
-        return $access && ($access->can_comment ?? true);
+        if ($access) {
+            return $access->can_comment ?? true;
+        }
+
+        // Fallback: access via any shared folder containing this file
+        $sharedFolderIds = SharedFolderFile::where('file_id', $fileId)->pluck('shared_folder_id');
+        if ($sharedFolderIds->isNotEmpty()) {
+            return SharedFolderAccess::whereIn('shared_folder_id', $sharedFolderIds)
+                ->where('user_id', $user->id)
+                ->exists();
+        }
+
+        return false;
     }
 
     private function sfUserCanWriteShared(User $user, string $folderId): bool

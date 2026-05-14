@@ -638,7 +638,14 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── File actions ──────────────────────────────────────────────────────────
   openFileDetail(file: AnyFile): void {
-    this.router.navigate(['/files', file.id]);
+    const sfId = this.currentSharedFolderId();
+    if (this.activeTab() === 'shared' && sfId) {
+      this.router.navigate(['/files', file.id], {
+        queryParams: { from: 'shared-folder', folder_id: sfId },
+      });
+    } else {
+      this.router.navigate(['/files', file.id]);
+    }
     this.closeMenu();
   }
 

@@ -90,8 +90,12 @@ export class ThreadCommentsComponent implements OnInit {
 
         // Init owner settings
         if (this.isOwner()) {
-          this.sharedEnabled.set(data.policy.shared_comments_enabled ?? true);
-          this.overrideValue.set(data.policy.file_override ?? 'inherit');
+          if (this.targetType() === 'shared_folder') {
+            this.overrideValue.set(data.policy.shared_comments_mode ?? 'enabled');
+          } else {
+            this.sharedEnabled.set(data.policy.shared_comments_enabled ?? true);
+            this.overrideValue.set(data.policy.file_override ?? 'inherit');
+          }
         }
 
         // Auto-load active tab thread
@@ -228,20 +232,23 @@ export class ThreadCommentsComponent implements OnInit {
 
   // ─── Owner settings ────────────────────────────────────────────────────────
 
-  saveFileSettings(): void {
+  saveSettings(): void {
     if (this.savingSettings()) return;
     this.savingSettings.set(true);
-    this.commentsApi.updateFileCommentSettings(this.targetId(), {
-      sharedCommentsEnabled: this.sharedEnabled(),
-      sharedCommentsOverride: this.overrideValue(),
-    }).subscribe({
-      next: () => {
-        this.savingSettings.set(false);
-        this.settingsOpen.set(false);
-        this.loadThreads();
-      },
-      error: () => this.savingSettings.set(false),
-    });
+
+    const done = () => { this.savingSettings.set(false); this.settingsOpen.set(false); this.loadThreads(); };
+    const fail = () => this.savingSettings.set(false);
+
+    if (this.targetType() === 'shared_folder') {
+      this.commentsApi.updateSharedFolderCommentSettings(this.targetId(), {
+        sharedCommentsMode: this.overrideValue(),
+      }).subscribe({ next: done, error: fail });
+    } else {
+      this.commentsApi.updateFileCommentSettings(this.targetId(), {
+        sharedCommentsEnabled: this.sharedEnabled(),
+        sharedCommentsOverride: this.overrideValue(),
+      }).subscribe({ next: done, error: fail });
+    }
   }
 
   // ─── Thread mutation helpers ────────────────────────────────────────────────

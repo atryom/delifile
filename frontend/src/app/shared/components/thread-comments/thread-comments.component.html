@@ -30,7 +30,7 @@
   }
 
   <!-- Owner settings toggle (file only) -->
-  @if (isOwner() && targetType() === 'file') {
+  @if (isOwner() && (targetType() === 'file' || targetType() === 'shared_folder')) {
     <div class="tc-settings-bar">
       <button class="tc-settings-btn" (click)="settingsOpen.set(!settingsOpen())">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -41,7 +41,17 @@
 
       @if (settingsOpen()) {
         <div class="tc-settings-panel">
-          @if (contextSharedFolderId()) {
+          @if (targetType() === 'shared_folder') {
+            <!-- Shared folder: configure comment mode -->
+            <div class="tc-settings-row">
+              <label class="tc-settings-label" for="sf-mode-select">{{ 'comments.sf_mode_label' | translate }}</label>
+              <select id="sf-mode-select" class="tc-select" [value]="overrideValue()" (change)="overrideValue.set($any($event.target).value)">
+                <option value="enabled">{{ 'comments.sf_mode_enabled' | translate }}</option>
+                <option value="disabled">{{ 'comments.sf_mode_disabled' | translate }}</option>
+              </select>
+            </div>
+          } @else if (contextSharedFolderId()) {
+            <!-- File inside shared folder: per-file override -->
             <div class="tc-settings-row">
               <label class="tc-settings-label" for="override-select">{{ 'comments.override_label' | translate }}</label>
               <select id="override-select" class="tc-select" [value]="overrideValue()" (change)="overrideValue.set($any($event.target).value)">
@@ -51,6 +61,7 @@
               </select>
             </div>
           } @else {
+            <!-- Standalone file: enable/disable shared comments -->
             <div class="tc-settings-row">
               <label class="tc-settings-label" for="shared-toggle">{{ 'comments.allow_shared' | translate }}</label>
               <input
@@ -62,7 +73,7 @@
             </div>
           }
           <div class="tc-settings-actions">
-            <button class="btn-mini" (click)="saveFileSettings()" [disabled]="savingSettings()">
+            <button class="btn-mini" (click)="saveSettings()" [disabled]="savingSettings()">
               {{ savingSettings() ? ('comments.saving' | translate) : ('comments.save' | translate) }}
             </button>
             <button class="btn-mini btn-mini-neutral" (click)="settingsOpen.set(false)">
