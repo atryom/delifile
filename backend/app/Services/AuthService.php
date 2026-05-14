@@ -50,21 +50,46 @@ class AuthService
             return ['blocked' => true, 'user' => $this->formatUser($user)];
         }
 
-        $deviceLimit = $user->getPlan()->deviceLimit();
-        if ($deviceLimit !== null && DeviceSession::where('user_id', $user->id)->count() >= $deviceLimit) {
-            return ['device_limit' => true, 'user' => $this->formatUser($user)];
+        $deviceId   = $credentials['device_id'] ?? null;
+        $deviceType = $credentials['device_type'] ?? null;
+        $deviceName = $deviceType ?? 'Web Browser';
+
+        $existingSession = $deviceId
+            ? DeviceSession::where('user_id', $user->id)->where('device_id', $deviceId)->first()
+            : null;
+
+        if ($existingSession) {
+            $user->tokens()->where('id', $existingSession->token_id)->delete();
+
+            $token = $user->createToken('web-spa');
+
+            $existingSession->update([
+                'token_id'       => $token->accessToken->id,
+                'device_name'    => $deviceName,
+                'device_type'    => $deviceType,
+                'user_agent'     => $userAgent,
+                'ip_address'     => $ip,
+                'last_active_at' => now(),
+            ]);
+        } else {
+            $deviceLimit = $user->getPlan()->deviceLimit();
+            if ($deviceLimit !== null && DeviceSession::where('user_id', $user->id)->count() >= $deviceLimit) {
+                return ['device_limit' => true, 'user' => $this->formatUser($user)];
+            }
+
+            $token = $user->createToken('web-spa');
+
+            DeviceSession::create([
+                'user_id'        => $user->id,
+                'token_id'       => $token->accessToken->id,
+                'device_id'      => $deviceId,
+                'device_type'    => $deviceType,
+                'device_name'    => $deviceName,
+                'user_agent'     => $userAgent,
+                'ip_address'     => $ip,
+                'last_active_at' => now(),
+            ]);
         }
-
-        $token = $user->createToken('web-spa');
-
-        DeviceSession::create([
-            'user_id'        => $user->id,
-            'token_id'       => $token->accessToken->id,
-            'device_name'    => 'Web Browser',
-            'user_agent'     => $userAgent,
-            'ip_address'     => $ip,
-            'last_active_at' => now(),
-        ]);
 
         return [
             'token' => $token->plainTextToken,
@@ -91,6 +116,7 @@ class AuthService
             ->map(fn ($s) => [
                 'id'             => $s->id,
                 'device_name'    => $s->device_name,
+                'device_type'    => $s->device_type,
                 'ip_address'     => $s->ip_address,
                 'last_active_at' => $s->last_active_at?->toIso8601String(),
             ])

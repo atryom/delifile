@@ -341,6 +341,7 @@ export interface LinkPreview {
 export interface DeviceSession {
   id: string;
   device_name: string;
+  device_type: string | null;
   ip_address: string | null;
   last_active_at: string | null;
 }

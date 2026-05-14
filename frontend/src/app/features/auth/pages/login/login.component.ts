@@ -4,6 +4,7 @@ import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
+import { DeviceService } from '../../../../core/services/device.service';
 import { ApiError } from '../../../../shared/models/api.models';
 
 @Component({
@@ -18,6 +19,7 @@ export class LoginComponent {
   private readonly fb        = inject(FormBuilder);
   private readonly authApi   = inject(AuthApiService);
   private readonly authState = inject(AuthStateService);
+  private readonly device    = inject(DeviceService);
   private readonly router    = inject(Router);
   private readonly route     = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
@@ -57,7 +59,12 @@ export class LoginComponent {
 
     const { email, password, remember } = this.form.getRawValue();
 
-    this.authApi.login({ email: email!, password: password! }).subscribe({
+    this.authApi.login({
+      email:       email!,
+      password:    password!,
+      device_id:   this.device.getDeviceId(),
+      device_type: this.device.getDeviceType(),
+    }).subscribe({
       next: (res) => {
         this.authState.setUser(res.data.user, res.data.token, remember ?? true);
         if (res.data.user.account_status === 'blocked_unverified_email') {

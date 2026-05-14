@@ -14,6 +14,8 @@ class DeviceSession extends Model
     protected $fillable = [
         'user_id',
         'token_id',
+        'device_id',
+        'device_type',
         'device_name',
         'user_agent',
         'ip_address',

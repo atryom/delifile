@@ -6,6 +6,8 @@ import { ApiResponse, CurrentUser, DeviceSession } from '../../shared/models/api
 export interface LoginRequest {
   email: string;
   password: string;
+  device_id?: string;
+  device_type?: string;
 }
 
 export interface RegisterRequest {
