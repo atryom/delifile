@@ -8,6 +8,8 @@ use App\Enums\FileStatus;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\FileVersion;
+use App\Models\SharedFolderAccess;
+use App\Models\SharedFolderFile;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -126,7 +128,19 @@ class FileService
             return true;
         }
 
-        return FileUserAccess::where('file_id', $file->id)
+        if (FileUserAccess::where('file_id', $file->id)->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+
+        // Access via shared folder membership
+        $sharedFolderIds = SharedFolderFile::where('file_id', $file->id)
+            ->pluck('shared_folder_id');
+
+        if ($sharedFolderIds->isEmpty()) {
+            return false;
+        }
+
+        return SharedFolderAccess::whereIn('shared_folder_id', $sharedFolderIds)
             ->where('user_id', $user->id)
             ->exists();
     }

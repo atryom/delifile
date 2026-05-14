@@ -17,6 +17,7 @@ use App\Models\Folder;
 use App\Models\SharedFolder;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderCommentSettings;
+use App\Models\SharedFolderFile;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -352,7 +353,14 @@ class CommentService
         $file = File::find($fileId);
         if (!$file) return false;
         if ($file->owner_id === $user->id) return true;
-        return $file->accesses()->where('user_id', $user->id)->exists();
+        if ($file->accesses()->where('user_id', $user->id)->exists()) return true;
+
+        $sharedFolderIds = SharedFolderFile::where('file_id', $fileId)->pluck('shared_folder_id');
+        if ($sharedFolderIds->isEmpty()) return false;
+
+        return SharedFolderAccess::whereIn('shared_folder_id', $sharedFolderIds)
+            ->where('user_id', $user->id)
+            ->exists();
     }
 
     private function canAccessSharedFolder(User $user, string $folderId): bool
