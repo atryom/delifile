@@ -695,17 +695,19 @@
 
 @media (max-width: #{v.$bp-mobile}) {
   .page { padding: 14px 16px; overflow-x: hidden; }
-  .file-header-card { flex-direction: column; gap: 12px; }
-  .file-preview-thumb { width: 64px; height: 64px; }
-  .file-big-icon { font-size: 2.4rem; }
-  .file-title { font-size: 1.1rem; }
+  .file-header-card { padding: 14px 12px; gap: 10px; }
+  .url-card-body { padding: 14px 12px; gap: 8px; }
+  .file-preview-thumb { width: 56px; height: 56px; }
+  .file-big-icon { font-size: 2.2rem; }
+  .file-title { font-size: 1.05rem; }
   .file-meta-row { gap: 8px; font-size: 0.8rem; }
-  .actions-area { gap: 6px; }
-  .btn-action { padding: 8px 12px; font-size: 0.83rem; }
+  .card-inline-btns { gap: 6px; }
+  .card-link-btn { padding: 6px 10px; font-size: 0.8rem; }
   .sidebar-section { padding: 14px; }
   .folder-select { max-width: 100%; width: 100%; }
   .tag-search { width: 100%; }
   .link-meta { word-break: break-word; white-space: normal; }
   .folder-block { flex-direction: column; align-items: stretch; }
   .folder-block .btn-save { align-self: flex-start; }
+  .file-card-actions { padding-left: 8px; min-height: 60px; }
 }
