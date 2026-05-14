@@ -36,4 +36,9 @@ class SharedFolder extends Model
     {
         return $this->hasMany(SharedFolderFile::class);
     }
+
+    public function commentSettings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(SharedFolderCommentSettings::class);
+    }
 }

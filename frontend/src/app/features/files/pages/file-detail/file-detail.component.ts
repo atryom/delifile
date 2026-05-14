@@ -11,12 +11,12 @@ import { ShareContactDialogComponent } from '../../dialogs/share-contact/share-c
 import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link-dialog.component';
 import { AddToSharedFolderDialogComponent } from '../../dialogs/add-to-shared-folder/add-to-shared-folder-dialog.component';
 import { AddVersionDialogComponent } from '../../dialogs/add-version/add-version-dialog.component';
+import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 
 @Component({
   selector: 'app-file-detail',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, AddToSharedFolderDialogComponent, AddVersionDialogComponent, TranslateModule],
+  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, AddToSharedFolderDialogComponent, AddVersionDialogComponent, TranslateModule, ThreadCommentsComponent],
   templateUrl: './file-detail.component.html',
   styleUrl: './file-detail.component.scss',
 })
@@ -64,6 +64,11 @@ export class FileDetailComponent implements OnInit {
 
   readonly currentFolderName = signal<string | null>(null);
 
+  // ─── Comments state ───────────────────────────────────────────────────────────
+
+  readonly showComments           = signal(false);
+  readonly contextSharedFolderId  = signal<string | null>(null);
+
   // ─── Versioning state ────────────────────────────────────────────────────────
 
   readonly selectedVersionId = signal<string | null>(null);
@@ -109,6 +114,7 @@ export class FileDetailComponent implements OnInit {
     if (fromParam === 'shared-folder' && folderIdParam) {
       this.backFolderId = folderIdParam;
       this.backLink.set({ commands: ['/shared-folders'], queryParams: { folder_id: folderIdParam } });
+      this.contextSharedFolderId.set(folderIdParam);
     }
 
     this.loadFile();

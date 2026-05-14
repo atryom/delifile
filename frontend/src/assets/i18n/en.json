@@ -8,7 +8,8 @@
     "next": "Next →",
     "page_of": "Page {{page}} of {{total}}",
     "email_format_error": "Please enter a valid email address.",
-    "phone_format_error": "Enter phone in format +7 (999) 888-77-66"
+    "phone_format_error": "Enter phone in format +7 (999) 888-77-66",
+    "close": "Close"
   },
   "auth": {
     "login": {
@@ -571,5 +572,42 @@
     "public_link_save_banner": "You can add this folder to your account",
     "public_link_login": "Sign in",
     "public_link_register": "Sign up"
+  },
+  "comments": {
+    "section_title": "Comments",
+    "tab_shared": "Shared",
+    "tab_private": "My Notes",
+    "only_you": "only you",
+    "loading": "Loading...",
+    "no_comments": "No comments yet",
+    "placeholder": "Write a comment...",
+    "send": "Send",
+    "sending": "Sending...",
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "reply": "Reply",
+    "edit": "Edit",
+    "delete": "Delete",
+    "edited": "edited",
+    "deleted": "Comment deleted",
+    "replying_to": "Replying to:",
+    "write_aria": "Write a comment",
+    "reply_aria": "Write a reply",
+    "edit_aria": "Edit comment",
+    "shared_folder_disabled": "Shared comments are disabled for this folder",
+    "folder_rule_disabled": "Comments for this file are disabled by the shared folder policy",
+    "file_rule_disabled": "This file has a custom rule — shared comments are disabled",
+    "private_only_notice": "Your notes are visible only to you",
+    "settings": "Comment settings",
+    "allow_shared": "Allow shared comments",
+    "override_label": "Rule in shared folder context",
+    "override_inherit": "Inherit folder rule",
+    "override_enabled": "Allow",
+    "override_disabled": "Deny",
+    "discussion_btn": "Discussion",
+    "discussion_panel_aria": "Folder discussion panel",
+    "discussion_title": "Folder Discussion",
+    "my_notes_btn": "My Notes"
   }
 }

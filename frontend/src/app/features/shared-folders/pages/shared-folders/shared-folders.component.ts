@@ -15,6 +15,7 @@ import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { VideoThumbnailService } from '../../../files/services/video-thumbnail.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { InitUploadRequest } from '../../../../shared/models/api.models';
+import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 
 const PLAN_FILE_LIMITS: Record<string, number> = {
   free: 50 * 1024 * 1024, silver: 100 * 1024 * 1024, gold: 150 * 1024 * 1024,
@@ -39,7 +40,7 @@ function formatSize(bytes: number): string {
 @Component({
   selector: 'app-shared-folders',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, FormsModule, ReactiveFormsModule, TranslateModule, SharedFolderAccessDialogComponent],
+  imports: [DatePipe, RouterLink, FormsModule, ReactiveFormsModule, TranslateModule, SharedFolderAccessDialogComponent, ThreadCommentsComponent],
   templateUrl: './shared-folders.component.html',
   styleUrl: './shared-folders.component.scss',
 })
@@ -75,7 +76,8 @@ export class SharedFoldersComponent implements OnInit {
   readonly linkPreview     = signal<LinkPreview|null>(null);
   readonly linkError       = signal<string|null>(null);
 
-  readonly accessDialogOpen = signal(false);
+  readonly accessDialogOpen   = signal(false);
+  readonly discussionPanelOpen = signal(false);
 
   readonly searchQuery     = signal('');
   private searchTimer?: ReturnType<typeof setTimeout>;

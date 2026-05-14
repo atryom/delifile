@@ -19,6 +19,9 @@
         <button class="btn-add-folder" (click)="openAccessDialog()">
           {{ 'shared_folders.configure_access_btn' | translate }}
         </button>
+        <button class="btn-add-folder" (click)="discussionPanelOpen.set(!discussionPanelOpen())">
+          {{ 'comments.discussion_btn' | translate }}
+        </button>
       } @else {
         <a routerLink="/folders" [queryParams]="{tab:'shared'}" class="btn-add-folder">
           {{ 'shared_folders.add_btn' | translate }}
@@ -178,4 +181,30 @@
     [folderName]="selectedFolder()!.name"
     (closed)="closeAccessDialog()"
   />
+}
+
+<!-- Discussion panel drawer -->
+@if (discussionPanelOpen() && selectedFolder()) {
+  <div class="discussion-drawer" role="dialog" [attr.aria-label]="'comments.discussion_panel_aria' | translate">
+    <div class="discussion-drawer-header">
+      <h2 class="discussion-title">{{ 'comments.discussion_title' | translate }}</h2>
+      <button
+        class="discussion-close"
+        (click)="discussionPanelOpen.set(false)"
+        [attr.aria-label]="'common.close' | translate"
+      >
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="discussion-body">
+      <app-thread-comments
+        [targetType]="'shared_folder'"
+        [targetId]="selectedFolder()!.id"
+        [isOwner]="selectedFolder()!.is_owner"
+      />
+    </div>
+  </div>
+  <div class="discussion-overlay" (click)="discussionPanelOpen.set(false)" aria-hidden="true"></div>
 }

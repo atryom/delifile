@@ -320,6 +320,31 @@
               </div>
             </div>
 
+            <!-- Comments -->
+            <div class="section">
+              <button class="section-toggle" (click)="showComments.set(!showComments())">
+                <h3 class="section-title" style="margin:0">{{ 'comments.section_title' | translate }}</h3>
+                <svg
+                  width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"
+                  [style.transform]="showComments() ? 'rotate(180deg)' : 'rotate(0deg)'"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+              </button>
+              @if (showComments()) {
+                <div class="comments-section-body">
+                  <app-thread-comments
+                    [targetType]="'file'"
+                    [targetId]="id()"
+                    [isOwner]="file()!.is_owner"
+                    [contextSharedFolderId]="contextSharedFolderId()"
+                  />
+                </div>
+              }
+            </div>
+
             <!-- Action feedback -->
             @if (feedback()) {
               <div class="feedback" role="status">{{ feedback() }}</div>

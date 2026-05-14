@@ -1,0 +1,280 @@
+@if (loading()) {
+  <div class="tc-loading">{{ 'comments.loading' | translate }}</div>
+} @else {
+  <!-- Tabs -->
+  @if (targetType() !== 'local_folder') {
+    <div class="tc-tabs" role="tablist">
+      <button
+        class="tc-tab"
+        [class.active]="activeTab() === 'shared'"
+        (click)="selectTab('shared')"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'shared'"
+      >
+        {{ 'comments.tab_shared' | translate }}
+        @if ((sharedSummary()?.unread_count ?? 0) > 0) {
+          <span class="tc-badge">{{ sharedSummary()!.unread_count }}</span>
+        }
+      </button>
+      <button
+        class="tc-tab"
+        [class.active]="activeTab() === 'private'"
+        (click)="selectTab('private')"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'private'"
+      >
+        {{ 'comments.tab_private' | translate }}
+        <span class="tc-private-hint">{{ 'comments.only_you' | translate }}</span>
+      </button>
+    </div>
+  }
+
+  <!-- Owner settings toggle (file only) -->
+  @if (isOwner() && targetType() === 'file') {
+    <div class="tc-settings-bar">
+      <button class="tc-settings-btn" (click)="settingsOpen.set(!settingsOpen())">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        {{ 'comments.settings' | translate }}
+      </button>
+
+      @if (settingsOpen()) {
+        <div class="tc-settings-panel">
+          @if (contextSharedFolderId()) {
+            <div class="tc-settings-row">
+              <label class="tc-settings-label" for="override-select">{{ 'comments.override_label' | translate }}</label>
+              <select id="override-select" class="tc-select" [value]="overrideValue()" (change)="overrideValue.set($any($event.target).value)">
+                <option value="inherit">{{ 'comments.override_inherit' | translate }}</option>
+                <option value="enabled">{{ 'comments.override_enabled' | translate }}</option>
+                <option value="disabled">{{ 'comments.override_disabled' | translate }}</option>
+              </select>
+            </div>
+          } @else {
+            <div class="tc-settings-row">
+              <label class="tc-settings-label" for="shared-toggle">{{ 'comments.allow_shared' | translate }}</label>
+              <input
+                id="shared-toggle"
+                type="checkbox"
+                [checked]="sharedEnabled()"
+                (change)="sharedEnabled.set($any($event.target).checked)"
+              />
+            </div>
+          }
+          <div class="tc-settings-actions">
+            <button class="btn-mini" (click)="saveFileSettings()" [disabled]="savingSettings()">
+              {{ savingSettings() ? ('comments.saving' | translate) : ('comments.save' | translate) }}
+            </button>
+            <button class="btn-mini btn-mini-neutral" (click)="settingsOpen.set(false)">
+              {{ 'comments.cancel' | translate }}
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Shared tab content -->
+  @if (activeTab() === 'shared') {
+    @if (!canShowShared()) {
+      <div class="tc-disabled-notice">
+        @if (targetType() === 'file' && policy()?.file_override === 'disabled') {
+          {{ 'comments.file_rule_disabled' | translate }}
+        } @else if (targetType() === 'file') {
+          {{ 'comments.folder_rule_disabled' | translate }}
+        } @else {
+          {{ 'comments.shared_folder_disabled' | translate }}
+        }
+      </div>
+    } @else {
+      <div class="tc-thread">
+        <ng-container [ngTemplateOutlet]="threadItems" [ngTemplateOutletContext]="{ $implicit: sharedThread(), canWrite: canWriteShared() }" />
+      </div>
+      @if (canWriteShared()) {
+        <ng-container [ngTemplateOutlet]="composer" />
+      }
+    }
+  }
+
+  <!-- Private tab content -->
+  @if (activeTab() === 'private') {
+    @if (targetType() === 'local_folder') {
+      <div class="tc-private-only-notice">{{ 'comments.private_only_notice' | translate }}</div>
+    }
+    <div class="tc-thread">
+      <ng-container [ngTemplateOutlet]="threadItems" [ngTemplateOutletContext]="{ $implicit: privateThread(), canWrite: canWritePrivate() }" />
+    </div>
+    @if (canWritePrivate()) {
+      <ng-container [ngTemplateOutlet]="composer" />
+    }
+  }
+}
+
+<!-- Thread items template -->
+<ng-template #threadItems let-thread let-canWrite="canWrite">
+  @if (!thread) {
+    <div class="tc-empty">{{ 'comments.no_comments' | translate }}</div>
+  } @else if (thread.items.length === 0) {
+    <div class="tc-empty">{{ 'comments.no_comments' | translate }}</div>
+  } @else {
+    <div class="tc-items">
+      @for (comment of thread.items; track comment.id) {
+        <div class="tc-comment" [class.deleted]="comment.is_deleted">
+          <div class="tc-comment-header">
+            <span class="tc-author">{{ comment.author.name }}</span>
+            <span class="tc-time">{{ comment.created_at | date:'d MMM, HH:mm' }}</span>
+            @if (comment.edited_at) {
+              <span class="tc-edited">{{ 'comments.edited' | translate }}</span>
+            }
+          </div>
+
+          @if (comment.is_deleted) {
+            <div class="tc-body deleted-text">{{ 'comments.deleted' | translate }}</div>
+          } @else {
+            <div class="tc-body">{{ comment.body }}</div>
+            <div class="tc-actions">
+              @if (canWrite) {
+                <button class="tc-action-btn" (click)="startReply(comment)">
+                  {{ 'comments.reply' | translate }}
+                </button>
+              }
+              @if (comment.can_edit) {
+                <button class="tc-action-btn" (click)="startEdit(comment)">
+                  {{ 'comments.edit' | translate }}
+                </button>
+              }
+              @if (comment.can_delete) {
+                <button class="tc-action-btn danger" (click)="deleteComment(comment)">
+                  {{ 'comments.delete' | translate }}
+                </button>
+              }
+            </div>
+          }
+
+          <!-- Edit form for this comment -->
+          @if (editingComment()?.id === comment.id) {
+            <div class="tc-edit-form">
+              <textarea
+                class="tc-textarea"
+                [value]="editBody()"
+                (input)="editBody.set($any($event.target).value)"
+                rows="3"
+                [attr.aria-label]="'comments.edit_aria' | translate"
+              ></textarea>
+              <div class="tc-edit-actions">
+                <button class="btn-mini" (click)="submitEdit()" [disabled]="submitting()">
+                  {{ 'comments.save' | translate }}
+                </button>
+                <button class="btn-mini btn-mini-neutral" (click)="cancelEdit()">
+                  {{ 'comments.cancel' | translate }}
+                </button>
+              </div>
+            </div>
+          }
+
+          <!-- Replies -->
+          @if (comment.replies.length > 0) {
+            <div class="tc-replies">
+              @for (reply of comment.replies; track reply.id) {
+                <div class="tc-comment reply" [class.deleted]="reply.is_deleted">
+                  <div class="tc-comment-header">
+                    <span class="tc-author">{{ reply.author.name }}</span>
+                    <span class="tc-time">{{ reply.created_at | date:'d MMM, HH:mm' }}</span>
+                    @if (reply.edited_at) {
+                      <span class="tc-edited">{{ 'comments.edited' | translate }}</span>
+                    }
+                  </div>
+                  @if (reply.is_deleted) {
+                    <div class="tc-body deleted-text">{{ 'comments.deleted' | translate }}</div>
+                  } @else {
+                    <div class="tc-body">{{ reply.body }}</div>
+                    <div class="tc-actions">
+                      @if (reply.can_edit) {
+                        <button class="tc-action-btn" (click)="startEdit(reply)">
+                          {{ 'comments.edit' | translate }}
+                        </button>
+                      }
+                      @if (reply.can_delete) {
+                        <button class="tc-action-btn danger" (click)="deleteComment(reply)">
+                          {{ 'comments.delete' | translate }}
+                        </button>
+                      }
+                    </div>
+                    <!-- Edit form for reply -->
+                    @if (editingComment()?.id === reply.id) {
+                      <div class="tc-edit-form">
+                        <textarea
+                          class="tc-textarea"
+                          [value]="editBody()"
+                          (input)="editBody.set($any($event.target).value)"
+                          rows="2"
+                          [attr.aria-label]="'comments.edit_aria' | translate"
+                        ></textarea>
+                        <div class="tc-edit-actions">
+                          <button class="btn-mini" (click)="submitEdit()" [disabled]="submitting()">
+                            {{ 'comments.save' | translate }}
+                          </button>
+                          <button class="btn-mini btn-mini-neutral" (click)="cancelEdit()">
+                            {{ 'comments.cancel' | translate }}
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Reply composer inline -->
+          @if (replyingTo()?.id === comment.id) {
+            <div class="tc-reply-form">
+              <div class="tc-reply-to">{{ 'comments.replying_to' | translate }} {{ comment.author.name }}</div>
+              <textarea
+                class="tc-textarea"
+                [value]="composerBody()"
+                (input)="composerBody.set($any($event.target).value)"
+                rows="2"
+                [placeholder]="'comments.placeholder' | translate"
+                [attr.aria-label]="'comments.reply_aria' | translate"
+              ></textarea>
+              <div class="tc-composer-actions">
+                <button class="btn-mini" (click)="submitComment()" [disabled]="!composerBody().trim() || submitting()">
+                  {{ submitting() ? ('comments.sending' | translate) : ('comments.send' | translate) }}
+                </button>
+                <button class="btn-mini btn-mini-neutral" (click)="cancelReply()">
+                  {{ 'comments.cancel' | translate }}
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</ng-template>
+
+<!-- Root composer template -->
+<ng-template #composer>
+  @if (!replyingTo()) {
+    <div class="tc-composer">
+      <textarea
+        class="tc-textarea"
+        [value]="composerBody()"
+        (input)="composerBody.set($any($event.target).value)"
+        rows="3"
+        [placeholder]="'comments.placeholder' | translate"
+        [attr.aria-label]="'comments.write_aria' | translate"
+      ></textarea>
+      <div class="tc-composer-actions">
+        <button
+          class="btn-mini"
+          (click)="submitComment()"
+          [disabled]="!composerBody().trim() || submitting()"
+        >
+          {{ submitting() ? ('comments.sending' | translate) : ('comments.send' | translate) }}
+        </button>
+      </div>
+    </div>
+  }
+</ng-template>

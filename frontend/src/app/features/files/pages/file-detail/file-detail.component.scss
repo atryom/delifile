@@ -547,6 +547,23 @@
   .file-detail-layout { grid-template-columns: 1fr; }
 }
 
+// ─── Comments section ─────────────────────────────────────────────────────────
+.section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 10px;
+  svg { transition: transform 0.2s ease; flex-shrink: 0; }
+}
+.comments-section-body {
+  margin-top: 4px;
+}
+
 @media (max-width: #{v.$bp-mobile}) {
   .page { padding: 14px 16px; overflow-x: hidden; }
   .file-header-card { flex-direction: column; gap: 12px; }

@@ -20,6 +20,9 @@ use App\Http\Controllers\Tariff\TariffController;
 use App\Http\Controllers\Push\PushController;
 use App\Http\Controllers\User\UserSettingsController;
 use App\Http\Controllers\SharedFolders\SharedFolderController;
+use App\Http\Controllers\Comments\CommentThreadController;
+use App\Http\Controllers\Comments\CommentController;
+use App\Http\Controllers\Comments\CommentSettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -213,6 +216,24 @@ Route::prefix('v1')->group(function () {
             Route::post('{id}/links',                    [SharedFolderController::class, 'createLink']);
             Route::post('{id}/links/{linkId}/disable',   [SharedFolderController::class, 'disableLink']);
         });
+
+        // Comments — threads
+        Route::get('comment-threads',                           [CommentThreadController::class, 'index']);
+        Route::get('comment-threads/unread-counters',           [CommentThreadController::class, 'unreadCounters']);
+        Route::get('comment-threads/{threadId}',                [CommentThreadController::class, 'show']);
+        Route::post('comment-threads/{threadId}/read',          [CommentThreadController::class, 'markRead']);
+
+        // Comments — CRUD
+        Route::post('comments',                                 [CommentController::class, 'store']);
+        Route::patch('comments/{id}',                           [CommentController::class, 'update']);
+        Route::delete('comments/{id}',                          [CommentController::class, 'destroy']);
+
+        // Comment settings
+        Route::get('files/{fileId}/comment-settings',           [CommentSettingsController::class, 'getFileSettings']);
+        Route::patch('files/{fileId}/comment-settings',         [CommentSettingsController::class, 'updateFileSettings']);
+        Route::get('shared-folders/{folderId}/comment-settings',    [CommentSettingsController::class, 'getSharedFolderSettings']);
+        Route::patch('shared-folders/{folderId}/comment-settings',  [CommentSettingsController::class, 'updateSharedFolderSettings']);
+        Route::patch('local-folders/{folderId}/comment-settings',   [CommentSettingsController::class, 'updateLocalFolderSettings']);
 
         // File shared folder operations
         Route::post('files/{id}/add-to-my-files',  [SharedFolderFileController::class, 'addToMyFiles']);

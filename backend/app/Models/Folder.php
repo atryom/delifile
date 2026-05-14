@@ -46,6 +46,11 @@ class Folder extends Model
         return $this->hasMany(FileUserAccess::class, 'folder_id');
     }
 
+    public function commentSettings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(LocalFolderCommentSettings::class, 'local_folder_id');
+    }
+
     public function hasChildren(): bool
     {
         return $this->children()->exists();

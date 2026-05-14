@@ -5,6 +5,7 @@ import { forkJoin } from 'rxjs';
 import { DatePipe } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { TranslateModule } from '@ngx-translate/core';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { FilesApiService, FileFilter } from '../../../../core/api/files-api.service';
@@ -16,6 +17,7 @@ import {
   Tag, TariffUsage, FileTypeGroup, LinkPreview,
 } from '../../../../shared/models/api.models';
 import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialogs/access/shared-folder-access-dialog.component';
+import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 
 interface Breadcrumb {
   label: string;
@@ -28,7 +30,7 @@ type AnyFile = FileListItem | SharedFolderFileItem;
 @Component({
   selector: 'app-folders-tree',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, FormsModule, ReactiveFormsModule, SharedFolderAccessDialogComponent],
+  imports: [DatePipe, FormsModule, ReactiveFormsModule, TranslateModule, SharedFolderAccessDialogComponent, ThreadCommentsComponent],
   templateUrl: './folders-tree.component.html',
   styleUrl: './folders-tree.component.scss',
   host: {},
@@ -86,6 +88,9 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── Storage ───────────────────────────────────────────────────────────────
   readonly usage = signal<TariffUsage | null>(null);
+
+  // ── Local folder private notes ────────────────────────────────────────────
+  readonly folderNotesOpen = signal(false);
 
   // ── Create folder ─────────────────────────────────────────────────────────
   readonly creating = signal(false);

@@ -95,6 +95,11 @@ class File extends Model
         return $this->hasMany(FileVersion::class)->orderBy('version_number');
     }
 
+    public function commentSettings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(FileCommentSettings::class);
+    }
+
     // Helpers
     public function isAvailable(): bool
     {

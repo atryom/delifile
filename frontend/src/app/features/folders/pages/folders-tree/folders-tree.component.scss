@@ -1300,3 +1300,31 @@ tbody tr.row-selected:hover { background: var(--accent-dim); }
   vertical-align: middle;
   line-height: 1;
 }
+
+// ─── Folder private notes bar ──────────────────────────────────────────────
+.folder-notes-bar {
+  display: flex;
+  margin: 8px 0 4px;
+}
+.btn-notes-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted, #6b7280);
+  background: var(--surface, #f9fafb);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  &:hover { background: var(--surface2, #f3f4f6); color: var(--text, #111); }
+}
+.folder-notes-panel {
+  background: var(--surface, #f9fafb);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}

@@ -1,0 +1,294 @@
+@use 'styles/variables' as v;
+
+.tc-loading {
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+
+.tc-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.tc-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+
+  &:hover { color: var(--text); }
+  &.active {
+    color: var(--accent-text);
+    border-bottom-color: var(--accent);
+  }
+}
+
+.tc-badge {
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 1px 6px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.tc-private-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+// ─── Disabled notice ──────────────────────────────────────────────────────────
+
+.tc-disabled-notice {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin-bottom: 12px;
+}
+
+.tc-private-only-notice {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+// ─── Thread items ─────────────────────────────────────────────────────────────
+
+.tc-thread {
+  min-height: 40px;
+}
+
+.tc-empty {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  padding: 12px 0;
+}
+
+.tc-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tc-comment {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+
+  &.deleted { opacity: 0.6; }
+  &.reply {
+    margin-left: 0;
+    background: var(--bg);
+    border-color: transparent;
+    border-left: 2px solid var(--border);
+    border-radius: 0 6px 6px 0;
+    padding: 6px 10px;
+  }
+}
+
+.tc-comment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.tc-author {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tc-time {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.tc-edited {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.tc-body {
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  &.deleted-text { color: var(--text-muted); font-style: italic; }
+}
+
+.tc-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tc-action-btn {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+
+  &:hover { color: var(--accent-text); }
+  &.danger:hover { color: var(--danger, #ef4444); }
+}
+
+.tc-replies {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+// ─── Composer ─────────────────────────────────────────────────────────────────
+
+.tc-composer {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tc-reply-form,
+.tc-edit-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tc-reply-to {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.tc-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+}
+
+.tc-composer-actions,
+.tc-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+// ─── Settings bar ─────────────────────────────────────────────────────────────
+
+.tc-settings-bar {
+  margin-bottom: 12px;
+}
+
+.tc-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+
+  &:hover { color: var(--text); }
+}
+
+.tc-settings-panel {
+  margin-top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tc-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tc-settings-label {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.tc-select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tc-settings-actions {
+  display: flex;
+  gap: 8px;
+}
+
+// ─── Buttons (reuse from app) ─────────────────────────────────────────────────
+
+.btn-mini {
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { background: var(--accent-hover); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.btn-mini-neutral {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+
+  &:hover:not(:disabled) { background: var(--bg); }
+}

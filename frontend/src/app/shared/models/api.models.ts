@@ -435,3 +435,77 @@ export interface SuggestionItem {
 export interface SuggestionDetail extends SuggestionItem {
   admin_comments?: { id: string; body: string; created_at: string | null }[];
 }
+
+// ─── Comment Models ───────────────────────────────────────────────────────────
+
+export type CommentScope = 'shared' | 'private';
+export type CommentTargetType = 'file' | 'shared_folder' | 'local_folder';
+export type SharedCommentMode = 'enabled' | 'disabled' | 'inherit_for_items';
+export type SharedCommentOverride = 'inherit' | 'enabled' | 'disabled';
+
+export interface CommentAuthor {
+  id: number;
+  name: string;
+}
+
+export interface CommentItem {
+  id: string;
+  thread_id: string;
+  parent_comment_id: string | null;
+  author: CommentAuthor;
+  body: string | null;
+  is_deleted: boolean;
+  replies_count: number;
+  edited_at: string | null;
+  created_at: string | null;
+  can_edit: boolean;
+  can_delete: boolean;
+  replies: CommentItem[];
+}
+
+export interface CommentThreadSummary {
+  id: string;
+  comments_count: number;
+  unread_count: number;
+}
+
+export interface CommentThreadDetail {
+  id: string;
+  scope: CommentScope;
+  comments_count: number;
+  unread_count: number;
+  items: CommentItem[];
+  pagination: { page: number; per_page: number; total: number };
+}
+
+export interface CommentPolicy {
+  shared_comments_allowed: boolean;
+  source?: string;
+  shared_comments_mode?: SharedCommentMode | null;
+  file_override?: SharedCommentOverride;
+  shared_comments_enabled?: boolean;
+  can_write_shared: boolean;
+  can_write_private: boolean;
+  mentions_enabled: boolean;
+}
+
+export interface CommentThreadsResponse {
+  policy: CommentPolicy;
+  threads: {
+    shared?: CommentThreadSummary | null;
+    private?: CommentThreadSummary | null;
+  };
+}
+
+export interface FileCommentSettings {
+  shared_comments_enabled: boolean;
+  shared_comments_override: SharedCommentOverride;
+  private_comments_enabled: boolean;
+  mentions_enabled: boolean;
+}
+
+export interface SharedFolderCommentSettings {
+  shared_comments_mode: SharedCommentMode;
+  private_comments_enabled: boolean;
+  mentions_enabled: boolean;
+}

@@ -10,7 +10,8 @@
     "next": "Вперёд →",
     "page_of": "Страница {{page}} из {{total}}",
     "email_format_error": "Введите корректный email-адрес.",
-    "phone_format_error": "Введите номер в формате +7 (999) 888-77-66"
+    "phone_format_error": "Введите номер в формате +7 (999) 888-77-66",
+    "close": "Закрыть"
   },
   "auth": {
     "login": {
@@ -602,5 +603,42 @@
     "public_link_save_banner": "Вы можете добавить эту папку себе в аккаунт",
     "public_link_login": "Войти",
     "public_link_register": "Зарегистрироваться"
+  },
+  "comments": {
+    "section_title": "Комментарии",
+    "tab_shared": "Общие",
+    "tab_private": "Мои заметки",
+    "only_you": "только вы",
+    "loading": "Загрузка...",
+    "no_comments": "Комментариев пока нет",
+    "placeholder": "Написать комментарий...",
+    "send": "Отправить",
+    "sending": "Отправка...",
+    "save": "Сохранить",
+    "saving": "Сохраняем...",
+    "cancel": "Отмена",
+    "reply": "Ответить",
+    "edit": "Редактировать",
+    "delete": "Удалить",
+    "edited": "изм.",
+    "deleted": "Комментарий удалён",
+    "replying_to": "Ответ:",
+    "write_aria": "Написать комментарий",
+    "reply_aria": "Написать ответ",
+    "edit_aria": "Редактировать комментарий",
+    "shared_folder_disabled": "Общие комментарии для этой папки отключены",
+    "folder_rule_disabled": "Комментарии к этому файлу запрещены правилом общей папки",
+    "file_rule_disabled": "Для этого файла задано собственное правило — комментарии отключены",
+    "private_only_notice": "Ваши заметки видны только вам",
+    "settings": "Настройки комментариев",
+    "allow_shared": "Разрешить общие комментарии",
+    "override_label": "Правило в контексте общей папки",
+    "override_inherit": "Наследовать правило папки",
+    "override_enabled": "Разрешить",
+    "override_disabled": "Запретить",
+    "discussion_btn": "Обсуждение",
+    "discussion_panel_aria": "Панель обсуждения папки",
+    "discussion_title": "Обсуждение папки",
+    "my_notes_btn": "Мои заметки"
   }
 }
