@@ -140,7 +140,7 @@ class CommentController extends Controller
             $this->commentService->auditComment($comment, $user, 'create', null, ['body' => $comment->body]);
 
             // Mentions & notifications
-            $targetUrl = config('app.url');
+            $targetUrl = $this->buildDeepLinkUrl($thread, $ctxFolder);
             if ($mentionsJson) {
                 $this->commentService->processMentions($comment, $mentionsJson, $targetUrl);
             }
@@ -209,5 +209,24 @@ class CommentController extends Controller
         $this->commentService->auditComment($comment, $request->user(), 'delete', ['body' => $comment->body], null);
 
         return $this->success('Comment deleted');
+    }
+
+    private function buildDeepLinkUrl(CommentThread $thread, ?string $contextSharedFolderId): string
+    {
+        $base = rtrim(config('app.url'), '/');
+
+        return match ($thread->target_type) {
+            CommentTargetType::File => $contextSharedFolderId
+                ? $base . '/files/' . $thread->target_id . '?from=shared-folder&folder_id=' . $contextSharedFolderId
+                : $base . '/files/' . $thread->target_id,
+
+            CommentTargetType::SharedFolder =>
+                $base . '/folders?tab=shared&shared_folder_id=' . $thread->target_id,
+
+            CommentTargetType::LocalFolder =>
+                $base . '/folders',
+
+            default => $base,
+        };
     }
 }

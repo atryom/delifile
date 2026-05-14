@@ -463,7 +463,7 @@ class SharedFolderController extends Controller
                 $access->user,
                 'Доступ к общей папке',
                 "{$senderName} открыл вам доступ ({$accessLabel}) к папке «{$folder->name}»",
-                config('app.url') . '/shared-folders?folder_id=' . $folder->id,
+                config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id,
             );
         }
 
