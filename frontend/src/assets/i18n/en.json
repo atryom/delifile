@@ -609,7 +609,11 @@
     "subfolders": "Folders",
     "add_subfolder": "Create subfolder",
     "subfolder_name_placeholder": "Subfolder name",
-    "create_subfolder_btn": "Create"
+    "create_subfolder_btn": "Create",
+    "leave_folder_btn": "Leave folder",
+    "leave_folder_title": "Leave folder?",
+    "leave_folder_warning": "You will leave \"{{name}}\". This action is irreversible — you will lose access to this folder.",
+    "leave_folder_confirm": "Leave"
   },
   "comments": {
     "section_title": "Comments",

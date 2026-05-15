@@ -230,6 +230,7 @@ Route::prefix('v1')->group(function () {
             Route::get('{id}/subfolders',                [SharedFolderController::class, 'subfolders']);
             Route::post('{id}/subfolders',               [SharedFolderController::class, 'createSubfolder']);
             Route::delete('{id}/files/{fileId}',         [SharedFolderFileController::class, 'removeFile']);
+            Route::delete('{id}/leave',                  [SharedFolderController::class, 'leave']);
         });
 
         // Comments — threads

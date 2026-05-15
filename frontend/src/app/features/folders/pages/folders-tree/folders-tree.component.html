@@ -402,6 +402,8 @@
                             <button type="button" role="menuitem" (click)="startRename(folder.id, 'shared', folder.name)">Переименовать</button>
                             <button type="button" role="menuitem" (click)="openAccessDialog(folder)">Управление доступом</button>
                             <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteSharedFolder(folder)">Удалить</button>
+                          } @else {
+                            <button type="button" role="menuitem" class="menu-danger" (click)="confirmLeaveSharedFolder(folder)">Покинуть папку</button>
                           }
                         </div>
                       }
@@ -808,6 +810,24 @@
       <div class="modal-actions">
         <button type="button" class="btn-danger" (click)="forceDeleteLocalFolder()" [disabled]="deleting()">Удалить всё</button>
         <button type="button" class="btn-secondary" (click)="forceDeleteTarget.set(null)">Отмена</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ LEAVE DIALOG -->
+
+@if (leaveTarget()) {
+  <div class="modal-backdrop" (click)="cancelLeave()" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3 id="leave-title">Покинуть папку?</h3>
+      <p>Вы покинете «{{ leaveTarget()!.name }}». Это действие необратимо — вы потеряете доступ к папке.</p>
+      @if (leaveError()) {
+        <div class="alert-error" role="alert">{{ leaveError() }}</div>
+      }
+      <div class="modal-actions">
+        <button type="button" class="btn-danger" (click)="executeLeave()" [disabled]="leaving()">Покинуть</button>
+        <button type="button" class="btn-secondary" (click)="cancelLeave()">Отмена</button>
       </div>
     </div>
   </div>

@@ -16,12 +16,19 @@
         }
       </select>
       @if (selectedFolder()) {
-        <button class="btn-add-folder" (click)="openAccessDialog()">
-          {{ 'shared_folders.configure_access_btn' | translate }}
-        </button>
+        @if (selectedFolder()!.is_owner) {
+          <button class="btn-add-folder" (click)="openAccessDialog()">
+            {{ 'shared_folders.configure_access_btn' | translate }}
+          </button>
+        }
         <button class="btn-add-folder" (click)="discussionPanelOpen.set(!discussionPanelOpen())">
           {{ 'comments.discussion_btn' | translate }}
         </button>
+        @if (!selectedFolder()!.is_owner) {
+          <button class="btn-leave-folder" (click)="openLeaveDialog()">
+            {{ 'shared_folders.leave_folder_btn' | translate }}
+          </button>
+        }
       } @else {
         <a routerLink="/folders" [queryParams]="{tab:'shared'}" class="btn-add-folder">
           {{ 'shared_folders.add_btn' | translate }}
@@ -267,4 +274,22 @@
     </div>
   </div>
   <div class="discussion-overlay" (click)="discussionPanelOpen.set(false)" aria-hidden="true"></div>
+}
+
+@if (leaveDialogOpen() && selectedFolder()) {
+  <div class="modal-backdrop" (click)="closeLeaveDialog()" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+    <div class="modal-dialog" (click)="$event.stopPropagation()">
+      <h3 id="leave-title">{{ 'shared_folders.leave_folder_title' | translate }}</h3>
+      <p>{{ 'shared_folders.leave_folder_warning' | translate: { name: selectedFolder()!.name } }}</p>
+      @if (leaveError()) {
+        <div class="modal-error" role="alert">{{ leaveError() }}</div>
+      }
+      <div class="modal-actions">
+        <button class="btn-danger" (click)="confirmLeave()" [disabled]="leavingFolder()">
+          {{ 'shared_folders.leave_folder_confirm' | translate }}
+        </button>
+        <button class="btn-secondary" (click)="closeLeaveDialog()">{{ 'common.cancel' | translate }}</button>
+      </div>
+    </div>
+  </div>
 }

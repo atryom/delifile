@@ -121,6 +121,11 @@ export class FoldersTreeComponent implements OnInit {
   readonly deleteError       = signal<string | null>(null);
   readonly deleting          = signal(false);
 
+  // ── Leave shared folder ───────────────────────────────────────────────────
+  readonly leaveTarget  = signal<{ id: string; name: string } | null>(null);
+  readonly leaveError   = signal<string | null>(null);
+  readonly leaving      = signal(false);
+
   // ── Dropdown menu ─────────────────────────────────────────────────────────
   readonly openMenuId = signal<string | null>(null);
 
@@ -649,6 +654,34 @@ export class FoldersTreeComponent implements OnInit {
         });
       }
     }
+  }
+
+  // ── Leave shared folder ───────────────────────────────────────────────────
+  confirmLeaveSharedFolder(folder: SharedFolder): void {
+    this.leaveTarget.set({ id: folder.id, name: folder.name });
+    this.leaveError.set(null);
+    this.closeMenu();
+  }
+
+  cancelLeave(): void { this.leaveTarget.set(null); this.leaveError.set(null); }
+
+  executeLeave(): void {
+    const target = this.leaveTarget();
+    if (!target || this.leaving()) return;
+    this.leaving.set(true);
+    this.leaveError.set(null);
+    this.sfApi.leaveFolder(target.id).subscribe({
+      next: () => {
+        this.leaving.set(false);
+        this.leaveTarget.set(null);
+        this.currentSharedFolderId.set(null);
+        this.sfSubfolders.set([]);
+        this.files.set([]);
+        this.loadShared();
+        this.breadcrumbs.set([{ label: 'Общие', localFolderId: null, sharedFolderId: null }]);
+      },
+      error: (err) => { this.leaving.set(false); this.leaveError.set(err.message ?? 'Ошибка'); },
+    });
   }
 
   forceDeleteLocalFolder(): void {

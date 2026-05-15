@@ -83,8 +83,11 @@ export class SharedFoldersComponent implements OnInit {
   readonly linkPreview     = signal<LinkPreview|null>(null);
   readonly linkError       = signal<string|null>(null);
 
-  readonly accessDialogOpen   = signal(false);
+  readonly accessDialogOpen    = signal(false);
   readonly discussionPanelOpen = signal(false);
+  readonly leaveDialogOpen     = signal(false);
+  readonly leavingFolder       = signal(false);
+  readonly leaveError          = signal<string | null>(null);
 
   readonly searchQuery     = signal('');
   private searchTimer?: ReturnType<typeof setTimeout>;
@@ -309,6 +312,31 @@ export class SharedFoldersComponent implements OnInit {
 
   openAccessDialog(): void { this.accessDialogOpen.set(true); }
   closeAccessDialog(): void { this.accessDialogOpen.set(false); }
+
+  openLeaveDialog(): void { this.leaveDialogOpen.set(true); this.leaveError.set(null); }
+  closeLeaveDialog(): void { this.leaveDialogOpen.set(false); }
+
+  confirmLeave(): void {
+    const folder = this.selectedFolder();
+    if (!folder || this.leavingFolder()) return;
+    this.leavingFolder.set(true);
+    this.leaveError.set(null);
+    this.sfApi.leaveFolder(folder.id).subscribe({
+      next: () => {
+        this.leavingFolder.set(false);
+        this.leaveDialogOpen.set(false);
+        this.selectedFolder.set(null);
+        this.subfolders.set([]);
+        this.breadcrumb.set([]);
+        this.files.set([]);
+        this.loadFolders();
+      },
+      error: (err) => {
+        this.leavingFolder.set(false);
+        this.leaveError.set(err.message ?? 'Ошибка');
+      },
+    });
+  }
 
   resetUpload(): void {
     this.uploadPhase.set('idle');

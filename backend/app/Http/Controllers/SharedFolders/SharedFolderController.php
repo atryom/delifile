@@ -270,6 +270,50 @@ class SharedFolderController extends Controller
         return $this->success('Shared folder deleted');
     }
 
+    /**
+     * DELETE /api/v1/shared-folders/{id}/leave
+     * Non-owner removes themselves from a shared folder.
+     */
+    public function leave(Request $request, string $id): JsonResponse
+    {
+        $user   = $request->user();
+        $folder = SharedFolder::find($id);
+
+        if (!$folder) {
+            return $this->notFound('Shared folder not found');
+        }
+
+        if ($folder->owner_id === $user->id) {
+            return $this->error('Owner cannot leave their own folder', 'OWNER_CANNOT_LEAVE', [], 422);
+        }
+
+        $access = SharedFolderAccess::where('shared_folder_id', $id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$access) {
+            return $this->notFound('You are not a member of this folder');
+        }
+
+        $accessType = $access->access_type instanceof \BackedEnum
+            ? $access->access_type->value
+            : (string) $access->access_type;
+
+        $access->delete();
+
+        if (!($user->auto_add_received_files ?? true)) {
+            PendingReceivedSharedFolder::firstOrCreate([
+                'shared_folder_id'  => $folder->id,
+                'recipient_user_id' => $user->id,
+            ], [
+                'inviter_user_id' => $folder->owner_id,
+                'access_type'     => $accessType,
+            ]);
+        }
+
+        return $this->success('You have left the shared folder');
+    }
+
     // ─── Files ────────────────────────────────────────────────────────────────
 
     /**

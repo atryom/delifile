@@ -121,4 +121,8 @@ export class SharedFoldersApiService {
   removeFile(folderId: string, fileId: string): Observable<ApiResponse<Record<string, never>>> {
     return this.api.delete(`/shared-folders/${folderId}/files/${fileId}`);
   }
+
+  leaveFolder(id: string): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.delete(`/shared-folders/${id}/leave`);
+  }
 }

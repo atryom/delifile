@@ -23,6 +23,7 @@
 .folder-label:hover { background: #f9f8ff; }
 .folder-checkbox { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
 .folder-icon { font-size: 1.1rem; flex-shrink: 0; }
+.folder-indent-icon { font-size: 0.8rem; color: #9ca3af; flex-shrink: 0; margin-right: -4px; }
 .folder-name { font-size: 0.9rem; font-weight: 500; color: #111; }
 .error-msg { color: #dc2626; font-size: 0.85rem; flex: 1; }
 .btn-primary { background: #6366f1; color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }

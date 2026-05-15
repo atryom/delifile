@@ -640,7 +640,11 @@
     "subfolders": "Папки",
     "add_subfolder": "Создать подпапку",
     "subfolder_name_placeholder": "Название подпапки",
-    "create_subfolder_btn": "Создать"
+    "create_subfolder_btn": "Создать",
+    "leave_folder_btn": "Покинуть папку",
+    "leave_folder_title": "Покинуть папку?",
+    "leave_folder_warning": "Вы покинете «{{name}}». Это действие необратимо — вы потеряете доступ к этой папке.",
+    "leave_folder_confirm": "Покинуть"
   },
   "comments": {
     "section_title": "Комментарии",

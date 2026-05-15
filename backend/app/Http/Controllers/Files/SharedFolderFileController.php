@@ -173,9 +173,10 @@ class SharedFolderFileController extends Controller
             ->toArray();
 
         $foldersList = $folders->map(fn (SharedFolder $f) => [
-            'id'    => $f->id,
-            'name'  => $f->name,
-            'is_in' => in_array($f->id, $containingIds),
+            'id'        => $f->id,
+            'name'      => $f->name,
+            'parent_id' => $f->parent_id,
+            'is_in'     => in_array($f->id, $containingIds),
         ]);
 
         return $this->success('Shared folders fetched', [

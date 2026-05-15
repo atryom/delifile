@@ -1,9 +1,29 @@
-import { Component, input, output, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 
-interface FolderItem { id: string; name: string; is_in: boolean; }
+interface FolderItem { id: string; name: string; parent_id?: string | null; is_in: boolean; }
+interface FolderTreeItem extends FolderItem { depth: number; }
+
+function buildFolderTree(folders: FolderItem[]): FolderTreeItem[] {
+  const result: FolderTreeItem[] = [];
+  function walk(parentId: string | null, depth: number): void {
+    for (const f of folders) {
+      if ((f.parent_id ?? null) === (parentId ?? null)) {
+        result.push({ ...f, depth });
+        walk(f.id, depth + 1);
+      }
+    }
+  }
+  walk(null, 0);
+  // Append any orphaned folders (parent not in list) at root level
+  const placed = new Set(result.map(r => r.id));
+  for (const f of folders) {
+    if (!placed.has(f.id)) result.push({ ...f, depth: 0 });
+  }
+  return result;
+}
 
 @Component({
   selector: 'app-add-to-shared-folder-dialog',
@@ -22,12 +42,12 @@ interface FolderItem { id: string; name: string; is_in: boolean; }
 
           @if (loading()) {
             <div class="loading">{{ 'common.loading' | translate }}</div>
-          } @else if (folders().length === 0) {
+          } @else if (tree().length === 0) {
             <div class="empty">{{ 'shared_folders.add_to_shared_folder_empty' | translate }}</div>
           } @else {
             <ul class="folder-list" role="list">
-              @for (f of folders(); track f.id) {
-                <li class="folder-item">
+              @for (f of tree(); track f.id) {
+                <li class="folder-item" [style.padding-left.px]="f.depth * 20">
                   <label class="folder-label">
                     <input
                       type="checkbox"
@@ -35,6 +55,9 @@ interface FolderItem { id: string; name: string; is_in: boolean; }
                       (change)="toggleFolder(f.id, $event)"
                       class="folder-checkbox"
                     />
+                    @if (f.depth > 0) {
+                      <span class="folder-indent-icon" aria-hidden="true">↳</span>
+                    }
                     <span class="folder-icon" aria-hidden="true">📁</span>
                     <span class="folder-name">{{ f.name }}</span>
                   </label>
@@ -67,11 +90,13 @@ export class AddToSharedFolderDialogComponent implements OnInit {
 
   private readonly sfApi = inject(SharedFoldersApiService);
 
-  readonly loading   = signal(true);
-  readonly saving    = signal(false);
-  readonly folders   = signal<FolderItem[]>([]);
+  readonly loading    = signal(true);
+  readonly saving     = signal(false);
+  readonly folders    = signal<FolderItem[]>([]);
   readonly checkedIds = signal<Set<string>>(new Set());
-  readonly error     = signal<string | null>(null);
+  readonly error      = signal<string | null>(null);
+
+  readonly tree = computed(() => buildFolderTree(this.folders()));
 
   ngOnInit(): void {
     this.sfApi.getFileSharedFolders(this.fileId()).subscribe({
