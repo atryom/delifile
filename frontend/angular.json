@@ -76,16 +76,12 @@
           },
           "defaultConfiguration": "development"
         },
-        "test": {
-          "builder": "@angular-devkit/build-angular:karma",
-          "options": {
-            "polyfills": ["zone.js", "zone.js/testing"],
-            "tsConfig": "tsconfig.spec.json",
-            "assets": ["src/favicon.ico", "src/assets"],
-            "styles": ["src/styles/global.css"],
-            "scripts": []
-          }
-        }
+    "test": {
+      "builder": "@angular-devkit/build-angular:application",
+      "options": {
+        "tsConfig": "tsconfig.spec.json"
+      }
+    }
       }
     }
   },

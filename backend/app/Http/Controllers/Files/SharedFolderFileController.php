@@ -94,7 +94,7 @@ class SharedFolderFileController extends Controller
             ->pluck('shared_folder_id')->toArray();
 
         $allFolderIds = array_unique(array_merge($targetFolderIds, $currentFolderIds));
-        $allFolders   = SharedFolder::whereIn('id', $allFolderIds)->keyBy('id');
+        $allFolders   = SharedFolder::whereIn('id', $allFolderIds)->get()->keyBy('id');
 
         // Determine which folders the user can actually edit (with ancestor inheritance)
         $editableIds = [];

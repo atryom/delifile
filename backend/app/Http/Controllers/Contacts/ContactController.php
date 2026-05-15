@@ -56,7 +56,7 @@ class ContactController extends Controller
         ]);
 
         if (empty($request->email) && empty($request->phone)) {
-            return $this->error('Email или телефон обязателен', ['code' => 'VALIDATION_ERROR'], 422);
+            return $this->error('Email или телефон обязателен', 'VALIDATION_ERROR', [], 422);
         }
 
         // Duplicate check

@@ -8,7 +8,8 @@
     "build": "ng build && node scripts/postbuild.js",
     "build:prod": "ng build --configuration production && node scripts/postbuild.js",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "ng lint"
   },
   "private": true,
@@ -28,16 +29,15 @@
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.5.1",
     "@angular-devkit/build-angular": "^21.0.0",
+    "@angular/build": "^21.2.9",
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
-    "@types/jasmine": "~5.1.0",
-    "jasmine-core": "~5.4.0",
-    "karma": "~6.4.0",
-    "karma-chrome-launcher": "~3.2.0",
-    "karma-coverage": "~2.2.0",
-    "karma-jasmine": "~5.1.0",
-    "karma-jasmine-html-reporter": "~2.1.0",
-    "typescript": "~5.9.0"
+    "happy-dom": "^20.9.0",
+    "jsdom": "^29.1.1",
+    "typescript": "~5.9.0",
+    "unzip": "^0.1.11",
+    "vitest": "^3.2.4"
   }
 }
