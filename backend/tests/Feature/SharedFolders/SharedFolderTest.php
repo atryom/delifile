@@ -573,4 +573,138 @@ class SharedFolderTest extends TestCase
         $response->assertStatus(410)
             ->assertJsonPath('data.code', 'LINK_INVALID');
     }
+
+    // ─── Complete upload ────────────────────────────────────────────────────
+
+    public function test_owner_can_complete_upload_in_folder(): void
+    {
+        $user = User::factory()->create();
+        $folder = SharedFolder::factory()->create(['owner_id' => $user->id]);
+        $file = File::factory()->uploading()->create(['owner_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/v1/shared-folders/{$folder->id}/complete-upload", [
+                'file_id' => $file->id,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('result', 'success')
+            ->assertJsonStructure(['data' => ['file' => ['id', 'status']]]);
+        $this->assertDatabaseHas('files', [
+            'id'     => $file->id,
+            'status' => 'available',
+        ]);
+    }
+
+    public function test_editor_can_complete_upload_in_folder(): void
+    {
+        $owner = User::factory()->create();
+        $editor = User::factory()->create();
+        $folder = SharedFolder::factory()->create(['owner_id' => $owner->id]);
+        SharedFolderAccess::factory()->edit()->create([
+            'shared_folder_id' => $folder->id,
+            'user_id'          => $editor->id,
+        ]);
+        $file = File::factory()->uploading()->create(['owner_id' => $editor->id]);
+
+        $response = $this->actingAs($editor)
+            ->postJson("/api/v1/shared-folders/{$folder->id}/complete-upload", [
+                'file_id' => $file->id,
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('result', 'success');
+    }
+
+    public function test_viewer_cannot_complete_upload(): void
+    {
+        $owner = User::factory()->create();
+        $viewer = User::factory()->create();
+        $folder = SharedFolder::factory()->create(['owner_id' => $owner->id]);
+        SharedFolderAccess::factory()->create([
+            'shared_folder_id' => $folder->id,
+            'user_id'          => $viewer->id,
+        ]);
+
+        $response = $this->actingAs($viewer)
+            ->postJson("/api/v1/shared-folders/{$folder->id}/complete-upload", [
+                'file_id' => 'test',
+            ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_non_member_cannot_complete_upload(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $folder = SharedFolder::factory()->create(['owner_id' => $owner->id]);
+
+        $response = $this->actingAs($other)
+            ->postJson("/api/v1/shared-folders/{$folder->id}/complete-upload", [
+                'file_id' => 'test',
+            ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_complete_upload_requires_file_id(): void
+    {
+        $user = User::factory()->create();
+        $folder = SharedFolder::factory()->create(['owner_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/v1/shared-folders/{$folder->id}/complete-upload", []);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_complete_upload_nonexistent_file_returns_404(): void
+    {
+        $user = User::factory()->create();
+        $folder = SharedFolder::factory()->create(['owner_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/v1/shared-folders/{$folder->id}/complete-upload", [
+                'file_id' => 'nonexistent',
+            ]);
+
+        $response->assertStatus(404);
+    }
+
+    public function test_complete_upload_nonexistent_folder_returns_404(): void
+    {
+        $user = User::factory()->create();
+        $file = File::factory()->create(['owner_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson('/api/v1/shared-folders/nonexistent/complete-upload', [
+                'file_id' => $file->id,
+            ]);
+
+        $response->assertStatus(404);
+    }
+
+    public function test_complete_upload_other_users_file_returns_403(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $folder = SharedFolder::factory()->create(['owner_id' => $owner->id]);
+        $file = File::factory()->create(['owner_id' => $other->id]);
+
+        $response = $this->actingAs($owner)
+            ->postJson("/api/v1/shared-folders/{$folder->id}/complete-upload", [
+                'file_id' => $file->id,
+            ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_complete_upload_unauthenticated(): void
+    {
+        $response = $this->postJson('/api/v1/shared-folders/test/complete-upload', [
+            'file_id' => 'test',
+        ]);
+        $response->assertUnauthorized();
+    }
 }

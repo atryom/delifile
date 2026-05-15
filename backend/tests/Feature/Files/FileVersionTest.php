@@ -7,6 +7,7 @@ use App\Models\FileVersion;
 use App\Models\FileUserAccess;
 use App\Models\User;
 use Tests\TestCase;
+use Illuminate\Support\Facades\Storage;
 
 class FileVersionTest extends TestCase
 {
@@ -167,5 +168,121 @@ class FileVersionTest extends TestCase
     {
         $response = $this->postJson('/api/v1/files/test/versions/init-upload', []);
         $response->assertUnauthorized();
+    }
+
+    // ─── Version download ───────────────────────────────────────────────────
+
+    public function test_owner_can_download_version(): void
+    {
+        Storage::fake('s3');
+
+        $user = User::factory()->create();
+        $file = File::factory()->create(['owner_id' => $user->id]);
+        $version = FileVersion::create([
+            'file_id'        => $file->id,
+            'version_number' => 1,
+            'storage_key'    => 'test/v1.txt',
+            'original_name'  => 'doc.txt',
+            'size'           => 100,
+            'mime_type'      => 'text/plain',
+            'status'         => 'available',
+            'is_active'      => true,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/v1/files/{$file->id}/versions/{$version->id}/download");
+
+        $response->assertOk()
+            ->assertJsonPath('result', 'success')
+            ->assertJsonStructure(['data' => ['url', 'expires_in']]);
+    }
+
+    public function test_user_with_access_can_download_version(): void
+    {
+        Storage::fake('s3');
+
+        $owner = User::factory()->create();
+        $editor = User::factory()->create();
+        $file = File::factory()->create(['owner_id' => $owner->id]);
+        FileUserAccess::factory()->create([
+            'file_id' => $file->id,
+            'user_id' => $editor->id,
+        ]);
+        $version = FileVersion::create([
+            'file_id'        => $file->id,
+            'version_number' => 1,
+            'storage_key'    => 'test/v1.txt',
+            'original_name'  => 'doc.txt',
+            'size'           => 100,
+            'mime_type'      => 'text/plain',
+            'status'         => 'available',
+            'is_active'      => true,
+        ]);
+
+        $response = $this->actingAs($editor)
+            ->postJson("/api/v1/files/{$file->id}/versions/{$version->id}/download");
+
+        $response->assertOk()
+            ->assertJsonPath('result', 'success');
+    }
+
+    public function test_user_without_access_cannot_download_version(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $file = File::factory()->create(['owner_id' => $owner->id]);
+        $version = FileVersion::create([
+            'file_id'        => $file->id,
+            'version_number' => 1,
+            'storage_key'    => 'test/v1.txt',
+            'original_name'  => 'doc.txt',
+            'size'           => 100,
+            'mime_type'      => 'text/plain',
+            'status'         => 'available',
+            'is_active'      => true,
+        ]);
+
+        $response = $this->actingAs($other)
+            ->postJson("/api/v1/files/{$file->id}/versions/{$version->id}/download");
+
+        $response->assertStatus(404);
+    }
+
+    public function test_download_nonexistent_version_returns_404(): void
+    {
+        $user = User::factory()->create();
+        $file = File::factory()->create(['owner_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/v1/files/{$file->id}/versions/nonexistent/download");
+
+        $response->assertStatus(404);
+    }
+
+    public function test_download_version_unauthenticated_returns_401(): void
+    {
+        $response = $this->postJson('/api/v1/files/test/versions/test/download');
+        $response->assertUnauthorized();
+    }
+
+    public function test_download_uploading_version_returns_404(): void
+    {
+        $user = User::factory()->create();
+        $file = File::factory()->create(['owner_id' => $user->id]);
+        $version = FileVersion::create([
+            'file_id'        => $file->id,
+            'version_number' => 0,
+            'storage_key'    => 'test/tmp',
+            'original_name'  => 'uploading.txt',
+            'size'           => 100,
+            'mime_type'      => 'text/plain',
+            'status'         => 'uploading',
+            'is_active'      => false,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/v1/files/{$file->id}/versions/{$version->id}/download");
+
+        $response->assertStatus(404);
     }
 }
