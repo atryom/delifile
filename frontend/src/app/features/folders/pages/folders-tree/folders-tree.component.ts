@@ -1,5 +1,5 @@
 import {
-  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy,
+  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy, viewChild, ElementRef,
 } from '@angular/core';
 import { forkJoin, Observable, of, from, switchMap } from 'rxjs';
 import { HttpClient, HttpEventType, HttpEvent } from '@angular/common/http';
@@ -27,6 +27,26 @@ const PLAN_FILE_LIMITS: Record<string, number> = {
 import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialogs/access/shared-folder-access-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
+
+interface SharedFolderMoveItem { folder: SharedFolder; depth: number; }
+
+function buildSharedFolderMoveTree(folders: SharedFolder[]): SharedFolderMoveItem[] {
+  const result: SharedFolderMoveItem[] = [];
+  function walk(parentId: string | null, depth: number): void {
+    for (const f of folders) {
+      if ((f.parent_id ?? null) === parentId) {
+        result.push({ folder: f, depth });
+        walk(f.id, depth + 1);
+      }
+    }
+  }
+  walk(null, 0);
+  const placed = new Set(result.map(r => r.folder.id));
+  for (const f of folders) {
+    if (!placed.has(f.id)) result.push({ folder: f, depth: 0 });
+  }
+  return result;
+}
 
 interface Breadcrumb {
   label: string;
@@ -109,6 +129,7 @@ export class FoldersTreeComponent implements OnInit {
   // ── Create folder ─────────────────────────────────────────────────────────
   readonly creating = signal(false);
   createNameValue = '';
+  private readonly createNameInput = viewChild<ElementRef<HTMLInputElement>>('createNameInput');
 
   // ── Rename ────────────────────────────────────────────────────────────────
   readonly renamingId   = signal<string | null>(null);
@@ -182,6 +203,10 @@ export class FoldersTreeComponent implements OnInit {
     const n = this.moveDialogTargetIds().length;
     return n === 1 ? '1 файл' : n >= 2 && n <= 4 ? `${n} файла` : `${n} файлов`;
   });
+
+  readonly moveDialogIsShared    = computed(() => this.activeTab() === 'shared' && this.currentSharedFolderId() !== null);
+  readonly sharedFoldersMoveList = signal<SharedFolder[]>([]);
+  readonly sharedFoldersMoveTree = computed(() => buildSharedFolderMoveTree(this.sharedFoldersMoveList()));
 
   // ── Bulk delete ───────────────────────────────────────────────────────────
   readonly bulkDeleteDialogOpen = signal(false);
@@ -274,9 +299,10 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
-    const qp  = this.route.snapshot.queryParamMap;
+    const qp = this.route.snapshot.queryParamMap;
     const tab: 'local' | 'shared' = qp.get('tab') === 'shared' ? 'shared' : 'local';
     const deepSharedId = qp.get('shared_folder_id');
+    const deepLocalId  = qp.get('folder_id');
     const tagId = qp.get('tag_id');
 
     if (tagId) this.activeTagId.set(tagId);
@@ -287,24 +313,34 @@ export class FoldersTreeComponent implements OnInit {
       localFolderId: null,
       sharedFolderId: null,
     }]);
-    this.loadLocal();
     this.loadTags();
     this.loadUsage();
 
+    this.treeLoading.set(true);
+    this.orgApi.getFolderTree().subscribe({
+      next: (res) => {
+        this.fullTree.set(res.data.items);
+        this.treeLoading.set(false);
+        if (tab === 'local' && deepLocalId) {
+          this.restoreLocalFolderPath(deepLocalId);
+        }
+      },
+      error: () => this.treeLoading.set(false),
+    });
+
     if (tab === 'shared' && deepSharedId) {
       this.sfLoading.set(true);
-      this.sfApi.list().subscribe({
+      this.sfApi.listAll().subscribe({
         next: (res) => {
-          this.sharedFolders.set(res.data.items);
+          this.sharedFolders.set(res.data.items.filter(f => !f.parent_id));
           this.sfLoading.set(false);
-          const target = res.data.items.find(f => f.id === deepSharedId);
-          if (target) this.navigateIntoSharedFolder(target);
+          this.restoreSharedFolderPath(res.data.items, deepSharedId);
         },
-        error: () => this.sfLoading.set(false),
+        error: () => { this.sfLoading.set(false); this.loadShared(); },
       });
     } else {
       this.loadShared();
-      if (tab === 'local') this.loadFiles();
+      if (tab === 'local' && !deepLocalId) this.loadFiles();
     }
   }
 
@@ -534,6 +570,7 @@ export class FoldersTreeComponent implements OnInit {
     this.createNameValue = '';
     this.cancelRename();
     this.closeMenu();
+    setTimeout(() => this.createNameInput()?.nativeElement.focus(), 0);
   }
 
   cancelCreate(): void {
@@ -586,7 +623,15 @@ export class FoldersTreeComponent implements OnInit {
       });
     } else {
       this.sfApi.update(id, name).subscribe({
-        next: () => { this.cancelRename(); this.loadShared(); },
+        next: () => {
+          this.cancelRename();
+          const parentId = this.currentSharedFolderId();
+          if (parentId) {
+            this.loadSfSubfolders(parentId);
+          } else {
+            this.loadShared();
+          }
+        },
         error: (err) => alert(err.message ?? 'Ошибка'),
       });
     }
@@ -637,7 +682,16 @@ export class FoldersTreeComponent implements OnInit {
       });
     } else if (target.kind === 'shared-folder') {
       this.sfApi.delete(target.id).subscribe({
-        next: () => { this.deleting.set(false); this.deleteTarget.set(null); this.loadShared(); },
+        next: () => {
+          this.deleting.set(false);
+          this.deleteTarget.set(null);
+          const parentId = this.currentSharedFolderId();
+          if (parentId) {
+            this.loadSfSubfolders(parentId);
+          } else {
+            this.loadShared();
+          }
+        },
         error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
       });
     } else {
@@ -705,9 +759,14 @@ export class FoldersTreeComponent implements OnInit {
   // ── File actions ──────────────────────────────────────────────────────────
   openFileDetail(file: AnyFile): void {
     const sfId = this.currentSharedFolderId();
+    const localId = this.currentLocalFolderId();
     if (this.activeTab() === 'shared' && sfId) {
       this.router.navigate(['/files', file.id], {
         queryParams: { from: 'shared-folder', folder_id: sfId },
+      });
+    } else if (this.activeTab() === 'local' && localId) {
+      this.router.navigate(['/files', file.id], {
+        queryParams: { from: 'local-folder', folder_id: localId },
       });
     } else {
       this.router.navigate(['/files', file.id]);
@@ -978,6 +1037,12 @@ export class FoldersTreeComponent implements OnInit {
       this.moveDialogTargetIds.set(ids);
       this.moveDialogFolderId.set(null);
       this.moveDialogOpen.set(true);
+      if (this.moveDialogIsShared()) {
+        this.sfApi.listAll().subscribe({
+          next: (res) => this.sharedFoldersMoveList.set(res.data.items),
+          error: () => {},
+        });
+      }
     } else {
       this.bulkDeleteDialogOpen.set(true);
     }
@@ -1033,24 +1098,49 @@ export class FoldersTreeComponent implements OnInit {
     this.moveDialogFolderId.set(null);
     this.moveDialogOpen.set(true);
     this.closeMenu();
+    if (this.moveDialogIsShared()) {
+      this.sfApi.listAll().subscribe({
+        next: (res) => this.sharedFoldersMoveList.set(res.data.items),
+        error: () => {},
+      });
+    }
   }
 
   executeBulkMove(): void {
-    const folderId = this.moveDialogFolderId();
-    const ids      = this.moveDialogTargetIds();
+    const targetFolderId = this.moveDialogFolderId();
+    const ids            = this.moveDialogTargetIds();
     if (ids.length === 0 || this.movingFiles()) return;
     this.movingFiles.set(true);
-    forkJoin(ids.map(id => this.filesApi.moveFolder(id, folderId))).subscribe({
-      next: () => {
-        this.movingFiles.set(false);
-        this.moveDialogOpen.set(false);
-        const movedSet = new Set(ids);
-        this.files.update(fs => fs.filter(f => !movedSet.has(f.id)));
-        this.clearSelection();
-        this.loadLocal();
-      },
-      error: () => { this.movingFiles.set(false); },
-    });
+
+    if (this.moveDialogIsShared()) {
+      const sourceFolderId = this.currentSharedFolderId()!;
+      const ops = ids.flatMap(id => [
+        this.sfApi.removeFile(sourceFolderId, id),
+        this.sfApi.addFile(targetFolderId!, id),
+      ]);
+      forkJoin(ops).subscribe({
+        next: () => {
+          this.movingFiles.set(false);
+          this.moveDialogOpen.set(false);
+          const movedSet = new Set(ids);
+          this.files.update(fs => fs.filter(f => !movedSet.has(f.id)));
+          this.clearSelection();
+        },
+        error: () => { this.movingFiles.set(false); },
+      });
+    } else {
+      forkJoin(ids.map(id => this.filesApi.moveFolder(id, targetFolderId))).subscribe({
+        next: () => {
+          this.movingFiles.set(false);
+          this.moveDialogOpen.set(false);
+          const movedSet = new Set(ids);
+          this.files.update(fs => fs.filter(f => !movedSet.has(f.id)));
+          this.clearSelection();
+          this.loadLocal();
+        },
+        error: () => { this.movingFiles.set(false); },
+      });
+    }
   }
 
   // ── Bulk delete ───────────────────────────────────────────────────────────
@@ -1113,5 +1203,56 @@ export class FoldersTreeComponent implements OnInit {
       if (found) return found;
     }
     return null;
+  }
+
+  private restoreSharedFolderPath(allFolders: SharedFolder[], targetId: string): void {
+    const path = this.findSharedFolderPath(allFolders, targetId);
+    if (!path.length) { this.loadShared(); return; }
+
+    const crumbs: Breadcrumb[] = [{ label: 'Общие', localFolderId: null, sharedFolderId: null }];
+    for (const folder of path) {
+      crumbs.push({ label: folder.name, localFolderId: null, sharedFolderId: folder.id });
+    }
+    this.breadcrumbs.set(crumbs);
+
+    const target = path[path.length - 1];
+    this.currentSharedFolderId.set(target.id);
+    this.loadSharedFolderFiles(target.id);
+    this.loadSfSubfolders(target.id);
+  }
+
+  private findSharedFolderPath(allFolders: SharedFolder[], targetId: string): SharedFolder[] {
+    const byId = new Map(allFolders.map(f => [f.id, f]));
+    const path: SharedFolder[] = [];
+    let current = byId.get(targetId);
+    while (current) {
+      path.unshift(current);
+      if (!current.parent_id) break;
+      current = byId.get(current.parent_id);
+    }
+    return path;
+  }
+
+  private restoreLocalFolderPath(targetId: string): void {
+    const path = this.findLocalFolderPath(this.fullTree(), targetId);
+    if (!path.length) { this.loadFiles(); return; }
+
+    const crumbs: Breadcrumb[] = [{ label: 'Локальные', localFolderId: null, sharedFolderId: null }];
+    for (const node of path) {
+      crumbs.push({ label: node.name, localFolderId: node.id, sharedFolderId: null });
+    }
+    this.breadcrumbs.set(crumbs);
+
+    this.currentLocalFolderId.set(path[path.length - 1].id);
+    this.loadFiles();
+  }
+
+  private findLocalFolderPath(nodes: FolderTreeNode[], targetId: string): FolderTreeNode[] {
+    for (const node of nodes) {
+      if (node.id === targetId) return [node];
+      const childPath = this.findLocalFolderPath(node.children, targetId);
+      if (childPath.length) return [node, ...childPath];
+    }
+    return [];
   }
 }

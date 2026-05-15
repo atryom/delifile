@@ -118,31 +118,124 @@ class SharedFolderController extends Controller
 
     /**
      * GET /api/v1/shared-folders
+     *
+     * Returns the "root-level" shared folders for the current user:
+     * - Owned folders at the tree root (parent_id IS NULL)
+     * - Directly-granted folders where NO ancestor is accessible to the user
+     *   (so a subfolder granted in isolation appears at the root of the user's view)
      */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        $ownedIds  = SharedFolder::where('owner_id', $user->id)->pluck('id');
-        $accessIds = SharedFolderAccess::where('user_id', $user->id)->pluck('shared_folder_id');
-        $allIds    = $ownedIds->merge($accessIds)->unique();
+        $ownedIds        = SharedFolder::where('owner_id', $user->id)->pluck('id')->toArray();
+        $directAccessIds = SharedFolderAccess::where('user_id', $user->id)
+            ->pluck('shared_folder_id')->toArray();
 
-        $folders = SharedFolder::whereIn('id', $allIds)
+        // Set of all folder IDs the user can reach directly (owned or granted)
+        $accessibleSet = array_flip(array_unique(array_merge($ownedIds, $directAccessIds)));
+
+        // 1. User's own root folders
+        $showIds = SharedFolder::whereIn('id', $ownedIds)
+            ->whereNull('parent_id')
+            ->pluck('id')
+            ->toArray();
+
+        // 2. Directly-granted folders where no ancestor is in the accessible set
+        if (!empty($directAccessIds)) {
+            $accessFolders = SharedFolder::whereIn('id', $directAccessIds)
+                ->get(['id', 'owner_id', 'parent_id']);
+
+            // Pre-load entire ancestor chains to avoid N+1
+            $loaded   = $accessFolders->keyBy('id')->toArray();
+            $toFetch  = $accessFolders->pluck('parent_id')->filter()->unique()
+                ->diff(array_keys($loaded))->toArray();
+
+            while (!empty($toFetch)) {
+                $parents = SharedFolder::whereIn('id', $toFetch)->get(['id', 'owner_id', 'parent_id']);
+                foreach ($parents as $p) {
+                    $loaded[$p->id] = $p;
+                }
+                $toFetch = $parents->pluck('parent_id')->filter()->unique()
+                    ->diff(array_keys($loaded))->toArray();
+            }
+
+            foreach ($accessFolders as $folder) {
+                if ($folder->owner_id === $user->id) {
+                    continue; // already covered by owned-root logic
+                }
+
+                $ancestorAccessible = false;
+                $parentId = $folder->parent_id;
+
+                while ($parentId !== null) {
+                    if (isset($accessibleSet[$parentId])) {
+                        $ancestorAccessible = true;
+                        break;
+                    }
+                    $parent = $loaded[$parentId] ?? null;
+                    if (!$parent) break;
+                    if ($parent->owner_id === $user->id) {
+                        $ancestorAccessible = true;
+                        break;
+                    }
+                    $parentId = $parent->parent_id;
+                }
+
+                if (!$ancestorAccessible) {
+                    $showIds[] = $folder->id;
+                }
+            }
+        }
+
+        $showIds = array_unique($showIds);
+
+        $folders = SharedFolder::whereIn('id', $showIds)
             ->withCount('sharedFiles as files_count')
             ->get();
 
-        // Load my accesses for non-owned folders
         $myAccesses = SharedFolderAccess::where('user_id', $user->id)
-            ->whereIn('shared_folder_id', $allIds)
+            ->whereIn('shared_folder_id', $showIds)
             ->get()
             ->keyBy('shared_folder_id');
 
         $items = $folders->map(function (SharedFolder $folder) use ($user, $myAccesses) {
-            $myAccess = $myAccesses->get($folder->id);
-            return $this->formatFolder($folder, $user, $myAccess);
+            return $this->formatFolder($folder, $user, $myAccesses->get($folder->id));
         });
 
         return $this->success('Shared folders fetched', ['items' => $items]);
+    }
+
+    /**
+     * GET /api/v1/shared-folders/all-flat
+     * All accessible folders including subfolders, for tree-picker UI.
+     */
+    public function allFlat(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $ownedRootIds  = SharedFolder::where('owner_id', $user->id)->whereNull('parent_id')->pluck('id');
+        $accessRootIds = SharedFolderAccess::where('user_id', $user->id)->pluck('shared_folder_id');
+        $rootIds       = $ownedRootIds->merge($accessRootIds)->unique();
+
+        // BFS to collect all descendants
+        $all       = SharedFolder::whereIn('id', $rootIds)->get();
+        $nextIds   = $all->pluck('id');
+
+        while ($nextIds->isNotEmpty()) {
+            $children = SharedFolder::whereIn('parent_id', $nextIds)->get();
+            if ($children->isEmpty()) break;
+            $all     = $all->merge($children);
+            $nextIds = $children->pluck('id');
+        }
+
+        $myAccesses = SharedFolderAccess::where('user_id', $user->id)
+            ->whereIn('shared_folder_id', $all->pluck('id'))
+            ->get()->keyBy('shared_folder_id');
+
+        $items = $all->map(fn (SharedFolder $f) => $this->formatFolder($f, $user, $myAccesses->get($f->id)));
+
+        return $this->success('All shared folders', ['items' => $items]);
     }
 
     /**

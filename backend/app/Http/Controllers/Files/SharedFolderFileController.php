@@ -8,12 +8,34 @@ use App\Models\FileUserAccess;
 use App\Models\SharedFolder;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class SharedFolderFileController extends Controller
 {
+    /**
+     * Check folder access with ancestor inheritance — mirrors SharedFolderController::canAccess().
+     */
+    private function canAccessSharedFolder(User $user, SharedFolder $folder, string $requiredType = 'view'): bool
+    {
+        $current = $folder;
+        while ($current) {
+            if ($current->owner_id === $user->id) return true;
+
+            $query = SharedFolderAccess::where('shared_folder_id', $current->id)
+                ->where('user_id', $user->id);
+            if ($requiredType === 'edit') {
+                $query->where('access_type', 'edit');
+            }
+            if ($query->exists()) return true;
+
+            $current = $current->parent_id ? SharedFolder::find($current->parent_id) : null;
+        }
+        return false;
+    }
+
     /**
      * POST /api/v1/files/{id}/add-to-my-files
      * Move a shared_folder_only file into the user's regular files.
@@ -65,43 +87,74 @@ class SharedFolderFileController extends Controller
             'folder_ids.*' => 'string',
         ]);
 
-        $targetFolderIds = $data['folder_ids'];
+        $targetFolderIds = collect($data['folder_ids'])->unique()->values()->toArray();
 
-        // Resolve folders user can edit
-        $ownedIds = SharedFolder::where('owner_id', $user->id)->pluck('id');
-        $editAccessIds = SharedFolderAccess::where('user_id', $user->id)
-            ->where('access_type', 'edit')
-            ->pluck('shared_folder_id');
+        // All folder IDs relevant to this operation (current + requested)
+        $currentFolderIds = SharedFolderFile::where('file_id', $file->id)
+            ->pluck('shared_folder_id')->toArray();
 
-        $editableFolderIds = $ownedIds->merge($editAccessIds)->unique()->values();
+        $allFolderIds = array_unique(array_merge($targetFolderIds, $currentFolderIds));
+        $allFolders   = SharedFolder::whereIn('id', $allFolderIds)->keyBy('id');
 
-        DB::transaction(function () use ($file, $user, $targetFolderIds, $editableFolderIds) {
-            // Remove file from editable folders not in target list
-            SharedFolderFile::where('file_id', $file->id)
-                ->whereIn('shared_folder_id', $editableFolderIds)
-                ->whereNotIn('shared_folder_id', $targetFolderIds)
-                ->delete();
+        // Determine which folders the user can actually edit (with ancestor inheritance)
+        $editableIds = [];
+        foreach ($allFolderIds as $folderId) {
+            $folder = $allFolders->get($folderId);
+            if ($folder && $this->canAccessSharedFolder($user, $folder, 'edit')) {
+                $editableIds[] = $folderId;
+            }
+        }
 
-            // Add file to new folders (only editable ones)
-            $toAdd = array_intersect($targetFolderIds, $editableFolderIds->toArray());
+        $toRemove = array_diff(array_intersect($currentFolderIds, $editableIds), $targetFolderIds);
+        $toAdd    = array_diff(array_intersect($targetFolderIds, $editableIds), $currentFolderIds);
+
+        DB::transaction(function () use ($file, $user, $toAdd, $toRemove) {
+            if (!empty($toRemove)) {
+                SharedFolderFile::where('file_id', $file->id)
+                    ->whereIn('shared_folder_id', $toRemove)
+                    ->delete();
+            }
             foreach ($toAdd as $folderId) {
                 SharedFolderFile::firstOrCreate([
                     'shared_folder_id' => $folderId,
                     'file_id'          => $file->id,
-                ], [
-                    'added_by' => $user->id,
-                ]);
+                ], ['added_by' => $user->id]);
             }
         });
 
-        // Return the full list of folder IDs this file is now in (across all user-accessible folders)
-        $currentFolderIds = SharedFolderFile::where('file_id', $file->id)
-            ->whereIn('shared_folder_id', $editableFolderIds)
-            ->pluck('shared_folder_id')
-            ->values()
-            ->toArray();
+        $updatedFolderIds = SharedFolderFile::where('file_id', $file->id)
+            ->pluck('shared_folder_id')->values()->toArray();
 
-        return $this->success('Shared folders updated', ['folder_ids' => $currentFolderIds]);
+        return $this->success('Shared folders updated', ['folder_ids' => $updatedFolderIds]);
+    }
+
+    /**
+     * POST /api/v1/shared-folders/{folderId}/files/{fileId}
+     * Add an existing file to a shared folder.
+     */
+    public function addFile(Request $request, string $folderId, string $fileId): JsonResponse
+    {
+        $user   = $request->user();
+        $folder = SharedFolder::find($folderId);
+        if (!$folder) {
+            return $this->notFound('Folder not found');
+        }
+
+        $file = File::find($fileId);
+        if (!$file) {
+            return $this->notFound('File not found');
+        }
+
+        if (!$this->canAccessSharedFolder($user, $folder, 'edit')) {
+            return $this->forbidden('Edit access required to add files');
+        }
+
+        SharedFolderFile::firstOrCreate([
+            'shared_folder_id' => $folderId,
+            'file_id'          => $fileId,
+        ], ['added_by' => $user->id]);
+
+        return $this->success('File added to folder');
     }
 
     /**
@@ -121,14 +174,9 @@ class SharedFolderFileController extends Controller
             return $this->notFound('File not found');
         }
 
-        $isOwner     = $folder->owner_id === $user->id;
-        $hasEdit     = SharedFolderAccess::where('shared_folder_id', $folderId)
-            ->where('user_id', $user->id)
-            ->where('access_type', 'edit')
-            ->exists();
         $isFileOwner = $file->isOwnedBy($user);
 
-        if (!$isOwner && !$hasEdit && !$isFileOwner) {
+        if (!$this->canAccessSharedFolder($user, $folder, 'edit') && !$isFileOwner) {
             return $this->forbidden('You do not have permission to remove this file');
         }
 

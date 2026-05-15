@@ -43,6 +43,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   toggleTheme(): void { this.themeService.toggle(); }
 
   readonly isAuth          = this.authState.isAuthenticated;
+  readonly isBlocked       = this.authState.isBlocked;
   readonly needsVerification = this.authState.needsEmailVerification;
   readonly emailVerified   = this.authState.isEmailVerified;
   readonly userEmail       = computed(() => this.authState.user()?.email ?? '');
@@ -75,7 +76,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   private _routerSub?: Subscription;
 
   ngOnInit(): void {
-    if (this.isAuth()) {
+    if (this.isAuth() && !this.isBlocked()) {
       this._startPolling();
       // Restore push subscription if permission was granted in a previous session
       if (this.notifService.isGranted()) {

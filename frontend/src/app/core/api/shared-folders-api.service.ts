@@ -125,4 +125,12 @@ export class SharedFoldersApiService {
   leaveFolder(id: string): Observable<ApiResponse<Record<string, never>>> {
     return this.api.delete(`/shared-folders/${id}/leave`);
   }
+
+  listAll(): Observable<ApiResponse<{ items: SharedFolder[] }>> {
+    return this.api.get('/shared-folders/all-flat');
+  }
+
+  addFile(folderId: string, fileId: string): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.post(`/shared-folders/${folderId}/files/${fileId}`, {});
+  }
 }

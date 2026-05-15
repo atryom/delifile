@@ -47,7 +47,12 @@ class AuthService
         }
 
         if ($user->isBlocked()) {
-            return ['blocked' => true, 'user' => $this->formatUser($user)];
+            $token = $user->createToken('resend-verification');
+            return [
+                'blocked' => true,
+                'user'    => $this->formatUser($user),
+                'token'   => $token->plainTextToken,
+            ];
         }
 
         $deviceId   = $credentials['device_id'] ?? null;

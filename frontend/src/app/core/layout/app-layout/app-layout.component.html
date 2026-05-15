@@ -22,7 +22,7 @@
         }
 
         <!-- Notification enable banner (red, like verify but below it) -->
-        @if (showNotifBanner()) {
+        @if (showNotifBanner() && !isBlocked()) {
           <div class="notif-enable-banner"
                [class.notif-enable-banner--offset]="hasVerifyBanner()"
                role="status">
@@ -35,6 +35,7 @@
         }
 
         <!-- Mobile top bar -->
+        @if (!isBlocked()) {
         <header class="mobile-header">
           <span class="mobile-brand">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
@@ -261,13 +262,14 @@
             <button class="btn-logout" (click)="logout()">{{ 'nav.logout' | translate }}</button>
           </div>
         </nav>
+        }
       }
 
       <!-- Main content -->
       <main class="main-content"
-            [class.no-sidebar]="!isAuth()"
-            [class.has-banner]="hasVerifyBanner() || showNotifBanner()"
-            [class.has-two-banners]="hasVerifyBanner() && showNotifBanner()">
+            [class.no-sidebar]="!isAuth() || isBlocked()"
+            [class.has-banner]="hasVerifyBanner() || (showNotifBanner() && !isBlocked())"
+            [class.has-two-banners]="hasVerifyBanner() && showNotifBanner() && !isBlocked()">
         <ng-content/>
         <app-footer/>
       </main>

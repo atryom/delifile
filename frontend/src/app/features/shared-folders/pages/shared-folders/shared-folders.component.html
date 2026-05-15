@@ -61,7 +61,7 @@
         <div class="subfolders-header">
           <span class="subfolders-title">{{ 'shared_folders.subfolders' | translate }}</span>
           @if (canEdit()) {
-            <button class="btn-add-subfolder" (click)="showCreateSubfolder.set(!showCreateSubfolder())">
+            <button class="btn-add-subfolder" (click)="openCreateSubfolderForm()">
               + {{ 'shared_folders.add_subfolder' | translate }}
             </button>
           }
@@ -70,12 +70,14 @@
         @if (showCreateSubfolder()) {
           <div class="create-subfolder-form">
             <input
+              #subfolderNameInput
               type="text"
               class="subfolder-name-input"
               [placeholder]="'shared_folders.subfolder_name_placeholder' | translate"
               [value]="newSubfolderName()"
               (input)="newSubfolderName.set($any($event.target).value)"
-              (keyup.enter)="createSubfolder()" />
+              (keyup.enter)="createSubfolder()"
+              (keydown.escape)="showCreateSubfolder.set(false)" />
             <button class="btn-primary-sm" (click)="createSubfolder()" [disabled]="!newSubfolderName().trim() || creatingSubfolder()">
               {{ 'shared_folders.create_subfolder_btn' | translate }}
             </button>

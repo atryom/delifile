@@ -146,6 +146,14 @@ export class InboxComponent implements OnInit {
     });
   }
 
+  clearFileSelection(): void {
+    this.selectedFileIds.set(new Set());
+  }
+
+  clearFolderSelection(): void {
+    this.selectedFolderIds.set(new Set());
+  }
+
   formatSize(bytes: number | null): string {
     if (!bytes) return '—';
     if (bytes < 1024) return bytes + ' B';

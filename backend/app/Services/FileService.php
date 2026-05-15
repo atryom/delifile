@@ -8,6 +8,7 @@ use App\Enums\FileStatus;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\FileVersion;
+use App\Models\SharedFolder;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
 use App\Models\User;
@@ -132,7 +133,7 @@ class FileService
             return true;
         }
 
-        // Access via shared folder membership
+        // Access via shared folder membership — respects inherited access from parent folders
         $sharedFolderIds = SharedFolderFile::where('file_id', $file->id)
             ->pluck('shared_folder_id');
 
@@ -140,9 +141,21 @@ class FileService
             return false;
         }
 
-        return SharedFolderAccess::whereIn('shared_folder_id', $sharedFolderIds)
-            ->where('user_id', $user->id)
-            ->exists();
+        foreach ($sharedFolderIds as $folderId) {
+            $current = SharedFolder::find($folderId);
+            while ($current) {
+                if ($current->owner_id === $user->id) {
+                    return true;
+                }
+                if (SharedFolderAccess::where('shared_folder_id', $current->id)
+                    ->where('user_id', $user->id)->exists()) {
+                    return true;
+                }
+                $current = $current->parent_id ? SharedFolder::find($current->parent_id) : null;
+            }
+        }
+
+        return false;
     }
 
     /**

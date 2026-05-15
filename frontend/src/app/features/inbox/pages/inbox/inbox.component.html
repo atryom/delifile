@@ -36,19 +36,6 @@
         <p>{{ 'inbox.files_empty' | translate }}</p>
       </div>
     } @else {
-      <!-- Bulk action bar -->
-      @if (hasFileSelection()) {
-        <div class="bulk-bar" role="toolbar">
-          <span class="bulk-count">{{ 'inbox.selected' | translate:{ count: selectedFileIds().size } }}</span>
-          <button class="btn-accept" (click)="acceptFiles()" [disabled]="actionPending()">
-            {{ 'inbox.accept' | translate }}
-          </button>
-          <button class="btn-reject" (click)="rejectFiles()" [disabled]="actionPending()">
-            {{ 'inbox.reject' | translate }}
-          </button>
-        </div>
-      }
-
       <div class="list-header">
         <label class="checkbox-wrap" [attr.aria-label]="'inbox.select_all' | translate">
           <input
@@ -57,6 +44,7 @@
             (change)="toggleAllFiles()"
             [attr.aria-label]="'inbox.select_all' | translate" />
         </label>
+        <span aria-hidden="true"></span>
         <span class="col-name">{{ 'inbox.col_name' | translate }}</span>
         <span class="col-sender">{{ 'inbox.col_sender' | translate }}</span>
         <span class="col-size">{{ 'inbox.col_size' | translate }}</span>
@@ -122,19 +110,6 @@
         <p>{{ 'inbox.folders_empty' | translate }}</p>
       </div>
     } @else {
-      <!-- Bulk action bar -->
-      @if (hasFolderSelection()) {
-        <div class="bulk-bar" role="toolbar">
-          <span class="bulk-count">{{ 'inbox.selected' | translate:{ count: selectedFolderIds().size } }}</span>
-          <button class="btn-accept" (click)="acceptFolders()" [disabled]="actionPending()">
-            {{ 'inbox.accept' | translate }}
-          </button>
-          <button class="btn-reject" (click)="rejectFolders()" [disabled]="actionPending()">
-            {{ 'inbox.reject' | translate }}
-          </button>
-        </div>
-      }
-
       <div class="list-header">
         <label class="checkbox-wrap" [attr.aria-label]="'inbox.select_all' | translate">
           <input
@@ -143,6 +118,7 @@
             (change)="toggleAllFolders()"
             [attr.aria-label]="'inbox.select_all' | translate" />
         </label>
+        <span aria-hidden="true"></span>
         <span class="col-name">{{ 'inbox.col_name' | translate }}</span>
         <span class="col-sender">{{ 'inbox.col_inviter' | translate }}</span>
         <span class="col-access">{{ 'inbox.col_access' | translate }}</span>
@@ -198,3 +174,39 @@
     }
   }
 </div>
+
+<!-- ══════════════════════════════════════════════ SELECTION BAR (fixed bottom) -->
+
+@if (hasFileSelection()) {
+  <div class="selection-bar" role="toolbar" aria-label="Групповые действия над файлами">
+    <div class="selection-row1">
+      <span class="selection-count">{{ 'inbox.selected' | translate:{ count: selectedFileIds().size } }}</span>
+      <button type="button" class="btn-bulk-cancel" (click)="clearFileSelection()">Снять выделение</button>
+    </div>
+    <div class="selection-actions">
+      <button type="button" class="btn-bulk-accept" (click)="acceptFiles()" [disabled]="actionPending()">
+        {{ 'inbox.accept' | translate }}
+      </button>
+      <button type="button" class="btn-bulk-reject" (click)="rejectFiles()" [disabled]="actionPending()">
+        {{ 'inbox.reject' | translate }}
+      </button>
+    </div>
+  </div>
+}
+
+@if (hasFolderSelection()) {
+  <div class="selection-bar" role="toolbar" aria-label="Групповые действия над папками">
+    <div class="selection-row1">
+      <span class="selection-count">{{ 'inbox.selected' | translate:{ count: selectedFolderIds().size } }}</span>
+      <button type="button" class="btn-bulk-cancel" (click)="clearFolderSelection()">Снять выделение</button>
+    </div>
+    <div class="selection-actions">
+      <button type="button" class="btn-bulk-accept" (click)="acceptFolders()" [disabled]="actionPending()">
+        {{ 'inbox.accept' | translate }}
+      </button>
+      <button type="button" class="btn-bulk-reject" (click)="rejectFolders()" [disabled]="actionPending()">
+        {{ 'inbox.reject' | translate }}
+      </button>
+    </div>
+  </div>
+}

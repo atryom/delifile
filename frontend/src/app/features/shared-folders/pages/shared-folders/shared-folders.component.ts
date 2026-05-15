@@ -1,5 +1,5 @@
 import {
-  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy,
+  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy, viewChild, ElementRef,
 } from '@angular/core';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -65,6 +65,7 @@ export class SharedFoldersComponent implements OnInit {
   readonly showCreateSubfolder = signal(false);
   readonly newSubfolderName   = signal('');
   readonly creatingSubfolder  = signal(false);
+  private readonly subfolderNameInput = viewChild<ElementRef<HTMLInputElement>>('subfolderNameInput');
 
   readonly files           = signal<SharedFolderFileItem[]>([]);
   readonly filesLoading    = signal(false);
@@ -308,6 +309,12 @@ export class SharedFoldersComponent implements OnInit {
   fileDetailQueryParams(): Record<string, string> {
     const folderId = this.selectedFolder()?.id;
     return folderId ? { from: 'shared-folder', folder_id: folderId } : {};
+  }
+
+  openCreateSubfolderForm(): void {
+    this.showCreateSubfolder.set(true);
+    this.newSubfolderName.set('');
+    setTimeout(() => this.subfolderNameInput()?.nativeElement.focus(), 0);
   }
 
   openAccessDialog(): void { this.accessDialogOpen.set(true); }

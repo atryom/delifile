@@ -214,6 +214,7 @@ Route::prefix('v1')->group(function () {
         // Shared Folders
         Route::prefix('shared-folders')->group(function () {
             Route::get('',                               [SharedFolderController::class, 'index']);
+            Route::get('all-flat',                       [SharedFolderController::class, 'allFlat']);
             Route::post('',                              [SharedFolderController::class, 'store']);
             Route::patch('{id}',                         [SharedFolderController::class, 'update']);
             Route::delete('{id}',                        [SharedFolderController::class, 'destroy']);
@@ -229,6 +230,7 @@ Route::prefix('v1')->group(function () {
             Route::post('{id}/links/{linkId}/disable',   [SharedFolderController::class, 'disableLink']);
             Route::get('{id}/subfolders',                [SharedFolderController::class, 'subfolders']);
             Route::post('{id}/subfolders',               [SharedFolderController::class, 'createSubfolder']);
+            Route::post('{id}/files/{fileId}',            [SharedFolderFileController::class, 'addFile']);
             Route::delete('{id}/files/{fileId}',         [SharedFolderFileController::class, 'removeFile']);
             Route::delete('{id}/leave',                  [SharedFolderController::class, 'leave']);
         });

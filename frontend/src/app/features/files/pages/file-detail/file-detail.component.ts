@@ -120,6 +120,9 @@ export class FileDetailComponent implements OnInit {
       this.backFolderId = folderIdParam;
       this.backLink.set({ commands: ['/folders'], queryParams: { tab: 'shared', shared_folder_id: folderIdParam } });
       this.contextSharedFolderId.set(folderIdParam);
+    } else if (fromParam === 'local-folder' && folderIdParam) {
+      this.backFolderId = folderIdParam;
+      this.backLink.set({ commands: ['/folders'], queryParams: { folder_id: folderIdParam } });
     }
 
     this.loadFile();
@@ -140,6 +143,11 @@ export class FileDetailComponent implements OnInit {
         this.pendingFolderId.set(res.data.file.folder_id ?? null);
         this.displayNameDraft = res.data.file.display_name ?? '';
         this.loading.set(false);
+        // Direct link: set back to local folder if file belongs to one
+        const fromParam = this.route.snapshot.queryParamMap.get('from');
+        if (!fromParam && res.data.file.folder_id) {
+          this.backLink.set({ commands: ['/folders'], queryParams: { folder_id: res.data.file.folder_id } });
+        }
         // Select last active version by default; fall back to first inactive if none active
         const versions = res.data.file.versions ?? [];
         if (versions.length > 0) {

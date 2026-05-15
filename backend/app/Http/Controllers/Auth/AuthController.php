@@ -53,12 +53,10 @@ class AuthController extends Controller
         }
 
         if (!empty($result['blocked'])) {
-            return $this->error(
-                'Учётная запись заблокирована из-за неподтверждённого email.',
-                'ACCOUNT_BLOCKED',
-                ['user' => $result['user']],
-                403
-            );
+            return $this->success('Вход выполнен успешно', [
+                'token' => $result['token'],
+                'user'  => $result['user'],
+            ]);
         }
 
         if (!empty($result['device_limit'])) {
