@@ -4,6 +4,7 @@ import angular from '@analogjs/vite-plugin-angular';
 export default defineConfig({
   test: {
     globals: true,
+    pool: 'vmThreads',
     environment: 'happy-dom',
     include: ['src/**/*.spec.ts'],
     setupFiles: ['src/test-setup.ts'],
