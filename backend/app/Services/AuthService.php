@@ -179,6 +179,7 @@ class AuthService
             'notify_new_files'                      => (bool) ($user->notify_new_files ?? true),
             'notify_contacts_added'                 => (bool) ($user->notify_contacts_added ?? true),
             'allow_contacts_without_confirmation'   => (bool) ($user->allow_contacts_without_confirmation ?? true),
+            'auto_add_received_files'               => (bool) ($user->auto_add_received_files ?? true),
         ];
     }
 }

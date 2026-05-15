@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Files;
 
 use App\Http\Controllers\Controller;
 use App\Models\File;
+use App\Models\FileUserAccess;
 use App\Models\SharedFolder;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
@@ -52,8 +53,11 @@ class SharedFolderFileController extends Controller
             return $this->notFound('File not found');
         }
 
-        if (!$file->isOwnedBy($user) || $file->shared_folder_only) {
-            return $this->forbidden('File must be in your personal files');
+        $hasAccess = $file->isOwnedBy($user)
+            || FileUserAccess::where('file_id', $file->id)->where('user_id', $user->id)->exists();
+
+        if (!$hasAccess || $file->shared_folder_only) {
+            return $this->forbidden('File must be accessible and not shared_folder_only');
         }
 
         $data = $request->validate([
@@ -113,8 +117,11 @@ class SharedFolderFileController extends Controller
             return $this->notFound('File not found');
         }
 
-        if (!$file->isOwnedBy($user)) {
-            return $this->forbidden('You do not own this file');
+        $hasAccess = $file->isOwnedBy($user)
+            || FileUserAccess::where('file_id', $file->id)->where('user_id', $user->id)->exists();
+
+        if (!$hasAccess) {
+            return $this->forbidden('You do not have access to this file');
         }
 
         // All folders accessible to this user

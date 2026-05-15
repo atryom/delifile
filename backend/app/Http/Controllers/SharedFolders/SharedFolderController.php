@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Models\File;
 use App\Models\FileUserAccess;
+use App\Models\PendingReceivedSharedFolder;
 use App\Models\SharedFolder;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
@@ -33,23 +34,36 @@ class SharedFolderController extends Controller
 
     /**
      * Check if user can access the shared folder at the given level.
-     * 'view': owner OR has any access record (view or edit)
-     * 'edit': owner OR has access_type=edit
+     * 'view': owner OR has any access record (view or edit) on this folder OR any ancestor
+     * 'edit': owner OR has access_type=edit on this folder OR any ancestor
+     *
+     * Nested folders inherit access from ancestors; they can also have their own
+     * additional participants that narrow or widen the inherited set.
      */
     private function canAccess(User $user, SharedFolder $folder, string $requiredType = 'view'): bool
     {
-        if ($folder->owner_id === $user->id) {
-            return true;
+        // Walk from this folder up to root
+        $current = $folder;
+        while ($current) {
+            if ($current->owner_id === $user->id) {
+                return true;
+            }
+
+            $query = SharedFolderAccess::where('shared_folder_id', $current->id)
+                ->where('user_id', $user->id);
+
+            if ($requiredType === 'edit') {
+                $query->where('access_type', 'edit');
+            }
+
+            if ($query->exists()) {
+                return true;
+            }
+
+            $current = $current->parent_id ? SharedFolder::find($current->parent_id) : null;
         }
 
-        $query = SharedFolderAccess::where('shared_folder_id', $folder->id)
-            ->where('user_id', $user->id);
-
-        if ($requiredType === 'edit') {
-            $query->where('access_type', 'edit');
-        }
-
-        return $query->exists();
+        return false;
     }
 
     private function formatFolder(SharedFolder $folder, User $user, ?SharedFolderAccess $myAccess = null): array
@@ -58,7 +72,9 @@ class SharedFolderController extends Controller
             'id'             => $folder->id,
             'name'           => $folder->name,
             'owner_id'       => $folder->owner_id,
+            'parent_id'      => $folder->parent_id,
             'files_count'    => $folder->files_count ?? 0,
+            'children_count' => $folder->children()->count(),
             'is_owner'       => $folder->owner_id === $user->id,
             'my_access_type' => $myAccess?->access_type?->value,
             'created_at'     => $folder->created_at?->toIso8601String(),
@@ -146,6 +162,69 @@ class SharedFolderController extends Controller
         return $this->success('Shared folder created', [
             'folder' => $this->formatFolder($folder, $request->user()),
         ], 201);
+    }
+
+    /**
+     * POST /api/v1/shared-folders/{id}/subfolders
+     * Create a nested folder inside an existing shared folder.
+     * Requires edit access on the parent.
+     */
+    public function createSubfolder(Request $request, string $id): JsonResponse
+    {
+        $parent = SharedFolder::find($id);
+        if (!$parent) {
+            return $this->notFound('Shared folder not found');
+        }
+
+        if (!$this->canAccess($request->user(), $parent, 'edit')) {
+            return $this->forbidden('Edit access required to create subfolders');
+        }
+
+        $data = $request->validate(['name' => 'required|string|max:100']);
+
+        $folder = SharedFolder::create([
+            'owner_id'  => $request->user()->id,
+            'parent_id' => $parent->id,
+            'name'      => $data['name'],
+        ]);
+
+        $folder->files_count = 0;
+
+        return $this->success('Subfolder created', [
+            'folder' => $this->formatFolder($folder, $request->user()),
+        ], 201);
+    }
+
+    /**
+     * GET /api/v1/shared-folders/{id}/subfolders
+     * List direct children of a shared folder.
+     */
+    public function subfolders(Request $request, string $id): JsonResponse
+    {
+        $parent = SharedFolder::find($id);
+        if (!$parent) {
+            return $this->notFound('Shared folder not found');
+        }
+
+        if (!$this->canAccess($request->user(), $parent)) {
+            return $this->forbidden();
+        }
+
+        $user = $request->user();
+        $children = SharedFolder::where('parent_id', $id)
+            ->withCount('sharedFiles as files_count')
+            ->get();
+
+        $myAccesses = SharedFolderAccess::where('user_id', $user->id)
+            ->whereIn('shared_folder_id', $children->pluck('id'))
+            ->get()
+            ->keyBy('shared_folder_id');
+
+        $items = $children->map(function (SharedFolder $folder) use ($user, $myAccesses) {
+            return $this->formatFolder($folder, $user, $myAccesses->get($folder->id));
+        });
+
+        return $this->success('Subfolders fetched', ['items' => $items]);
     }
 
     /**
@@ -445,6 +524,42 @@ class SharedFolderController extends Controller
 
         if ($existingQuery->exists()) {
             return $this->error('Access already exists for this contact', 'DUPLICATE_ACCESS', [], 422);
+        }
+
+        $recipientUser = $resolvedUserId ? User::find($resolvedUserId) : null;
+        $autoAdd = $recipientUser ? ($recipientUser->auto_add_received_files ?? true) : true;
+
+        if (!$autoAdd) {
+            PendingReceivedSharedFolder::firstOrCreate([
+                'shared_folder_id' => $folder->id,
+                'recipient_user_id' => $recipientUser->id,
+            ], [
+                'inviter_user_id' => $request->user()->id,
+                'access_type'     => $data['access_type'],
+            ]);
+
+            $senderName = $request->user()->name ?? $request->user()->email;
+            $this->pushService->sendToUser(
+                $recipientUser,
+                'Приглашение в общую папку',
+                "{$senderName} приглашает вас в папку «{$folder->name}»",
+                config('app.url') . '/inbox',
+            );
+
+            return $this->success('Access pending recipient approval', [
+                'access' => [
+                    'id'          => null,
+                    'user_id'     => $resolvedUserId,
+                    'contact_id'  => $contact->id,
+                    'access_type' => $data['access_type'],
+                    'pending'     => true,
+                    'user'        => $recipientUser ? [
+                        'id'    => $recipientUser->id,
+                        'email' => $recipientUser->email,
+                        'name'  => $recipientUser->name,
+                    ] : null,
+                ],
+            ], 201);
         }
 
         $access = SharedFolderAccess::create([

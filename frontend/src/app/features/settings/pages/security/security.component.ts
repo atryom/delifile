@@ -51,6 +51,9 @@ export class SecurityComponent implements OnInit {
   // Contact settings
   readonly allowContactsWithout   = signal(true);
 
+  // Privacy
+  readonly autoAddReceivedFiles   = signal(true);
+
   // Contact requests
   readonly contactRequests        = signal<ContactRequestItem[]>([]);
   readonly loadingRequests        = signal(false);
@@ -91,6 +94,7 @@ export class SecurityComponent implements OnInit {
     this.notifyNewFiles.set(user.notify_new_files ?? true);
     this.notifyContactsAdded.set(user.notify_contacts_added ?? true);
     this.allowContactsWithout.set(user.allow_contacts_without_confirmation ?? true);
+    this.autoAddReceivedFiles.set(user.auto_add_received_files ?? true);
   }
 
   private _loadContactRequests(): void {
@@ -229,6 +233,11 @@ export class SecurityComponent implements OnInit {
     this._saveSettings();
   }
 
+  toggleAutoAddReceivedFiles(value: boolean): void {
+    this.autoAddReceivedFiles.set(value);
+    this._saveSettings();
+  }
+
   private _saveSettings(): void {
     if (this.savingSettings()) return;
     this.savingSettings.set(true);
@@ -237,6 +246,7 @@ export class SecurityComponent implements OnInit {
       notify_new_files:                    this.notifyNewFiles(),
       notify_contacts_added:               this.notifyContactsAdded(),
       allow_contacts_without_confirmation: this.allowContactsWithout(),
+      auto_add_received_files:             this.autoAddReceivedFiles(),
     }).subscribe({
       next: res => {
         this.savingSettings.set(false);

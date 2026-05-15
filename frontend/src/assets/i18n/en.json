@@ -114,7 +114,8 @@
     "support": "Support",
     "logout": "Sign out",
     "menu": "Menu",
-    "shared_folders": "Shared Folders"
+    "shared_folders": "Shared Folders",
+    "inbox": "Inbox"
   },
   "tariffs": {
     "title": "Tariff Plans",
@@ -490,7 +491,36 @@
       "no_requests": "No incoming requests.",
       "accept": "Allow",
       "reject": "Decline"
+    },
+    "privacy": {
+      "title": "Privacy",
+      "hint": "Manage privacy settings and behaviour when receiving files.",
+      "auto_add_label": "Automatically add received files and links",
+      "auto_add_desc": "If disabled, incoming files and shared folders will go to the 'Inbox' section where you can accept or decline them."
     }
+  },
+  "inbox": {
+    "title": "Inbox",
+    "tabs": {
+      "files": "Files",
+      "folders": "Shared Folders"
+    },
+    "files_empty": "No incoming files.",
+    "folders_empty": "No incoming shared folders.",
+    "selected": "Selected: {{count}}",
+    "select_all": "Select all",
+    "select_item": "Select",
+    "accept": "Accept",
+    "reject": "Decline",
+    "col_name": "Name",
+    "col_sender": "Sender",
+    "col_inviter": "Invited by",
+    "col_size": "Size",
+    "col_date": "Received",
+    "col_access": "Access",
+    "col_actions": "",
+    "access_view": "View",
+    "access_edit": "Edit"
   },
   "notifications": {
     "banner_text": "Enable notifications",
@@ -575,7 +605,11 @@
     "public_link_invalid": "Link is invalid or expired",
     "public_link_save_banner": "You can add this folder to your account",
     "public_link_login": "Sign in",
-    "public_link_register": "Sign up"
+    "public_link_register": "Sign up",
+    "subfolders": "Folders",
+    "add_subfolder": "Create subfolder",
+    "subfolder_name_placeholder": "Subfolder name",
+    "create_subfolder_btn": "Create"
   },
   "comments": {
     "section_title": "Comments",

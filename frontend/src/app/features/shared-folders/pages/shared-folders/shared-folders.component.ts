@@ -59,6 +59,13 @@ export class SharedFoldersComponent implements OnInit {
   readonly foldersLoading  = signal(false);
   readonly selectedFolder  = signal<SharedFolder | null>(null);
 
+  // Nested folder navigation
+  readonly subfolders         = signal<SharedFolder[]>([]);
+  readonly breadcrumb         = signal<SharedFolder[]>([]);
+  readonly showCreateSubfolder = signal(false);
+  readonly newSubfolderName   = signal('');
+  readonly creatingSubfolder  = signal(false);
+
   readonly files           = signal<SharedFolderFileItem[]>([]);
   readonly filesLoading    = signal(false);
   readonly page            = signal(1);
@@ -114,8 +121,52 @@ export class SharedFoldersComponent implements OnInit {
 
   selectFolder(f: SharedFolder): void {
     this.selectedFolder.set(f);
+    this.breadcrumb.set([f]);
     this.router.navigate([], { queryParams: { folder_id: f.id }, replaceUrl: true });
     this.loadFiles(1);
+    this.loadSubfolders(f.id);
+  }
+
+  navigateToSubfolder(sub: SharedFolder): void {
+    this.selectedFolder.set(sub);
+    this.breadcrumb.update(bc => [...bc, sub]);
+    this.router.navigate([], { queryParams: { folder_id: sub.id }, replaceUrl: true });
+    this.loadFiles(1);
+    this.loadSubfolders(sub.id);
+  }
+
+  navigateBreadcrumb(index: number): void {
+    const bc = this.breadcrumb();
+    const target = bc[index];
+    if (!target) return;
+    this.breadcrumb.set(bc.slice(0, index + 1));
+    this.selectedFolder.set(target);
+    this.router.navigate([], { queryParams: { folder_id: target.id }, replaceUrl: true });
+    this.loadFiles(1);
+    this.loadSubfolders(target.id);
+  }
+
+  private loadSubfolders(folderId: string): void {
+    this.sfApi.getSubfolders(folderId).subscribe({
+      next: res => this.subfolders.set(res.data.items),
+      error: () => this.subfolders.set([]),
+    });
+  }
+
+  createSubfolder(): void {
+    const name = this.newSubfolderName().trim();
+    const parent = this.selectedFolder();
+    if (!name || !parent || this.creatingSubfolder()) return;
+    this.creatingSubfolder.set(true);
+    this.sfApi.createSubfolder(parent.id, name).subscribe({
+      next: res => {
+        this.subfolders.update(sf => [...sf, res.data.folder]);
+        this.newSubfolderName.set('');
+        this.showCreateSubfolder.set(false);
+        this.creatingSubfolder.set(false);
+      },
+      error: () => this.creatingSubfolder.set(false),
+    });
   }
 
   onFolderSelect(event: Event): void {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\AdminNotificationMail;
 use App\Models\DeviceSession;
 use App\Models\File;
 use App\Models\FileUserAccess;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class AdminController extends Controller
@@ -23,7 +25,7 @@ class AdminController extends Controller
      */
     public function users(): JsonResponse
     {
-        $users = User::select('id', 'email', 'name', 'account_status', 'email_verified_at', 'plan', 'is_superuser', 'created_at')
+        $users = User::select('id', 'email', 'name', 'account_status', 'email_verified_at', 'plan', 'is_superuser', 'notifications_enabled', 'created_at')
             ->orderByDesc('created_at')
             ->get()
             ->map(function (User $user) {
@@ -32,15 +34,16 @@ class AdminController extends Controller
                     ->value('last_active_at');
 
                 return [
-                    'id'             => $user->id,
-                    'email'          => $user->email,
-                    'name'           => $user->name,
-                    'account_status' => $user->account_status,
-                    'email_verified' => $user->isEmailVerified(),
-                    'plan'           => $user->plan?->value,
-                    'is_superuser'   => $user->is_superuser,
-                    'last_login_at'  => $lastActive?->toIso8601String(),
-                    'created_at'     => $user->created_at?->toIso8601String(),
+                    'id'                    => $user->id,
+                    'email'                 => $user->email,
+                    'name'                  => $user->name,
+                    'account_status'        => $user->account_status,
+                    'email_verified'        => $user->isEmailVerified(),
+                    'plan'                  => $user->plan?->value,
+                    'is_superuser'          => $user->is_superuser,
+                    'notifications_enabled' => (bool) $user->notifications_enabled,
+                    'last_login_at'         => $lastActive?->toIso8601String(),
+                    'created_at'            => $user->created_at?->toIso8601String(),
                 ];
             });
 
@@ -124,7 +127,11 @@ class AdminController extends Controller
             return $this->notFound('Пользователь не найден');
         }
 
-        $this->pushService->sendToUser($user, $request->title, $request->body);
+        if ($user->notifications_enabled) {
+            $this->pushService->sendToUser($user, $request->title, $request->body);
+        } elseif ($user->email) {
+            Mail::to($user->email)->send(new AdminNotificationMail($user, $request->title, $request->body));
+        }
 
         return $this->success('Сообщение отправлено');
     }
@@ -140,7 +147,11 @@ class AdminController extends Controller
         ]);
 
         User::with('pushSubscriptions')->each(function (User $user) use ($request) {
-            $this->pushService->sendToUser($user, $request->title, $request->body);
+            if ($user->notifications_enabled) {
+                $this->pushService->sendToUser($user, $request->title, $request->body);
+            } elseif ($user->email) {
+                Mail::to($user->email)->send(new AdminNotificationMail($user, $request->title, $request->body));
+            }
         });
 
         return $this->success('Сообщение разослано всем пользователям');

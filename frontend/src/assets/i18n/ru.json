@@ -119,7 +119,8 @@
     "support": "Техподдержка",
     "logout": "Выйти",
     "menu": "Меню",
-    "shared_folders": "Общие папки"
+    "shared_folders": "Общие папки",
+    "inbox": "Полученные"
   },
   "tariffs": {
     "title": "Использование текущего тарифа",
@@ -500,7 +501,36 @@
       "no_requests": "Нет входящих запросов.",
       "accept": "Разрешить",
       "reject": "Отклонить"
+    },
+    "privacy": {
+      "title": "Конфиденциальность",
+      "hint": "Управляйте настройками приватности и поведением при получении файлов.",
+      "auto_add_label": "Автоматически добавлять полученные файлы и ссылки",
+      "auto_add_desc": "Если выключено, входящие файлы и общие папки попадут в раздел «Полученные», где вы сможете принять или отклонить их."
     }
+  },
+  "inbox": {
+    "title": "Полученные",
+    "tabs": {
+      "files": "Файлы",
+      "folders": "Общие папки"
+    },
+    "files_empty": "Нет входящих файлов.",
+    "folders_empty": "Нет входящих общих папок.",
+    "selected": "Выбрано: {{count}}",
+    "select_all": "Выбрать все",
+    "select_item": "Выбрать",
+    "accept": "Принять",
+    "reject": "Отклонить",
+    "col_name": "Название",
+    "col_sender": "Отправитель",
+    "col_inviter": "Пригласил",
+    "col_size": "Размер",
+    "col_date": "Получено",
+    "col_access": "Доступ",
+    "col_actions": "",
+    "access_view": "Просмотр",
+    "access_edit": "Редактирование"
   },
   "notifications": {
     "banner_text": "Включить оповещения",
@@ -606,7 +636,11 @@
     "public_link_invalid": "Ссылка недействительна или истекла",
     "public_link_save_banner": "Вы можете добавить эту папку себе в аккаунт",
     "public_link_login": "Войти",
-    "public_link_register": "Зарегистрироваться"
+    "public_link_register": "Зарегистрироваться",
+    "subfolders": "Папки",
+    "add_subfolder": "Создать подпапку",
+    "subfolder_name_placeholder": "Название подпапки",
+    "create_subfolder_btn": "Создать"
   },
   "comments": {
     "section_title": "Комментарии",

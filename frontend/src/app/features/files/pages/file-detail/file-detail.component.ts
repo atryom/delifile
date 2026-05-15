@@ -6,6 +6,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
+import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode } from '../../../../shared/models/api.models';
 import { ShareContactDialogComponent } from '../../dialogs/share-contact/share-contact-dialog.component';
 import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link-dialog.component';
@@ -29,6 +30,7 @@ export class FileDetailComponent implements OnInit {
   private readonly router    = inject(Router);
   private readonly route     = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
+  readonly authState         = inject(AuthStateService);
 
   private backFolderId: string | null = null;
   readonly backLink = signal<{ commands: string[]; queryParams?: Record<string,string> }>({ commands: ['/folders'] });

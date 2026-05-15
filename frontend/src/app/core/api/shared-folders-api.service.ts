@@ -107,4 +107,14 @@ export class SharedFoldersApiService {
   addFileToMyFiles(fileId: string): Observable<ApiResponse<Record<string, never>>> {
     return this.api.post(`/files/${fileId}/add-to-my-files`);
   }
+
+  // ── Subfolders ────────────────────────────────────────────────────────────
+
+  getSubfolders(parentId: string): Observable<ApiResponse<{ items: SharedFolder[] }>> {
+    return this.api.get(`/shared-folders/${parentId}/subfolders`);
+  }
+
+  createSubfolder(parentId: string, name: string): Observable<ApiResponse<{ folder: SharedFolder }>> {
+    return this.api.post(`/shared-folders/${parentId}/subfolders`, { name });
+  }
 }

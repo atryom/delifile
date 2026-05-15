@@ -19,6 +19,7 @@ use App\Http\Controllers\Support\SuggestionController;
 use App\Http\Controllers\Tariff\TariffController;
 use App\Http\Controllers\Push\PushController;
 use App\Http\Controllers\User\UserSettingsController;
+use App\Http\Controllers\User\InboxController;
 use App\Http\Controllers\SharedFolders\SharedFolderController;
 use App\Http\Controllers\Comments\CommentThreadController;
 use App\Http\Controllers\Comments\CommentController;
@@ -177,6 +178,17 @@ Route::prefix('v1')->group(function () {
         // User settings
         Route::patch('user/settings', [UserSettingsController::class, 'update']);
 
+        // Inbox (received files & shared folders pending acceptance)
+        Route::prefix('inbox')->group(function () {
+            Route::get('count',                          [InboxController::class, 'count']);
+            Route::get('files',                          [InboxController::class, 'files']);
+            Route::post('files/accept',                  [InboxController::class, 'acceptFiles']);
+            Route::post('files/reject',                  [InboxController::class, 'rejectFiles']);
+            Route::get('shared-folders',                 [InboxController::class, 'sharedFolders']);
+            Route::post('shared-folders/accept',         [InboxController::class, 'acceptSharedFolders']);
+            Route::post('shared-folders/reject',         [InboxController::class, 'rejectSharedFolders']);
+        });
+
         // Contact requests
         Route::get('contact-requests',                      [ContactRequestController::class, 'index']);
         Route::post('contact-requests/{id}/accept',         [ContactRequestController::class, 'accept']);
@@ -215,6 +227,8 @@ Route::prefix('v1')->group(function () {
             Route::get('{id}/links',                     [SharedFolderController::class, 'listLinks']);
             Route::post('{id}/links',                    [SharedFolderController::class, 'createLink']);
             Route::post('{id}/links/{linkId}/disable',   [SharedFolderController::class, 'disableLink']);
+            Route::get('{id}/subfolders',                [SharedFolderController::class, 'subfolders']);
+            Route::post('{id}/subfolders',               [SharedFolderController::class, 'createSubfolder']);
         });
 
         // Comments — threads

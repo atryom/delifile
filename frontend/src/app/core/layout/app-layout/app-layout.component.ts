@@ -47,8 +47,9 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   readonly emailVerified   = this.authState.isEmailVerified;
   readonly userEmail       = computed(() => this.authState.user()?.email ?? '');
   readonly userPlan        = this.authState.plan;
-  readonly isSuperUser     = this.authState.isSuperUser;
-  readonly sidebarOpen     = signal(false);
+  readonly isSuperUser       = this.authState.isSuperUser;
+  readonly showInboxNav      = computed(() => !(this.authState.user()?.auto_add_received_files ?? true));
+  readonly sidebarOpen       = signal(false);
   readonly resending       = signal(false);
   readonly resent          = signal(false);
 

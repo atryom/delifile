@@ -145,6 +145,7 @@ export interface ShareLink {
   allow_save: boolean;
   expires_at: string | null;
   created_at: string | null;
+  created_by: string;
 }
 
 // ─── Contact Models ──────────────────────────────────────────────────────────
@@ -186,6 +187,7 @@ export interface CurrentUser {
   notify_new_files: boolean;
   notify_contacts_added: boolean;
   allow_contacts_without_confirmation: boolean;
+  auto_add_received_files: boolean;
 }
 
 // ─── Admin Models ─────────────────────────────────────────────────────────────
@@ -198,6 +200,7 @@ export interface AdminUser {
   email_verified: boolean;
   plan: TariffPlan | null;
   is_superuser: boolean;
+  notifications_enabled: boolean;
   last_login_at: string | null;
   created_at: string | null;
 }
@@ -266,7 +269,9 @@ export interface SharedFolder {
   id: string;
   name: string;
   owner_id: number;
+  parent_id: string | null;
   files_count: number;
+  children_count: number;
   is_owner: boolean;
   my_access_type: SharedFolderAccessType | null;
   created_at: string | null;
@@ -373,6 +378,39 @@ export interface UserSettings {
   notify_new_files?: boolean;
   notify_contacts_added?: boolean;
   allow_contacts_without_confirmation?: boolean;
+  auto_add_received_files?: boolean;
+}
+
+// ─── Inbox Models ────────────────────────────────────────────────────────────
+
+export interface InboxFile {
+  id: string;
+  file_id: string;
+  file: {
+    id: string;
+    original_name: string;
+    description: string | null;
+    size: number | null;
+    mime_type: string | null;
+    thumbnail_url: string | null;
+  } | null;
+  sender: { id: string; email: string; name: string | null } | null;
+  received_at: string | null;
+}
+
+export interface InboxSharedFolder {
+  id: string;
+  shared_folder_id: string;
+  folder: { id: string; name: string } | null;
+  access_type: string;
+  inviter: { id: string; email: string; name: string | null } | null;
+  received_at: string | null;
+}
+
+export interface InboxCount {
+  files: number;
+  folders: number;
+  total: number;
 }
 
 // ─── Support Models ───────────────────────────────────────────────────────────

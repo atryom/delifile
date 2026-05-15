@@ -84,7 +84,7 @@
                           <span class="btn-card-label">{{ 'shared_folders.add_to_my_files_btn' | translate }}</span>
                         </button>
                       }
-                      @if (file()!.is_owner && !isSharedFolderOnly()) {
+                      @if (!isSharedFolderOnly()) {
                         <button class="btn-card-icon" (click)="showAddToSharedFolderDialog.set(true)" [attr.aria-label]="'shared_folders.add_to_shared_folder_btn' | translate">
                           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>
                           <span class="btn-card-label">{{ 'shared_folders.add_to_shared_folder_btn' | translate }}</span>
@@ -172,7 +172,7 @@
                         <span class="btn-card-label">{{ 'shared_folders.add_to_my_files_btn' | translate }}</span>
                       </button>
                     }
-                    @if (file()!.is_owner && !isSharedFolderOnly()) {
+                    @if (!isSharedFolderOnly()) {
                       <button class="btn-card-icon" (click)="showAddToSharedFolderDialog.set(true)" [attr.aria-label]="'shared_folders.add_to_shared_folder_btn' | translate">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>
                         <span class="btn-card-label">{{ 'shared_folders.add_to_shared_folder_btn' | translate }}</span>
@@ -432,7 +432,7 @@
                       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                       {{ 'files.detail.copy' | translate }}
                     </button>
-                    @if (link.status === 'active') {
+                    @if (link.status === 'active' && link.created_by === authState.user()?.id) {
                       <button class="btn-mini btn-mini-danger" (click)="disableLink(link)">
                         <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
                         {{ 'files.detail.disable' | translate }}

@@ -29,6 +29,7 @@ class User extends Authenticatable
         'notify_new_files',
         'notify_contacts_added',
         'allow_contacts_without_confirmation',
+        'auto_add_received_files',
     ];
 
     protected $hidden = [
@@ -50,6 +51,7 @@ class User extends Authenticatable
             'notify_new_files'                      => 'boolean',
             'notify_contacts_added'                 => 'boolean',
             'allow_contacts_without_confirmation'   => 'boolean',
+            'auto_add_received_files'               => 'boolean',
         ];
     }
 

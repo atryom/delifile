@@ -10,6 +10,7 @@ use App\Models\Contact;
 use App\Models\ContactPendingShare;
 use App\Models\File;
 use App\Models\FileUserAccess;
+use App\Models\PendingReceivedFile;
 use App\Models\ShareLink;
 use App\Models\User;
 use App\Services\ActivityService;
@@ -91,19 +92,29 @@ class SharingController extends Controller
         $recipientUser = $contact->resolvedUser;
 
         DB::transaction(function () use ($file, $contact, $request, $recipientUser) {
-            // Copy sharer's description so recipient starts with the same text
-            $sharerAccess = FileUserAccess::where('file_id', $file->id)
-                ->where('user_id', $request->user()->id)
-                ->first();
+            $autoAdd = $recipientUser ? ($recipientUser->auto_add_received_files ?? true) : true;
 
-            FileUserAccess::firstOrCreate([
-                'file_id'     => $file->id,
-                'user_id'     => $contact->resolved_user_id,
-                'access_type' => AccessType::Shared,
-            ], [
-                'contact_id'  => $contact->id,
-                'description' => $sharerAccess?->description,
-            ]);
+            if ($autoAdd) {
+                $sharerAccess = FileUserAccess::where('file_id', $file->id)
+                    ->where('user_id', $request->user()->id)
+                    ->first();
+
+                FileUserAccess::firstOrCreate([
+                    'file_id'     => $file->id,
+                    'user_id'     => $contact->resolved_user_id,
+                    'access_type' => AccessType::Shared,
+                ], [
+                    'contact_id'  => $contact->id,
+                    'description' => $sharerAccess?->description,
+                ]);
+            } else {
+                PendingReceivedFile::firstOrCreate([
+                    'file_id'           => $file->id,
+                    'recipient_user_id' => $recipientUser->id,
+                ], [
+                    'sender_user_id' => $request->user()->id,
+                ]);
+            }
 
             $this->activityService->log($file, $request->user(), ActivityType::SharedToContact, [
                 'contact_id'   => $contact->id,
@@ -121,7 +132,9 @@ class SharingController extends Controller
                     $recipientUser,
                     __('notifications.new_file_title'),
                     $file->original_name . ' — от ' . $senderName,
-                    config('app.url') . '/files/' . $file->id,
+                    $autoAdd
+                        ? config('app.url') . '/files/' . $file->id
+                        : config('app.url') . '/inbox',
                 );
             }
         });
@@ -237,6 +250,7 @@ class SharingController extends Controller
                 'allow_save' => $l->allow_save,
                 'expires_at' => $l->expires_at?->toIso8601String(),
                 'created_at' => $l->created_at?->toIso8601String(),
+                'created_by' => $l->created_by,
             ]);
 
         return $this->success(__('messages.sharing.links_fetched'), [
@@ -255,7 +269,7 @@ class SharingController extends Controller
             return $this->notFound('Link not found');
         }
 
-        if (!$link->file->isOwnedBy($request->user())) {
+        if ($link->created_by !== $request->user()->id) {
             return $this->forbidden();
         }
 

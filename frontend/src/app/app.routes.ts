@@ -90,6 +90,14 @@ export const routes: Routes = [
       import('./features/settings/pages/security/security.component').then(m => m.SecurityComponent),
   },
 
+  // ─── Inbox ───────────────────────────────────────────────────────────────
+  {
+    path: 'inbox',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/inbox/pages/inbox/inbox.component').then(m => m.InboxComponent),
+  },
+
   // ─── Invitation flow ─────────────────────────────────────────────────────
   {
     path: 'invite/:token',

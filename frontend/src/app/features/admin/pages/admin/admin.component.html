@@ -71,6 +71,7 @@
                 <th>Email</th>
                 <th>Статус</th>
                 <th>Email подтверждён</th>
+                <th>Уведомления</th>
                 <th>Последний вход</th>
                 <th>Тариф</th>
                 <th>Действия</th>
@@ -100,6 +101,19 @@
                       <span class="verified no">
                         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                         Нет
+                      </span>
+                    }
+                  </td>
+                  <td>
+                    @if (user.notifications_enabled) {
+                      <span class="verified yes">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        Вкл
+                      </span>
+                    } @else {
+                      <span class="verified no">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        Выкл
                       </span>
                     }
                   </td>

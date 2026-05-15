@@ -198,12 +198,12 @@
         </div>
       </div>
 
-      <!-- Contact privacy section -->
+      <!-- Privacy section -->
       <div class="settings-section">
         <div class="section-header">
           <div>
-            <h2 class="section-title">{{ 'security.contacts_privacy.title' | translate }}</h2>
-            <p class="section-desc">{{ 'security.contacts_privacy.hint' | translate }}</p>
+            <h2 class="section-title">{{ 'security.privacy.title' | translate }}</h2>
+            <p class="section-desc">{{ 'security.privacy.hint' | translate }}</p>
           </div>
         </div>
 
@@ -220,6 +220,22 @@
               role="switch"
               [attr.aria-label]="'security.contacts_privacy.allow_label' | translate"
               (click)="toggleAllowContacts(!allowContactsWithout())">
+              <span class="toggle-thumb"></span>
+            </button>
+          </label>
+
+          <label class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">{{ 'security.privacy.auto_add_label' | translate }}</span>
+              <span class="toggle-desc">{{ 'security.privacy.auto_add_desc' | translate }}</span>
+            </div>
+            <button
+              class="toggle-switch"
+              [class.toggle-switch--on]="autoAddReceivedFiles()"
+              [attr.aria-checked]="autoAddReceivedFiles()"
+              role="switch"
+              [attr.aria-label]="'security.privacy.auto_add_label' | translate"
+              (click)="toggleAutoAddReceivedFiles(!autoAddReceivedFiles())">
               <span class="toggle-thumb"></span>
             </button>
           </label>
