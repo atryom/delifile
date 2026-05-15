@@ -105,6 +105,41 @@ class SharedFolderFileController extends Controller
     }
 
     /**
+     * DELETE /api/v1/shared-folders/{folderId}/files/{fileId}
+     * Remove a file from a shared folder (does not delete the file from the system).
+     */
+    public function removeFile(Request $request, string $folderId, string $fileId): JsonResponse
+    {
+        $user   = $request->user();
+        $folder = SharedFolder::find($folderId);
+        if (!$folder) {
+            return $this->notFound('Folder not found');
+        }
+
+        $file = File::find($fileId);
+        if (!$file) {
+            return $this->notFound('File not found');
+        }
+
+        $isOwner     = $folder->owner_id === $user->id;
+        $hasEdit     = SharedFolderAccess::where('shared_folder_id', $folderId)
+            ->where('user_id', $user->id)
+            ->where('access_type', 'edit')
+            ->exists();
+        $isFileOwner = $file->isOwnedBy($user);
+
+        if (!$isOwner && !$hasEdit && !$isFileOwner) {
+            return $this->forbidden('You do not have permission to remove this file');
+        }
+
+        SharedFolderFile::where('shared_folder_id', $folderId)
+            ->where('file_id', $fileId)
+            ->delete();
+
+        return $this->success('File removed from folder');
+    }
+
+    /**
      * GET /api/v1/files/{id}/shared-folders
      * Return the shared folders that contain this file along with membership flags.
      */

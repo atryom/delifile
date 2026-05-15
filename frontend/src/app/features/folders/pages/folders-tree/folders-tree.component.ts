@@ -78,8 +78,10 @@ export class FoldersTreeComponent implements OnInit {
   });
 
   // ── Shared folders ────────────────────────────────────────────────────────
-  readonly sfLoading     = signal(false);
-  readonly sharedFolders = signal<SharedFolder[]>([]);
+  readonly sfLoading      = signal(false);
+  readonly sharedFolders  = signal<SharedFolder[]>([]);
+  readonly sfSubfolders   = signal<SharedFolder[]>([]);
+  readonly sfSubsLoading  = signal(false);
 
   // ── Files ─────────────────────────────────────────────────────────────────
   readonly files        = signal<AnyFile[]>([]);
@@ -258,7 +260,7 @@ export class FoldersTreeComponent implements OnInit {
     if (this.currentSharedFolderId() === null) {
       return this.filteredSharedFolders().length === 0;
     }
-    return this.files().length === 0;
+    return this.sfSubfolders().length === 0 && this.files().length === 0;
   });
 
   readonly showFilesArea = computed(() =>
@@ -307,6 +309,7 @@ export class FoldersTreeComponent implements OnInit {
     this.activeTab.set(tab);
     this.currentLocalFolderId.set(null);
     this.currentSharedFolderId.set(null);
+    this.sfSubfolders.set([]);
     this.folderNotesOpen.set(false);
     this.breadcrumbs.set([{
       label: tab === 'local' ? 'Локальные' : 'Общие',
@@ -327,6 +330,11 @@ export class FoldersTreeComponent implements OnInit {
     this.folderNotesOpen.set(false);
     this.resetFiltersKeepTag();
     this.loadFiles();
+    if (crumb.sharedFolderId) {
+      this.loadSfSubfolders(crumb.sharedFolderId);
+    } else {
+      this.sfSubfolders.set([]);
+    }
   }
 
   // ── Folder navigation ─────────────────────────────────────────────────────
@@ -354,6 +362,7 @@ export class FoldersTreeComponent implements OnInit {
     this.closeMenu();
     this.resetFiltersKeepTag();
     this.loadSharedFolderFiles(folder.id);
+    this.loadSfSubfolders(folder.id);
   }
 
   isSharedFolderOwner(): boolean {
@@ -435,6 +444,14 @@ export class FoldersTreeComponent implements OnInit {
         this.filesLoading.set(false);
       },
       error: () => this.filesLoading.set(false),
+    });
+  }
+
+  private loadSfSubfolders(sfId: string): void {
+    this.sfSubsLoading.set(true);
+    this.sfApi.getSubfolders(sfId).subscribe({
+      next: (res) => { this.sfSubfolders.set(res.data.items); this.sfSubsLoading.set(false); },
+      error: () => { this.sfSubfolders.set([]); this.sfSubsLoading.set(false); },
     });
   }
 
@@ -528,10 +545,18 @@ export class FoldersTreeComponent implements OnInit {
         error: (err) => alert(err.message ?? 'Ошибка создания папки'),
       });
     } else {
-      this.sfApi.create(name).subscribe({
-        next: () => { this.cancelCreate(); this.loadShared(); },
-        error: (err) => alert(err.message ?? 'Ошибка создания папки'),
-      });
+      const parentId = this.currentSharedFolderId();
+      if (parentId) {
+        this.sfApi.createSubfolder(parentId, name).subscribe({
+          next: () => { this.cancelCreate(); this.loadSfSubfolders(parentId); },
+          error: (err) => alert(err.message ?? 'Ошибка создания папки'),
+        });
+      } else {
+        this.sfApi.create(name).subscribe({
+          next: () => { this.cancelCreate(); this.loadShared(); },
+          error: (err) => alert(err.message ?? 'Ошибка создания папки'),
+        });
+      }
     }
   }
 
@@ -611,10 +636,18 @@ export class FoldersTreeComponent implements OnInit {
         error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
       });
     } else {
-      this.filesApi.delete(target.id).subscribe({
-        next: () => { this.deleting.set(false); this.deleteTarget.set(null); this.loadFiles(); },
-        error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
-      });
+      const sfId = this.currentSharedFolderId();
+      if (sfId) {
+        this.sfApi.removeFile(sfId, target.id).subscribe({
+          next: () => { this.deleting.set(false); this.deleteTarget.set(null); this.loadFiles(); },
+          error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
+        });
+      } else {
+        this.filesApi.delete(target.id).subscribe({
+          next: () => { this.deleting.set(false); this.deleteTarget.set(null); this.loadFiles(); },
+          error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
+        });
+      }
     }
   }
 

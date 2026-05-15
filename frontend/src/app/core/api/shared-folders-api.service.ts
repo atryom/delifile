@@ -117,4 +117,8 @@ export class SharedFoldersApiService {
   createSubfolder(parentId: string, name: string): Observable<ApiResponse<{ folder: SharedFolder }>> {
     return this.api.post(`/shared-folders/${parentId}/subfolders`, { name });
   }
+
+  removeFile(folderId: string, fileId: string): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.delete(`/shared-folders/${folderId}/files/${fileId}`);
+  }
 }

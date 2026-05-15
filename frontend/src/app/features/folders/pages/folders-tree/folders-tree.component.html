@@ -410,6 +410,40 @@
                 }
               }
 
+              <!-- ── Shared subfolders (when inside a shared folder) ─── -->
+              @if (activeTab() === 'shared' && currentSharedFolderId() !== null) {
+                @for (sub of sfSubfolders(); track sub.id) {
+                  <tr (click)="navigateIntoSharedFolder(sub)">
+                    <td class="col-check"></td>
+                    <td>
+                      <div class="file-cell">
+                        <div class="file-icon icon-folder" aria-hidden="true">
+                          <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+                          </svg>
+                        </div>
+                        <div class="file-info">
+                          <div class="file-name">{{ sub.name }}</div>
+                          <div class="file-meta-mobile">{{ sub.files_count }} файлов</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="col-mod-cell">{{ sub.created_at | date:'d MMM y' }}</td>
+                    <td class="col-size-cell">{{ sub.files_count }} файлов</td>
+                    <td class="col-open-cell">
+                      <button type="button" class="open-btn"
+                              (click)="navigateIntoSharedFolder(sub); $event.stopPropagation()"
+                              title="Открыть папку" aria-label="Открыть папку {{ sub.name }}">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+                        </svg>
+                      </button>
+                    </td>
+                    <td class="actions-cell"></td>
+                  </tr>
+                }
+              }
+
               <!-- ── Files ─────────────────────────────────────────────── -->
               @if (showFilesArea()) {
                 @for (file of files(); track file.id) {
@@ -548,6 +582,22 @@
                 </div>
                 <div class="grid-name">{{ folder.name }}</div>
                 <div class="grid-meta">{{ folder.files_count }} файлов</div>
+              </div>
+            }
+          }
+
+          <!-- Shared subfolders (when inside a shared folder) -->
+          @if (activeTab() === 'shared' && currentSharedFolderId() !== null) {
+            @for (sub of sfSubfolders(); track sub.id) {
+              <div class="grid-card" (click)="navigateIntoSharedFolder(sub)" role="button" tabindex="0"
+                   (keydown.enter)="navigateIntoSharedFolder(sub)" aria-label="Открыть папку {{ sub.name }}">
+                <div class="grid-icon folder-grid-icon" aria-hidden="true">
+                  <svg width="36" height="36" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+                  </svg>
+                </div>
+                <div class="grid-name">{{ sub.name }}</div>
+                <div class="grid-meta">{{ sub.files_count }} файлов</div>
               </div>
             }
           }
@@ -725,8 +775,16 @@
 @if (deleteTarget()) {
   <div class="modal-backdrop" (click)="cancelDelete()" role="dialog" aria-modal="true" aria-labelledby="del-title">
     <div class="modal" (click)="$event.stopPropagation()">
-      <h3 id="del-title">Удалить {{ deleteTarget()!.kind === 'file' ? 'файл' : 'папку' }}?</h3>
-      @if (deleteTarget()!.kind === 'file') {
+      <h3 id="del-title">
+        @if (deleteTarget()!.kind === 'file' && currentSharedFolderId()) {
+          Убрать из папки?
+        } @else {
+          Удалить {{ deleteTarget()!.kind === 'file' ? 'файл' : 'папку' }}?
+        }
+      </h3>
+      @if (deleteTarget()!.kind === 'file' && currentSharedFolderId()) {
+        <p>«{{ deleteTarget()!.name }}» будет убран из этой общей папки. Сам файл не удалится.</p>
+      } @else if (deleteTarget()!.kind === 'file') {
         <p>«{{ deleteTarget()!.name }}» будет удалён. Если файл ваш — удалится навсегда, если получен — уберётся из вашего списка.</p>
       } @else {
         <p>Вы уверены, что хотите удалить «{{ deleteTarget()!.name }}»?</p>
