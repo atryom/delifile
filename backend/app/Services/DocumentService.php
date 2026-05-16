@@ -65,7 +65,11 @@ class DocumentService
 
     public function getDocument(File $file, User $user): array
     {
-        $content = Storage::disk('s3')->get($file->storage_key) ?? '';
+        try {
+            $content = Storage::disk('s3')->get($file->storage_key) ?? '';
+        } catch (\Throwable) {
+            $content = '';
+        }
 
         return $this->buildDocumentResponse($file, $user, $content);
     }

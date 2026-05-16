@@ -102,7 +102,7 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
           <button type="button" [class.active]="editor?.isActive('blockquote')"
             (click)="cmd('toggleBlockquote')" aria-label="Цитата">"</button>
           <button type="button" [class.active]="editor?.isActive('codeBlock')"
-            (click)="cmd('toggleCodeBlock')" aria-label="Блок кода">{ }</button>
+            (click)="cmd('toggleCodeBlock')" aria-label="Блок кода">&#123; &#125;</button>
           <span class="md-toolbar-sep" aria-hidden="true"></span>
           <button type="button" (click)="cmd('undo')" aria-label="Отменить">↩</button>
           <button type="button" (click)="cmd('redo')" aria-label="Повторить">↪</button>

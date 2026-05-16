@@ -7,6 +7,7 @@ use App\Models\File;
 use App\Services\DocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class DocumentLockController extends Controller
 {
@@ -99,7 +100,7 @@ class DocumentLockController extends Controller
     /**
      * DELETE /api/v1/documents/:id/lock
      */
-    public function release(Request $request, string $id): JsonResponse
+    public function release(Request $request, string $id): JsonResponse|Response
     {
         $file = File::find($id);
 
