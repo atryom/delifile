@@ -127,6 +127,25 @@
     ← status=deleted
 ```
 
+### 2.9 Версионирование файлов
+
+```
+/files/:id → вкладка "Версии"
+  → POST /api/v1/files/{id}/versions/init-upload {name, size, mime_type, ...}
+    ← Создаётся FileVersion (status=uploading)
+    ← Возвращается S3 presigned PUT URL
+  → PUT <presigned-url> (прямая загрузка в S3)
+    ← 200 OK
+  → POST /api/v1/files/{id}/versions/complete-upload {version_id, thumbnail_key?}
+    ← Новая версия активна
+  → PATCH /api/v1/files/{id}/versions/{version_id} {comment, version_label}
+    ← Обновление метаданных версии
+  → POST /api/v1/files/{id}/versions/{version_id}/download
+    ← S3 signed URL
+  → PATCH /api/v1/files/{id}/display-name {display_name}
+    ← Отображаемое имя файла обновлено
+```
+
 ---
 
 ## 3. Организация файлов
@@ -134,6 +153,7 @@
 ### 3.1 Папки (Folders)
 
 ```
+/folders → GET /api/v1/folders (плоский список)
 /folders → GET /api/v1/folders/tree
   ← Иерархическое дерево папок
   → Создать: POST /api/v1/folders {name, parent_id}
@@ -178,7 +198,7 @@
     ← Если контакт НЕ зарегистрирован:
       → Создаётся ContactPendingShare (очередь)
       → При регистрации/принятии инвайта файл доставится
-  → Отозвать доступ: DELETE /api/v1/files/{id}/share-to-contact/{contactId}
+  → Отозвать доступ: DELETE /api/v1/files/{id}/share-to-contact/{contact}
 ```
 
 ### 4.2 Создание публичной ссылки (Share Link)
@@ -210,12 +230,14 @@
 
 ## 5. Общие папки (Shared Folders)
 
-### 5.1 Создание общей папки
+### 5.1 Создание и просмотр общих папок
 
 ```
 /shared-folders → "Создать папку"
   → POST /api/v1/shared-folders {name}
     ← Создаётся SharedFolder, владелец получает доступ
+/shared-folders → GET /api/v1/shared-folders (список папок пользователя)
+/shared-folders → GET /api/v1/shared-folders/all-flat (плоский список)
 ```
 
 ### 5.2 Управление доступом
@@ -256,7 +278,40 @@
   → GET /api/v1/shared-links/{token}/files (публичный список файлов)
 ```
 
-### 5.6 Добавление в "Мои файлы"
+### 5.6 Управление подпапками
+
+```
+/shared-folders/:id → "Добавить подпапку"
+  → POST /api/v1/shared-folders/{id}/subfolders {name}
+    ← Создаётся вложенная SharedFolder
+  → GET /api/v1/shared-folders/{id}/subfolders
+    ← Список подпапок
+```
+
+### 5.7 Добавление/удаление существующего файла
+
+```
+Из файла → "Добавить в общую папку" (диалог)
+  → POST /api/v1/shared-folders/{folder_id}/files/{file_id}
+    ← Файл привязан к папке
+/shared-folders/:id → удалить файл из папки
+  → DELETE /api/v1/shared-folders/{id}/files/{file_id}
+    ← Файл отвязан от папки
+  → GET /api/v1/files/{id}/shared-folders
+    ← Список общих папок файла
+  → POST /api/v1/files/{id}/shared-folders {folder_ids}
+    ← Обновить привязку к общим папкам
+```
+
+### 5.8 Выход из общей папки
+
+```
+/shared-folders/:id → "Покинуть папку"
+  → DELETE /api/v1/shared-folders/{id}/leave
+    ← Пользователь удалён из участников папки
+```
+
+### 5.9 Добавление в "Мои файлы"
 
 ```
 Из общей папки → "Добавить в мои файлы"
@@ -277,6 +332,15 @@
       → Создаётся ContactRequest получателю
     ← Если не зарегистрирован:
       → contact.resolved_user_id = null
+/contacts → детальная карточка контакта
+  → GET /api/v1/contacts/{id}
+    ← Метаданные контакта
+  → GET /api/v1/contacts/{id}/history
+    ← История действий с контактом (шэринг, файлы)
+  → DELETE /api/v1/contacts/{id}
+    ← Контакт удалён
+  → POST /api/v1/contacts/resolve
+    ← Резолвинг контактов (связывание с зарегистрированными пользователями)
 ```
 
 ### 6.2 Импорт контактов
@@ -307,6 +371,28 @@
   → POST /api/v1/invitations/{token}/accept (требует auth)
     ← Контакт резолвится, ContactPendingShare доставляются
   → POST /api/v1/invitations/{token}/reject
+  → POST /api/v1/invitations/{id}/cancel (отозвать отправленное приглашение)
+```
+
+### 6.5 Входящие (Inbox)
+
+```
+/inbox → GET /api/v1/inbox/count
+  ← Количество новых непринятых файлов и общих папок
+/inbox → "Файлы"
+  → GET /api/v1/inbox/files
+    ← Список файлов, которыми поделились (ожидают принятия)
+  → POST /api/v1/inbox/files/accept {file_ids}
+    ← FileUserAccess создаются, файлы появляются в /files
+  → POST /api/v1/inbox/files/reject {file_ids}
+    ← Файлы отклонены
+/inbox → "Общие папки"
+  → GET /api/v1/inbox/shared-folders
+    ← Список приглашений в общие папки
+  → POST /api/v1/inbox/shared-folders/accept {folder_ids}
+    ← Доступ к общей папке активирован
+  → POST /api/v1/inbox/shared-folders/reject {folder_ids}
+    ← Приглашение отклонено
 ```
 
 ---
@@ -393,6 +479,7 @@
   → POST /api/v1/support/tickets/{id}/messages {body, attachments?}
   → POST /api/v1/support/tickets/{id}/confirm (подтвердить решение)
   → POST /api/v1/support/tickets/{id}/mark-read
+  → GET /api/v1/support/tickets/{id}/attachments/{attachmentId} (скачать вложение)
 ```
 
 ### 10.2 Предложения (Suggestion)
@@ -402,6 +489,8 @@
   → POST /api/v1/support/suggestions {body, attachments?}
     ← Создаётся SuggestionTicket (status=new)
   → GET /api/v1/support/suggestions (список предложений)
+  → GET /api/v1/support/suggestions/{id} (детали предложения)
+  → GET /api/v1/support/suggestions/{id}/attachments/{attachmentId} (скачать вложение)
 ```
 
 ---
@@ -424,6 +513,8 @@
   → POST /api/v1/admin/users/{id}/block (заблокировать / разблокировать)
   → POST /api/v1/admin/users/{id}/reset-link (сгенерировать ссылку сброса пароля)
   → POST /api/v1/admin/users/{id}/reset-sessions (сбросить все сессии)
+  → POST /api/v1/admin/users/{id}/notify {title, body} (отправить уведомление)
+  → POST /api/v1/admin/notify-all {title, body} (уведомить всех пользователей)
 ```
 
 ### 11.3 Управление тикетами поддержки
@@ -435,6 +526,7 @@
   → POST /api/v1/admin/support/tickets/{id}/take (взять в работу)
   → POST /api/v1/admin/support/tickets/{id}/await-confirmation (отправить на подтверждение)
   → POST /api/v1/admin/support/tickets/{id}/messages (ответить)
+  → POST /api/v1/admin/support/tickets/{id}/mark-read
 ```
 
 ### 11.4 Управление предложениями
@@ -461,8 +553,10 @@
 ### 12.2 Web Share Target
 
 ```
+/share-target (SPA страница, PWA Share Target)
 Другое приложение → "Поделиться" → DeliFile
-  → /share-target → POST /api/v1/files/init-upload (делегирование)
+  → Принимает входящие файлы через Web Share Target API
+  → POST /api/v1/files/init-upload (делегирование в стандартный флоу загрузки)
 ```
 
 ### 12.3 Push-уведомления
@@ -504,8 +598,55 @@
 |-----|--------|----------|
 | `ExpireShareLinksJob` | Каждые 30 мин | Просроченные ссылки → expired |
 | `CleanExpiredFilesJob` | Каждый час | Удаление истёкших файлов из S3 + БД |
-| `BlockUnverifiedAccounts` | Каждые 15 мин | Блокировка неподтверждённых email (>24ч) |
-| `AutoCloseTickets` | Каждый час | Автозакрытие зависших тикетов |
+| `auth:block-unverified` | Каждые 15 мин | Блокировка неподтверждённых email (>24ч) |
+| `support:auto-close-tickets` | Каждый час | Автозакрытие зависших тикетов |
+
+---
+
+## 15. Комментарии и треды
+
+### 15.1 Треды комментариев
+
+```
+/folders или /files/:id → вкладка "Комментарии"
+  → GET /api/v1/comment-threads?target_type=file|shared_folder|local_folder&target_id=...&scope=private|shared
+    ← Список тредов с последними комментариями
+  → GET /api/v1/comment-threads/{threadId}?page=...&per_page=...
+    ← Комментарии треда с пагинацией
+  → POST /api/v1/comment-threads/{threadId}/read
+    ← Отметить тред прочитанным
+  → GET /api/v1/comment-threads/unread-counters {thread_ids}
+    ← Счётчики непрочитанных по тредам
+```
+
+### 15.2 CRUD комментариев
+
+```
+Внутри треда → "Написать комментарий"
+  → POST /api/v1/comments {thread_id, body, parent_comment_id?, mentions_json?}
+    ← Создаётся Comment, replies_count обновляется
+  → PATCH /api/v1/comments/{id} {body}
+    ← Комментарий отредактирован
+  → DELETE /api/v1/comments/{id}
+    ← Комментарий помечен как удалённый
+```
+
+### 15.3 Настройки комментариев
+
+```
+Для файла:
+  → GET /api/v1/files/{fileId}/comment-settings
+    ← shared_comments_enabled, private_comments_enabled, mentions_enabled
+  → PATCH /api/v1/files/{fileId}/comment-settings {settings}
+    ← Обновление настроек
+
+Для локальной папки:
+  → PATCH /api/v1/local-folders/{folderId}/comment-settings
+
+Для общей папки:
+  → GET /api/v1/shared-folders/{folderId}/comment-settings
+  → PATCH /api/v1/shared-folders/{folderId}/comment-settings
+```
 
 ---
 
@@ -530,33 +671,38 @@
     /account-blocked           Аутентифицирован
     (email не верифицирован)        │
                                    │
-                    ┌──────────────┼──────────────────────┐
-                    ▼              ▼                      ▼
-              ┌──────────┐  ┌────────────┐  ┌─────────────────────┐
-              │ /files    │  │ /contacts  │  │ /shared-folders      │
-              │ (главная) │  │            │  │                     │
-              └────┬─────┘  └─────┬──────┘  └──────────┬──────────┘
-                   │              │                     │
-         ┌─────────┼────────┐    │        ┌─────────────┼──────┐
-         ▼         ▼        ▼    ▼        ▼             ▼      ▼
-    /files/:id  /folders  /tags  │  Создать/упр.  Загрузить  Ссылка
-    (детали)    (дерево)  (теги) │  папкой        файлы      на папку
-         │                       │
-         ▼                       ▼
-    Шеринг → контакт     Контакты → приглашения
-    Шеринг → ссылка     Запросы в контакты
-    Pin / Favorite
-    Скачать / Удалить
-    Описание / Теги
+               ┌──────────────┼──────────────────────────────────┐
+               ▼              ▼                  ▼                ▼
+         ┌──────────┐  ┌────────────┐  ┌──────────────┐  ┌─────────────────────┐
+         │ /files    │  │  /inbox    │  │ /contacts    │  │ /shared-folders      │
+         │ (главная) │  │ (входящие) │  │              │  │                     │
+         └────┬─────┘  └─────┬──────┘  └──────┬───────┘  └──────────┬──────────┘
+              │              │                │                     │
+    ┌─────────┼────────┐    │     ┌───────────┼──────────┐  ┌───────┼──────┐
+    ▼         ▼        ▼    ▼     ▼           ▼          ▼  ▼       ▼      ▼
+   /files/:id  /folders  /tags  │  Создать/   Принять/   │  Соз-   Загру-  Ссылка
+   (детали)    (дерево)  (теги) │  удалить    отклонить  │  дать   зить    на
+        │                      │  контакт    инвайт     │  папку  файлы   папку
+        │                      │                       │
+   ┌────┼────┬─────┐          ▼                       ▼
+   │    │    │     │    Контакты → приглашения     Подпапки
+   ▼    ▼    ▼     ▼    Запросы в контакты         Добавить файл
+  Шеринг Шеринг Pin /                               Выйти из папки
+  → контакт → ссылка Favorite
+                         Скачать / Удалить
+                         Описание / Теги / Версии
+                         Комментарии
 
-              ┌──────────────────────┐
-              │ Доп. страницы         │
-              ├──────────────────────┤
-              │ /activity  — лента   │
-              │ /tariffs   — тарифы  │
-              │ /support   — тикеты  │
-              │ /settings  — настройки│
-              │ /invite/:token — инвайт │
-              │ /admin     — админка │
-              └──────────────────────┘
+             ┌──────────────────────────┐
+             │ Доп. страницы             │
+             ├──────────────────────────┤
+             │ /activity    — лента     │
+             │ /tariffs     — тарифы    │
+             │ /support     — тикеты    │
+             │ /settings    — настройки │
+             │ /invite/:token — инвайт  │
+             │ /admin       — админка  │
+             │ /privacy     — политика │
+             │ /share-target — PWA     │
+             └──────────────────────────┘
 ```

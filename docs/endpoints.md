@@ -47,6 +47,16 @@
 | POST | `/files/{id}/detach-tags` | auth | Открепить теги от файла |
 | POST | `/files/{id}/clear-folder` | auth | Убрать файл из папки |
 
+### 📄 Файлы — Версионирование
+
+| Метод | Путь | Auth | Описание |
+|-------|------|------|----------|
+| POST | `/files/{id}/versions/init-upload` | auth | Шаг 1: инициализация загрузки новой версии |
+| POST | `/files/{id}/versions/complete-upload` | auth | Шаг 2: подтверждение загрузки версии |
+| PATCH | `/files/{id}/versions/{vid}` | auth | Обновить метаданные версии (label, comment) |
+| POST | `/files/{id}/versions/{vid}/download` | auth | Скачать конкретную версию |
+| PATCH | `/files/{id}/display-name` | auth | Обновить отображаемое имя файла |
+
 ## 🔗 URL-файлы
 
 | Метод | Путь | Auth | Описание |
@@ -180,6 +190,12 @@
 | GET | `/shared-folders/{id}/links` | auth | Список ссылок на папку (только владелец) |
 | POST | `/shared-folders/{id}/links` | auth | Создать ссылку на папку (только владелец) |
 | POST | `/shared-folders/{id}/links/{linkId}/disable` | auth | Отключить ссылку (только владелец) |
+| GET | `/shared-folders/all-flat` | auth | Плоский список всех общих папок (без иерархии) |
+| GET | `/shared-folders/{id}/subfolders` | auth | Список подпапок внутри общей папки |
+| POST | `/shared-folders/{id}/subfolders` | auth | Создать подпапку в общей папке |
+| POST | `/shared-folders/{id}/files/{fileId}` | auth | Добавить существующий файл в общую папку |
+| DELETE | `/shared-folders/{id}/files/{fileId}` | auth | Удалить файл из общей папки |
+| DELETE | `/shared-folders/{id}/leave` | auth | Покинуть общую папку (не владелец) |
 
 ## 🔄 Операции файл ↔ общая папка
 
@@ -198,6 +214,35 @@
 | POST | `/links/{token}/save` | auth | Сохранить файл из публичной ссылки к себе |
 | POST | `/shared-links/{token}/resolve` | public | Информация о расшаренной папке |
 | GET | `/shared-links/{token}/files` | public | Файлы в расшаренной папке |
+
+## 💬 Комментарии
+
+| Метод | Путь | Auth | Описание |
+|-------|------|------|----------|
+| GET | `/comment-threads` | auth | Список тредов комментариев для текущего пользователя |
+| GET | `/comment-threads/unread-counters` | auth | Счётчики непрочитанных по каждому треду |
+| GET | `/comment-threads/{threadId}` | auth | Детали треда с комментариями |
+| POST | `/comment-threads/{threadId}/read` | auth | Отметить тред прочитанным |
+| POST | `/comments` | auth | Создать новый комментарий |
+| PATCH | `/comments/{id}` | auth | Редактировать комментарий |
+| DELETE | `/comments/{id}` | auth | Удалить комментарий |
+| GET | `/files/{fileId}/comment-settings` | auth | Настройки комментариев файла |
+| PATCH | `/files/{fileId}/comment-settings` | auth | Обновить настройки комментариев файла |
+| GET | `/shared-folders/{folderId}/comment-settings` | auth | Настройки комментариев общей папки |
+| PATCH | `/shared-folders/{folderId}/comment-settings` | auth | Обновить настройки комментариев общей папки |
+| PATCH | `/local-folders/{folderId}/comment-settings` | auth | Обновить настройки комментариев локальной папки |
+
+## 📥 Входящие (Inbox)
+
+| Метод | Путь | Auth | Описание |
+|-------|------|------|----------|
+| GET | `/inbox/count` | auth | Количество ожидающих файлов и общих папок |
+| GET | `/inbox/files` | auth | Список файлов, ожидающих принятия |
+| POST | `/inbox/files/accept` | auth | Принять выбранные файлы (IDs в теле) |
+| POST | `/inbox/files/reject` | auth | Отклонить выбранные файлы |
+| GET | `/inbox/shared-folders` | auth | Список общих папок, ожидающих принятия |
+| POST | `/inbox/shared-folders/accept` | auth | Принять выбранные общие папки |
+| POST | `/inbox/shared-folders/reject` | auth | Отклонить выбранные общие папки |
 
 ## 🔧 Admin (Superuser)
 
@@ -256,5 +301,5 @@
 
 ---
 
-**Итого:** ~120 API-endpoint'ов, разделённых на 26 логических групп.
+**Итого:** ~155 API-endpoint'ов, разделённых на 30 логических групп.
 Авторизация: Laravel Sanctum (токены). Формат ответа: `{ result, message, data }`.

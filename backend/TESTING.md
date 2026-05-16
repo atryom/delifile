@@ -39,27 +39,31 @@ tests/
 │   ├── Activity/
 │   │   └── ActivityTest.php                 (5 тестов)
 │   ├── Admin/
-│   │   └── AdminTest.php                    (14 тестов)
+│   │   ├── AdminTest.php                    (14 тестов)
+│   │   ├── SuggestionAdminTest.php          (11 тестов)
+│   │   └── SupportAdminTest.php             (15 тестов)
 │   ├── Auth/
-│   │   ├── RegistrationTest.php             (4 теста)
+│   │   ├── RegistrationTest.php             (5 тестов)
 │   │   ├── LoginTest.php                    (5 тестов)
-│   │   ├── SessionTest.php                  (3 теста)
+│   │   ├── SessionTest.php                  (7 тестов)
 │   │   ├── PasswordChangeTest.php           (3 теста)
-│   │   ├── EmailVerificationTest.php        (6 тестов)
+│   │   ├── EmailVerificationTest.php        (5 тестов)
 │   │   └── PasswordResetTest.php            (6 тестов)
 │   ├── Comments/
-│   │   └── CommentTest.php                  (13 тестов)
+│   │   ├── CommentTest.php                  (13 тестов)
+│   │   └── CommentSettingsTest.php          (12 тестов)
 │   ├── Contacts/
 │   │   ├── ContactTest.php                  (10 тестов)
-│   │   └── ContactRequestTest.php           (8 тестов)
+│   │   ├── ContactRequestTest.php           (7 тестов)
+│   │   └── ContactResolveHistoryTest.php    (10 тестов)
 │   ├── Files/
 │   │   ├── FileUploadTest.php               (6 тестов)
 │   │   ├── FileShowTest.php                 (5 тестов)
-│   │   ├── FileIndexTest.php                (3 теста)
-│   │   ├── FileDeleteTest.php               (4 теста)
-│   │   ├── FileActionsTest.php              (7 тестов)
-│   │   ├── FileDownloadTest.php             (6 тестов)
-│   │   └── FileVersionTest.php              (12 тестов)
+│   │   ├── FileIndexTest.php                (5 тестов)
+│   │   ├── FileDeleteTest.php               (3 теста)
+│   │   ├── FileActionsTest.php              (11 тестов)
+│   │   ├── FileDownloadTest.php             (3 теста)
+│   │   └── FileVersionTest.php              (17 тестов)
 │   ├── Invitations/
 │   │   └── InvitationTest.php               (12 тестов)
 │   ├── Links/
@@ -67,12 +71,15 @@ tests/
 │   ├── Organization/
 │   │   ├── FolderTest.php                   (12 тестов)
 │   │   └── TagTest.php                      (10 тестов)
+│   ├── Push/
+│   │   └── PushTest.php                     (8 тестов)
 │   ├── SharedFolders/
-│   │   └── SharedFolderTest.php             (20 тестов)
+│   │   ├── SharedFolderTest.php             (41 тест)
+│   │   └── SharedFolderFileTest.php         (16 тестов)
 │   ├── Sharing/
 │   │   ├── ShareToContactTest.php           (3 теста)
 │   │   ├── CreateLinkTest.php               (3 теста)
-│   │   ├── PublicLinkTest.php               (3 теста)
+│   │   ├── PublicLinkTest.php               (4 теста)
 │   │   └── SharingCoverageTest.php          (10 тестов)
 │   ├── Support/
 │   │   ├── SupportTicketTest.php            (14 тестов)
@@ -83,11 +90,11 @@ tests/
 │       ├── InboxTest.php                    (12 тестов)
 │       └── UserSettingsTest.php             (6 тестов)
 ├── Unit/
-│   └── Services/
+│   └── ExampleTest.php                      (1 тест)
 └── TestCase.php
 ```
 
-**Всего: 31 файл, 230+ feature-тестов**
+**Всего: 40 файлов, 356 тестов**
 
 ## Соглашения
 
