@@ -25,6 +25,7 @@ class FileUserAccess extends Model
         'saved_at',
         'folder_id',
         'can_comment',
+        'can_edit',
     ];
 
     protected function casts(): array
@@ -35,6 +36,7 @@ class FileUserAccess extends Model
             'pinned_at'   => 'datetime',
             'saved_at'    => 'datetime',
             'can_comment' => 'boolean',
+            'can_edit'    => 'boolean',
         ];
     }
 

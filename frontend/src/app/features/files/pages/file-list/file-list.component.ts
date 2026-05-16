@@ -1,11 +1,12 @@
 import {
   Component, inject, signal, computed, OnInit, ChangeDetectionStrategy,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
+import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { FileUploadService } from '../../services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { FileTypeIconComponent } from '../../../../shared/components/file-type-icon/file-type-icon.component';
@@ -20,10 +21,14 @@ import { FileListItem, FileCard, LinkPreview } from '../../../../shared/models/a
 })
 export class FileListComponent implements OnInit {
   private readonly filesApi      = inject(FilesApiService);
+  private readonly docsApi       = inject(DocumentsApiService);
   private readonly uploadService = inject(FileUploadService);
   private readonly urlFilesApi   = inject(UrlFilesApiService);
   private readonly translate     = inject(TranslateService);
+  private readonly router        = inject(Router);
   private readonly fb            = inject(FormBuilder);
+
+  readonly creatingDoc = signal(false);
 
   readonly recentFiles    = signal<FileListItem[]>([]);
   readonly recentLoading  = signal(false);
@@ -109,6 +114,28 @@ export class FileListComponent implements OnInit {
   }
 
   resetUpload(): void { this.uploadService.reset(); }
+
+  createDocument(): void {
+    const name = prompt('Название заметки:', 'Новая заметка');
+    if (!name) return;
+
+    this.creatingDoc.set(true);
+    this.docsApi.create(name).subscribe({
+      next: res => {
+        this.creatingDoc.set(false);
+        this.router.navigate(['/documents', res.data.document.id]);
+      },
+      error: () => this.creatingDoc.set(false),
+    });
+  }
+
+  openFile(file: FileListItem): void {
+    if (file.mime_type === 'text/markdown') {
+      this.router.navigate(['/documents', file.id]);
+    } else {
+      this.router.navigate(['/files', file.id]);
+    }
+  }
 
   // ─── Add Link ─────────────────────────────────────────────────────────────
 

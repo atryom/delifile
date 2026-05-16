@@ -8,6 +8,17 @@
     <!-- ── Left: upload + link + newly added ──────────────────────────────── -->
     <div class="home-left">
 
+      <!-- Create note -->
+      <button
+        type="button"
+        class="create-note-btn"
+        [disabled]="creatingDoc()"
+        (click)="createDocument()"
+      >
+        <span aria-hidden="true">📝</span>
+        {{ creatingDoc() ? 'Создаём...' : 'Создать заметку' }}
+      </button>
+
       <!-- Upload zone -->
       <label
         class="upload-zone"

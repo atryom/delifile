@@ -26,6 +26,12 @@ class File extends Model
         'folder_id',
         'shared_folder_only',
         'has_versions',
+        'is_editable',
+        'editor_type',
+        'etag',
+        'updated_by',
+        'width',
+        'height',
         'display_name',
         'expires_at',
         'content_kind',
@@ -46,12 +52,30 @@ class File extends Model
             'size'               => 'integer',
             'shared_folder_only' => 'boolean',
             'has_versions'       => 'boolean',
+            'is_editable'        => 'boolean',
+            'width'              => 'integer',
+            'height'             => 'integer',
         ];
     }
 
     public function isUrlFile(): bool
     {
         return $this->content_kind === 'url_file';
+    }
+
+    public function isMarkdownDocument(): bool
+    {
+        return $this->is_editable && $this->editor_type === 'markdown';
+    }
+
+    public function updatedByUser(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function documentLock(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(DocumentLock::class, 'file_id');
     }
 
     // Relations
