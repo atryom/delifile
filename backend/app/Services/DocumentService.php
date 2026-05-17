@@ -71,6 +71,9 @@ class DocumentService
             $content = '';
         }
 
+        // Replace stable API image URLs with fresh presigned S3 URLs so <img> tags load.
+        $content = $this->hydrateImageUrls($content);
+
         return $this->buildDocumentResponse($file, $user, $content);
     }
 
@@ -86,6 +89,9 @@ class DocumentService
                 ],
             ];
         }
+
+        // Normalize any presigned S3 URLs back to stable /api/v1/files/{id}/content paths.
+        $content = $this->normalizeImageUrls($content);
 
         Storage::disk('s3')->put($file->storage_key, $content, [
             'ContentType' => self::MIME_TYPE,
@@ -332,6 +338,17 @@ class DocumentService
 
     private function formatImageItem(File $file): array
     {
+        $ttl        = now()->addHour();
+        $previewKey = $file->thumbnail_key ?? $file->storage_key;
+
+        try {
+            $previewUrl = Storage::disk('s3')->temporaryUrl($previewKey, $ttl);
+            $assetUrl   = Storage::disk('s3')->temporaryUrl($file->storage_key, $ttl);
+        } catch (\Throwable) {
+            $previewUrl = '/api/v1/files/' . $file->id . '/preview';
+            $assetUrl   = '/api/v1/files/' . $file->id . '/content';
+        }
+
         return [
             'id'         => $file->id,
             'fileName'   => $file->original_name,
@@ -339,10 +356,72 @@ class DocumentService
             'size'       => $file->size,
             'width'      => $file->width,
             'height'     => $file->height,
-            'previewUrl' => '/api/v1/files/' . $file->id . '/preview',
-            'assetUrl'   => '/api/v1/files/' . $file->id . '/content',
+            'previewUrl' => $previewUrl,
+            'assetUrl'   => $assetUrl,
+            'stableUrl'  => '/api/v1/files/' . $file->id . '/content',
             'updatedAt'  => $file->updated_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Replace stable /api/v1/files/{id}/content URLs in markdown content
+     * with fresh presigned S3 URLs so <img> tags render without auth headers.
+     */
+    private function hydrateImageUrls(string $content): string
+    {
+        return preg_replace_callback(
+            '#/api/v1/files/([a-z0-9]+)/content#',
+            function (array $m): string {
+                $file = File::find($m[1]);
+                if (!$file) {
+                    return $m[0];
+                }
+                try {
+                    return Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addHour());
+                } catch (\Throwable) {
+                    return $m[0];
+                }
+            },
+            $content
+        ) ?? $content;
+    }
+
+    /**
+     * Replace presigned S3 URLs in markdown content with stable API URLs
+     * so the stored document always contains durable, auth-independent paths.
+     */
+    private function normalizeImageUrls(string $content): string
+    {
+        $endpoint = rtrim((string) config('filesystems.disks.s3.endpoint', ''), '/');
+        $bucket   = (string) config('filesystems.disks.s3.bucket', '');
+
+        if (!$endpoint || !$bucket) {
+            return $content;
+        }
+
+        // Match presigned S3 URLs: https://<host>/<bucket>/<key>?X-Amz-...
+        // or https://<bucket>.<host>/<key>?X-Amz-...
+        $pattern = '#https?://[^\s"\')\]]+X-Amz-[^\s"\')\]]+#';
+
+        return preg_replace_callback($pattern, function (array $m) use ($bucket): string {
+            $url    = $m[0];
+            $parsed = parse_url($url);
+            if (!$parsed || empty($parsed['path'])) {
+                return $url;
+            }
+
+            $path = ltrim($parsed['path'], '/');
+
+            // Strip bucket prefix (path-style) — e.g. "delifile-ru-test/files/..."
+            if ($bucket && str_starts_with($path, $bucket . '/')) {
+                $path = substr($path, strlen($bucket) + 1);
+            }
+
+            $storageKey = urldecode($path);
+            $file = File::where('storage_key', $storageKey)->first();
+
+            return $file ? '/api/v1/files/' . $file->id . '/content' : $url;
+        }, $content) ?? $content;
     }
 
     private function fetchEtagFromS3(string $storageKey): ?string

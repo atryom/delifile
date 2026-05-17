@@ -3,6 +3,7 @@ import {
   inject,
   signal,
   computed,
+  effect,
   OnInit,
   OnDestroy,
   AfterViewInit,
@@ -15,7 +16,7 @@ import {
 import { Router } from '@angular/router';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import { Image } from '@tiptap/extension-image';
+import { ResizableImage } from './resizable-image.extension';
 import { Link } from '@tiptap/extension-link';
 import { TaskList } from '@tiptap/extension-task-list';
 import { TaskItem } from '@tiptap/extension-task-item';
@@ -113,6 +114,26 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
         </div>
       }
 
+      @if (isImageSelected() && canEdit()) {
+        <div class="md-img-bar" role="toolbar" aria-label="Размер изображения">
+          <span class="md-img-bar-label">Ширина:</span>
+          <button type="button" class="md-btn md-btn--img-preset" (click)="setImgWidth(200)">S</button>
+          <button type="button" class="md-btn md-btn--img-preset" (click)="setImgWidth(400)">M</button>
+          <button type="button" class="md-btn md-btn--img-preset" (click)="setImgWidth(640)">L</button>
+          <button type="button" class="md-btn md-btn--img-preset" (click)="setImgWidth(null)">100%</button>
+          <input
+            type="number"
+            class="md-img-width-input"
+            aria-label="Ширина в пикселях"
+            [value]="imgWidthPx()"
+            min="10"
+            max="2000"
+            (change)="onImgWidthChange($event)"
+          >
+          <span class="md-img-bar-px">px</span>
+        </div>
+      }
+
       <div class="md-editor-body">
         @if (loading()) {
           <div class="md-state" aria-live="polite">Загрузка документа...</div>
@@ -148,10 +169,19 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
 
   editor: Editor | null = null;
 
+  constructor() {
+    effect(() => {
+      this.editor?.setEditable(this.canEdit());
+    });
+  }
+
   readonly doc         = signal<DocModel | null>(null);
-  readonly loading     = signal(true);
-  readonly saveStatus  = signal<SaveStatus>('saved');
+  readonly loading         = signal(true);
+  readonly saveStatus      = signal<SaveStatus>('saved');
   readonly showImagePicker = signal(false);
+  readonly isImageSelected = signal(false);
+  readonly selectedImgWidth = signal<string | null>(null);
+  readonly imgWidthPx       = signal('');
 
   readonly lockState  = this.lockService.lockState;
   readonly canEdit    = computed(() => {
@@ -194,24 +224,21 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
 
   private loadDocument(): void {
     this.docsApi.get(this.id()).subscribe({
-      next: res => {
+      next: async (res) => {
         this.doc.set(res.data.document);
         this.loading.set(false);
 
-        // Init editor after view updates
-        setTimeout(() => this.initEditor(res.data.document.content), 0);
-
-        // Try to acquire lock if user can edit and doc is not locked
+        // Acquire lock BEFORE creating editor so canEdit() is settled.
+        // Always try — backend returns 201 for same-user re-acquisition (e.g. after
+        // page refresh), 423 only when another user genuinely holds the lock.
         if (res.data.document.capabilities.canEdit) {
-          const lock = res.data.document.lock;
-          if (!lock?.isLocked) {
-            this.lockService.acquire(this.id());
-          } else {
-            this.lockService.lockState.set('readonly');
-          }
+          await this.lockService.acquire(this.id());
         } else {
           this.lockService.lockState.set('readonly');
         }
+
+        // Init editor after view has updated (loading spinner replaced by editorEl)
+        setTimeout(() => this.initEditor(res.data.document.content), 0);
       },
       error: () => {
         this.loading.set(false);
@@ -227,14 +254,14 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
         element: this.editorEl.nativeElement,
         extensions: [
           StarterKit,
-          Image.configure({ allowBase64: false }),
+          ResizableImage.configure({ allowBase64: false }),
           Link.configure({ openOnClick: false }),
           TaskList,
           TaskItem.configure({ nested: true }),
           Markdown.configure({ transformPastedText: true }),
         ],
         content: '',
-        editable: false,
+        editable: this.canEdit(),
         onUpdate: () => {
           this.zone.run(() => {
             if (this.canEdit()) {
@@ -242,15 +269,27 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
             }
           });
         },
+        onSelectionUpdate: ({ editor }) => {
+          this.zone.run(() => {
+            const sel = editor.state.selection as unknown as { node?: { type?: { name?: string }; attrs?: Record<string, unknown> } };
+            const imgNode = sel.node?.type?.name === 'image' ? sel.node : null;
+            if (imgNode) {
+              this.isImageSelected.set(true);
+              const w = (imgNode.attrs?.['width'] as string | null) ?? null;
+              this.selectedImgWidth.set(w);
+              this.imgWidthPx.set(w ?? '');
+            } else {
+              this.isImageSelected.set(false);
+              this.selectedImgWidth.set(null);
+              this.imgWidthPx.set('');
+            }
+          });
+        },
       });
 
       // Set markdown content via Tiptap-markdown storage
       if (content) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mdStorage = (this.editor.storage as Record<string, any>)['markdown'];
-        if (mdStorage?.parse) {
-          this.editor.commands.setContent(mdStorage.parse(content));
-        }
+        this.editor.commands.setContent(content);
       }
     });
   }
@@ -262,11 +301,15 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
     if (!etag) return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mdStorage = (this.editor.storage as Record<string, any>)['markdown'];
-    const content: string = mdStorage?.serialize?.(this.editor.state.doc) ?? '';
+    const raw: string = (this.editor.storage as any)['markdown']?.getMarkdown?.() ?? '';
+
+    if (!raw.trim()) {
+      this.saveStatus.set('saved');
+      return;
+    }
 
     this.saveStatus.set('saving');
-    this.docsApi.save(this.id(), content, etag).subscribe({
+    this.docsApi.save(this.id(), raw, etag).subscribe({
       next: res => {
         this.doc.update(d => d ? { ...d, etag: res.data.etag, updatedAt: res.data.updatedAt } : d);
         this.saveStatus.set('saved');
@@ -284,7 +327,9 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
 
   cmd(command: string): void {
     if (!this.editor || !this.canEdit()) return;
-    (this.editor.chain().focus() as unknown as Record<string, () => unknown>)[command]?.();
+    const chain = this.editor.chain().focus();
+    (chain as unknown as Record<string, () => unknown>)[command]?.();
+    chain.run();
   }
 
   cmdHeading(level: 1 | 2 | 3): void {
@@ -320,6 +365,30 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
         this.editor?.setEditable(true);
       }
     });
+  }
+
+  setImgWidth(width: number | null): void {
+    if (!this.editor) return;
+    const { state, dispatch } = this.editor.view;
+    const { selection } = state;
+    const attrs = width ? { width: String(width) } : { width: null };
+    dispatch(state.tr.setNodeMarkup(selection.from, undefined, {
+      ...(state.doc.nodeAt(selection.from)?.attrs ?? {}),
+      ...attrs,
+    }));
+    this.selectedImgWidth.set(attrs.width);
+    this.imgWidthPx.set(attrs.width ?? '');
+    this.saveStatus.set('unsaved');
+  }
+
+  onImgWidthChange(event: Event): void {
+    const val = (event.target as HTMLInputElement).value.trim();
+    const px = val ? parseInt(val, 10) : null;
+    if (px && px > 0) {
+      this.setImgWidth(px);
+    } else if (!val) {
+      this.setImgWidth(null);
+    }
   }
 
   goBack(): void {

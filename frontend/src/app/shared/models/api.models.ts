@@ -524,6 +524,7 @@ export interface ImageAsset {
   height: number | null;
   previewUrl: string;
   assetUrl: string;
+  stableUrl: string;
   updatedAt: string | null;
 }
 

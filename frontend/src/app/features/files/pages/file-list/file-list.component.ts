@@ -1,5 +1,5 @@
 import {
-  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy,
+  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy, viewChild, ElementRef,
 } from '@angular/core';
 import { RouterLink, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -28,7 +28,10 @@ export class FileListComponent implements OnInit {
   private readonly router        = inject(Router);
   private readonly fb            = inject(FormBuilder);
 
-  readonly creatingDoc = signal(false);
+  readonly creatingDoc   = signal(false);
+  readonly showNoteInput = signal(false);
+  noteCreateValue        = '';
+  private readonly noteNameInputRef = viewChild<ElementRef<HTMLInputElement>>('noteNameInput');
 
   readonly recentFiles    = signal<FileListItem[]>([]);
   readonly recentLoading  = signal(false);
@@ -115,26 +118,37 @@ export class FileListComponent implements OnInit {
 
   resetUpload(): void { this.uploadService.reset(); }
 
-  createDocument(): void {
-    const name = prompt('Название заметки:', 'Новая заметка');
-    if (!name) return;
+  startNoteCreate(): void {
+    this.showNoteInput.set(true);
+    this.noteCreateValue = '';
+    setTimeout(() => this.noteNameInputRef()?.nativeElement.focus(), 0);
+  }
 
+  cancelNoteCreate(): void {
+    this.showNoteInput.set(false);
+    this.noteCreateValue = '';
+  }
+
+  saveNoteCreate(): void {
+    const name = this.noteCreateValue.trim();
+    if (!name) return;
+    this.showNoteInput.set(false);
     this.creatingDoc.set(true);
     this.docsApi.create(name).subscribe({
       next: res => {
         this.creatingDoc.set(false);
-        this.router.navigate(['/documents', res.data.document.id]);
+        this.router.navigate(['/files', res.data.document.id], { queryParams: { editor: 'expanded' } });
       },
       error: () => this.creatingDoc.set(false),
     });
   }
 
+  fileRoute(file: FileListItem): string[] {
+    return ['/files', file.id];
+  }
+
   openFile(file: FileListItem): void {
-    if (file.mime_type === 'text/markdown') {
-      this.router.navigate(['/documents', file.id]);
-    } else {
-      this.router.navigate(['/files', file.id]);
-    }
+    this.router.navigate(this.fileRoute(file));
   }
 
   // ─── Add Link ─────────────────────────────────────────────────────────────

@@ -46,6 +46,10 @@ import { ImageAsset } from '../../../../shared/models/api.models';
 
         @if (loading()) {
           <div class="image-picker-state" aria-live="polite">Загрузка...</div>
+        } @else if (loadError()) {
+          <div class="image-picker-state" aria-live="polite" role="alert">
+            Не удалось загрузить изображения. Попробуйте позже.
+          </div>
         } @else if (images().length === 0) {
           <div class="image-picker-state" aria-live="polite">Изображения не найдены</div>
         } @else {
@@ -165,11 +169,12 @@ export class ImagePickerComponent implements OnInit {
 
   private readonly docsApi = inject(DocumentsApiService);
 
-  readonly images     = signal<ImageAsset[]>([]);
-  readonly loading    = signal(false);
+  readonly images      = signal<ImageAsset[]>([]);
+  readonly loading     = signal(false);
   readonly loadingMore = signal(false);
-  readonly nextCursor = signal<string | null>(null);
-  readonly selected   = signal<ImageAsset | null>(null);
+  readonly loadError   = signal(false);
+  readonly nextCursor  = signal<string | null>(null);
+  readonly selected    = signal<ImageAsset | null>(null);
 
   searchQuery = '';
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -217,6 +222,7 @@ export class ImagePickerComponent implements OnInit {
 
   private load(): void {
     this.loading.set(true);
+    this.loadError.set(false);
     this.images.set([]);
     this.nextCursor.set(null);
     this.selected.set(null);
@@ -229,7 +235,10 @@ export class ImagePickerComponent implements OnInit {
           this.nextCursor.set(res.data.nextCursor);
           this.loading.set(false);
         },
-        error: () => this.loading.set(false),
+        error: () => {
+          this.loading.set(false);
+          this.loadError.set(true);
+        },
       });
   }
 }

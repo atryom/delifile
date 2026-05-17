@@ -80,7 +80,10 @@ export class FoldersTreeComponent implements OnInit {
   private readonly authState    = inject(AuthStateService);
   private readonly docsApi      = inject(DocumentsApiService);
 
-  readonly creatingDoc = signal(false);
+  readonly creatingDoc    = signal(false);
+  readonly showNoteInput  = signal(false);
+  noteCreateValue         = '';
+  private readonly noteNameInputEl = viewChild<ElementRef<HTMLInputElement>>('noteNameInput');
 
   // ── Tab & navigation ─────────────────────────────────────────────────────
   readonly activeTab             = signal<'local' | 'shared'>('local');
@@ -804,11 +807,24 @@ export class FoldersTreeComponent implements OnInit {
   }
 
   // ── Create document ───────────────────────────────────────────────────────
-  createDocument(event?: Event): void {
+  startNoteCreate(event?: Event): void {
     event?.stopPropagation();
-    const name = prompt('Название заметки:', 'Новая заметка');
-    if (!name) return;
+    this.showNoteInput.set(true);
+    this.noteCreateValue = '';
+    this.cancelCreate();
+    this.closeMenu();
+    setTimeout(() => this.noteNameInputEl()?.nativeElement.focus(), 0);
+  }
 
+  cancelNoteCreate(): void {
+    this.showNoteInput.set(false);
+    this.noteCreateValue = '';
+  }
+
+  saveNoteCreate(): void {
+    const name = this.noteCreateValue.trim();
+    if (!name) return;
+    this.showNoteInput.set(false);
     this.creatingDoc.set(true);
     this.docsApi.create(name).subscribe({
       next: res => {
@@ -818,7 +834,7 @@ export class FoldersTreeComponent implements OnInit {
 
         const navigate = () => {
           this.creatingDoc.set(false);
-          this.router.navigate(['/documents', docId]);
+          this.router.navigate(['/files', docId], { queryParams: { editor: 'expanded' } });
         };
 
         if (localId) {

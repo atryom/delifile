@@ -12,8 +12,8 @@
       <button
         type="button"
         class="create-note-btn"
-        [disabled]="creatingDoc()"
-        (click)="createDocument()"
+        [disabled]="creatingDoc() || showNoteInput()"
+        (click)="startNoteCreate()"
       >
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
@@ -24,6 +24,7 @@
         </svg>
         {{ creatingDoc() ? 'Создаём...' : 'Создать заметку' }}
       </button>
+
 
       <!-- Upload zone -->
       <label
@@ -206,7 +207,7 @@
       } @else {
         <div class="recent-list">
           @for (file of recentFiles(); track file.id) {
-            <a [routerLink]="['/files', file.id]" class="recent-item">
+            <a [routerLink]="fileRoute(file)" class="recent-item">
               <div class="recent-thumb-wrap">
                 @if (file.preview_url ?? file.link_image_url; as thumbUrl) {
                   <img [src]="thumbUrl" alt="" class="recent-thumb" loading="lazy" />
@@ -239,3 +240,23 @@
 
   </div>
 </div>
+
+@if (showNoteInput()) {
+  <div class="modal-backdrop" (click)="cancelNoteCreate()" role="dialog" aria-modal="true" aria-labelledby="note-create-title">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3 id="note-create-title">Создать заметку</h3>
+      <input type="text" #noteNameInput [(ngModel)]="noteCreateValue" placeholder="Название заметки"
+             class="modal-name-input" maxlength="100"
+             (keydown.enter)="saveNoteCreate()" (keydown.escape)="cancelNoteCreate()"
+             aria-label="Название заметки" />
+      <div class="modal-actions">
+        <button type="button" class="btn-primary-modal"
+                [disabled]="creatingDoc() || !noteCreateValue.trim()"
+                (click)="saveNoteCreate()">
+          {{ creatingDoc() ? 'Создаём...' : 'Создать' }}
+        </button>
+        <button type="button" class="btn-secondary-modal" (click)="cancelNoteCreate()">Отмена</button>
+      </div>
+    </div>
+  </div>
+}

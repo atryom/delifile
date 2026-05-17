@@ -68,6 +68,77 @@
   @media (max-width: v.$bp-tablet) { width: 100%; }
 }
 
+// ─── Note create modal ────────────────────────────────────────────────────
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400;
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .3);
+
+  h3 { margin: 0 0 16px; font-size: 16px; color: var(--text); }
+}
+
+.modal-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  margin-bottom: 20px;
+  display: block;
+
+  &:focus { border-color: var(--accent); }
+  &::placeholder { color: var(--text-muted); }
+}
+
+.modal-actions { display: flex; gap: 10px; }
+
+.btn-primary-modal {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s;
+  &:hover:not(:disabled) { background: var(--accent-hover); }
+  &:disabled { opacity: .5; cursor: not-allowed; }
+}
+
+.btn-secondary-modal {
+  background: var(--surface3);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  padding: 9px 18px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .12s;
+}
+
 // ─── Upload zone ──────────────────────────────────────────────────────────
 .upload-zone {
   display: flex;
