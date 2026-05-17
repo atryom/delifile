@@ -58,6 +58,14 @@ export const routes: Routes = [
       import('./features/files/pages/file-detail/file-detail.component').then(m => m.FileDetailComponent),
   },
   {
+    path: 'documents/:id',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/files/pages/markdown-editor/markdown-editor.component').then(
+        m => m.MarkdownEditorComponent
+      ),
+  },
+  {
     path: 'folders',
     canActivate: [authGuard],
     loadComponent: () =>

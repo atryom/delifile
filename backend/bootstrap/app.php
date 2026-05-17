@@ -24,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(append: [
             \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
         ]);
+
+        // Override default Authenticate so it never calls route('login').
+        // Unauthenticated API requests get 401 JSON from our Handler, not a redirect.
+        $middleware->alias(['auth' => \App\Http\Middleware\Authenticate::class]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // Delegate to our unified Handler

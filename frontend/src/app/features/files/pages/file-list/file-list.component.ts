@@ -1,11 +1,12 @@
 import {
-  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy,
+  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy, viewChild, ElementRef,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
+import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { FileUploadService } from '../../services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { FileTypeIconComponent } from '../../../../shared/components/file-type-icon/file-type-icon.component';
@@ -20,10 +21,17 @@ import { FileListItem, FileCard, LinkPreview } from '../../../../shared/models/a
 })
 export class FileListComponent implements OnInit {
   private readonly filesApi      = inject(FilesApiService);
+  private readonly docsApi       = inject(DocumentsApiService);
   private readonly uploadService = inject(FileUploadService);
   private readonly urlFilesApi   = inject(UrlFilesApiService);
   private readonly translate     = inject(TranslateService);
+  private readonly router        = inject(Router);
   private readonly fb            = inject(FormBuilder);
+
+  readonly creatingDoc   = signal(false);
+  readonly showNoteInput = signal(false);
+  noteCreateValue        = '';
+  private readonly noteNameInputRef = viewChild<ElementRef<HTMLInputElement>>('noteNameInput');
 
   readonly recentFiles    = signal<FileListItem[]>([]);
   readonly recentLoading  = signal(false);
@@ -109,6 +117,39 @@ export class FileListComponent implements OnInit {
   }
 
   resetUpload(): void { this.uploadService.reset(); }
+
+  startNoteCreate(): void {
+    this.showNoteInput.set(true);
+    this.noteCreateValue = '';
+    setTimeout(() => this.noteNameInputRef()?.nativeElement.focus(), 0);
+  }
+
+  cancelNoteCreate(): void {
+    this.showNoteInput.set(false);
+    this.noteCreateValue = '';
+  }
+
+  saveNoteCreate(): void {
+    const name = this.noteCreateValue.trim();
+    if (!name) return;
+    this.showNoteInput.set(false);
+    this.creatingDoc.set(true);
+    this.docsApi.create(name).subscribe({
+      next: res => {
+        this.creatingDoc.set(false);
+        this.router.navigate(['/files', res.data.document.id], { queryParams: { editor: 'expanded' } });
+      },
+      error: () => this.creatingDoc.set(false),
+    });
+  }
+
+  fileRoute(file: FileListItem): string[] {
+    return ['/files', file.id];
+  }
+
+  openFile(file: FileListItem): void {
+    this.router.navigate(this.fileRoute(file));
+  }
 
   // ─── Add Link ─────────────────────────────────────────────────────────────
 

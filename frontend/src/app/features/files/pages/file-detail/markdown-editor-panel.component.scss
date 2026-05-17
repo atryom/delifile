@@ -1,0 +1,255 @@
+// ── Host layout ───────────────────────────────────────────────────────────────
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+:host.is-expanded {
+  height: 100%;
+
+  .ep-body { flex: 1; max-height: none; }
+}
+
+// ── Banners ───────────────────────────────────────────────────────────────────
+.ep-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+
+  &--warning {
+    background: rgba(161, 103, 0, 0.1);
+    border-bottom: 1px solid rgba(161, 103, 0, 0.22);
+    color: var(--text);
+  }
+  &--info {
+    background: var(--accent-dim);
+    border-bottom: 1px solid var(--accent);
+    color: var(--accent-text);
+  }
+}
+
+.ep-banner-action {
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+}
+
+// ── Header bar ────────────────────────────────────────────────────────────────
+.ep-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.ep-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ep-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ep-save-status {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ep-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 5px;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+
+  &:hover {
+    background: var(--border);
+    color: var(--text);
+  }
+}
+
+.ep-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+
+  &--primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+    &:hover:not(:disabled) { background: var(--accent-hover); }
+  }
+
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+}
+
+// ── Collapsible wrapper ───────────────────────────────────────────────────────
+.ep-collapse-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+// ── Toolbar ───────────────────────────────────────────────────────────────────
+.ep-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1px;
+  padding: 5px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.ep-sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+// Base toolbar button
+.ep-tb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 5px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-family: inherit;
+  transition: background 0.1s, color 0.1s;
+
+  &:hover  { background: var(--surface2); color: var(--text); }
+  &.active { background: var(--accent-dim); color: var(--accent-text); }
+}
+
+// Styled-text variants
+.ep-tb-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  padding: 0 6px;
+}
+.ep-tb-bold   { font-weight: 800; }
+.ep-tb-italic { font-style: italic; }
+.ep-tb-strike { text-decoration: line-through; }
+
+// ── Image size bar ────────────────────────────────────────────────────────────
+.ep-img-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: var(--accent-dim);
+  border-bottom: 1px solid var(--accent);
+  flex-shrink: 0;
+}
+
+.ep-img-bar-label,
+.ep-img-bar-px {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ep-img-width-input {
+  width: 54px;
+  padding: 2px 5px;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  text-align: right;
+
+  &:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  -moz-appearance: textfield;
+}
+
+// ── Editor body ───────────────────────────────────────────────────────────────
+.ep-body {
+  overflow-y: auto;
+  background: var(--bg, var(--surface));
+  color: var(--text);
+  max-height: 480px;
+  flex: 1;
+  cursor: text;
+}
+
+.ep-prose-wrap {
+  padding: 36px 48px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100%;
+
+  @media (max-width: 700px) {
+    padding: 20px 18px;
+  }
+}
+
+.ep-content {
+  width: 100%;
+  max-width: 740px;
+  min-height: 220px;
+  color: var(--text);
+}
+
+.ep-state {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}

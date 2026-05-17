@@ -317,3 +317,110 @@
   display: flex;
   gap: 10px;
 }
+
+// ── Tiptap / ProseMirror ───────────────────────────────────────────────────────
+
+[contenteditable] { outline: none !important; }
+
+.ProseMirror {
+  outline: none !important;
+  border: none;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text);
+  min-height: 220px;
+  cursor: text;
+
+  h1 { font-size: 1.8rem; font-weight: 700; margin: 1em 0 .4em; }
+  h2 { font-size: 1.4rem; font-weight: 600; margin: .9em 0 .35em; }
+  h3 { font-size: 1.15rem; font-weight: 600; margin: .8em 0 .3em; }
+
+  p { margin: .2em 0; }
+  p:first-child { margin-top: 0; }
+  p:last-child  { margin-bottom: 0; }
+
+  strong { font-weight: 700; }
+  em     { font-style: italic; }
+  s      { text-decoration: line-through; }
+
+  ul, ol { padding-left: 1.5em; margin: .3em 0; }
+  li     { margin: .1em 0; }
+
+  blockquote {
+    border-left: 3px solid var(--accent, #6366f1);
+    padding-left: 1em;
+    color: var(--text-dim, #6b7280);
+    margin: .5em 0;
+  }
+
+  code {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    background: var(--surface2, rgba(0,0,0,.06));
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: .9em;
+  }
+
+  pre {
+    background: var(--surface3, rgba(0,0,0,.08));
+    padding: 14px 18px;
+    border-radius: 6px;
+    overflow-x: auto;
+    border: 1px solid var(--border, #e5e7eb);
+    margin: .5em 0;
+    code { background: none; padding: 0; }
+  }
+
+  img {
+    max-width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    border-radius: 4px;
+    display: block;
+  }
+
+  a { color: var(--accent, #6366f1); text-decoration: underline; }
+
+  hr { border: none; border-top: 1px solid var(--border, #e5e7eb); margin: 1em 0; }
+
+  ul[data-type="taskList"] {
+    list-style: none;
+    padding-left: .25em;
+
+    > li {
+      display: flex;
+      align-items: flex-start;
+      gap: .45em;
+      margin: .15em 0;
+
+      > label {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        padding-top: .22em;
+        input[type="checkbox"] { margin: 0; cursor: pointer; }
+      }
+
+      > div {
+        flex: 1;
+        min-width: 0;
+        p { margin: 0; }
+      }
+    }
+  }
+
+  p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--text-muted, #9ca3af);
+    pointer-events: none;
+    float: left;
+    height: 0;
+  }
+}
+
+.theme-dark .ProseMirror {
+  color: var(--text);
+  h1, h2, h3 { color: var(--text); }
+  code { background: var(--surface2); }
+  pre  { background: var(--surface3); border-color: var(--border); }
+}

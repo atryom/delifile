@@ -14,6 +14,7 @@ import { TariffApiService } from '../../../../core/api/tariff-api.service';
 import { FileUploadService } from '../../../files/services/file-upload.service';
 import { VideoThumbnailService } from '../../../files/services/video-thumbnail.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
+import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import {
   FolderTreeNode, SharedFolder, FileListItem, SharedFolderFileItem,
   Tag, TariffUsage, FileTypeGroup, LinkPreview, InitUploadRequest,
@@ -77,6 +78,12 @@ export class FoldersTreeComponent implements OnInit {
   private readonly route        = inject(ActivatedRoute);
   private readonly fb           = inject(FormBuilder);
   private readonly authState    = inject(AuthStateService);
+  private readonly docsApi      = inject(DocumentsApiService);
+
+  readonly creatingDoc    = signal(false);
+  readonly showNoteInput  = signal(false);
+  noteCreateValue         = '';
+  private readonly noteNameInputEl = viewChild<ElementRef<HTMLInputElement>>('noteNameInput');
 
   // ── Tab & navigation ─────────────────────────────────────────────────────
   readonly activeTab             = signal<'local' | 'shared'>('local');
@@ -797,6 +804,49 @@ export class FoldersTreeComponent implements OnInit {
   favoriteFile(file: AnyFile): void {
     this.filesApi.favorite(file.id).subscribe({ error: () => {} });
     this.closeMenu();
+  }
+
+  // ── Create document ───────────────────────────────────────────────────────
+  startNoteCreate(event?: Event): void {
+    event?.stopPropagation();
+    this.showNoteInput.set(true);
+    this.noteCreateValue = '';
+    this.cancelCreate();
+    this.closeMenu();
+    setTimeout(() => this.noteNameInputEl()?.nativeElement.focus(), 0);
+  }
+
+  cancelNoteCreate(): void {
+    this.showNoteInput.set(false);
+    this.noteCreateValue = '';
+  }
+
+  saveNoteCreate(): void {
+    const name = this.noteCreateValue.trim();
+    if (!name) return;
+    this.showNoteInput.set(false);
+    this.creatingDoc.set(true);
+    this.docsApi.create(name).subscribe({
+      next: res => {
+        const docId   = res.data.document.id;
+        const localId = this.activeTab() === 'local' ? this.currentLocalFolderId() : null;
+        const sfId    = this.activeTab() === 'shared' ? this.currentSharedFolderId() : null;
+
+        const navigate = () => {
+          this.creatingDoc.set(false);
+          this.router.navigate(['/files', docId], { queryParams: { editor: 'expanded' } });
+        };
+
+        if (localId) {
+          this.filesApi.moveFolder(docId, localId).subscribe({ next: navigate, error: navigate });
+        } else if (sfId) {
+          this.sfApi.addFile(sfId, docId).subscribe({ next: navigate, error: navigate });
+        } else {
+          navigate();
+        }
+      },
+      error: () => this.creatingDoc.set(false),
+    });
   }
 
   // ── Add modal ─────────────────────────────────────────────────────────────

@@ -13,11 +13,12 @@ import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link
 import { AddToSharedFolderDialogComponent } from '../../dialogs/add-to-shared-folder/add-to-shared-folder-dialog.component';
 import { AddVersionDialogComponent } from '../../dialogs/add-version/add-version-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
+import { MarkdownEditorPanelComponent } from './markdown-editor-panel.component';
 
 @Component({
   selector: 'app-file-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, AddToSharedFolderDialogComponent, AddVersionDialogComponent, TranslateModule, ThreadCommentsComponent],
+  imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, AddToSharedFolderDialogComponent, AddVersionDialogComponent, TranslateModule, ThreadCommentsComponent, MarkdownEditorPanelComponent],
   templateUrl: './file-detail.component.html',
   styleUrl: './file-detail.component.scss',
 })
@@ -73,6 +74,8 @@ export class FileDetailComponent implements OnInit {
   readonly showVersions           = signal(false);
   readonly contextSharedFolderId  = signal<string | null>(null);
   readonly descriptionEditorOpen  = signal(false);
+  readonly editorPanelOpen        = signal(false);
+  readonly editorExpanded         = signal(false);
 
   // ─── Versioning state ────────────────────────────────────────────────────────
 
@@ -123,6 +126,12 @@ export class FileDetailComponent implements OnInit {
     } else if (fromParam === 'local-folder' && folderIdParam) {
       this.backFolderId = folderIdParam;
       this.backLink.set({ commands: ['/folders'], queryParams: { folder_id: folderIdParam } });
+    }
+
+    const editorParam = this.route.snapshot.queryParamMap.get('editor');
+    if (editorParam === 'expanded') {
+      this.editorPanelOpen.set(true);
+      this.editorExpanded.set(true);
     }
 
     this.loadFile();

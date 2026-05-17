@@ -475,6 +475,64 @@ export interface SuggestionDetail extends SuggestionItem {
   admin_comments?: { id: string; body: string; created_at: string | null }[];
 }
 
+// ─── Document / Markdown Editor Models ───────────────────────────────────────
+
+export type LockLostReason = 'LOCK_EXPIRED' | 'LOCK_TAKEN_OVER';
+
+export interface DocumentLock {
+  isLocked: boolean;
+  lockedBy: { id: number | string; name: string } | null;
+  expiresAt: string;
+  canTakeOver: boolean;
+}
+
+export interface DocumentCapabilities {
+  canEdit: boolean;
+  canRename: boolean;
+  canDelete: boolean;
+  canInsertImages: boolean;
+  canTakeOverLock: boolean;
+}
+
+export interface Document {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  isEditable: boolean;
+  editorType: string;
+  content: string;
+  etag: string | null;
+  updatedAt: string | null;
+  updatedBy: { id: number | string; name: string } | null;
+  lock: DocumentLock | null;
+  capabilities: DocumentCapabilities;
+}
+
+export interface DocumentSaveResult {
+  id: string;
+  etag: string;
+  updatedAt: string;
+  updatedBy: { id: number | string; name: string } | null;
+}
+
+export interface ImageAsset {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  previewUrl: string;
+  assetUrl: string;
+  stableUrl: string;
+  updatedAt: string | null;
+}
+
+export interface ImageAssetsResponse {
+  items: ImageAsset[];
+  nextCursor: string | null;
+}
+
 // ─── Comment Models ───────────────────────────────────────────────────────────
 
 export type CommentScope = 'shared' | 'private';

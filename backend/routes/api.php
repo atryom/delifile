@@ -24,6 +24,9 @@ use App\Http\Controllers\SharedFolders\SharedFolderController;
 use App\Http\Controllers\Comments\CommentThreadController;
 use App\Http\Controllers\Comments\CommentController;
 use App\Http\Controllers\Comments\CommentSettingsController;
+use App\Http\Controllers\Documents\DocumentController;
+use App\Http\Controllers\Documents\DocumentLockController;
+use App\Http\Controllers\Assets\AssetController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -104,6 +107,10 @@ Route::prefix('v1')->group(function () {
         Route::delete('files/{id}',                [FileController::class, 'destroy']);
         Route::post('files/{id}/cancel-upload',    [FileController::class, 'cancelUpload']);
 
+        // Files — stable content/preview URLs (used in markdown documents)
+        Route::get('files/{id}/content',  [FileController::class, 'content']);
+        Route::get('files/{id}/preview',  [FileController::class, 'preview']);
+
         // Files — actions
         Route::post('files/{id}/download',         [FileController::class, 'download']);
         Route::post('files/{id}/pin',              [FileController::class, 'pin']);
@@ -131,6 +138,21 @@ Route::prefix('v1')->group(function () {
         // URL Files
         Route::post('links-preview',  [UrlFileController::class, 'preview']);
         Route::post('url-files',      [UrlFileController::class, 'store']);
+
+        // Documents (Markdown editor)
+        Route::post('documents',             [DocumentController::class, 'create']);
+        Route::get('documents/{id}',         [DocumentController::class, 'show']);
+        Route::put('documents/{id}',         [DocumentController::class, 'update']);
+        Route::patch('files/{id}/accesses/{accessId}', [DocumentController::class, 'updateAccess']);
+
+        // Document locks
+        Route::post('documents/{id}/lock',             [DocumentLockController::class, 'acquire']);
+        Route::post('documents/{id}/lock/heartbeat',   [DocumentLockController::class, 'heartbeat']);
+        Route::post('documents/{id}/lock/takeover',    [DocumentLockController::class, 'takeover']);
+        Route::delete('documents/{id}/lock',           [DocumentLockController::class, 'release']);
+
+        // Assets
+        Route::get('assets/images', [AssetController::class, 'images']);
 
         // Sharing
         Route::post('files/{id}/share-to-contact',             [SharingController::class, 'shareToContact']);

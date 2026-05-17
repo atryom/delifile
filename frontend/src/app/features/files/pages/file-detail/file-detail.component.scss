@@ -23,6 +23,27 @@
 }
 .file-main, .file-sidebar { min-width: 0; }
 
+// ─── Inline markdown editor card ─────────────────────────────────────────────
+.editor-panel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  &--expanded {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    border-radius: 0;
+    margin-bottom: 0;
+    border: none;
+    background: var(--bg, var(--surface));
+  }
+}
+
 // ─── URL file card ────────────────────────────────────────────────────────────
 .url-card {
   background: var(--surface);

@@ -77,6 +77,18 @@
           <span>Добавить</span>
         </button>
 
+        <button type="button" class="btn-action" (click)="startNoteCreate($event)"
+                [disabled]="creatingDoc() || showNoteInput()" title="Создать заметку">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          <span>{{ creatingDoc() ? 'Создаём...' : 'Заметка' }}</span>
+        </button>
+
         <div class="topbar-divider" aria-hidden="true"></div>
 
         <button type="button" class="topbar-btn" [class.active]="viewMode() === 'table'"
@@ -247,6 +259,7 @@
         <button type="button" class="btn-sm btn-cancel" (click)="cancelCreate()">Отмена</button>
       </div>
     }
+
 
     <!-- ── LOADING ────────────────────────────────────────────────────── -->
     @if (isLoading()) {
@@ -1012,6 +1025,28 @@
           {{ movingFiles() ? 'Перемещается…' : 'Переместить' }}
         </button>
         <button type="button" class="btn-secondary" (click)="moveDialogOpen.set(false)">Отмена</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ CREATE NOTE DIALOG -->
+
+@if (showNoteInput()) {
+  <div class="modal-backdrop" (click)="cancelNoteCreate()" role="dialog" aria-modal="true" aria-labelledby="note-create-title">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3 id="note-create-title">Создать заметку</h3>
+      <input type="text" #noteNameInput [(ngModel)]="noteCreateValue" placeholder="Название заметки"
+             class="modal-name-input" maxlength="100"
+             (keydown.enter)="saveNoteCreate()" (keydown.escape)="cancelNoteCreate()"
+             aria-label="Название заметки" />
+      <div class="modal-actions">
+        <button type="button" class="btn-primary"
+                [disabled]="creatingDoc() || !noteCreateValue.trim()"
+                (click)="saveNoteCreate()">
+          {{ creatingDoc() ? 'Создаём...' : 'Создать' }}
+        </button>
+        <button type="button" class="btn-secondary" (click)="cancelNoteCreate()">Отмена</button>
       </div>
     </div>
   </div>

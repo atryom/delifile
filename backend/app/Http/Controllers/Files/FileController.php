@@ -13,6 +13,7 @@ use App\Services\FileService;
 use App\Services\ActivityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class FileController extends Controller
 {
@@ -243,6 +244,50 @@ class FileController extends Controller
             'url'        => $url,
             'expires_in' => config('filesystems.disks.s3.presigned_url_ttl', 3600),
         ]);
+    }
+
+    /**
+     * GET /api/v1/files/{fileId}/content
+     * Stable application URL for file content (used in markdown documents).
+     * Checks access and redirects to a fresh presigned S3 URL.
+     */
+    public function content(Request $request, string $fileId): \Illuminate\Http\RedirectResponse|\Illuminate\Http\Response
+    {
+        $file = File::find($fileId);
+
+        if (!$file || !$file->isAvailable()) {
+            abort(404);
+        }
+
+        if (!$this->fileService->canAccess($request->user(), $file)) {
+            abort(403);
+        }
+
+        $url = Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addMinutes(15));
+
+        return redirect()->away($url);
+    }
+
+    /**
+     * GET /api/v1/files/{fileId}/preview
+     * Stable preview URL (thumbnail if available, otherwise content).
+     */
+    public function preview(Request $request, string $fileId): \Illuminate\Http\RedirectResponse|\Illuminate\Http\Response
+    {
+        $file = File::find($fileId);
+
+        if (!$file || !$file->isAvailable()) {
+            abort(404);
+        }
+
+        if (!$this->fileService->canAccess($request->user(), $file)) {
+            abort(403);
+        }
+
+        $key = $file->thumbnail_key ?? $file->storage_key;
+        $url = Storage::disk('s3')->temporaryUrl($key, now()->addMinutes(60));
+
+        return redirect()->away($url);
     }
 
     /**
