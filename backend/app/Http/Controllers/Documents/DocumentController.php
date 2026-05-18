@@ -61,7 +61,7 @@ class DocumentController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $request->validate([
-            'content' => 'required|string',
+            'content' => 'present|string',
             'etag'    => 'required|string',
         ]);
 
@@ -87,6 +87,10 @@ class DocumentController extends Controller
             $request->input('content'),
             $request->input('etag')
         );
+
+        if (!empty($result['quota_exceeded'])) {
+            return $this->error('Storage quota exceeded', 'QUOTA_EXCEEDED', [], 413);
+        }
 
         if ($result['conflict']) {
             return response()->json([
@@ -119,8 +123,8 @@ class DocumentController extends Controller
 
         $file = File::find($fileId);
 
-        if (!$file || !$file->isMarkdownDocument()) {
-            return $this->notFound('Document not found');
+        if (!$file) {
+            return $this->notFound('File not found');
         }
 
         if (!$file->isOwnedBy($request->user())) {

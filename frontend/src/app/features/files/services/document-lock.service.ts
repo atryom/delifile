@@ -43,7 +43,7 @@ export class DocumentLockService {
 
   release(fileId: string): void {
     this.stopHeartbeat();
-    this.docsApi.releaseLock(fileId).subscribe();
+    this.docsApi.releaseLock(fileId).subscribe({ error: () => {} });
     this.lockState.set('idle');
     this.currentFileId = null;
   }

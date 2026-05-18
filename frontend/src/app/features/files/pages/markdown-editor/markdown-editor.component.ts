@@ -58,6 +58,13 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
         </div>
       }
 
+      @if (conflictError()) {
+        <div class="md-banner md-banner--warning" role="alert">
+          Документ был изменён другим пользователем. Перезагрузите страницу, чтобы получить актуальную версию.
+          <button type="button" class="md-banner-action" (click)="goBack()">Назад</button>
+        </div>
+      }
+
       <header class="md-editor-header">
         <div class="md-editor-title">
           <h1 class="md-editor-filename">{{ doc()?.fileName ?? '...' }}</h1>
@@ -175,11 +182,12 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
-  readonly doc         = signal<DocModel | null>(null);
-  readonly loading         = signal(true);
-  readonly saveStatus      = signal<SaveStatus>('saved');
-  readonly showImagePicker = signal(false);
-  readonly isImageSelected = signal(false);
+  readonly doc              = signal<DocModel | null>(null);
+  readonly loading          = signal(true);
+  readonly saveStatus       = signal<SaveStatus>('saved');
+  readonly showImagePicker  = signal(false);
+  readonly conflictError    = signal(false);
+  readonly isImageSelected  = signal(false);
   readonly selectedImgWidth = signal<string | null>(null);
   readonly imgWidthPx       = signal('');
 
@@ -303,11 +311,7 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw: string = (this.editor.storage as any)['markdown']?.getMarkdown?.() ?? '';
 
-    if (!raw.trim()) {
-      this.saveStatus.set('saved');
-      return;
-    }
-
+    this.conflictError.set(false);
     this.saveStatus.set('saving');
     this.docsApi.save(this.id(), raw, etag).subscribe({
       next: res => {
@@ -315,11 +319,9 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
         this.saveStatus.set('saved');
       },
       error: err => {
+        this.saveStatus.set('error');
         if (err?.status === 409) {
-          this.saveStatus.set('error');
-          alert('Документ был изменён другим пользователем. Перезагрузите страницу.');
-        } else {
-          this.saveStatus.set('error');
+          this.conflictError.set(true);
         }
       },
     });
@@ -348,7 +350,7 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
     this.editor
       .chain()
       .focus()
-      .setImage({ src: img.assetUrl, alt: img.fileName, title: img.fileName })
+      .setImage({ src: img.stableUrl, alt: img.fileName, title: img.fileName })
       .run();
   }
 

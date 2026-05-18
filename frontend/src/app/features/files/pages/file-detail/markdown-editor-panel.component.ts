@@ -51,6 +51,11 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
         Документ редактирует <strong>{{ doc()?.lock?.lockedBy?.name }}</strong>.
       </div>
     }
+    @if (conflictError()) {
+      <div class="ep-banner ep-banner--warning" role="alert">
+        Документ был изменён другим пользователем — перезагрузите страницу для получения актуальной версии.
+      </div>
+    }
 
     <!-- Header bar -->
     <div class="ep-bar">
@@ -257,15 +262,16 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
     });
   }
 
-  readonly doc             = signal<DocModel | null>(null);
-  readonly loading         = signal(true);
-  readonly saveStatus      = signal<SaveStatus>('saved');
-  readonly collapsed       = signal(false);
-  readonly editorEmpty     = signal(true);
-  readonly showImagePicker = signal(false);
-  readonly isImageSelected = signal(false);
+  readonly doc              = signal<DocModel | null>(null);
+  readonly loading          = signal(true);
+  readonly saveStatus       = signal<SaveStatus>('saved');
+  readonly collapsed        = signal(false);
+  readonly editorEmpty      = signal(true);
+  readonly showImagePicker  = signal(false);
+  readonly conflictError    = signal(false);
+  readonly isImageSelected  = signal(false);
   readonly selectedImgWidth = signal<string | null>(null);
-  readonly imgWidthPx      = signal('');
+  readonly imgWidthPx       = signal('');
 
   readonly lockState = this.lockService.lockState;
 
@@ -385,11 +391,7 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw: string = (this.editor.storage as any)['markdown']?.getMarkdown?.() ?? '';
 
-    if (!raw.trim()) {
-      this.saveStatus.set('saved');
-      return;
-    }
-
+    this.conflictError.set(false);
     this.saveStatus.set('saving');
     this.docsApi.save(this.fileId(), raw, etag).subscribe({
       next: res => {
@@ -397,11 +399,9 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
         this.saveStatus.set('saved');
       },
       error: err => {
+        this.saveStatus.set('error');
         if (err?.status === 409) {
-          this.saveStatus.set('error');
-          alert('Документ был изменён другим пользователем. Перезагрузите страницу.');
-        } else {
-          this.saveStatus.set('error');
+          this.conflictError.set(true);
         }
       },
     });
@@ -426,12 +426,10 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
   onImageSelected(img: ImageAsset): void {
     this.showImagePicker.set(false);
     if (!this.editor) return;
-    // Use presigned assetUrl as src (displays without auth).
-    // Backend normalizes presigned URLs back to stable paths on save.
     this.editor
       .chain()
       .focus()
-      .setImage({ src: img.assetUrl, alt: img.fileName, title: img.fileName })
+      .setImage({ src: img.stableUrl, alt: img.fileName, title: img.fileName })
       .run();
   }
 

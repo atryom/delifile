@@ -14,6 +14,7 @@ use App\Models\SharedFolderFile;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Services\FileService;
 
 class DocumentService
 {
@@ -22,7 +23,8 @@ class DocumentService
     private const MIME_TYPE        = 'text/markdown';
 
     public function __construct(
-        private readonly ActivityService $activityService
+        private readonly ActivityService $activityService,
+        private readonly FileService     $fileService,
     ) {}
 
     public function createDocument(User $user, string $fileName): array
@@ -90,6 +92,13 @@ class DocumentService
             ];
         }
 
+        // Quota check: only the size delta matters — the current file is already counted.
+        $newSize = strlen($content);
+        $delta   = max(0, $newSize - (int) $file->size);
+        if ($delta > 0 && !$this->fileService->checkStorageQuota($user, $delta)) {
+            return ['quota_exceeded' => true];
+        }
+
         // Normalize any presigned S3 URLs back to stable /api/v1/files/{id}/content paths.
         $content = $this->normalizeImageUrls($content);
 
@@ -145,7 +154,13 @@ class DocumentService
 
         foreach ($sharedFolderIds as $folderId) {
             $current = SharedFolder::find($folderId);
+            $visited = [];
             while ($current) {
+                if (isset($visited[$current->id])) {
+                    break; // cycle guard
+                }
+                $visited[$current->id] = true;
+
                 if ($current->owner_id === $user->id) {
                     return true;
                 }
@@ -286,7 +301,6 @@ class DocumentService
         $lock   = DocumentLock::find($file->id);
         $canEdit = $this->canEditDocument($user, $file);
 
-        $lockData = null;
         if ($lock && !$lock->isExpired()) {
             $lockData = [
                 'isLocked'    => true,
@@ -294,6 +308,8 @@ class DocumentService
                 'expiresAt'   => $lock->expires_at->toIso8601String(),
                 'canTakeOver' => $file->isOwnedBy($user),
             ];
+        } else {
+            $lockData = ['isLocked' => false];
         }
 
         return [
@@ -403,23 +419,39 @@ class DocumentService
         // or https://<bucket>.<host>/<key>?X-Amz-...
         $pattern = '#https?://[^\s"\')\]]+X-Amz-[^\s"\')\]]+#';
 
-        return preg_replace_callback($pattern, function (array $m) use ($bucket): string {
-            $url    = $m[0];
+        // Collect all matches first to batch a single DB query.
+        $matches = [];
+        preg_match_all($pattern, $content, $matches);
+        $allUrls = array_unique($matches[0] ?? []);
+
+        if (empty($allUrls)) {
+            return $content;
+        }
+
+        // Resolve storage keys for every matched URL.
+        $urlToKey = [];
+        foreach ($allUrls as $url) {
             $parsed = parse_url($url);
             if (!$parsed || empty($parsed['path'])) {
-                return $url;
+                continue;
             }
-
             $path = ltrim($parsed['path'], '/');
-
-            // Strip bucket prefix (path-style) — e.g. "delifile-ru-test/files/..."
             if ($bucket && str_starts_with($path, $bucket . '/')) {
                 $path = substr($path, strlen($bucket) + 1);
             }
+            $urlToKey[$url] = urldecode($path);
+        }
 
-            $storageKey = urldecode($path);
-            $file = File::where('storage_key', $storageKey)->first();
+        $storageKeys = array_values($urlToKey);
+        $files = File::whereIn('storage_key', $storageKeys)->get()->keyBy('storage_key');
 
+        return preg_replace_callback($pattern, function (array $m) use ($urlToKey, $files): string {
+            $url = $m[0];
+            $key = $urlToKey[$url] ?? null;
+            if (!$key) {
+                return $url;
+            }
+            $file = $files->get($key);
             return $file ? '/api/v1/files/' . $file->id . '/content' : $url;
         }, $content) ?? $content;
     }
