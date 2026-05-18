@@ -500,6 +500,7 @@ export interface Document {
   mimeType: string;
   isEditable: boolean;
   editorType: string;
+  storageKey?: string;
   content: string;
   etag: string | null;
   updatedAt: string | null;

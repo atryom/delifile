@@ -318,6 +318,7 @@ class DocumentService
             'mimeType'   => $file->mime_type,
             'isEditable' => $file->is_editable,
             'editorType' => $file->editor_type,
+            'storageKey' => $file->storage_key,
             'content'    => $content,
             'etag'       => $file->etag,
             'updatedAt'  => $file->updated_at?->toIso8601String(),

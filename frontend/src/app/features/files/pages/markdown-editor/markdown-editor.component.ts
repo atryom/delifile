@@ -176,6 +176,9 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
 
   editor: Editor | null = null;
 
+  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly AUTO_SAVE_DELAY = 3000;
+
   constructor() {
     effect(() => {
       this.editor?.setEditable(this.canEdit());
@@ -223,6 +226,10 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   ngOnDestroy(): void {
+    if (this.autoSaveTimer) {
+      clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = null;
+    }
     const id = this.id();
     if (this.lockState() === 'held') {
       this.lockService.release(id);
@@ -275,6 +282,7 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
           this.zone.run(() => {
             if (this.canEdit()) {
               this.saveStatus.set('unsaved');
+              this.scheduleAutoSave();
             }
           });
         },
@@ -303,7 +311,23 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
+  private scheduleAutoSave(): void {
+    if (this.autoSaveTimer) {
+      clearTimeout(this.autoSaveTimer);
+    }
+    this.autoSaveTimer = setTimeout(() => {
+      this.autoSaveTimer = null;
+      if (this.canEdit() && this.saveStatus() === 'unsaved' && !this.conflictError()) {
+        this.save();
+      }
+    }, this.AUTO_SAVE_DELAY);
+  }
+
   save(): void {
+    if (this.autoSaveTimer) {
+      clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = null;
+    }
     if (!this.editor || !this.doc()) return;
 
     const etag = this.doc()!.etag;
