@@ -320,6 +320,67 @@ describe('MarkdownEditorComponent', () => {
     expect(component.editor?.destroy).toHaveBeenCalled();
   });
 
+  // ── Autosave ──────────────────────────────────────────────────────────────────
+
+  it('save() cancels pending autosave timer', () => {
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (component as any).autoSaveTimer = setTimeout(() => {}, 99999);
+
+    component.save();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((component as any).autoSaveTimer).toBeNull();
+  });
+
+  it('ngOnDestroy() cancels pending autosave timer', () => {
+    fixture.detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (component as any).autoSaveTimer = setTimeout(() => {}, 99999);
+
+    component.ngOnDestroy();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((component as any).autoSaveTimer).toBeNull();
+  });
+
+  it('autosave fires docsApi.save after 3 s when unsaved and no conflictError', () => {
+    fixture.detectChanges();
+    vi.useFakeTimers();
+    try {
+      component.editor = createMockEditor();
+      component.saveStatus.set('unsaved');
+      component.conflictError.set(false);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (component as any).scheduleAutoSave();
+      vi.advanceTimersByTime(3000);
+
+      expect(docsApiMock['save']).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('autosave does not fire when conflictError is true', () => {
+    fixture.detectChanges();
+    vi.useFakeTimers();
+    try {
+      component.editor = createMockEditor();
+      component.saveStatus.set('unsaved');
+      component.conflictError.set(true);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (component as any).scheduleAutoSave();
+      vi.advanceTimersByTime(3000);
+
+      expect(docsApiMock['save']).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   // ── reacquire / takeover ──────────────────────────────────────────────────────
 
   it('reacquire() calls lockService.reacquire', async () => {

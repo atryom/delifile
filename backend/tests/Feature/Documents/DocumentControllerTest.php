@@ -68,6 +68,25 @@ class DocumentControllerTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_create_and_get_include_storage_key(): void
+    {
+        Storage::fake('s3');
+        $user = User::factory()->create();
+
+        $createResponse = $this->actingAs($user)
+            ->postJson('/api/v1/documents', ['fileName' => 'note.md']);
+
+        $createResponse->assertCreated();
+        $this->assertNotNull($createResponse->json('data.document.storageKey'));
+
+        $docId = $createResponse->json('data.document.id');
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/documents/' . $docId)
+            ->assertOk()
+            ->assertJsonPath('data.document.storageKey', $createResponse->json('data.document.storageKey'));
+    }
+
     // ── GET /api/v1/documents/:id ─────────────────────────────────────────────
 
     public function test_owner_can_get_document(): void
