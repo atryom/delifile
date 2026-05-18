@@ -26,7 +26,7 @@ import { DocumentLockService, LockState } from '../../services/document-lock.ser
 import { Document as DocModel, ImageAsset } from '../../../../shared/models/api.models';
 import { ImagePickerComponent } from './image-picker.component';
 
-type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error';
+type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'quota';
 
 @Component({
   selector: 'app-markdown-editor',
@@ -209,6 +209,7 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
       case 'saved':   return 'Сохранено';
       case 'unsaved': return 'Есть несохранённые изменения';
       case 'saving':  return 'Сохраняем...';
+      case 'quota':   return 'Превышена квота хранилища';
       case 'error':   return 'Ошибка сохранения';
     }
   });
@@ -319,9 +320,13 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
         this.saveStatus.set('saved');
       },
       error: err => {
-        this.saveStatus.set('error');
         if (err?.status === 409) {
+          this.saveStatus.set('error');
           this.conflictError.set(true);
+        } else if (err?.status === 413) {
+          this.saveStatus.set('quota');
+        } else {
+          this.saveStatus.set('error');
         }
       },
     });

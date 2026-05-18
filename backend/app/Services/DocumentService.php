@@ -354,16 +354,15 @@ class DocumentService
 
     private function formatImageItem(File $file): array
     {
-        $ttl        = now()->addHour();
         $previewKey = $file->thumbnail_key ?? $file->storage_key;
 
         try {
-            $previewUrl = Storage::disk('s3')->temporaryUrl($previewKey, $ttl);
-            $assetUrl   = Storage::disk('s3')->temporaryUrl($file->storage_key, $ttl);
+            $previewUrl = Storage::disk('s3')->temporaryUrl($previewKey, now()->addHour());
         } catch (\Throwable) {
             $previewUrl = '/api/v1/files/' . $file->id . '/preview';
-            $assetUrl   = '/api/v1/files/' . $file->id . '/content';
         }
+
+        $stableUrl = '/api/v1/files/' . $file->id . '/content';
 
         return [
             'id'         => $file->id,
@@ -373,8 +372,8 @@ class DocumentService
             'width'      => $file->width,
             'height'     => $file->height,
             'previewUrl' => $previewUrl,
-            'assetUrl'   => $assetUrl,
-            'stableUrl'  => '/api/v1/files/' . $file->id . '/content',
+            'assetUrl'   => $stableUrl,
+            'stableUrl'  => $stableUrl,
             'updatedAt'  => $file->updated_at?->toIso8601String(),
         ];
     }
@@ -385,21 +384,31 @@ class DocumentService
      */
     private function hydrateImageUrls(string $content): string
     {
-        return preg_replace_callback(
-            '#/api/v1/files/([a-z0-9]+)/content#',
-            function (array $m): string {
-                $file = File::find($m[1]);
-                if (!$file) {
-                    return $m[0];
-                }
-                try {
-                    return Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addHour());
-                } catch (\Throwable) {
-                    return $m[0];
-                }
-            },
-            $content
-        ) ?? $content;
+        $pattern = '#/api/v1/files/([a-z0-9]+)/content#';
+
+        preg_match_all($pattern, $content, $matches);
+        $ids = array_unique($matches[1] ?? []);
+
+        if (empty($ids)) {
+            return $content;
+        }
+
+        $files = File::whereIn('id', $ids)->get()->keyBy('id');
+        $ttl   = now()->addHour();
+
+        // Pre-generate presigned URLs for all found files.
+        $presignedMap = [];
+        foreach ($files as $id => $file) {
+            try {
+                $presignedMap[$id] = Storage::disk('s3')->temporaryUrl($file->storage_key, $ttl);
+            } catch (\Throwable) {
+                // Leave stable URL in place if S3 is unavailable.
+            }
+        }
+
+        return preg_replace_callback($pattern, function (array $m) use ($presignedMap): string {
+            return $presignedMap[$m[1]] ?? $m[0];
+        }, $content) ?? $content;
     }
 
     /**
