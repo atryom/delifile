@@ -5,6 +5,36 @@ import { of, throwError } from 'rxjs';
 import { MarkdownEditorComponent } from './markdown-editor.component';
 import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { DocumentLockService } from '../../services/document-lock.service';
+import { ImageAsset } from '../../../../shared/models/api.models';
+import type { Editor } from '@tiptap/core';
+
+// Helper: creates a mock editor with controllable spies.
+// Each call returns a fresh instance — copy the reference before handing off to the component
+// when you need to assert on spy call history.
+const createMockEditor = (markdownContent = '# Mock content') => ({
+  storage: { markdown: { getMarkdown: vi.fn(() => markdownContent) } },
+  isActive: vi.fn(() => false),
+  destroy: vi.fn(),
+  setEditable: vi.fn(),
+  isEmpty: false,
+  commands: { setContent: vi.fn() },
+  view: {
+    state: {
+      selection: { from: 0 },
+      doc: { nodeAt: vi.fn(() => ({ attrs: { width: null } })) },
+      tr: { setNodeMarkup: vi.fn().mockReturnThis() },
+    },
+    dispatch: vi.fn(),
+  },
+  chain: vi.fn(() => ({
+    focus: vi.fn().mockReturnThis(),
+    run: vi.fn(),
+    setImage: vi.fn().mockReturnThis(),
+    toggleBold: vi.fn().mockReturnThis(),
+    toggleHeading: vi.fn().mockReturnThis(),
+    updateAttributes: vi.fn().mockReturnThis(),
+  })),
+}) as unknown as Editor;
 
 // Tiptap requires MutationObserver.takeRecords() which happy-dom doesn't implement.
 // We replace only the Editor class; extensions from other @tiptap/* packages stay real.
@@ -14,18 +44,32 @@ vi.mock('@tiptap/core', async (importOriginal) => {
     ...actual,
     Editor: class MockEditor {
       storage: Record<string, unknown> = {
-        markdown: { parse: vi.fn(() => ''), serialize: vi.fn(() => '') },
+        markdown: {
+          parse: vi.fn(() => ''),
+          serialize: vi.fn(() => ''),
+          getMarkdown: vi.fn(() => '# Mock content'),
+        },
       };
       isActive = vi.fn(() => false);
       destroy = vi.fn();
       setEditable = vi.fn();
+      isEmpty = false;
       commands = { setContent: vi.fn() };
+      view = {
+        state: {
+          selection: { from: 0 },
+          doc: { nodeAt: vi.fn(() => ({ attrs: { width: null } })) },
+          tr: { setNodeMarkup: vi.fn().mockReturnThis() },
+        },
+        dispatch: vi.fn(),
+      };
       chain = vi.fn(() => ({
         focus: vi.fn().mockReturnThis(),
         toggleBold: vi.fn().mockReturnThis(),
         run: vi.fn(),
         setImage: vi.fn().mockReturnThis(),
         toggleHeading: vi.fn().mockReturnThis(),
+        updateAttributes: vi.fn().mockReturnThis(),
       }));
     },
   };
@@ -180,5 +224,122 @@ describe('MarkdownEditorComponent', () => {
     fixture.detectChanges();
     expect(component.loading()).toBe(false);
     expect(component.doc()).toBeNull();
+  });
+
+  // ── save() ──────────────────────────────────────────────────────────────────
+
+  it('save() calls docsApi.save and updates etag on success', () => {
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+
+    component.save();
+
+    expect(docsApiMock['save']).toHaveBeenCalledWith('doc_1', '# Mock content', '"abc123"');
+    expect(component.saveStatus()).toBe('saved');
+    expect(component.doc()?.etag).toBe('"new"');
+  });
+
+  it('save() with empty content still calls docsApi.save', () => {
+    fixture.detectChanges();
+    const mockEditor = createMockEditor();
+    (mockEditor.storage['markdown'] as { getMarkdown: ReturnType<typeof vi.fn> }).getMarkdown
+      .mockReturnValueOnce('');
+    component.editor = mockEditor;
+
+    component.save();
+    expect(docsApiMock['save']).toHaveBeenCalledWith('doc_1', '', '"abc123"');
+  });
+
+  it('save() 409 → sets conflictError and saveStatus error', () => {
+    docsApiMock['save'].mockReturnValue(throwError(() => ({ status: 409 })));
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+
+    component.save();
+
+    expect(component.saveStatus()).toBe('error');
+    expect(component.conflictError()).toBe(true);
+  });
+
+  it('save() 413 → sets saveStatus to quota', () => {
+    docsApiMock['save'].mockReturnValue(throwError(() => ({ status: 413 })));
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+
+    component.save();
+
+    expect(component.saveStatus()).toBe('quota');
+    expect(component.conflictError()).toBe(false);
+  });
+
+  it('save() 500 → sets saveStatus to error without conflictError', () => {
+    docsApiMock['save'].mockReturnValue(throwError(() => ({ status: 500 })));
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+
+    component.save();
+
+    expect(component.saveStatus()).toBe('error');
+    expect(component.conflictError()).toBe(false);
+  });
+
+  // ── onImageSelected ──────────────────────────────────────────────────────────
+
+  it('onImageSelected inserts image using stableUrl, not assetUrl', () => {
+    fixture.detectChanges();
+    const mockEditor = createMockEditor();
+    component.editor = mockEditor;
+
+    const img: ImageAsset = {
+      id: 'img_1', fileName: 'photo.png', mimeType: 'image/png', size: 1024,
+      previewUrl: 'https://s3.example.com/presigned',
+      assetUrl: '/api/v1/files/img_1/content',
+      stableUrl: '/api/v1/files/img_1/content',
+    };
+
+    component.onImageSelected(img);
+
+    // chain() returns a new object on each call — inspect call history of the spy
+    const chainSpy = mockEditor.chain as ReturnType<typeof vi.fn>;
+    const firstChainResult = chainSpy.mock.results[0]?.value;
+    expect(firstChainResult?.setImage).toHaveBeenCalledWith(
+      expect.objectContaining({ src: '/api/v1/files/img_1/content' })
+    );
+  });
+
+  // ── ngOnDestroy ──────────────────────────────────────────────────────────────
+
+  it('ngOnDestroy releases lock and destroys editor when lock is held', () => {
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+
+    const lockServiceMock = TestBed.inject(DocumentLockService) as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    component.ngOnDestroy();
+
+    expect(lockServiceMock['release']).toHaveBeenCalledWith('doc_1');
+    expect(component.editor?.destroy).toHaveBeenCalled();
+  });
+
+  // ── reacquire / takeover ──────────────────────────────────────────────────────
+
+  it('reacquire() calls lockService.reacquire', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const lockServiceMock = TestBed.inject(DocumentLockService) as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    await component.reacquire();
+
+    expect(lockServiceMock['reacquire']).toHaveBeenCalledWith('doc_1');
+  });
+
+  it('takeover() calls lockService.takeover', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const lockServiceMock = TestBed.inject(DocumentLockService) as unknown as Record<string, ReturnType<typeof vi.fn>>;
+    component.takeover();
+    await fixture.whenStable();
+
+    expect(lockServiceMock['takeover']).toHaveBeenCalledWith('doc_1');
   });
 });

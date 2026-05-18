@@ -144,4 +144,56 @@ class AssetControllerTest extends TestCase
         $this->assertStringContainsString('/api/v1/files/' . $image->id . '/content', $assetUrl);
         $this->assertStringNotContainsString('X-Amz-Signature', $assetUrl);
     }
+
+    public function test_stable_url_field_is_always_application_path(): void
+    {
+        // stableUrl must be stable regardless of S3 availability (not a presigned URL)
+        $user = User::factory()->create();
+
+        $image = File::factory()->create([
+            'owner_id'  => $user->id,
+            'mime_type' => 'image/webp',
+            'status'    => FileStatus::Available,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->getJson('/api/v1/assets/images');
+
+        $item = $response->json('data.items.0');
+        $this->assertArrayHasKey('stableUrl', $item);
+        $this->assertEquals('/api/v1/files/' . $image->id . '/content', $item['stableUrl']);
+    }
+
+    public function test_cursor_pagination_returns_next_cursor_and_second_page(): void
+    {
+        $user = User::factory()->create();
+
+        File::factory()->count(3)->create([
+            'owner_id'  => $user->id,
+            'mime_type' => 'image/jpeg',
+            'status'    => FileStatus::Available,
+        ]);
+
+        // First page: 2 items + cursor
+        $page1 = $this->actingAs($user)
+            ->getJson('/api/v1/assets/images?per_page=2');
+
+        $page1->assertOk();
+        $this->assertCount(2, $page1->json('data.items'));
+        $cursor = $page1->json('data.nextCursor');
+        $this->assertNotNull($cursor);
+
+        // Second page: 1 remaining item, no cursor
+        $page2 = $this->actingAs($user)
+            ->getJson('/api/v1/assets/images?per_page=2&cursor=' . $cursor);
+
+        $page2->assertOk();
+        $this->assertCount(1, $page2->json('data.items'));
+        $this->assertNull($page2->json('data.nextCursor'));
+
+        // No overlap between pages
+        $ids1 = collect($page1->json('data.items'))->pluck('id');
+        $ids2 = collect($page2->json('data.items'))->pluck('id');
+        $this->assertEmpty($ids1->intersect($ids2));
+    }
 }

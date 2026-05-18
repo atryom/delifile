@@ -228,6 +228,80 @@ class DocumentLockControllerTest extends TestCase
             ->assertForbidden();
     }
 
+    // ── re-acquire own active lock ────────────────────────────────────────────
+
+    public function test_same_user_can_reacquire_own_active_lock(): void
+    {
+        Storage::fake('s3');
+        $user = User::factory()->create();
+        $doc  = $this->makeMarkdownFile($user);
+
+        DocumentLock::create([
+            'file_id'    => $doc->id,
+            'user_id'    => $user->id,
+            'expires_at' => now()->addMinutes(5),
+            'created_at' => now(),
+        ]);
+
+        // Same user re-acquires → 201 (not 423)
+        $this->actingAs($user)
+            ->postJson("/api/v1/documents/{$doc->id}/lock")
+            ->assertCreated()
+            ->assertJsonPath('data.lock.isLocked', true);
+
+        $this->assertDatabaseHas('document_locks', [
+            'file_id' => $doc->id,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    // ── heartbeat with expired own lock ───────────────────────────────────────
+
+    public function test_heartbeat_with_expired_own_lock_returns_lock_expired(): void
+    {
+        Storage::fake('s3');
+        $user = User::factory()->create();
+        $doc  = $this->makeMarkdownFile($user);
+
+        DocumentLock::create([
+            'file_id'    => $doc->id,
+            'user_id'    => $user->id,
+            'expires_at' => now()->subMinutes(1),
+            'created_at' => now()->subMinutes(10),
+        ]);
+
+        $this->actingAs($user)
+            ->postJson("/api/v1/documents/{$doc->id}/lock/heartbeat")
+            ->assertStatus(423)
+            ->assertJsonPath('data.reason', 'LOCK_EXPIRED');
+    }
+
+    // ── takeover own lock ────────────────────────────────────────────────────
+
+    public function test_owner_takeover_own_lock_refreshes_expiry(): void
+    {
+        Storage::fake('s3');
+        $owner = User::factory()->create();
+        $doc   = $this->makeMarkdownFile($owner);
+
+        DocumentLock::create([
+            'file_id'    => $doc->id,
+            'user_id'    => $owner->id,
+            'expires_at' => now()->addMinutes(1), // almost expired
+            'created_at' => now(),
+        ]);
+
+        $this->actingAs($owner)
+            ->postJson("/api/v1/documents/{$doc->id}/lock/takeover")
+            ->assertOk()
+            ->assertJsonPath('data.lock.isLocked', true);
+
+        // Lock still belongs to owner, expiry refreshed
+        $lock = DocumentLock::find($doc->id);
+        $this->assertEquals($owner->id, $lock->user_id);
+        $this->assertTrue($lock->expires_at->gt(now()->addMinutes(4)));
+    }
+
     // ── DELETE /lock — release ────────────────────────────────────────────────
 
     public function test_user_can_release_own_lock(): void

@@ -7,6 +7,9 @@ use App\Enums\FileStatus;
 use App\Models\DocumentLock;
 use App\Models\File;
 use App\Models\FileUserAccess;
+use App\Models\SharedFolder;
+use App\Models\SharedFolderAccess;
+use App\Models\SharedFolderFile;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -286,6 +289,170 @@ class DocumentControllerTest extends TestCase
         $this->actingAs($viewer)
             ->patchJson("/api/v1/files/{$doc->id}/accesses/{$access->id}", ['can_edit' => true])
             ->assertForbidden();
+    }
+
+    // ── lock field always present ─────────────────────────────────────────────
+
+    public function test_get_document_returns_is_locked_false_when_no_lock(): void
+    {
+        Storage::fake('s3');
+        $user = User::factory()->create();
+        $doc  = $this->makeMarkdownFile($user);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/documents/' . $doc->id)
+            ->assertOk()
+            ->assertJsonPath('data.document.lock.isLocked', false);
+    }
+
+    public function test_get_document_returns_is_locked_false_when_lock_expired(): void
+    {
+        Storage::fake('s3');
+        $user = User::factory()->create();
+        $doc  = $this->makeMarkdownFile($user);
+
+        DocumentLock::create([
+            'file_id'    => $doc->id,
+            'user_id'    => $user->id,
+            'expires_at' => now()->subMinutes(1),
+            'created_at' => now()->subMinutes(10),
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/documents/' . $doc->id)
+            ->assertOk()
+            ->assertJsonPath('data.document.lock.isLocked', false);
+    }
+
+    // ── empty content ─────────────────────────────────────────────────────────
+
+    public function test_save_with_empty_content_succeeds(): void
+    {
+        Storage::fake('s3');
+        $user = User::factory()->create();
+        $doc  = $this->makeMarkdownFile($user, '# Было содержимое');
+        $this->acquireLock($doc->id, $user->id);
+
+        $this->actingAs($user)
+            ->putJson('/api/v1/documents/' . $doc->id, [
+                'content' => '',
+                'etag'    => $doc->etag,
+            ])
+            ->assertOk()
+            ->assertJsonStructure(['data' => ['etag']]);
+    }
+
+    // ── quota ─────────────────────────────────────────────────────────────────
+
+    public function test_save_returns_413_when_quota_exceeded(): void
+    {
+        Storage::fake('s3');
+        $user = User::factory()->create();
+        $doc  = $this->makeMarkdownFile($user);
+        $doc->update(['size' => 0]); // ensure delta > 0 so quota is checked
+        $this->acquireLock($doc->id, $user->id);
+
+        // Push user over the Free-tier 500 MB limit with a dummy file
+        File::factory()->create([
+            'owner_id' => $user->id,
+            'size'     => 600 * 1024 * 1024,
+            'status'   => FileStatus::Available,
+        ]);
+
+        $this->actingAs($user)
+            ->putJson('/api/v1/documents/' . $doc->id, [
+                'content' => '# Контент',
+                'etag'    => $doc->etag,
+            ])
+            ->assertStatus(413);
+    }
+
+    // ── updateAccess: saved type returns 404 ──────────────────────────────────
+
+    public function test_update_access_returns_404_for_saved_type_access(): void
+    {
+        $owner  = User::factory()->create();
+        $viewer = User::factory()->create();
+        $doc    = $this->makeMarkdownFile($owner);
+
+        $access = FileUserAccess::factory()->create([
+            'file_id'     => $doc->id,
+            'user_id'     => $viewer->id,
+            'access_type' => AccessType::Saved,
+            'can_edit'    => false,
+        ]);
+
+        $this->actingAs($owner)
+            ->patchJson("/api/v1/files/{$doc->id}/accesses/{$access->id}", ['can_edit' => true])
+            ->assertNotFound();
+    }
+
+    // ── canViewDocument via shared folder ─────────────────────────────────────
+
+    public function test_user_can_view_document_via_shared_folder_access(): void
+    {
+        Storage::fake('s3');
+        $owner  = User::factory()->create();
+        $viewer = User::factory()->create();
+        $doc    = $this->makeMarkdownFile($owner);
+
+        $folder = SharedFolder::factory()->create(['owner_id' => $owner->id]);
+
+        SharedFolderFile::factory()->create([
+            'shared_folder_id' => $folder->id,
+            'file_id'          => $doc->id,
+            'added_by'         => $owner->id,
+        ]);
+
+        SharedFolderAccess::factory()->create([
+            'shared_folder_id' => $folder->id,
+            'user_id'          => $viewer->id,
+        ]);
+
+        $this->actingAs($viewer)
+            ->getJson('/api/v1/documents/' . $doc->id)
+            ->assertOk()
+            ->assertJsonPath('data.document.capabilities.canEdit', false);
+    }
+
+    // ── normalizeImageUrls ────────────────────────────────────────────────────
+
+    public function test_save_normalizes_presigned_urls_to_stable_paths(): void
+    {
+        Storage::fake('s3');
+        config([
+            'filesystems.disks.s3.endpoint' => 'https://s3.example.com',
+            'filesystems.disks.s3.bucket'   => 'testbucket',
+        ]);
+
+        $user = User::factory()->create();
+        $doc  = $this->makeMarkdownFile($user);
+        $this->acquireLock($doc->id, $user->id);
+
+        $img = File::factory()->create([
+            'owner_id'    => $user->id,
+            'storage_key' => 'files/' . $user->id . '/photo.png',
+            'mime_type'   => 'image/png',
+            'status'      => FileStatus::Available,
+        ]);
+
+        $presignedUrl = 'https://s3.example.com/testbucket/files/' . $user->id
+            . '/photo.png?X-Amz-Algorithm=AWS4&X-Amz-Signature=deadbeef';
+
+        $this->actingAs($user)
+            ->putJson('/api/v1/documents/' . $doc->id, [
+                'content' => "![photo]({$presignedUrl})",
+                'etag'    => $doc->etag,
+            ])
+            ->assertOk();
+
+        // Verify normalizeImageUrls saved the stable path to S3 (not the presigned URL).
+        // We read raw S3 content directly — the GET endpoint re-hydrates it with fresh presigned URLs,
+        // so checking the API response would give a false negative.
+        $doc->refresh();
+        $rawContent = Storage::disk('s3')->get($doc->storage_key);
+        $this->assertStringContainsString('/api/v1/files/' . $img->id . '/content', $rawContent);
+        $this->assertStringNotContainsString('X-Amz-', $rawContent);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

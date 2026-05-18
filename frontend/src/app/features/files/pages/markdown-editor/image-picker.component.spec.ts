@@ -11,7 +11,8 @@ const img = (id: string, name: string): ImageAsset => ({
   mimeType: 'image/png',
   size: 1024,
   previewUrl: `/preview/${id}`,
-  assetUrl: `/asset/${id}`,
+  assetUrl: `/api/v1/files/${id}/content`,
+  stableUrl: `/api/v1/files/${id}/content`,
 });
 
 const makeResponse = (items: ImageAsset[], nextCursor: string | null = null) => ({

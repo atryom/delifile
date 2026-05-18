@@ -61,7 +61,7 @@ class DocumentController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $request->validate([
-            'content' => 'present|string',
+            'content' => ['present', 'nullable', 'string'],
             'etag'    => 'required|string',
         ]);
 
@@ -84,7 +84,7 @@ class DocumentController extends Controller
         $result = $this->documentService->saveDocument(
             $file,
             $user,
-            $request->input('content'),
+            (string) ($request->input('content') ?? ''),
             $request->input('etag')
         );
 
