@@ -76,6 +76,9 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'quota';
       </button>
 
       <span class="ep-title">{{ doc()?.fileName ?? 'Редактор' }}</span>
+      @if (!canEdit() && lockState() !== 'acquiring') {
+        <span class="ep-view-badge" role="status">Просмотр</span>
+      }
 
       <div class="ep-bar-actions">
         <span class="ep-save-status" role="status" [attr.aria-live]="'polite'">{{ saveStatusLabel() }}</span>
@@ -242,10 +245,11 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'quota';
   styleUrl: './markdown-editor-panel.component.scss',
 })
 export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDestroy {
-  readonly fileId      = input.required<string>();
-  readonly expanded    = input(false);
-  readonly closed      = output<void>();
-  readonly expandToggle = output<void>();
+  readonly fileId         = input.required<string>();
+  readonly expanded       = input(false);
+  readonly refreshTrigger = input(0);
+  readonly closed         = output<void>();
+  readonly expandToggle   = output<void>();
 
   @ViewChild('editorEl') editorEl!: ElementRef<HTMLElement>;
 
@@ -267,6 +271,13 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
   constructor() {
     effect(() => {
       this.editor?.setEditable(this.canEdit());
+    });
+    effect(() => {
+      const trigger = this.refreshTrigger();
+      if (trigger > 0) {
+        this.lockService.reset();
+        this.loadDocument();
+      }
     });
   }
 
@@ -315,21 +326,28 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
 
   ngOnDestroy(): void {
     window.removeEventListener('beforeunload', this.onBeforeUnload);
-    if (this.periodicSaveTimer !== null) {
-      clearInterval(this.periodicSaveTimer);
-      this.periodicSaveTimer = null;
-    }
     if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
       this.save();
     }
     if (this.lockState() === 'held') {
       this.lockService.release(this.fileId());
     }
-    this.editor?.destroy();
+    this.teardownEditor();
     this.lockService.reset();
   }
 
+  private teardownEditor(): void {
+    if (this.periodicSaveTimer !== null) {
+      clearInterval(this.periodicSaveTimer);
+      this.periodicSaveTimer = null;
+    }
+    this.editor?.destroy();
+    this.editor = null;
+  }
+
   private loadDocument(): void {
+    this.teardownEditor();
+    this.loading.set(true);
     this.docsApi.get(this.fileId()).subscribe({
       next: async (res) => {
         this.doc.set(res.data.document);

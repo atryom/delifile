@@ -4,6 +4,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
+import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
@@ -26,6 +27,7 @@ export class FileDetailComponent implements OnInit {
   readonly id = input.required<string>();
 
   private readonly filesApi  = inject(FilesApiService);
+  private readonly docsApi   = inject(DocumentsApiService);
   private readonly orgApi    = inject(OrganizationApiService);
   private readonly sfApi     = inject(SharedFoldersApiService);
   private readonly router    = inject(Router);
@@ -76,6 +78,7 @@ export class FileDetailComponent implements OnInit {
   readonly descriptionEditorOpen  = signal(false);
   readonly editorPanelOpen        = signal(false);
   readonly editorExpanded         = signal(false);
+  readonly editorRefreshTrigger   = signal(0);
 
   // ─── Versioning state ────────────────────────────────────────────────────────
 
@@ -544,6 +547,46 @@ export class FileDetailComponent implements OnInit {
 
   versionDisplayLabel(v: FileVersion): string {
     return v.version_label ? `v${v.version_label}` : `v${v.version_number}`;
+  }
+
+  revokeAccess(access: FileAccess): void {
+    const name = access.user?.name ?? access.user?.email ?? 'пользователя';
+    if (!confirm(`Забрать доступ у ${name}?`)) return;
+    this.executeRevoke(access);
+  }
+
+  private executeRevoke(access: FileAccess, isRetry = false): void {
+    const ref = access.contact_id ?? String(access.user!.id);
+    const isMarkdown = this.file()?.mime_type === 'text/markdown';
+    this.filesApi.revokeContactAccess(this.id(), ref).subscribe({
+      next: () => {
+        this.accesses.update(list => list.filter(a => a.id !== access.id));
+        if (isMarkdown) {
+          this.editorRefreshTrigger.update(n => n + 1);
+        }
+      },
+      error: (err) => {
+        const isLocked = err?.status === 423
+          || err?.error?.message?.toLowerCase().includes('locked');
+        if (!isRetry && isLocked && isMarkdown) {
+          this.docsApi.takeover(this.id()).subscribe({
+            next: () => this.executeRevoke(access, true),
+            error: () => {},
+          });
+        }
+      },
+    });
+  }
+
+  toggleAccessEdit(access: FileAccess): void {
+    const newValue = !access.can_edit;
+    this.filesApi.updateAccess(this.id(), access.id, newValue).subscribe({
+      next: (res) => {
+        const updated: FileAccess = res.data?.access ?? { ...access, can_edit: newValue };
+        this.accesses.update(list => list.map(a => a.id === access.id ? updated : a));
+      },
+      error: () => {},
+    });
   }
 
   addToMyFiles(): void {

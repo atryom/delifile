@@ -20,6 +20,7 @@
                 <app-markdown-editor-panel
                   [fileId]="id()"
                   [expanded]="editorExpanded()"
+                  [refreshTrigger]="editorRefreshTrigger()"
                   (closed)="editorPanelOpen.set(false); editorExpanded.set(false)"
                   (expandToggle)="editorExpanded.set(!editorExpanded())"
                 />
@@ -483,9 +484,31 @@
                 <div class="empty-panel">{{ 'files.detail.only_you' | translate }}</div>
               }
               @for (a of accesses(); track a.id) {
-                <div class="access-item">
+                <div class="access-item" [class.access-item--pending]="a.is_pending">
                   <span class="access-user">{{ a.user?.name ?? a.user?.email ?? '—' }}</span>
-                  <span class="access-type badge badge-access">{{ a.access_type }}</span>
+                  @if (a.is_pending) {
+                    <span class="access-pending-badge">Ожидает принятия</span>
+                  }
+                  @if (!a.is_pending && file()!.mime_type === 'text/markdown' && a.access_type === 'shared') {
+                    <button
+                      type="button"
+                      class="access-edit-toggle"
+                      [class.access-edit-toggle--on]="a.can_edit"
+                      [title]="a.can_edit ? 'Запретить редактирование' : 'Разрешить редактирование'"
+                      (click)="toggleAccessEdit(a)"
+                    >{{ a.can_edit ? 'Редактирование' : 'Просмотр' }}</button>
+                  }
+                  @if (a.access_type === 'shared' && file()!.is_owner) {
+                    <button
+                      type="button"
+                      class="access-revoke-btn"
+                      title="Забрать доступ"
+                      (click)="revokeAccess(a)"
+                      aria-label="Забрать доступ"
+                    >
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  }
                 </div>
               }
             </div>
@@ -519,6 +542,7 @@
       @if (showShareDialog()) {
         <app-share-contact-dialog
           [fileId]="id()"
+          [mimeType]="file()!.mime_type ?? ''"
           (closed)="showShareDialog.set(false)"
           (shared)="onShared()"
         />

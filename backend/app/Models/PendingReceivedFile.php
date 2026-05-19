@@ -14,6 +14,7 @@ class PendingReceivedFile extends Model
         'file_id',
         'recipient_user_id',
         'sender_user_id',
+        'can_edit',
     ];
 
     public function file(): BelongsTo

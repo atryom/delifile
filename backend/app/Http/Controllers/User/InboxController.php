@@ -68,6 +68,8 @@ class InboxController extends Controller
                     'file_id'     => $p->file_id,
                     'user_id'     => $user->id,
                     'access_type' => AccessType::Shared,
+                ], [
+                    'can_edit' => (bool) $p->can_edit,
                 ]);
                 $p->delete();
             }

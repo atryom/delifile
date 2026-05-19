@@ -8,6 +8,7 @@ use App\Enums\ShareLinkStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Models\ContactPendingShare;
+use App\Models\DocumentLock;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\PendingReceivedFile;
@@ -36,7 +37,12 @@ class SharingController extends Controller
      */
     public function shareToContact(Request $request, string $fileId): JsonResponse
     {
-        $request->validate(['contact_id' => 'required|string']);
+        $request->validate([
+            'contact_id' => 'required|string',
+            'can_edit'   => 'sometimes|boolean',
+        ]);
+
+        $canEdit = $request->boolean('can_edit', false);
 
         $file = File::find($fileId);
         if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
@@ -91,7 +97,7 @@ class SharingController extends Controller
 
         $recipientUser = $contact->resolvedUser;
 
-        DB::transaction(function () use ($file, $contact, $request, $recipientUser) {
+        DB::transaction(function () use ($file, $contact, $request, $recipientUser, $canEdit) {
             $autoAdd = $recipientUser ? ($recipientUser->auto_add_received_files ?? true) : true;
 
             if ($autoAdd) {
@@ -106,6 +112,7 @@ class SharingController extends Controller
                 ], [
                     'contact_id'  => $contact->id,
                     'description' => $sharerAccess?->description,
+                    'can_edit'    => $canEdit,
                 ]);
             } else {
                 PendingReceivedFile::firstOrCreate([
@@ -113,6 +120,7 @@ class SharingController extends Controller
                     'recipient_user_id' => $recipientUser->id,
                 ], [
                     'sender_user_id' => $request->user()->id,
+                    'can_edit'       => $canEdit,
                 ]);
             }
 
@@ -162,17 +170,45 @@ class SharingController extends Controller
             ->where('user_id', $request->user()->id)
             ->first();
 
-        if (!$contact) {
-            return $this->notFound('Contact not found');
+        if ($contact) {
+            $revokedUserId = $contact->resolved_user_id;
+
+            FileUserAccess::where('file_id', $file->id)
+                ->where('user_id', $revokedUserId)
+                ->delete();
+
+            // Release document lock if the revoked user currently holds it.
+            DocumentLock::where('file_id', $file->id)
+                ->where('user_id', $revokedUserId)
+                ->delete();
+
+            $this->activityService->log($file, $request->user(), ActivityType::ShareRevoked, [
+                'contact_id' => $contactId,
+            ]);
+        } else {
+            // Fallback: contactId may be a numeric user ID for direct-access records
+            $targetUserId = is_numeric($contactId) ? (int) $contactId : null;
+            if (!$targetUserId) {
+                return $this->notFound('Contact not found');
+            }
+
+            $deleted = FileUserAccess::where('file_id', $file->id)
+                ->where('user_id', $targetUserId)
+                ->delete();
+
+            if (!$deleted) {
+                return $this->notFound('Access not found');
+            }
+
+            // Release document lock if the revoked user currently holds it.
+            DocumentLock::where('file_id', $file->id)
+                ->where('user_id', $targetUserId)
+                ->delete();
+
+            $this->activityService->log($file, $request->user(), ActivityType::ShareRevoked, [
+                'user_id' => $targetUserId,
+            ]);
         }
-
-        FileUserAccess::where('file_id', $file->id)
-            ->where('user_id', $contact->resolved_user_id)
-            ->delete();
-
-        $this->activityService->log($file, $request->user(), ActivityType::ShareRevoked, [
-            'contact_id' => $contactId,
-        ]);
 
         return $this->success(__('messages.sharing.access_revoked'));
     }

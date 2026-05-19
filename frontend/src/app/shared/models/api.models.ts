@@ -98,8 +98,11 @@ export interface FileAccess {
   id: string;
   access_type: AccessType;
   user: UserRef | null;
+  contact_id?: string | null;
   is_favorite: boolean;
   saved_at: string | null;
+  can_edit?: boolean;
+  is_pending?: boolean;
 }
 
 // ─── Upload Models ───────────────────────────────────────────────────────────

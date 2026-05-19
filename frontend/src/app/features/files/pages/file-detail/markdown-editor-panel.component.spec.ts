@@ -324,13 +324,14 @@ describe('MarkdownEditorPanelComponent', () => {
 
   it('ngOnDestroy releases lock and destroys editor when lock is held', () => {
     fixture.detectChanges();
-    component.editor = createMockEditor();
+    const mockEditor = createMockEditor();
+    component.editor = mockEditor;
 
     component.ngOnDestroy();
 
     expect((lockServiceMock['release'] as ReturnType<typeof vi.fn>))
       .toHaveBeenCalledWith('doc_1');
-    expect(component.editor?.destroy).toHaveBeenCalled();
+    expect(mockEditor.destroy).toHaveBeenCalled();
     expect((lockServiceMock['reset'] as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
   });
 

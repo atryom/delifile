@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { FileDetailComponent } from './file-detail.component';
 import { FilesApiService } from '../../../../core/api/files-api.service';
+import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { CommentsApiService } from '../../../../core/api/comments-api.service';
@@ -10,6 +11,7 @@ import { Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
+import { FileAccess } from '../../../../shared/models/api.models';
 
 describe('FileDetailComponent', () => {
   const mockFilesApi = {
@@ -27,6 +29,12 @@ describe('FileDetailComponent', () => {
     disableLink: vi.fn(() => of({ result: 'success' })),
     updateVersion: vi.fn(() => of({ result: 'success', data: { version: { id: 'v-1', is_active: true } } })),
     updateDisplayName: vi.fn(() => of({ result: 'success', data: { display_name: 'New Name' } })),
+    revokeContactAccess: vi.fn(() => of({ result: 'success', data: {} })),
+    updateAccess: vi.fn(() => of({ result: 'success', data: {} })),
+    shareToContact: vi.fn(() => of({ result: 'success', data: { share: { contact_id: 'c-1', status: 'shared' } } })),
+  };
+  const mockDocsApi = {
+    takeover: vi.fn(() => of({ result: 'success', data: { lock: {} } })),
   };
   const mockOrgApi = {
     getTags: vi.fn(() => of({ result: 'success', data: { items: [] } })),
@@ -88,6 +96,7 @@ describe('FileDetailComponent', () => {
       imports: [FileDetailComponent],
       providers: [
         { provide: FilesApiService, useValue: mockFilesApi },
+        { provide: DocumentsApiService, useValue: mockDocsApi },
         { provide: OrganizationApiService, useValue: mockOrgApi },
         { provide: SharedFoldersApiService, useValue: mockSfApi },
         { provide: AuthStateService, useValue: mockAuthState },
@@ -317,5 +326,123 @@ describe('FileDetailComponent', () => {
     vi.advanceTimersByTime(3000);
     expect(fixture.componentInstance.feedback()).toBeNull();
     vi.useRealTimers();
+  });
+
+  // ── revokeAccess ──────────────────────────────────────────────────────────────
+
+  function makeAccess(overrides?: Partial<FileAccess>): FileAccess {
+    return {
+      id: 'a-1',
+      access_type: 'shared',
+      user: { id: 42, email: 'bob@test.com', name: 'Bob' },
+      contact_id: 'c-bob',
+      is_favorite: false,
+      saved_at: null,
+      can_edit: false,
+      ...overrides,
+    };
+  }
+
+  it('revokeAccess() calls revokeContactAccess with contact_id and removes entry', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    const access = makeAccess();
+    fixture.componentInstance.accesses.set([access]);
+
+    fixture.componentInstance.revokeAccess(access);
+
+    expect(mockFilesApi.revokeContactAccess).toHaveBeenCalledWith('f-1', 'c-bob');
+    expect(fixture.componentInstance.accesses()).toHaveLength(0);
+  });
+
+  it('revokeAccess() falls back to user id string when contact_id is absent', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    const access = makeAccess({ contact_id: null });
+    fixture.componentInstance.accesses.set([access]);
+
+    fixture.componentInstance.revokeAccess(access);
+
+    expect(mockFilesApi.revokeContactAccess).toHaveBeenCalledWith('f-1', '42');
+  });
+
+  it('revokeAccess() does nothing when confirm is cancelled', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    const access = makeAccess();
+    fixture.componentInstance.accesses.set([access]);
+
+    fixture.componentInstance.revokeAccess(access);
+
+    expect(mockFilesApi.revokeContactAccess).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.accesses()).toHaveLength(1);
+  });
+
+  it('revokeAccess() on markdown file: fires editorRefreshTrigger after success', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    fixture.componentInstance.file.set(makeFile({ mime_type: 'text/markdown' }));
+    const access = makeAccess();
+    fixture.componentInstance.accesses.set([access]);
+    const before = fixture.componentInstance.editorRefreshTrigger();
+
+    fixture.componentInstance.revokeAccess(access);
+
+    expect(fixture.componentInstance.editorRefreshTrigger()).toBeGreaterThan(before);
+    expect(fixture.componentInstance.accesses()).toHaveLength(0);
+  });
+
+  it('revokeAccess() on non-markdown file: does not fire editorRefreshTrigger', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    fixture.componentInstance.file.set(makeFile({ mime_type: 'text/plain' }));
+    const access = makeAccess();
+    fixture.componentInstance.accesses.set([access]);
+    const before = fixture.componentInstance.editorRefreshTrigger();
+
+    fixture.componentInstance.revokeAccess(access);
+
+    expect(fixture.componentInstance.editorRefreshTrigger()).toBe(before);
+  });
+
+  it('revokeAccess() on locked markdown file: calls takeover then retries revoke', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockFilesApi.revokeContactAccess
+      .mockReturnValueOnce(throwError(() => ({ status: 423, error: { message: 'Document is locked by another user' } })))
+      .mockReturnValue(of({ result: 'success', data: {} }));
+
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    fixture.componentInstance.file.set(makeFile({ mime_type: 'text/markdown' }));
+    const access = makeAccess();
+    fixture.componentInstance.accesses.set([access]);
+
+    fixture.componentInstance.revokeAccess(access);
+
+    expect(mockDocsApi.takeover).toHaveBeenCalledWith('f-1');
+    expect(mockFilesApi.revokeContactAccess).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.accesses()).toHaveLength(0);
+    expect(fixture.componentInstance.editorRefreshTrigger()).toBeGreaterThan(0);
+  });
+
+  it('revokeAccess() on locked non-markdown file: does not call takeover', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockFilesApi.revokeContactAccess
+      .mockReturnValueOnce(throwError(() => ({ status: 423, error: { message: 'Document is locked by another user' } })));
+
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    fixture.componentInstance.file.set(makeFile({ mime_type: 'text/plain' }));
+    const access = makeAccess();
+    fixture.componentInstance.accesses.set([access]);
+
+    fixture.componentInstance.revokeAccess(access);
+
+    expect(mockDocsApi.takeover).not.toHaveBeenCalled();
   });
 });

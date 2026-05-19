@@ -9,6 +9,7 @@ use App\Http\Requests\Files\InitUploadRequest;
 use App\Http\Requests\Files\CompleteUploadRequest;
 use App\Models\File;
 use App\Models\FileUserAccess;
+use App\Models\PendingReceivedFile;
 use App\Services\FileService;
 use App\Services\ActivityService;
 use Illuminate\Http\JsonResponse;
@@ -426,10 +427,31 @@ class FileController extends Controller
                 ] : null,
                 'is_favorite' => $a->is_favorite,
                 'saved_at'    => $a->saved_at?->toIso8601String(),
+                'contact_id'  => $a->contact_id,
+                'can_edit'    => $a->can_edit,
+                'is_pending'  => false,
+            ]);
+
+        $pending = PendingReceivedFile::where('file_id', $file->id)
+            ->with('recipient:id,email,name')
+            ->get()
+            ->map(fn ($p) => [
+                'id'          => $p->id,
+                'access_type' => 'shared',
+                'user'        => $p->recipient ? [
+                    'id'    => $p->recipient->id,
+                    'email' => $p->recipient->email,
+                    'name'  => $p->recipient->name,
+                ] : null,
+                'is_favorite' => false,
+                'saved_at'    => null,
+                'contact_id'  => null,
+                'can_edit'    => (bool) $p->can_edit,
+                'is_pending'  => true,
             ]);
 
         return $this->success(__('messages.files.accesses_fetched'), [
-            'items' => $accesses,
+            'items' => $accesses->merge($pending)->values(),
         ]);
     }
 }

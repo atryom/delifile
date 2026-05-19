@@ -1,4 +1,4 @@
-import { Component, inject, signal, input, output, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, input, output, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
@@ -13,9 +13,13 @@ import { Contact } from '../../../../shared/models/api.models';
   styleUrl: './share-contact-dialog.component.scss',
 })
 export class ShareContactDialogComponent implements OnInit {
-  readonly fileId = input.required<string>();
-  readonly closed  = output<void>();
-  readonly shared  = output<void>();
+  readonly fileId   = input.required<string>();
+  readonly mimeType = input('');
+  readonly closed   = output<void>();
+  readonly shared   = output<void>();
+
+  readonly isMarkdown = computed(() => this.mimeType() === 'text/markdown');
+  readonly canEdit    = signal(true);
 
   private readonly filesApi    = inject(FilesApiService);
   private readonly contactsApi = inject(ContactsApiService);
@@ -63,7 +67,8 @@ export class ShareContactDialogComponent implements OnInit {
     this.submitting.set(true);
     this.error.set(null);
 
-    this.filesApi.shareToContact(this.fileId(), id).subscribe({
+    const canEdit = this.isMarkdown() ? this.canEdit() : undefined;
+    this.filesApi.shareToContact(this.fileId(), id, canEdit).subscribe({
       next: (res) => {
         this.submitting.set(false);
         const status = res.data?.share?.status ?? 'shared';

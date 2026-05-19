@@ -117,8 +117,14 @@ export class FilesApiService {
 
   // ─── Sharing ──────────────────────────────────────────────────────────────
 
-  shareToContact(fileId: string, contactId: string): Observable<ApiResponse<{ share: { contact_id: string; status: string } }>> {
-    return this.api.post(`/files/${fileId}/share-to-contact`, { contact_id: contactId });
+  shareToContact(fileId: string, contactId: string, canEdit?: boolean): Observable<ApiResponse<{ share: { contact_id: string; status: string } }>> {
+    const body: Record<string, unknown> = { contact_id: contactId };
+    if (canEdit !== undefined) body['can_edit'] = canEdit;
+    return this.api.post(`/files/${fileId}/share-to-contact`, body);
+  }
+
+  updateAccess(fileId: string, accessId: string, canEdit: boolean): Observable<ApiResponse<{ access: FileAccess }>> {
+    return this.api.patch(`/files/${fileId}/accesses/${accessId}`, { can_edit: canEdit });
   }
 
   revokeContactAccess(fileId: string, contactId: string): Observable<ApiResponse<Record<string, never>>> {

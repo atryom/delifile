@@ -50,6 +50,18 @@
             <div class="loading-contacts">{{ 'files.share.loading' | translate }}</div>
           }
 
+          @if (isMarkdown()) {
+            <label class="can-edit-row">
+              <input
+                type="checkbox"
+                class="can-edit-checkbox"
+                [checked]="canEdit()"
+                (change)="canEdit.set($any($event.target).checked)"
+              />
+              Разрешить редактирование заметки
+            </label>
+          }
+
           @if (shareStatus() === 'pending') {
             <div class="pending-notice">{{ 'files.share.pending_notice' | translate }}</div>
           }
