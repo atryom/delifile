@@ -168,16 +168,20 @@ describe('MarkdownEditorPanelComponent', () => {
     expect(title.textContent?.trim()).toBe('notes.md');
   });
 
-  it('should show save button when canEdit and not collapsed', () => {
+  it('should show revert button when canEdit and not collapsed', () => {
     lockStateSig.set('held');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.ep-btn--primary')).toBeTruthy();
+    const buttons = fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.ep-btn');
+    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Отменить изменения'));
+    expect(revertBtn).toBeTruthy();
   });
 
-  it('should hide save button when lockState is not held', () => {
+  it('should hide revert button when lockState is not held', () => {
     lockStateSig.set('readonly');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.ep-btn--primary')).toBeNull();
+    const buttons = fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.ep-btn');
+    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Отменить изменения'));
+    expect(revertBtn).toBeUndefined();
   });
 
   // ── Collapse / expand ───────────────────────────────────────────────────────
@@ -341,30 +345,28 @@ describe('MarkdownEditorPanelComponent', () => {
 
   // ── Autosave ──────────────────────────────────────────────────────────────────
 
-  it('save() cancels pending autosave timer', () => {
-    fixture.detectChanges();
-    component.editor = createMockEditor();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (component as any).autoSaveTimer = setTimeout(() => {}, 99999);
-
-    component.save();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((component as any).autoSaveTimer).toBeNull();
-  });
-
-  it('ngOnDestroy() cancels pending autosave timer', () => {
+  it('ngOnDestroy() clears periodic save interval', () => {
     fixture.detectChanges();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (component as any).autoSaveTimer = setTimeout(() => {}, 99999);
+    (component as any).periodicSaveTimer = setInterval(() => {}, 99999);
 
     component.ngOnDestroy();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((component as any).autoSaveTimer).toBeNull();
+    expect((component as any).periodicSaveTimer).toBeNull();
   });
 
-  it('autosave fires docsApi.save after 3 s when unsaved and no conflictError', () => {
+  it('ngOnDestroy() saves unsaved changes before cleanup', () => {
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+    component.saveStatus.set('unsaved');
+
+    component.ngOnDestroy();
+
+    expect(docsApiMock['save']).toHaveBeenCalled();
+  });
+
+  it('autosave fires docsApi.save after 30 s when unsaved and no conflictError', () => {
     fixture.detectChanges();
     vi.useFakeTimers();
     try {
@@ -373,8 +375,13 @@ describe('MarkdownEditorPanelComponent', () => {
       component.conflictError.set(false);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (component as any).scheduleAutoSave();
-      vi.advanceTimersByTime(3000);
+      (component as any).periodicSaveTimer = setInterval(() => {
+        if (component.canEdit() && component.saveStatus() === 'unsaved' && !component.conflictError()) {
+          component.save();
+        }
+      }, 30_000);
+
+      vi.advanceTimersByTime(30_000);
 
       expect(docsApiMock['save']).toHaveBeenCalled();
     } finally {
@@ -391,8 +398,13 @@ describe('MarkdownEditorPanelComponent', () => {
       component.conflictError.set(true);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (component as any).scheduleAutoSave();
-      vi.advanceTimersByTime(3000);
+      (component as any).periodicSaveTimer = setInterval(() => {
+        if (component.canEdit() && component.saveStatus() === 'unsaved' && !component.conflictError()) {
+          component.save();
+        }
+      }, 30_000);
+
+      vi.advanceTimersByTime(30_000);
 
       expect(docsApiMock['save']).not.toHaveBeenCalled();
     } finally {

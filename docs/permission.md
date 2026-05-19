@@ -5,11 +5,12 @@
 **4 модели доступа:**
 
 | Модель | Сущность | Типы доступа | Наследование |
-|---|---|---|---|
+|---|---|---|---|---|
 | `file_user_access` | Файл | `owner` / `shared` / `saved` | Нет (per-user per-file) |
 | `shared_folder_accesses` | Общая папка | `view` / `edit` | Да (по цепочке parent_id до root) |
 | `share_links` | Публичная ссылка на файл | `allow_save: bool` | Нет |
 | `shared_folder_links` | Публичная ссылка на папку | `view` / `edit` + `allow_save` | Нет |
+| `file_user_access.can_edit` | Markdown-документ | `can_edit: bool` на shared-доступе | Нет |
 
 ---
 
@@ -35,6 +36,10 @@
 | **Комментировать** | ✅ (`can_comment=true`) | ✅ (по умолч. true) | ✅ |
 | **Активность (activity)** | ✅ все события | ✅ только свои | ✅ только свои |
 | **Скачать версию** | ✅ | ✅ | ✅ |
+| **Markdown: просмотр документа** | ✅ | ✅ (с can_edit=false) | ✅ (с can_edit=false) |
+| **Markdown: редактирование** | ✅ | ✅ (только can_edit=true) | ❌ |
+| **Markdown: захват блокировки** | ✅ | ✅ (только can_edit=true) | ❌ |
+| **Markdown: перехват блокировки (takeover)** | ✅ **Owner Only** | ❌ | ❌ |
 
 ---
 
@@ -221,6 +226,44 @@ SharedFolder(root)  ← U2: view
 
 ---
 
+### Сценарий L — Markdown-документ с блокировками
+
+U1 создаёт Markdown-документ (`is_editable=true`, `editor_type='markdown'`). Файл расшарен с U2 (shared, `can_edit=true`). U3 имеет shared-доступ с `can_edit=false`.
+
+```
+Файл (markdown): owner=U1
+├── U1: FileUserAccess(owner)
+├── U2: FileUserAccess(shared, can_edit=true)
+└── U3: FileUserAccess(shared, can_edit=false)
+```
+
+| Операция | U1 (owner) | U2 (shared, can_edit) | U3 (shared, no edit) |
+|---|---|---|---|
+| Просмотр документа | ✅ | ✅ | ✅ |
+| Редактирование (PUT document) | ✅ | ✅ | ❌ (403) |
+| Захват блокировки | ✅ | ✅ | ❌ (403) |
+| Heartbeat блокировки | ✅ | ✅ | ❌ (423) |
+| Перехват блокировки (takeover) | ✅ | ❌ (403) | ❌ (403) |
+| Снятие блокировки | ✅ (своей) | ✅ (своей) | ❌ |
+| Сохранение (quota_exceeded → 413) | ✅ (проверка квоты) | ✅ (проверка квоты) | ❌ |
+
+**Проверка блокировки при сохранении:**
+- При PUT /documents/{id} проверяется `hasValidLock()` — 423 `LOCK_REQUIRED`, если блокировка не захвачена или истекла
+- При конфликте etag → 409 `DOCUMENT_CONFLICT` с текущим состоянием
+
+**Логика `canViewDocument()`:**
+1. Owner → true
+2. Есть `FileUserAccess` → true
+3. Доступ через shared folder → true
+4. Иначе → false
+
+**Логика `canEditDocument()`:**
+1. Owner → true
+2. `FileUserAccess` с `access_type=shared` AND `can_edit=true` → true
+3. Иначе → false
+
+---
+
 ## Исправления
 
 ### Исправлено: наследование прав в `SharedFolderFileController`
@@ -251,3 +294,4 @@ SharedFolder(root)  ← U2: view
 | **Public folder link** | Auth-юзеру авто-выдаётся постоянный доступ |
 | **Owner** | Абсолютный контроль (share, link, delete, rename, manage accesses) |
 | **Saved** | Файл навсегда сохранён пользователем — owner не может удалить пока есть Saved (см. `File::canBeDeleted()`) |
+| **Markdown document** | Owner может редактировать и управлять блокировками. Shared-пользователь редактирует только с `can_edit=true`. Блокировка — pessimistic lock с heartbeat/takeover. |

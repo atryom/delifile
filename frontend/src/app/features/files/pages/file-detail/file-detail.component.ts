@@ -152,6 +152,9 @@ export class FileDetailComponent implements OnInit {
         this.pendingFolderId.set(res.data.file.folder_id ?? null);
         this.displayNameDraft = res.data.file.display_name ?? '';
         this.loading.set(false);
+        if (res.data.file.mime_type === 'text/markdown') {
+          this.editorPanelOpen.set(true);
+        }
         // Direct link: set back to local folder if file belongs to one
         const fromParam = this.route.snapshot.queryParamMap.get('from');
         if (!fromParam && res.data.file.folder_id) {

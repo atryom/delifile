@@ -83,10 +83,9 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'quota';
         @if (canEdit() && !collapsed()) {
           <button
             type="button"
-            class="ep-btn ep-btn--primary"
-            [disabled]="saveStatus() === 'saving' || lockState() !== 'held'"
-            (click)="save()"
-          >Сохранить</button>
+            class="ep-btn"
+            (click)="revert()"
+          >Отменить изменения</button>
         }
 
         <!-- Expand / minimize -->
@@ -256,8 +255,14 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
 
   editor: Editor | null = null;
 
-  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly AUTO_SAVE_DELAY = 3000;
+  private periodicSaveTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly AUTO_SAVE_INTERVAL = 30_000;
+
+  private readonly onBeforeUnload = (): void => {
+    if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
+      this.save();
+    }
+  };
 
   constructor() {
     effect(() => {
@@ -268,6 +273,7 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
   readonly doc              = signal<DocModel | null>(null);
   readonly loading          = signal(true);
   readonly saveStatus       = signal<SaveStatus>('saved');
+  readonly originalContent  = signal<string>('');
   readonly collapsed        = signal(false);
   readonly editorEmpty      = signal(true);
   readonly showImagePicker  = signal(false);
@@ -301,15 +307,20 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
   });
 
   ngOnInit(): void {
+    window.addEventListener('beforeunload', this.onBeforeUnload);
     this.loadDocument();
   }
 
   ngAfterViewInit(): void {}
 
   ngOnDestroy(): void {
-    if (this.autoSaveTimer) {
-      clearTimeout(this.autoSaveTimer);
-      this.autoSaveTimer = null;
+    window.removeEventListener('beforeunload', this.onBeforeUnload);
+    if (this.periodicSaveTimer !== null) {
+      clearInterval(this.periodicSaveTimer);
+      this.periodicSaveTimer = null;
+    }
+    if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
+      this.save();
     }
     if (this.lockState() === 'held') {
       this.lockService.release(this.fileId());
@@ -322,6 +333,7 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
     this.docsApi.get(this.fileId()).subscribe({
       next: async (res) => {
         this.doc.set(res.data.document);
+        this.originalContent.set(res.data.document.content ?? '');
         this.loading.set(false);
 
         if (res.data.document.capabilities.canEdit) {
@@ -361,7 +373,6 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
             this.editorEmpty.set(editor.isEmpty);
             if (this.canEdit()) {
               this.saveStatus.set('unsaved');
-              this.scheduleAutoSave();
             }
           });
         },
@@ -388,26 +399,18 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
         this.editor.commands.setContent(content);
         this.zone.run(() => this.editorEmpty.set(this.editor?.isEmpty ?? true));
       }
+
+      this.periodicSaveTimer = setInterval(() => {
+        this.zone.run(() => {
+          if (this.canEdit() && this.saveStatus() === 'unsaved' && !this.conflictError()) {
+            this.save();
+          }
+        });
+      }, this.AUTO_SAVE_INTERVAL);
     });
   }
 
-  private scheduleAutoSave(): void {
-    if (this.autoSaveTimer) {
-      clearTimeout(this.autoSaveTimer);
-    }
-    this.autoSaveTimer = setTimeout(() => {
-      this.autoSaveTimer = null;
-      if (this.canEdit() && this.saveStatus() === 'unsaved' && !this.conflictError()) {
-        this.save();
-      }
-    }, this.AUTO_SAVE_DELAY);
-  }
-
   save(): void {
-    if (this.autoSaveTimer) {
-      clearTimeout(this.autoSaveTimer);
-      this.autoSaveTimer = null;
-    }
     if (!this.editor || !this.doc()) return;
 
     const etag = this.doc()!.etag;
@@ -434,6 +437,13 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
         }
       },
     });
+  }
+
+  revert(): void {
+    if (!confirm('Отменить все изменения и вернуться к исходному содержимому?')) return;
+    if (!this.editor) return;
+    this.editor.commands.setContent(this.originalContent());
+    this.saveStatus.set('saved');
   }
 
   cmd(command: string): void {

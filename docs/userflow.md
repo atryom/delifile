@@ -127,7 +127,99 @@
     ← status=deleted
 ```
 
-### 2.9 Версионирование файлов
+### 2.9 Markdown-документы
+
+#### 2.9.1 Создание документа
+
+```
+/folders или /files/:id → "Создать Markdown-документ"
+  → POST /api/v1/documents {fileName}
+    ← Создаётся File с is_editable=true, editor_type='markdown'
+    ← Возвращается id, etag, lock, capabilities
+  → Если расширение не указано — автоматически добавляется .md
+```
+
+#### 2.9.2 Редактирование документа (full-screen)
+
+```
+/files/:id/markdown-editor → GET /api/v1/documents/{id}
+  ← Содержимое документа (Markdown), etag, lock, capabilities
+  → Автоматический захват блокировки:
+    → POST /api/v1/documents/{id}/lock
+      ← 201 — блокировка захвачена, запущен heartbeat (60s)
+      ← 423 — документ заблокирован другим пользователем
+  → Редактирование в Tiptap-редакторе с тулбаром:
+    Bold, Italic, Strike, Inline Code
+    H1/H2/H3, Bullet list, Ordered list, Task list
+    Blockquote, Code block
+    Undo/Redo
+    Вставка изображения (🖼)
+  → Автосохранение (3s debounce после последнего изменения):
+    → PUT /api/v1/documents/{id} {content, etag}
+      ← 200 — success, обновлённый etag
+      ← 409 DOCUMENT_CONFLICT — конфликт версий
+      ← 413 quota_exceeded — превышена квота хранилища
+  → Панель изменения размера изображения: S(200px), M(400px), L(640px), 100%
+```
+
+#### 2.9.3 Блокировки документов (pessimistic lock)
+
+Механизм предотвращает одновременное редактирование документа несколькими пользователями.
+
+```
+Захват блокировки:
+  → POST /api/v1/documents/{id}/lock
+    ← 201 — блокировка активна
+    ← 423 LOCK_CONFLICT — заблокировано другим (возвращается lockedBy, canTakeOver)
+
+Продление (heartbeat):
+  → POST /api/v1/documents/{id}/lock/heartbeat (каждые 60с)
+    ← 200 — блокировка продлена
+    ← 423 LOCK_EXPIRED — блокировка истекла
+    ← 423 LOCK_TAKEN_OVER — блокировка перехвачена владельцем
+
+Перехват (takeover, только владелец файла):
+  → POST /api/v1/documents/{id}/lock/takeover
+    ← 200 — блокировка перехвачена
+
+Снятие:
+  → DELETE /api/v1/documents/{id}/lock
+    ← 204 — блокировка снята (идемпотентно)
+
+Состояния на клиенте:
+  idle → acquiring → held (редактирование разрешено)
+                    → readonly (редактирование запрещено)
+  held → lost_expired (heartbeat не удался)
+       → lost_takeover (блокировка перехвачена)
+```
+
+#### 2.9.4 Image Picker
+
+```
+В редакторе → кнопка 🖼
+  → GET /api/v1/assets/images?search=&cursor=&per_page=20
+    ← Список доступных изображений (свои + расшаренные)
+    ← Каждое изображение содержит stableUrl (/api/v1/files/{id}/content)
+  → Выбор изображения → вставка в редактор
+    ← В Markdown сохраняется stableUrl (не presigned S3 URL)
+    ← При чтении stableUrl заменяется на presigned S3 URL для отображения
+  → Поиск с debounce 400ms
+  → Курсорная пагинация ("Загрузить ещё")
+```
+
+#### 2.9.5 Встраиваемая панель (на странице файла)
+
+```
+/files/:id → секция "Markdown-редактор" (collapsible)
+  → Если документа нет — форма создания с полем ввода имени
+  → Если документ есть — мини-редактор с тулбаром
+  → Кнопки "Развернуть" (full-screen) / "Свернуть" (обратно на страницу)
+  → Автосохранение, image picker, баннеры блокировок
+```
+
+---
+
+### 2.10 Версионирование файлов
 
 ```
 /files/:id → вкладка "Версии"

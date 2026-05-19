@@ -43,6 +43,7 @@
 | PATCH | `/files/{id}/description` | auth | Обновить описание (per-user) |
 | GET | `/files/{id}/activity` | auth | История действий с файлом |
 | GET | `/files/{id}/accesses` | auth | Список пользователей с доступом (только владелец) |
+| PATCH | `/files/{id}/accesses/{accessId}` | auth | Обновить права доступа (can_edit) на shared-доступ (только владелец) |
 | POST | `/files/{id}/attach-tags` | auth | Прикрепить теги к файлу |
 | POST | `/files/{id}/detach-tags` | auth | Открепить теги от файла |
 | POST | `/files/{id}/clear-folder` | auth | Убрать файл из папки |
@@ -56,6 +57,31 @@
 | PATCH | `/files/{id}/versions/{vid}` | auth | Обновить метаданные версии (label, comment) |
 | POST | `/files/{id}/versions/{vid}/download` | auth | Скачать конкретную версию |
 | PATCH | `/files/{id}/display-name` | auth | Обновить отображаемое имя файла |
+| GET | `/files/{id}/content` | auth | Стабильный URL содержимого (редирект на presigned S3) |
+| GET | `/files/{id}/preview` | auth | Стабильный URL превью (редирект на thumbnail/content) |
+
+## 📝 Markdown-документы
+
+| Метод | Путь | Auth | Описание |
+|-------|------|------|----------|
+| POST | `/documents` | auth | Создать новый Markdown-документ |
+| GET | `/documents/{id}` | auth | Получить содержимое документа + метаданные |
+| PUT | `/documents/{id}` | auth | Сохранить документ (content + etag, проверка конфликтов) |
+
+## 🔒 Блокировки документов
+
+| Метод | Путь | Auth | Описание |
+|-------|------|------|----------|
+| POST | `/documents/{id}/lock` | auth | Установить блокировку для редактирования |
+| DELETE | `/documents/{id}/lock` | auth | Снять блокировку (идемпотентно) |
+| POST | `/documents/{id}/lock/heartbeat` | auth | Продлить блокировку (TTL, каждые 60 с) |
+| POST | `/documents/{id}/lock/takeover` | auth | Принудительно перехватить блокировку (только владелец) |
+
+## 🖼️ Assets
+
+| Метод | Путь | Auth | Описание |
+|-------|------|------|----------|
+| GET | `/assets/images` | auth | Список доступных изображений (курсорная пагинация, поиск) |
 
 ## 🔗 URL-файлы
 
@@ -301,5 +327,5 @@
 
 ---
 
-**Итого:** ~155 API-endpoint'ов, разделённых на 30 логических групп.
+**Итого:** ~166 API-endpoint'ов, разделённых на 33 логические группы.
 Авторизация: Laravel Sanctum (токены). Формат ответа: `{ result, message, data }`.

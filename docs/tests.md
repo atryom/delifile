@@ -1,6 +1,6 @@
 # Сводный отчёт по тестированию проекта Delifile
 
-> **Всего проанализировано тестов: 866**  
+> **Всего проанализировано тестов: 1005**  
 > **Дата составления:** 16 мая 2026 г.  
 > **Назначение:** детальное описание всех тестов проекта (Frontend Angular 21 + Backend Laravel 11)  
 > для формирования методики тестирования, контрольных примеров и тестовой документации.
@@ -28,6 +28,7 @@
 - [features/legal](#features-legal) — 2 тестов
 - [features/settings](#features-settings) — 14 тестов
 - [features/share-target](#features-share-target) — 11 тестов
+- [features/markdown-editor](#features-markdown-editor) — 92 тестов
 - [features/shared-folders](#features-shared-folders) — 41 тестов
 - [features/support](#features-support) — 12 тестов
 - [features/tags](#features-tags) — 12 тестов
@@ -43,6 +44,7 @@
 - [Feature/Links](#backend-feature-links) — 8 тестов
 - [Feature/Organization](#backend-feature-organization) — 22 тестов
 - [Feature/Push](#backend-feature-push) — 8 тестов
+- [Feature/Documents](#backend-feature-documents) — 47 тестов
 - [Feature/SharedFolders](#backend-feature-sharedfolders) — 58 тестов
 - [Feature/Sharing](#backend-feature-sharing) — 20 тестов
 - [Feature/Support](#backend-feature-support) — 22 тестов
@@ -975,6 +977,131 @@
 | 2 | `should compute storage percent` | Проверяет вычисление процента использования хранилища (начальное значение 0 до загрузки) | getUsage возвращает данные (вызывается в конструкторе) | Проверка storagePercent() === 0 | Процент хранилища 0% (сигнал вычисляется) |
 | 3 | `should format bytes` | Проверяет метод formatBytes: форматирование байтов в МБ и ГБ | formatBytes(0), formatBytes(1048576), formatBytes(1073741824) | '0 МБ', contains 'МБ', contains 'ГБ' | Размер корректно форматируется в русских единицах |
 
+### `features/markdown-editor`
+*Всего тестов: 92*
+
+#### `documents-api.service.spec`
+*Компонент/Сервис: `DocumentsApiService` | Тестов: 9*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `should create a document` | Проверяет создание Markdown-документа через POST /api/v1/documents с fileName. | fileName='test.md' передаётся в service.create() | POST запрос на /api/v1/documents, тело { fileName: 'test.md' } | req.request.method === 'POST', req.request.body === { fileName: 'test.md' } |
+| 2 | `should get a document` | Проверяет получение документа по ID через GET /api/v1/documents/doc-1. | ID 'doc-1' передаётся в service.get('doc-1') | GET запрос на /api/v1/documents/doc-1 | req.request.method === 'GET' |
+| 3 | `should save a document` | Проверяет сохранение документа через PUT /api/v1/documents/doc-1 с content и etag. | id='doc-1', content='# Hello', etag='abc' передаются в service.save() | PUT запрос на /api/v1/documents/doc-1, тело { content: '# Hello', etag: 'abc' } | req.request.method === 'PUT', req.request.body === { content: '# Hello', etag: 'abc' } |
+| 4 | `should acquire a lock` | Проверяет захват блокировки через POST /api/v1/documents/doc-1/lock. | ID 'doc-1' передаётся в service.acquireLock('doc-1') | POST запрос на /api/v1/documents/doc-1/lock | req.request.method === 'POST' |
+| 5 | `should send heartbeat` | Проверяет продление блокировки через POST /api/v1/documents/doc-1/lock/heartbeat. | ID 'doc-1' передаётся в service.heartbeat('doc-1') | POST запрос на /api/v1/documents/doc-1/lock/heartbeat | req.request.method === 'POST' |
+| 6 | `should takeover lock` | Проверяет перехват блокировки через POST /api/v1/documents/doc-1/lock/takeover. | ID 'doc-1' передаётся в service.takeover('doc-1') | POST запрос на /api/v1/documents/doc-1/lock/takeover | req.request.method === 'POST' |
+| 7 | `should release lock` | Проверяет снятие блокировки через DELETE /api/v1/documents/doc-1/lock. | ID 'doc-1' передаётся в service.releaseLock('doc-1') | DELETE запрос на /api/v1/documents/doc-1/lock | req.request.method === 'DELETE' |
+| 8 | `should get images` | Проверяет получение изображений через GET /api/v1/assets/images с параметрами. | Параметры { search, cursor, per_page } передаются в service.getImages() | GET запрос на /api/v1/assets/images с query params | req.request.method === 'GET' |
+| 9 | `should update access` | Проверяет обновление can_edit через PATCH /api/v1/files/f1/accesses/a1 с телом { can_edit: true }. | fileId='f1', accessId='a1', canEdit=true передаются в service.updateAccess() | PATCH запрос на /api/v1/files/f1/accesses/a1, тело { can_edit: true } | req.request.method === 'PATCH', req.request.body === { can_edit: true } |
+
+#### `document-lock.service.spec`
+*Компонент/Сервис: `DocumentLockService` | Тестов: 12*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `should start in idle state` | Проверяет начальное состояние — lockState === 'idle'. | DocumentLockService проинициализирован | Чтение сигнала lockState() | lockState() === 'idle' |
+| 2 | `should acquire lock and hold it` | Проверяет успешный захват блокировки: acquire → lockState='held', запущен heartbeat. | mockDocumentsApi.acquireLock возвращает 201; mockDocumentsApi.heartbeat возвращает 200 | acquire('doc-1'); verify acquireLock; затем check lockState | lockState() === 'held'; acquireLock вызван с 'doc-1' |
+| 3 | `should fail to acquire and go readonly` | Проверяет отказ при захвате: acquire → lockState='readonly'. | mockDocumentsApi.acquireLock возвращает 423 | acquire('doc-1') | lockState() === 'readonly' |
+| 4 | `should release lock and go idle` | Проверяет освобождение блокировки: release → lockState='idle'. | acquire успешен, затем release | release('doc-1') | lockState() === 'idle'; releaseLock вызван с 'doc-1' |
+| 5 | `should reset state` | Проверяет полный сброс состояния: reset → lockState='idle', takenOverBy=null. | acquire успешен, затем reset | reset() | lockState() === 'idle'; takenOverBy() === null |
+| 6 | `should reacquire after release` | Проверяет повторный захват после освобождения: acquire → release → acquire → held. | acquire успешен, release успешен, acquire успешен | acquire('doc-1') после release | lockState() === 'held' |
+| 7 | `should handle LOCK_EXPIRED in heartbeat` | Проверяет heartbeat с ошибкой LOCK_EXPIRED → lockState='lost_expired'. | acquire успешен; heartbeat возвращает 423 LOCK_EXPIRED | Ожидание heartbeat 60s | lockState() === 'lost_expired' |
+| 8 | `should handle LOCK_TAKEN_OVER in heartbeat` | Проверяет heartbeat с ошибкой LOCK_TAKEN_OVER → lockState='lost_takeover', takenOverBy='John'. | acquire успешен; heartbeat возвращает 423 LOCK_TAKEN_OVER с lockedBy={name:'John'} | Ожидание heartbeat 60s | lockState() === 'lost_takeover'; takenOverBy() === 'John' |
+| 9 | `should takeover lock` | Проверяет перехват блокировки: takeover → lockState='held', heartbeat перезапущен. | mockDocumentsApi.takeover возвращает успех; ранее был потерян | takeover('doc-1') | lockState() === 'held'; takeover вызван с 'doc-1' |
+| 10 | `should reacquire after lost` | Проверяет восстановление после LOCK_EXPIRED: reacquire → lock reset → acquire → held. | heartbeat вернул LOCK_EXPIRED; acquire успешен при повторной попытке | reacquire('doc-1') | lockState() === 'held' |
+| 11 | `should not start heartbeat if acquire fails` | Проверяет, что heartbeat НЕ запускается при неудачном acquire (lockState='readonly'). | acquire возвращает ошибку | acquire('doc-1') | heartbeat НЕ вызван |
+| 12 | `should dispose heartbeat on release and destroy` | Проверяет, что heartbeat таймер уничтожается при release и при destroy. | acquire успешен, затем release | release('doc-1'); проверка интервала | Интервал heartbeat остановлен |
+
+#### `markdown-editor.component.spec`
+*Компонент/Сервис: `MarkdownEditorComponent` | Тестов: 27*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `should create` | Проверяет базовое создание компонента. | id=input('doc-1'), mock API возвращает Document | fixture.detectChanges() | Компонент создан |
+| 2 | `should create editor with document when lock is held` | Проверяет инициализацию Tiptap-редактора после успешного acquire. | get('doc-1') → Document с content='# Hello'; acquire успешен | fixture.detectChanges() | editor инициализирован, contains content |
+| 3 | `should show READ ONLY banner when lock is not held` | Проверяет вывод банера read-only при lockState='readonly'. | acquire → readonly | fixture.detectChanges() | Баннер «Режим только для чтения» виден |
+| 4 | `should show lock taken over banner` | Проверяет баннер при LOCK_TAKEN_OVER | heartbeat → LOCK_TAKEN_OVER | fixture.detectChanges() | Баннер «Забран пользователем» виден |
+| 5 | `should show lock expired banner` | Проверяет баннер при LOCK_EXPIRED | heartbeat → LOCK_EXPIRED | fixture.detectChanges() | Баннер «Сессия истекла» + кнопка «Продолжить» |
+| 6 | `should show locked by other banner with takeover button` | Проверяет баннер «Документ редактирует [имя]» с кнопкой «Забрать» при canTakeOver=true. | get → Document с lock={isLocked:true, lockedBy:{name:'John'}, canTakeOver:true} | fixture.detectChanges() | Баннер виден, кнопка «Забрать документ» видна |
+| 7 | `should not show takeover button when cannot takeover` | Проверяет отсутствие кнопки «Забрать» при canTakeOver=false. | get → Document с lock={isLocked:true, canTakeOver:false} | fixture.detectChanges() | Кнопка «Забрать» отсутствует |
+| 8 | `should call takeover on button click` | Проверяет вызов takeover при клике на кнопку. | toggleLockTakeover вызывается | Клик на «Забрать» | lockService.takeover вызван 1 раз |
+| 9 | `should call reacquire on Continue editing` | Проверяет восстановление при клике «Продолжить редактирование». | reacquire вызывается | Клик на «Продолжить» | lockService.reacquire вызван 1 раз |
+| 10 | `should render toolbar with basic formatting buttons` | Проверяет отображение панели инструментов (Bold, Italic, H1, H2, Undo, Redo). | acquire успешен; editor инициализирован | fixture.detectChanges() | Кнопки Bold, Italic, H1, Undo, Redo видны |
+| 11 | `should show image insert button when canInsertImages` | Проверяет кнопку вставки изображения при canInsertImages=true. | capabilities.canInsertImages=true | fixture.detectChanges() | Кнопка 🖼 видна |
+| 12 | `should hide image insert button when cannot insert images` | Проверяет скрытие кнопки вставки изображения при canInsertImages=false. | capabilities.canInsertImages=false | fixture.detectChanges() | Кнопка 🖼 отсутствует |
+| 13 | `should open image picker on image button click` | Проверяет открытие ImagePicker при клике на 🖼. | canInsertImages=true | Клик на 🖼 | showImagePickerSignal === true |
+| 14 | `should insert image on picker select` | Проверяет вставку изображения после выбора из ImagePicker. | ImageAsset со stableUrl, fileName, width | selectedImage.emit(asset) | editor.chain().focus().setImage вызван |
+| 15 | `should close image picker on cancel` | Проверяет закрытие ImagePicker при отмене. | showImagePicker=true | cancelImagePicker() | showImagePickerSignal === false |
+| 16 | `should save document via API` | Проверяет ручное сохранение: save → PUT /documents/{id} с content и etag. | acquire успешен; editor content='# Updated'; etag='abc' | save() | documentsApi.save вызван с id, content, etag |
+| 17 | `should update etag after successful save` | Проверяет обновление etag из ответа после сохранения. | save возвращает { etag: 'new-etag', updatedAt: '2026-01-01', updatedBy: {id:1, name:'U'} } | save() → flush | doc.update etag='new-etag' |
+| 18 | `should reset saveStatus on editor change` | Проверяет, что при изменении текста статус становится 'unsaved' и запускается autosave. | editor update | onUpdate callback | saveStatus() === 'unsaved' |
+| 19 | `should schedule autosave with 3s debounce` | Проверяет таймер автозахранения 3s. | После изменения текста | scheduleAutoSave; setTimeout 3000ms | save вызван через 3s |
+| 20 | `should cancel previous autosave timer on new edit` | Проверяет сброс таймера при новом изменении. | Два изменения подряд | Первый таймер сброшен | save вызван 1 раз через 3s |
+| 21 | `should show saving status` | Проверяет индикатор сохранения. | save() в процессе | saveStatus() === 'saving' | Индикатор активности виден |
+| 22 | `should block autosave after 409 conflict` | Проверяет блокировку автосохранения при 409 CONFLICT. | save возвращает 409 error | После ошибки 409 | saveStatus() === 'conflict'; autosave не запускается |
+| 23 | `should show conflict error banner` | Проверяет баннер конфликта. | saveStatus='conflict' | conflictError=true | Баннер «Конфликт версий» виден |
+| 24 | `should show 413 quota exceeded error` | Проверяет ошибку превышения квоты. | save возвращает 413 | После ошибки 413 | saveStatus() === 'quota_exceeded' |
+| 25 | `should go back using router` | Проверяет навигацию назад. | Компонент создан | goBack() | location.back() вызван |
+| 26 | `should call lockService.release on destroy` | Проверяет освобождение блокировки при уничтожении компонента. | acquire успешен | ngOnDestroy() | lockService.release вызван; editor уничтожен |
+| 27 | `should dispose editor on destroy` | Проверяет уничтожение Tiptap-редактора при ngOnDestroy. | editor инициализирован | ngOnDestroy() | editor.destroy() вызван |
+
+#### `markdown-editor-panel.component.spec`
+*Компонент/Сервис: `MarkdownEditorPanelComponent` | Тестов: 29*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `should create` | Проверяет базовое создание панели. | fileId=input('doc-1'), expanded=false | fixture.detectChanges() | Компонент создан |
+| 2 | `should be collapsed when expanded=false` | Проверяет свёрнутое состояние по умолчанию. | expanded=false | fixture.detectChanges() | collapsed() === true |
+| 3 | `should be expanded when expanded=true` | Проверяет развёрнутое состояние. | expanded=true | fixture.detectChanges() | collapsed() === false |
+| 4 | `should show empty state when no document loaded` | Проверяет отображение пустого состояния. | get возвращает undefined | fixture.detectChanges() | Баннер «Нет документа» виден |
+| 5 | `should load document and create editor` | Проверяет загрузку документа и создание редактора. | get('doc-1') → Document; acquire успешен | fixture.detectChanges() | editor инициализирован |
+| 6 | `should hide editor when collapsed` | Проверяет скрытие редактора при сворачивании. | expanded=true, acquire успешен | collapsed.set(true) | body content скрыт |
+| 7 | `should expand on header click` | Проверяет разворачивание по клику на заголовок. | collapsed=true | Клик на заголовок | collapsed() === false |
+| 8 | `should show READ ONLY banner` | Проверяет read-only баннер. | acquire → readonly | fixture.detectChanges() | Баннер read-only виден |
+| 9 | `should show taken over banner` | Проверяет баннер LOCK_TAKEN_OVER. | heartbeat → LOCK_TAKEN_OVER | fixture.detectChanges() | Баннер «Забран» виден |
+| 10 | `should show expired banner` | Проверяет баннер LOCK_EXPIRED. | heartbeat → LOCK_EXPIRED | fixture.detectChanges() | Баннер «Сессия истекла» |
+| 11 | `should expand on create` | Проверяет, что при создании документа панель автоматически разворачивается. | expanded=false | createDocument и успех | collapsed() === false |
+| 12 | `should show create document form when no document` | Проверяет форму создания нового документа. | get возвращает undefined | fixture.detectChanges() | Поле ввода имени + кнопка «Создать» видимы |
+| 13 | `should create document with .md extension` | Проверяет, что при создании без .md расширение добавляется. | fileName='MyDoc' | createDocument() | documentsApi.create('MyDoc.md') |
+| 14 | `should not create document with empty name` | Проверяет валидацию — пустое имя не отправляет запрос. | fileName='' | createDocument() | documentsApi.create НЕ вызван |
+| 15 | `should show save button when unsaved` | Проверяет кнопку «Сохранить» при статусе unsaved. | saveStatus='unsaved' | fixture.detectChanges() | Кнопка «Сохранить» видна |
+| 16 | `should show saving indicator` | Проверяет индикатор сохранения. | saveStatus='saving' | fixture.detectChanges() | «Сохранение...» видно |
+| 17 | `should save document` | Проверяет сохранение документа. | acquire успешен; content и etag | saveDocument() | documentsApi.save вызван |
+| 18 | `should save on Ctrl+S` | Проверяет сохранение по Ctrl+S. | acquire успешен | keydown Ctrl+S | save вызван |
+| 19 | `should not save when read only` | Проверяет, что в read-only сохранение не вызывается. | lockState='readonly' | saveDocument() | documentsApi.save НЕ вызван |
+| 20 | `should schedule autosave 3s after edit` | Проверяет автосохранение 3s. | После изменения текста | scheduleAutoSave | save вызван через 3s |
+| 21 | `should cancel autosave timer on destroy` | Проверяет отмену таймера при ngOnDestroy. | После изменения текста | ngOnDestroy() | Таймер очищен |
+| 22 | `should emit closed event on minimize` | Проверяет эмит события закрытия. | Компонент создан | minimize() | closed.emit() вызван |
+| 23 | `should emit expandToggle event` | Проверяет эмит события expandToggle. | Компонент создан | onExpandClick() | expandToggle.emit() вызван |
+| 24 | `should open image picker` | Проверяет открытие ImagePicker. | canInsertImages=true | insertImage() | showImagePickerSignal=true |
+| 25 | `should insert image from picker` | Проверяет вставку изображения. | ImageAsset выбран | selectedImage.emit(asset) | setImage вызван в редакторе |
+| 26 | `should close image picker on cancel` | Проверяет закрытие picker при отмене. | showImagePicker=true | cancelImagePicker() | showImagePickerSignal=false |
+| 27 | `should reacquire lock` | Проверяет кнопку «Продолжить редактирование». | lost_expired | reacquire() | lockService.reacquire вызван |
+| 28 | `should release lock on destroy` | Проверяет освобождение блокировки при уничтожении. | acquire успешен | ngOnDestroy() | lockService.release вызван |
+| 29 | `should reset lock state on destroy` | Проверяет сброс состояния блокировки. | acquire успешен | ngOnDestroy() | lockService.reset вызван |
+
+#### `image-picker.component.spec`
+*Компонент/Сервис: `ImagePickerComponent` | Тестов: 15*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `should create` | Проверяет базовое создание. | Мок getImages возвращает список изображений | fixture.detectChanges() | Компонент создан |
+| 2 | `should load images on init` | Проверяет загрузку изображений при инициализации. | 3 ImageAsset | fixture.detectChanges() | getImages вызван 1 раз; items.length === 3 |
+| 3 | `should render images in grid` | Проверяет отображение сетки изображений. | 3 ImageAsset; mockPreviewUrls | fixture.detectChanges() | 3 элемента img в сетке |
+| 4 | `should display image name` | Проверяет отображение имени изображения. | ImageAsset { fileName: 'photo.png' } | fixture.detectChanges() | 'photo.png' виден |
+| 5 | `should select image on click` | Проверяет выбор изображения по клику. | ImageAsset { id: 'img-1' } | Клик на элемент | selectedImage()?.id === 'img-1'; элемент подсвечен |
+| 6 | `should deselect on click same image` | Проверяет снятие выбора повторным кликом. | selectedImage='img-1' | Клик на 'img-1' | selectedImage() === null |
+| 7 | `should confirm selection` | Проверяет подтверждение выбранного изображения. | selectedImage='img-1' | confirm() | selected.emit с ImageAsset |
+| 8 | `should not confirm without selection` | Проверяет, что без выбора confirm не эмитит. | selectedImage=null | confirm() | selected.emit НЕ вызван |
+| 9 | `should cancel on close button` | Проверяет отмену по кнопке закрытия. | Компонент открыт | Клик на ✕ | cancelled.emit() |
+| 10 | `should cancel on Cancel button` | Проверяет отмену по кнопке «Отмена». | Компонент открыт | Клик на «Отмена» | cancelled.emit() |
+| 11 | `should cancel on overlay click` | Проверяет отмену по клику вне панели. | Компонент открыт | Клик на overlay | cancelled.emit() |
+| 12 | `should search with debounce 400ms` | Проверяет поиск с дебаунсом 400ms. | searchQuery='cat' | setTimeout 400ms | getImages вызван с search='cat' |
+| 13 | `should load more on pagination` | Проверяет пагинацию. | nextCursor='cursor-abc'; клик «Загрузить ещё» | loadMore() | getImages вызван с cursor='cursor-abc'; элементы добавлены |
+| 14 | `should not show load more when no cursor` | Проверяет скрытие кнопки пагинации. | nextCursor=null | fixture.detectChanges() | Кнопка «Загрузить ещё» отсутствует |
+| 15 | `should have disabled insert button when no selection` | Проверяет, что кнопка «Вставить» неактивна без выбора. | selectedImage=null | fixture.detectChanges() | Кнопка «Вставить» disabled |
+
 ### `shared/components`
 *Всего тестов: 23*
 
@@ -1266,6 +1393,74 @@
 | 8 | `test_user_can_delete_contact` | Проверяет удаление контакта | Пользователь, контакт | DELETE-запрос /api/v1/contacts/{contactId} | assertOk() (200), assertDatabaseMissing('contacts', ['id' => $contact->id]) |
 | 9 | `test_user_can_import_contacts` | Проверяет массовый импорт контактов | Пользователь | POST-запрос /api/v1/contacts/import с JSON: contacts = [['name'=>'Alice', 'email'=>'alice@example.com'], ['name'=>'Bob', 'email'=>'bob@example.com']] | assertOk() (200), assertJsonPath('data.imported', 2) |
 | 10 | `test_unauthenticated_user_cannot_access_contacts` | Проверяет, что неаутентифицированный пользователь не может получить список контактов | Нет пользователя | GET-запрос /api/v1/contacts | assertUnauthorized() (401) |
+
+### `Feature/Documents`
+*Всего тестов: 47*
+
+#### `DocumentControllerTest`
+*Класс: `Tests\Feature\Documents\DocumentControllerTest` | Тестов: 24*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `test_owner_can_create_markdown_document` | Проверяет создание Markdown-документа с добавлением .md. | User, payload: fileName='TestDoc' | POST /api/v1/documents (actingAs user) | assertStatus(201), assertJsonPath('data.file.is_editable', true), assertJsonPath('data.file.editor_type', 'markdown'), assertStringEndsWith('.md', fileName) |
+| 2 | `test_create_document_appends_md_extension` | Проверяет, что .md добавляется, если не указан. | User, payload: fileName='Doc.md' | POST /api/v1/documents | assertStatus(201), fileName='Doc.md' (без дублирования) |
+| 3 | `test_create_document_requires_file_name` | Проверяет валидацию — fileName обязателен. | User, payload: {} | POST /api/v1/documents | assertStatus(422) |
+| 4 | `test_owner_can_view_document` | Проверяет просмотр документа владельцем. | User, File (is_editable=true, editor_type='markdown') | GET /api/v1/documents/{id} (actingAs user) | assertOk(), assertJsonPath('data.file.id', $file->id), assertJsonStructure с content |
+| 5 | `test_shared_user_can_view_document` | Проверяет просмотр shared-пользователем. | owner, shared (FileUserAccess), File | GET /api/v1/documents/{id} (actingAs shared) | assertOk() |
+| 6 | `test_non_access_user_cannot_view_document` | Проверяет, что без доступа — 403. | owner, other, File | GET /api/v1/documents/{id} (actingAs other) | assertStatus(403) |
+| 7 | `test_non_markdown_file_returns_404` | Проверяет, что не-markdown файл возвращает 404. | User, File (is_editable=false) | GET /api/v1/documents/{id} | assertStatus(404) |
+| 8 | `test_owner_can_save_document` | Проверяет сохранение документа владельцем. | User, File markdown, lock захвачен, content | PUT /api/v1/documents/{id} (actingAs user) с content, etag | assertOk(), assertJsonPath('result', 'success') |
+| 9 | `test_update_document_checks_lock` | Проверяет, что без блокировки — 423 LOCK_REQUIRED. | User, File markdown, нет lock | PUT /api/v1/documents/{id} без lock | assertStatus(423), assertJsonPath('data.code', 'LOCK_REQUIRED') |
+| 10 | `test_update_document_with_wrong_etag_returns_409` | Проверяет конфликт etag — 409 DOCUMENT_CONFLICT. | User, File, lock, content; etag не совпадает | PUT /api/v1/documents/{id} с неверным etag | assertStatus(409), assertJsonPath('data.code', 'DOCUMENT_CONFLICT'), assertJsonStructure с currentState |
+| 11 | `test_non_owner_can_save_with_can_edit` | Проверяет, что shared-пользователь с can_edit=true может сохранять. | owner, shared (can_edit=true), File, lock захвачен shared | PUT /api/v1/documents/{id} (actingAs shared) | assertOk() |
+| 12 | `test_shared_without_can_edit_cannot_save` | Проверяет, что shared-пользователь без can_edit не может сохранять. | owner, shared (can_edit=false), File | PUT /api/v1/documents/{id} (actingAs shared) | assertStatus(403) |
+| 13 | `test_save_with_quota_exceeded_returns_413` | Проверяет, что при превышении квоты возвращается 413. | User, File, lock, content; StorageService имитирует превышение | PUT /api/v1/documents/{id} | assertStatus(413), assertJsonPath('data.code', 'quota_exceeded') |
+| 14 | `test_save_updates_etag_and_updated_by` | Проверяет, что после сохранения etag и updated_by обновлены. | User, File, lock, content | PUT /api/v1/documents/{id} | assertJsonPath('data.etag', новый etag), assertJsonPath('data.updatedBy.id', $user->id) |
+| 15 | `test_update_document_content_in_s3` | Проверяет, что content сохраняется/обновляется в S3 (Storage::fake()). | User, File, lock, content='# Hello' | PUT /api/v1/documents/{id} с content | Storage assertExists |
+| 16 | `test_owner_can_update_can_edit_flag` | Проверяет обновление can_edit владельцем. | owner, shared (User), File, FileUserAccess (shared, can_edit=false) | PATCH /api/v1/files/{id}/accesses/{accessId} (actingAs owner) с {can_edit: true} | assertOk(), assertDatabaseHas('file_user_access', ['can_edit' => true]) |
+| 17 | `test_non_owner_cannot_update_can_edit` | Проверяет, что не-владелец не может изменить can_edit. | owner, other, File, FileUserAccess | PATCH /api/v1/files/{id}/accesses/{accessId} (actingAs other) | assertStatus(404) |
+| 18 | `test_can_edit_update_requires_boolean` | Проверяет валидацию — can_edit обязателен и boolean. | owner, File, FileUserAccess | PATCH /api/v1/files/{id}/accesses/{accessId} без can_edit | assertStatus(422) |
+| 19 | `test_document_content_normalizes_image_urls` | Проверяет, что presigned URL заменяются на stable URL при сохранении. | User, File, lock, content с presigned S3 URL | PUT /api/v1/documents/{id} | S3 URL заменён на /api/v1/files/{id}/content |
+| 20 | `test_document_content_hydrates_image_urls` | Проверяет, что stable URL заменяются на presigned при чтении. | User, File, content с /api/v1/files/{id}/content | GET /api/v1/documents/{id} | content содержит presigned S3 URL |
+| 21 | `test_view_document_via_shared_folder_access` | Проверяет просмотр через общую папку. | owner, editor, SharedFolder, SharedFolderAccess edit, SharedFolderFile, File markdown | GET /api/v1/documents/{id} (actingAs editor) | assertOk() |
+| 22 | `test_edit_document_via_shared_folder_access` | Проверяет редактирование через общую папку (can_edit не проверяется, т.к. через shared folder). | owner, editor, SharedFolder, SharedFolderAccess edit, SharedFolderFile, File markdown, lock | PUT /api/v1/documents/{id} (actingAs editor) с content, etag | assertOk() |
+| 23 | `test_nonexistent_document_returns_404` | Проверяет, что несуществующий документ возвращает 404. | User | GET /api/v1/documents/nonexistent | assertStatus(404) |
+| 24 | `test_unauthenticated_user_cannot_access_documents` | Проверяет, что без auth — 401. | Нет пользователя | GET /api/v1/documents/some-id | assertUnauthorized() |
+
+#### `DocumentLockControllerTest`
+*Класс: `Tests\Feature\Documents\DocumentLockControllerTest` | Тестов: 14*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `test_user_can_acquire_lock` | Проверяет захват блокировки. | User, File markdown, canEditDocument=true | POST /api/v1/documents/{id}/lock (actingAs user) | assertStatus(201), assertDatabaseHas('document_locks', ['file_id' => $file->id, 'user_id' => $user->id]) |
+| 2 | `test_cannot_acquire_lock_if_already_locked_by_other` | Проверяет, что при блокировке другим пользователем — 423. | User, other, File, DocumentLock на other | POST /api/v1/documents/{id}/lock (actingAs user) | assertStatus(423), assertJsonPath('data.code', 'LOCK_CONFLICT'), assertJsonStructure с lock info |
+| 3 | `test_same_user_can_reacquire_lock` | Проверяет, что тот же пользователь может перезахватить блокировку. | User, File, DocumentLock на user | POST /api/v1/documents/{id}/lock (actingAs user) | assertStatus(201) |
+| 4 | `test_can_acquire_expired_lock` | Проверяет, что можно захватить истекшую блокировку. | User, File, DocumentLock на other (expires_at в прошлом) | POST /api/v1/documents/{id}/lock (actingAs user) | assertStatus(201) |
+| 5 | `test_cannot_acquire_lock_without_edit_permission` | Проверяет, что без can_edit — 403. | owner, shared (can_edit=false), File, FileUserAccess | POST /api/v1/documents/{id}/lock (actingAs shared) | assertStatus(403) |
+| 6 | `test_owner_can_takeover_lock` | Проверяет перехват блокировки владельцем. | owner, other, File, DocumentLock на other | POST /api/v1/documents/{id}/lock/takeover (actingAs owner) | assertOk(), assertDatabaseHas('document_locks', ['file_id' => $file->id, 'user_id' => $owner->id]) |
+| 7 | `test_non_owner_cannot_takeover` | Проверяет, что не-владелец не может перехватить блокировку. | owner, shared, other, File, DocumentLock на other | POST /api/v1/documents/{id}/lock/takeover (actingAs shared) | assertStatus(403) |
+| 8 | `test_takeover_nonexistent_lock` | Проверяет перехват без активной блокировки. | owner, File (нет DocumentLock) | POST /api/v1/documents/{id}/lock/takeover (actingAs owner) | assertOk(), создаётся новая блокировка |
+| 9 | `test_user_can_renew_lock_with_heartbeat` | Проверяет продление блокировки heartbeat. | User, File, DocumentLock на user | POST /api/v1/documents/{id}/lock/heartbeat (actingAs user) | assertOk(), expires_at обновлён |
+| 10 | `test_heartbeat_fails_if_lock_expired` | Проверяет heartbeat для истекшей блокировки — 423 LOCK_EXPIRED. | User, File, DocumentLock на user (expires_at в прошлом) | POST /api/v1/documents/{id}/lock/heartbeat (actingAs user) | assertStatus(423), assertJsonPath('data.code', 'LOCK_EXPIRED') |
+| 11 | `test_heartbeat_fails_if_lock_taken_over` | Проверяет heartbeat для забранной блокировки — 423 LOCK_TAKEN_OVER. | User, File, DocumentLock на other | POST /api/v1/documents/{id}/lock/heartbeat (actingAs user) | assertStatus(423), assertJsonPath('data.code', 'LOCK_TAKEN_OVER'), assertJsonStructure с lockedBy |
+| 12 | `test_user_can_release_lock` | Проверяет снятие блокировки. | User, File, DocumentLock на user | DELETE /api/v1/documents/{id}/lock (actingAs user) | assertStatus(204), assertDatabaseMissing('document_locks', ['file_id' => $file->id]) |
+| 13 | `test_release_nonexistent_lock_is_idempotent` | Проверяет идемпотентность — удаление несуществующей блокировки возвращает 204. | User, File (нет DocumentLock) | DELETE /api/v1/documents/{id}/lock (actingAs user) | assertStatus(204) |
+| 14 | `test_unauthenticated_user_cannot_access_lock_endpoints` | Проверяет, что без auth — 401. | Нет пользователя | POST /api/v1/documents/some-id/lock | assertUnauthorized() |
+
+#### `AssetControllerTest`
+*Класс: `Tests\Feature\Documents\AssetControllerTest` | Тестов: 9*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `test_user_can_list_their_own_images` | Проверяет список изображений владельца. | User, 3 File (image/png, owner_id=user), статус Available | GET /api/v1/assets/images (actingAs user) | assertOk(), assertCount(3, items), assertJsonPath('result', 'success') |
+| 2 | `test_user_can_list_images_shared_with_them` | Проверяет доступ к изображениям, расшаренным пользователю. | owner, user, File (image/png), FileUserAccess (shared) | GET /api/v1/assets/images (actingAs user) | assertOk(), items содержит shared-изображение |
+| 3 | `test_images_exclude_non_image_mime_types` | Проверяет, что не-изображения исключены из списка. | User, File (text/plain), File (image/png) | GET /api/v1/assets/images | items содержит только image/png |
+| 4 | `test_images_include_only_available_status` | Проверяет, что файлы со статусом, отличным от Available, не показываются. | User, 2 File (image/png): один Available, один uploading | GET /api/v1/assets/images | assertCount(1, items) |
+| 5 | `test_images_filter_by_search` | Проверяет поиск по имени. | User, File 'photo.png', File 'document.png' | GET /api/v1/assets/images?search=photo | assertCount(1, items); fileName === 'photo.png' |
+| 6 | `test_images_cursor_pagination` | Проверяет курсорную пагинацию. | User, 3 изображения; per_page=2 | GET /api/v1/assets/images?per_page=2 | assertCount(2, items); nextCursor не null; второй запрос с cursor возвращает последнее |
+| 7 | `test_images_include_stable_url_format` | Проверяет, что каждое изображение содержит stableUrl=/api/v1/files/{id}/content. | User, File image/png | GET /api/v1/assets/images | assertStringContainsString('/api/v1/files/', item.stableUrl) |
+| 8 | `test_images_include_width_and_height` | Проверяет, что ответ содержит width и height. | User, File (image/png, width=800, height=600) | GET /api/v1/assets/images | item.width === 800, item.height === 600 |
+| 9 | `test_unauthenticated_cannot_list_images` | Проверяет, что без auth — 401. | Нет пользователя | GET /api/v1/assets/images | assertUnauthorized() |
 
 ### `Feature/Files`
 *Всего тестов: 50*

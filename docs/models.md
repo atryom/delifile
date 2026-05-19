@@ -1,6 +1,6 @@
 # Модели и таблицы БД проекта DeliFile
 
-Всего **41 таблица**. Модели используют ULID в качестве первичных ключей (кроме `users`, `push_subscriptions`, `password_reset_codes` и системных таблиц Laravel).
+Всего **42 таблицы**. Модели используют ULID в качестве первичных ключей (кроме `users`, `push_subscriptions`, `password_reset_codes` и системных таблиц Laravel).
 
 ---
 
@@ -86,11 +86,17 @@ PHP-сессии (для web-роутов).
 | shared_folder_only | bool | Файл только в общей папке (не в личных) |
 | has_versions | bool | Есть версии |
 | display_name | string(255), nullable | Отображаемое имя |
+| is_editable | bool, default false | Флаг редактируемого документа |
+| editor_type | string(50), nullable | Тип редактора: `markdown` |
+| etag | string(255), nullable | ETag для оптимистичных блокировок |
+| updated_by | FK→users, nullable | Кто последним обновил содержимое |
+| width | unsigned int, nullable | Ширина (для изображений) |
+| height | unsigned int, nullable | Высота (для изображений) |
 | expires_at | timestamp, nullable | TTL (не используется) |
 | deleted_at | timestamp, nullable | Soft delete |
 | timestamps | created_at, updated_at | |
 
-**Связи:** `owner` → User, `folder` → Folder, `accesses` → FileUserAccess, `shareLinks` → ShareLink, `activityLogs` → ActivityLog, `tags` ↔ Tag (pivot `file_tags`), `sharedFolderFiles` → SharedFolderFile, `versions` → FileVersion, `commentSettings` → FileCommentSettings
+**Связи:** `owner` → User, `folder` → Folder, `accesses` → FileUserAccess, `shareLinks` → ShareLink, `activityLogs` → ActivityLog, `tags` ↔ Tag (pivot `file_tags`), `sharedFolderFiles` → SharedFolderFile, `versions` → FileVersion, `commentSettings` → FileCommentSettings, `updatedByUser` → User, `documentLock` → DocumentLock
 
 ### `file_versions` — `App\Models\FileVersion` (HasUlids)
 Версии файла (для файлов с `has_versions = true`).
@@ -124,9 +130,27 @@ PHP-сессии (для web-роутов).
 | saved_at | timestamp, nullable | Сохранён (скопирован к себе) |
 | folder_id | FK→folders, nullable | Папка (у получателя) |
 | can_comment | bool, default true | Может комментировать |
+| can_edit | bool, default false | Может редактировать Markdown-документ |
 | unique | (file_id, user_id) | |
 
 **Связи:** `file` → File, `user` → User, `contact` → Contact
+
+### `document_locks` — `App\Models\DocumentLock` (без timestamps)
+Блокировки документов для Markdown-редактора (pessimistic lock, PK=file_id).
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| file_id | string(26), PK, FK→files | Документ (один к одному) |
+| user_id | FK→users | Кто захватил блокировку |
+| expires_at | timestamp | Когда истекает блокировка |
+| created_at | timestamp | Когда создана |
+
+**Особенности:**
+- Одна запись на документ (PK=file_id, один к одному)
+- Блокировка истекает по `expires_at` (проверка `isExpired(): expires_at->isPast()`)
+- Heartbeat продлевает `expires_at` (каждые 60 с)
+- Takeover позволяет владельцу принудительно перехватить блокировку
+
+**Связи:** `file` → File, `user` → User
 
 ### `folders` — `App\Models\Folder` (HasUlids)
 Личные папки пользователя (иерархические).
@@ -443,3 +467,4 @@ PHP-сессии (для web-роутов).
 | `CommentScope` | `shared`, `private` | comment_threads.scope |
 | `SharedCommentMode` | `enabled`, `disabled`, `inherit_for_items` | shared_folder_comment_settings.shared_comments_mode |
 | `SharedCommentOverride` | `inherit`, `enabled`, `disabled` | file_comment_settings.shared_comments_override |
+| `EditorType` | `markdown` | files.editor_type |

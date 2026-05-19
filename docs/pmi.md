@@ -14,7 +14,7 @@
 
 | Компонент | Технология | Описание |
 |-----------|-----------|----------|
-| Backend API | Laravel 13 | REST API, ~155 endpoint'ов, аутентификация Laravel Sanctum |
+| Backend API | Laravel 13 | REST API, ~166 endpoint'ов, аутентификация Laravel Sanctum |
 | Frontend SPA | Angular 21 | Progressive Web Application (PWA), Service Worker |
 | Хранилище | S3-совместимое (MinIO / AWS S3) | Хранение файлов, presigned URL для загрузки/скачивания |
 | База данных | PostgreSQL | Основное хранилище данных |
@@ -38,10 +38,11 @@
 | 12 | Активность | Лента действий пользователя, активность по файлу |
 | 13 | PWA / Push | Установка приложения, Web Share Target, push-уведомления, VAPID |
 | 14 | Настройки | Смена пароля/email, управление сессиями, приватность, уведомления |
+| 15 | Markdown-редактор | Создание/редактирование Markdown-документов, автосохранение (3s debounce), image picker, блокировки документа (pessimistic lock с heartbeat/takeover) |
 
 ### 1.3 Система прав доступа
 
-Реализованы 4 модели доступа:
+Реализованы 5 моделей доступа:
 
 | Модель | Сущность | Типы доступа |
 |--------|----------|-------------|
@@ -49,13 +50,14 @@
 | `shared_folder_accesses` | Общая папка | `view` / `edit` |
 | `share_links` | Публичная ссылка на файл | `allow_save: bool` |
 | `shared_folder_links` | Публичная ссылка на папку | `view` / `edit` + `allow_save` |
+| `file_user_access.can_edit` | Markdown-документ | `can_edit: bool` на shared-доступе |
 
 **Особенности:**
 - Наследование прав shared folders по цепочке parent_id вверх
 - Owner имеет абсолютный контроль (share, link, delete, manage accesses)
 - Shared-пользователь не может пересылать файл
 - Saved — неотзываемое владельцем сохранение
-- 11 описанных сценариев прав (сценарии A–K)
+- 12 описанных сценариев прав (сценарии A–L)
 
 ### 1.4 Фоновые задачи
 
@@ -71,8 +73,8 @@
 ## 2. Цель испытаний
 
 1. **Оценка соответствия функциональным требованиям** — проверка полной реализации всех сценариев, описанных в `userflow.md` и `usermanual.md`.
-2. **Верификация API** — проверка корректности всех ~155 API-эндпоинтов (статусы ответов, коды ошибок, права доступа, форматы данных).
-3. **Проверка системы прав доступа** — валидация матрицы прав (permission.md) на всех 11 сценариях (A–K).
+2. **Верификация API** — проверка корректности всех ~166 API-эндпоинтов (статусы ответов, коды ошибок, права доступа, форматы данных).
+3. **Проверка системы прав доступа** — валидация матрицы прав (permission.md) на всех 12 сценариях (A–L).
 4. **Оценка стабильности и безопасности** — изоляция данных между пользователями, аутентификация, обработка ошибок, валидация входных данных.
 5. **Ввод в эксплуатацию** — подтверждение готовности системы к промышленной эксплуатации.
 
@@ -102,6 +104,7 @@
 | F-16 | Тарифы | Free/Silver/Gold, проверка лимитов при загрузке, usage |
 | F-17 | PWA | Установка, Service Worker, Share Target, VAPID push |
 | F-18 | Администрирование | Статистика, управление пользователями, тикетами, предложениями, массовые уведомления |
+| F-19 | Markdown-редактор | Создание/редактирование Markdown-документов, автозахранение (3s debounce), image picker, блокировки (pessimistic lock с heartbeat/takeover), stableUrl для изображений |
 
 ### 3.2 Требования к системе прав
 
@@ -115,6 +118,7 @@
 | P-06 | Наследование прав shared folders | Только вверх (additive), restrict не применяется |
 | P-07 | Публичная ссылка: auth не требуется для resolve/download | Сохранение требует auth |
 | P-08 | Публичная ссылка на папку: авто-грант доступа auth-пользователю | Создание SharedFolderAccess |
+| P-09 | Markdown-документ: can_edit только при shared-доступе | Owner — полный контроль; Shared + can_edit=true — редактирование, захват блокировки; Shared + can_edit=false — только просмотр |
 
 ### 3.3 Нефункциональные требования
 
@@ -136,11 +140,11 @@
 | Документ | Назначение | Статус |
 |----------|-----------|--------|
 | `docs/userflow.md` | Описание потоков пользователя по всем модулям | ✅ |
-| `docs/usermanual.md` | Руководство пользователя (17 разделов) | ✅ |
-| `docs/endpoints.md` | Полный список API-эндпоинтов (~155 шт.) | ✅ |
-| `docs/permission.md` | Матрица прав доступа, сценарии A–K | ✅ |
+| `docs/usermanual.md` | Руководство пользователя (18 разделов) | ✅ |
+| `docs/endpoints.md` | Полный список API-эндпоинтов (~166 шт.) | ✅ |
+| `docs/permission.md` | Матрица прав доступа, сценарии A–L | ✅ |
 | `docs/tests.md` | Сводный отчёт по тестированию (866 тестов) | ✅ |
-| `docs/pmt.md` | План методики испытания (данный документ) | ✅ |
+| `docs/pmi.md` | План методики испытания (данный документ) | ✅ |
 
 Все документы должны поддерживаться в актуальном состоянии при изменении функциональности.
 
@@ -620,7 +624,64 @@
 | 17.3 | auth:block-unverified | Неподтверждённые email >24ч | Статус → blocked_unverified_email |
 | 17.4 | support:auto-close-tickets | Зависшие тикеты >24ч | Статус → completed |
 
-### 6.18 Сводная таблица методов испытаний
+### 6.18 Модуль «Markdown-редактор»
+
+Всего тестов: **139** (Frontend 92 + Backend 47)
+
+| № | Метод проверки | Входные данные | Ожидаемый результат | Кол-во тестов |
+|---|---------------|----------------|-------------------|:------------:|
+| 18.1 | POST /documents — создание документа | fileName='TestDoc' | 201, is_editable=true, editor_type='markdown', .md добавлен | 2 |
+| 18.2 | POST /documents — без fileName | {} | 422 | 1 |
+| 18.3 | GET /documents/{id} — просмотр (owner) | Document | 200, content + metadata | 1 |
+| 18.4 | GET /documents/{id} — просмотр (shared) | shared user | 200 | 1 |
+| 18.5 | GET /documents/{id} — без доступа | other user | 403 | 1 |
+| 18.6 | GET /documents/{id} — не-markdown файл | is_editable=false | 404 | 1 |
+| 18.7 | GET /documents/{id} — несуществующий | nonexistent | 404 | 1 |
+| 18.8 | GET /documents/{id} — без auth | unauth | 401 | 1 |
+| 18.9 | PUT /documents/{id} — сохранение (owner) | content + etag + lock | 200, etag обновлён | 1 |
+| 18.10 | PUT /documents/{id} — без блокировки | нет lock | 423 LOCK_REQUIRED | 1 |
+| 18.11 | PUT /documents/{id} — конфликт etag | неверный etag | 409 DOCUMENT_CONFLICT | 1 |
+| 18.12 | PUT /documents/{id} — сохранение (can_edit=true) | shared + can_edit | 200 | 1 |
+| 18.13 | PUT /documents/{id} — без can_edit | shared + can_edit=false | 403 | 1 |
+| 18.14 | PUT /documents/{id} — превышение квоты | storage full | 413 quota_exceeded | 1 |
+| 18.15 | PUT /documents/{id} — контент в S3 | content=# Hello | Storage::fake assertExists | 1 |
+| 18.16 | PUT /documents/{id} — нормализация URL | presigned S3 URL в content | URL заменён на stable | 1 |
+| 18.17 | GET /documents/{id} — гидратация URL | stable URL в content | URL заменён на presigned S3 | 1 |
+| 18.18 | GET /documents/{id} — доступ через shared folder | SharedFolderFile | 200 | 1 |
+| 18.19 | PUT /documents/{id} — редактирование через shared folder | SharedFolderFile + lock | 200 | 1 |
+| 18.20 | PATCH /accesses — обновление can_edit (owner) | can_edit=true | 200 | 1 |
+| 18.21 | PATCH /accesses — не-владелец | other | 404 | 1 |
+| 18.22 | PATCH /accesses — без boolean | body {} | 422 | 1 |
+| 18.23 | POST /lock — захват блокировки | user + document | 201, DocumentLock создан | 1 |
+| 18.24 | POST /lock — уже заблокирован другим | other's lock | 423 LOCK_CONFLICT | 1 |
+| 18.25 | POST /lock — повторный захват тем же | свой lock | 201 | 1 |
+| 18.26 | POST /lock — истекшая блокировка | expired lock | 201 | 1 |
+| 18.27 | POST /lock — без can_edit | shared + can_edit=false | 403 | 1 |
+| 18.28 | POST /lock/takeover — перехват (owner) | owner перехватывает | 200 | 1 |
+| 18.29 | POST /lock/takeover — не-владелец | shared | 403 | 1 |
+| 18.30 | POST /lock/takeover — без блокировки | нет lock | 200 (создаётся) | 1 |
+| 18.31 | POST /lock/heartbeat — продление | свой lock | 200, expires_at обновлён | 1 |
+| 18.32 | POST /lock/heartbeat — истекла | expired lock | 423 LOCK_EXPIRED | 1 |
+| 18.33 | POST /lock/heartbeat — перехвачена | other's lock | 423 LOCK_TAKEN_OVER | 1 |
+| 18.34 | DELETE /lock — снятие | свой lock | 204 | 1 |
+| 18.35 | DELETE /lock — идемпотентность | нет lock | 204 | 1 |
+| 18.36 | Без auth для lock endpoints | unauth | 401 | 1 |
+| 18.37 | GET /assets/images — список своих | 3 images | 200, count=3 | 1 |
+| 18.38 | GET /assets/images — расшаренные | shared image | 200, содержит shared | 1 |
+| 18.39 | GET /assets/images — только изображения | text/plain + image/png | только png | 1 |
+| 18.40 | GET /assets/images — только Available | uploading + available | только available | 1 |
+| 18.41 | GET /assets/images — поиск | search='photo' | 1 результат | 1 |
+| 18.42 | GET /assets/images — курсорная пагинация | per_page=2, 3 images | 2 items, nextCursor | 1 |
+| 18.43 | GET /assets/images — stableUrl формат | image | contains /api/v1/files/ | 1 |
+| 18.44 | GET /assets/images — width/height | image 800x600 | width=800, height=600 | 1 |
+| 18.45 | GET /assets/images — без auth | unauth | 401 | 1 |
+| 18.46 | **Frontend: DocumentsApiService** (9 тестов) | сервис | create, get, save, lock, heartbeat, takeover, release, getImages, updateAccess | 9 |
+| 18.47 | **Frontend: DocumentLockService** (12 тестов) | сервис | idle, acquire, readonly, release, reset, reacquire, LOCK_EXPIRED, LOCK_TAKEN_OVER, takeover, heartbeat lifecycle | 12 |
+| 18.48 | **Frontend: MarkdownEditorComponent** (27 тестов) | full-page редактор | create, load, toolbar, image picker, save, autosave 3s, conflict 409, takeover, lock banners, ngOnDestroy | 27 |
+| 18.49 | **Frontend: MarkdownEditorPanelComponent** (29 тестов) | inline-панель | collapsed/expanded, create form, save, Ctrl+S, autosave, image picker, lock banners, minimize | 29 |
+| 18.50 | **Frontend: ImagePickerComponent** (15 тестов) | модальное окно | grid, select, confirm, cancel, search 400ms, pagination, disabled button | 15 |
+
+### 6.19 Сводная таблица методов испытаний
 
 | № | Модуль | Frontend | Backend | Всего |
 |---|--------|:--------:|:-------:|:----:|
@@ -641,7 +702,8 @@
 | 6.15 | Организация (папки + теги) | 32 | 22 | **54** |
 | 6.16 | Core-сервисы | 55 | — | **55** |
 | 6.17 | Фоновые задачи | — | — | 4 jobs |
-| | **Итого** | **~400** | **~376** | **~866** |
+| 6.18 | **Markdown-редактор** | 92 | 47 | **139** |
+| | **Итого** | **~492** | **~423** | **~1005** |
 
 ---
 
@@ -649,11 +711,11 @@
 
 ### Приложение A: Полный перечень API-эндпоинтов
 
-См. `docs/endpoints.md` — ~155 REST API endpoint'ов, разделённых на 30 логических групп.
+См. `docs/endpoints.md` — ~166 REST API endpoint'ов, разделённых на 33 логические группы.
 
 ### Приложение B: Матрица прав доступа
 
-См. `docs/permission.md` — 4 модели доступа, сценарии A–K.
+См. `docs/permission.md` — 5 моделей доступа, сценарии A–L.
 
 ### Приложение C: Тестовые сценарии для проверки прав (permission.md)
 
@@ -670,6 +732,7 @@
 | I | Публичная ссылка на общую папку | resolve (public), авто-грант (auth) |
 | J | Файл и в общей папке, и расшарен напрямую | Двойной доступ, delete owner vs detach |
 | K | Наследование с разными типами на уровнях | Edit на подпапку расширяет view с корня |
+| L | Markdown-документ с блокировками | Owner — полный контроль; Shared can_edit=true — edit + lock; Shared can_edit=false — readonly; takeover только owner |
 
 ### Приложение D: Структура ответа API
 
@@ -709,6 +772,12 @@
 | 422 | EMAIL_ALREADY_VERIFIED | Email уже подтверждён |
 | 422 | NO_VERSIONS | Версионирование не включено |
 | 422 | ALREADY_IN_MY_FILES | Файл уже в личных |
+| 423 | LOCK_REQUIRED | Для сохранения требуется блокировка |
+| 423 | LOCK_CONFLICT | Документ заблокирован другим пользователем |
+| 423 | LOCK_EXPIRED | Сессия редактирования истекла |
+| 423 | LOCK_TAKEN_OVER | Блокировка перехвачена владельцем |
+| 409 | DOCUMENT_CONFLICT | Конфликт версий (etag не совпадает) |
+| 413 | quota_exceeded | Превышена квота хранилища при сохранении документа |
 
 ---
 

@@ -153,17 +153,21 @@ describe('MarkdownEditorComponent', () => {
     expect(h1.textContent?.trim()).toBe('notes.md');
   });
 
-  it('should hide toolbar and save button when lockState is not held', () => {
+  it('should hide toolbar and revert button when lockState is not held', () => {
     lockStateSig.set('readonly');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.md-btn--primary')).toBeNull();
+    const buttons = fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.md-btn');
+    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Отменить изменения'));
+    expect(revertBtn).toBeUndefined();
     expect(fixture.nativeElement.querySelector('.md-toolbar')).toBeNull();
   });
 
-  it('should show save button when lockState is held and canEdit is true', () => {
+  it('should show revert button when lockState is held and canEdit is true', () => {
     lockStateSig.set('held');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.md-btn--primary')).toBeTruthy();
+    const buttons = fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.md-btn');
+    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Отменить изменения'));
+    expect(revertBtn).toBeTruthy();
   });
 
   it('canEdit is true only when lockState is held', () => {
@@ -322,30 +326,28 @@ describe('MarkdownEditorComponent', () => {
 
   // ── Autosave ──────────────────────────────────────────────────────────────────
 
-  it('save() cancels pending autosave timer', () => {
-    fixture.detectChanges();
-    component.editor = createMockEditor();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (component as any).autoSaveTimer = setTimeout(() => {}, 99999);
-
-    component.save();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((component as any).autoSaveTimer).toBeNull();
-  });
-
-  it('ngOnDestroy() cancels pending autosave timer', () => {
+  it('ngOnDestroy() clears periodic save interval', () => {
     fixture.detectChanges();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (component as any).autoSaveTimer = setTimeout(() => {}, 99999);
+    (component as any).periodicSaveTimer = setInterval(() => {}, 99999);
 
     component.ngOnDestroy();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect((component as any).autoSaveTimer).toBeNull();
+    expect((component as any).periodicSaveTimer).toBeNull();
   });
 
-  it('autosave fires docsApi.save after 3 s when unsaved and no conflictError', () => {
+  it('ngOnDestroy() saves unsaved changes before cleanup', () => {
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+    component.saveStatus.set('unsaved');
+
+    component.ngOnDestroy();
+
+    expect(docsApiMock['save']).toHaveBeenCalled();
+  });
+
+  it('autosave fires docsApi.save after 30 s when unsaved and no conflictError', () => {
     fixture.detectChanges();
     vi.useFakeTimers();
     try {
@@ -353,9 +355,15 @@ describe('MarkdownEditorComponent', () => {
       component.saveStatus.set('unsaved');
       component.conflictError.set(false);
 
+      // Manually start the periodic interval to avoid timing dependency on initEditor
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (component as any).scheduleAutoSave();
-      vi.advanceTimersByTime(3000);
+      (component as any).periodicSaveTimer = setInterval(() => {
+        if (component.canEdit() && component.saveStatus() === 'unsaved' && !component.conflictError()) {
+          component.save();
+        }
+      }, 30_000);
+
+      vi.advanceTimersByTime(30_000);
 
       expect(docsApiMock['save']).toHaveBeenCalled();
     } finally {
@@ -372,8 +380,13 @@ describe('MarkdownEditorComponent', () => {
       component.conflictError.set(true);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (component as any).scheduleAutoSave();
-      vi.advanceTimersByTime(3000);
+      (component as any).periodicSaveTimer = setInterval(() => {
+        if (component.canEdit() && component.saveStatus() === 'unsaved' && !component.conflictError()) {
+          component.save();
+        }
+      }, 30_000);
+
+      vi.advanceTimersByTime(30_000);
 
       expect(docsApiMock['save']).not.toHaveBeenCalled();
     } finally {
