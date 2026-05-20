@@ -1,11 +1,18 @@
 import { useState } from 'react';
-import { Alert, FlatList, SectionList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SectionList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useFileList } from '@/hooks/useFiles';
-import { useFolderList, useCreateFolder } from '@/hooks/useFolders';
+import { useFolderList } from '@/hooks/useFolders';
 import { Spinner } from '@/components/ui/Spinner';
-import type { FileListItem } from '@/types';
+import type { FileListItem, FileFilter } from '@/types';
 import type { Folder } from '@/types';
+
+const FILTERS: { key: FileFilter; label: string }[] = [
+  { key: 'all',       label: 'Все'        },
+  { key: 'mine',      label: 'Мои'        },
+  { key: 'received',  label: 'Полученные' },
+  { key: 'favorites', label: 'Избранное'  },
+];
 
 function formatSize(bytes: number) {
   if (!bytes || bytes === 0) return '0 Б';
@@ -65,11 +72,13 @@ export default function FilesScreen() {
   const folderName = params.folder_name || 'Файлы';
 
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<FileFilter>('all');
 
   const { data: allFolders, isLoading: foldersLoading } = useFolderList();
   const { data: filesData, isLoading: filesLoading, isError, refetch } = useFileList({
     folder_id: folderId ?? null,
     search: search || undefined,
+    filter: folderId ? undefined : filter,
   });
 
   const subFolders = (allFolders ?? []).filter(
@@ -109,6 +118,22 @@ export default function FilesScreen() {
           clearButtonMode="while-editing"
         />
       </View>
+
+      {!folderId && (
+        <View style={styles.filtersBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContent}>
+            {FILTERS.map((f) => (
+              <TouchableOpacity
+                key={f.key}
+                style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
+                onPress={() => setFilter(f.key)}
+              >
+                <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>{f.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {isLoading ? (
         <Spinner />
@@ -156,6 +181,12 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#F8FAFC' },
   searchBar: { padding: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   search: { height: 40, backgroundColor: '#F1F5F9', borderRadius: 10, paddingHorizontal: 14, fontSize: 15, color: '#1E293B' },
+  filtersBar: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingVertical: 9 },
+  filtersContent: { paddingHorizontal: 12, gap: 8 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: '#F1F5F9' },
+  filterChipActive: { backgroundColor: '#EFF6FF' },
+  filterText: { fontSize: 13, fontWeight: '500', color: '#64748B' },
+  filterTextActive: { color: '#2563EB', fontWeight: '600' },
   sectionHeader: { backgroundColor: '#F8FAFC', paddingHorizontal: 16, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   sectionTitle: { fontSize: 12, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
   folderRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12 },

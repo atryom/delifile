@@ -39,8 +39,8 @@ enum TariffPlan: string
     {
         return match($this) {
             self::Free   => 0,
-            self::Silver => 100,
-            self::Gold   => 300,
+            self::Silver => 200,
+            self::Gold   => 500,
         };
     }
 }

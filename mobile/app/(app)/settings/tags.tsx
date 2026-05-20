@@ -1,16 +1,25 @@
-import { useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View, Modal } from 'react-native';
+import { useRef, useEffect, useState } from 'react';
+import { Alert, FlatList, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tagsApi } from '@/api/tags';
 import { Spinner } from '@/components/ui/Spinner';
-import { Button } from '@/components/ui/Button';
 import type { Tag } from '@/types';
+
+type EditMode = { mode: 'create' } | { mode: 'edit'; tag: Tag } | null;
 
 export default function TagsScreen() {
   const qc = useQueryClient();
-  const [modal, setModal] = useState<{ mode: 'create' | 'edit'; tag?: Tag } | null>(null);
+  const [editMode, setEditMode] = useState<EditMode>(null);
   const [name, setName] = useState('');
+  const [kbHeight, setKbHeight] = useState(0);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKbHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ['tags'],
@@ -19,12 +28,14 @@ export default function TagsScreen() {
 
   const createTag = useMutation({
     mutationFn: (n: string) => tagsApi.create(n),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tags'] }); closeModal(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tags'] }); close(); },
+    onError: (e: any) => Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось создать тег'),
   });
 
   const updateTag = useMutation({
     mutationFn: ({ id, n }: { id: string; n: string }) => tagsApi.update(id, n),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tags'] }); closeModal(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tags'] }); close(); },
+    onError: (e: any) => Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось обновить тег'),
   });
 
   const removeTag = useMutation({
@@ -34,25 +45,28 @@ export default function TagsScreen() {
 
   function openCreate() {
     setName('');
-    setModal({ mode: 'create' });
+    setEditMode({ mode: 'create' });
+    inputRef.current?.focus();
   }
 
   function openEdit(tag: Tag) {
     setName(tag.name);
-    setModal({ mode: 'edit', tag });
+    setEditMode({ mode: 'edit', tag });
+    inputRef.current?.focus();
   }
 
-  function closeModal() {
-    setModal(null);
+  function close() {
+    Keyboard.dismiss();
+    setEditMode(null);
     setName('');
   }
 
-  async function handleSave() {
+  function handleSave() {
     if (!name.trim()) return;
-    if (modal?.mode === 'create') {
+    if (editMode?.mode === 'create') {
       createTag.mutate(name.trim());
-    } else if (modal?.mode === 'edit' && modal.tag) {
-      updateTag.mutate({ id: modal.tag.id, n: name.trim() });
+    } else if (editMode?.mode === 'edit') {
+      updateTag.mutate({ id: editMode.tag.id, n: name.trim() });
     }
   }
 
@@ -62,6 +76,8 @@ export default function TagsScreen() {
       { text: 'Удалить', style: 'destructive', onPress: () => removeTag.mutate(tag.id) },
     ]);
   }
+
+  const isPending = createTag.isPending || updateTag.isPending;
 
   return (
     <View style={styles.flex}>
@@ -82,6 +98,7 @@ export default function TagsScreen() {
         <FlatList
           data={data ?? []}
           keyExtractor={(t) => t.id}
+          contentContainerStyle={editMode ? { paddingBottom: 140 } : undefined}
           ListEmptyComponent={<Text style={styles.empty}>Нет тегов</Text>}
           renderItem={({ item }) => (
             <View style={styles.tagRow}>
@@ -102,30 +119,36 @@ export default function TagsScreen() {
         />
       )}
 
-      <Modal visible={!!modal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>
-              {modal?.mode === 'create' ? 'Новый тег' : 'Изменить тег'}
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Название тега"
-              value={name}
-              onChangeText={setName}
-              autoFocus
-            />
-            <Button
-              title="Сохранить"
-              onPress={handleSave}
-              loading={createTag.isPending || updateTag.isPending}
-            />
-            <TouchableOpacity onPress={closeModal} style={styles.cancelBtn}>
+      {editMode && (
+        <View style={[styles.inputBar, { bottom: kbHeight }]}>
+          <Text style={styles.barTitle}>
+            {editMode.mode === 'create' ? 'Новый тег' : 'Изменить тег'}
+          </Text>
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            placeholder="Название тега"
+            placeholderTextColor="#94A3B8"
+            value={name}
+            onChangeText={setName}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleSave}
+          />
+          <View style={styles.barButtons}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={close}>
               <Text style={styles.cancelText}>Отмена</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.saveBtn, isPending && styles.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={isPending}
+            >
+              <Text style={styles.saveText}>Сохранить</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      )}
     </View>
   );
 }
@@ -144,10 +167,13 @@ const styles = StyleSheet.create({
   deleteBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
   deleteText: { fontSize: 13, color: '#EF4444', fontWeight: '700' },
   empty: { textAlign: 'center', color: '#94A3B8', fontSize: 15, marginTop: 40 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 12 },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
+  inputBar: { position: 'absolute', left: 0, right: 0, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 8 },
+  barTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
   input: { height: 48, backgroundColor: '#F8FAFC', borderRadius: 10, paddingHorizontal: 14, fontSize: 16, color: '#1E293B', borderWidth: 1, borderColor: '#E2E8F0' },
-  cancelBtn: { alignItems: 'center', paddingVertical: 8 },
-  cancelText: { fontSize: 15, color: '#94A3B8' },
+  barButtons: { flexDirection: 'row', gap: 10 },
+  cancelBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+  cancelText: { fontSize: 15, color: '#64748B' },
+  saveBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
+  saveBtnDisabled: { opacity: 0.6 },
+  saveText: { fontSize: 15, color: '#fff', fontWeight: '600' },
 });

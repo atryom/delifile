@@ -5,8 +5,8 @@ export const contactsApi = {
   list: (search?: string) =>
     apiClient.get<ApiResponse<{ items: Contact[] }>>('/contacts', { params: search ? { search } : undefined }),
 
-  create: (email: string) =>
-    apiClient.post<ApiResponse<{ contact: Contact; invitation_sent: boolean }>>('/contacts', { email }),
+  create: (params: { email: string; name: string }) =>
+    apiClient.post<ApiResponse<{ contact: Contact; invitation_sent: boolean }>>('/contacts', params),
 
   remove: (id: string) =>
     apiClient.delete<ApiResponse<Record<string, never>>>(`/contacts/${id}`),

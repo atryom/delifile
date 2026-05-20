@@ -1,6 +1,6 @@
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { useFile, useDownloadUrl, useToggleFavorite, useTogglePin } from '@/hooks/useFiles';
+import { useFile, useDownloadUrl, useToggleFavorite } from '@/hooks/useFiles';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { useNetworkStore } from '@/store/network';
@@ -11,7 +11,6 @@ export default function FileDetailScreen() {
   const { data: file, isLoading, isError } = useFile(id);
   const downloadUrl = useDownloadUrl(id);
   const toggleFavorite = useToggleFavorite();
-  const togglePin = useTogglePin();
   const isOnline = useNetworkStore((s) => s.isOnline);
 
   async function handleDownload() {
@@ -51,12 +50,6 @@ export default function FileDetailScreen() {
             style={styles.iconBtn}
           >
             <Text style={file.is_favorite ? styles.starActive : styles.star}>★</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => togglePin.mutate({ id: file.id, isPinned: file.is_pinned })}
-            style={styles.iconBtn}
-          >
-            <Text style={file.is_pinned ? styles.pinActive : styles.pin}>📌</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -111,8 +104,6 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 8 },
   star: { fontSize: 22, color: '#CBD5E1' },
   starActive: { fontSize: 22, color: '#F59E0B' },
-  pin: { fontSize: 20, opacity: 0.3 },
-  pinActive: { fontSize: 20 },
   meta: { backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   rowLabel: { fontSize: 14, color: '#94A3B8', flex: 1 },

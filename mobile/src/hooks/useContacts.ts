@@ -13,14 +13,16 @@ export function useContactRequests() {
   return useQuery({
     queryKey: ['contact-requests'],
     queryFn: () => contactsApi.listRequests().then((r) => r.data.data.items),
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 30,
+    refetchOnMount: 'always',
+    refetchInterval: 1000 * 60,
   });
 }
 
 export function useCreateContact() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (email: string) => contactsApi.create(email),
+    mutationFn: (params: { email: string; name: string }) => contactsApi.create(params),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts'] }),
   });
 }

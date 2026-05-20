@@ -1,10 +1,9 @@
-import { useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { useRef, useEffect, useState } from 'react';
+import { Alert, FlatList, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supportApi } from '@/api/support';
 import { Spinner } from '@/components/ui/Spinner';
-import { Button } from '@/components/ui/Button';
 import type { SupportTicketStatus } from '@/types';
 
 const STATUS_LABEL: Record<SupportTicketStatus, string> = {
@@ -23,8 +22,16 @@ const STATUS_COLOR: Record<SupportTicketStatus, string> = {
 
 export default function SupportScreen() {
   const qc = useQueryClient();
-  const [createModal, setCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [body, setBody] = useState('');
+  const [kbHeight, setKbHeight] = useState(0);
+  const textRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKbHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ['support', 'tickets'],
@@ -36,11 +43,23 @@ export default function SupportScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['support'] });
       setBody('');
-      setCreateModal(false);
+      close();
       Alert.alert('Готово', 'Обращение отправлено. Мы ответим в ближайшее время.');
     },
     onError: () => Alert.alert('Ошибка', 'Не удалось создать обращение'),
   });
+
+  function openCreate() {
+    setBody('');
+    setCreating(true);
+    textRef.current?.focus();
+  }
+
+  function close() {
+    Keyboard.dismiss();
+    setCreating(false);
+    setBody('');
+  }
 
   function formatDate(iso: string | null) {
     if (!iso) return '';
@@ -53,7 +72,7 @@ export default function SupportScreen() {
         options={{
           title: 'Техподдержка',
           headerRight: () => (
-            <TouchableOpacity onPress={() => setCreateModal(true)} style={styles.addBtn}>
+            <TouchableOpacity onPress={openCreate} style={styles.addBtn}>
               <Text style={styles.addBtnText}>＋</Text>
             </TouchableOpacity>
           ),
@@ -66,6 +85,7 @@ export default function SupportScreen() {
         <FlatList
           data={data ?? []}
           keyExtractor={(t) => t.id}
+          contentContainerStyle={creating ? { paddingBottom: 200 } : undefined}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyTitle}>Нет обращений</Text>
@@ -93,31 +113,35 @@ export default function SupportScreen() {
         />
       )}
 
-      <Modal visible={createModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Новое обращение</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Опишите проблему или вопрос..."
-              value={body}
-              onChangeText={setBody}
-              multiline
-              numberOfLines={5}
-              autoFocus
-              textAlignVertical="top"
-            />
-            <Button
-              title="Отправить"
-              onPress={() => { if (body.trim()) createTicket.mutate(body.trim()); }}
-              loading={createTicket.isPending}
-            />
-            <TouchableOpacity onPress={() => setCreateModal(false)} style={styles.cancelBtn}>
+      {creating && (
+        <View style={[styles.inputBar, { bottom: kbHeight }]}>
+          <Text style={styles.barTitle}>Новое обращение</Text>
+          <TextInput
+            ref={textRef}
+            style={styles.textArea}
+            placeholder="Опишите проблему или вопрос..."
+            placeholderTextColor="#94A3B8"
+            value={body}
+            onChangeText={setBody}
+            autoFocus
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+          <View style={styles.barButtons}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={close}>
               <Text style={styles.cancelText}>Отмена</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendBtn, createTicket.isPending && styles.sendBtnDisabled]}
+              onPress={() => { if (body.trim()) createTicket.mutate(body.trim()); }}
+              disabled={createTicket.isPending}
+            >
+              <Text style={styles.sendText}>Отправить</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      )}
     </View>
   );
 }
@@ -137,10 +161,13 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', marginTop: 60, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
   emptySub: { fontSize: 14, color: '#94A3B8' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalBox: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 12 },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
-  textArea: { height: 120, backgroundColor: '#F8FAFC', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#1E293B', borderWidth: 1, borderColor: '#E2E8F0' },
-  cancelBtn: { alignItems: 'center', paddingVertical: 8 },
-  cancelText: { fontSize: 15, color: '#94A3B8' },
+  inputBar: { position: 'absolute', left: 0, right: 0, backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 8 },
+  barTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
+  textArea: { height: 100, backgroundColor: '#F8FAFC', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: '#1E293B', borderWidth: 1, borderColor: '#E2E8F0' },
+  barButtons: { flexDirection: 'row', gap: 10 },
+  cancelBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+  cancelText: { fontSize: 15, color: '#64748B' },
+  sendBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
+  sendBtnDisabled: { opacity: 0.6 },
+  sendText: { fontSize: 15, color: '#fff', fontWeight: '600' },
 });

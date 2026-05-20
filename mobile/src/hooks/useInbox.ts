@@ -14,7 +14,9 @@ export function useInboxFiles() {
   return useQuery({
     queryKey: ['inbox', 'files'],
     queryFn: () => inboxApi.files().then((r) => r.data.data.items),
-    staleTime: 1000 * 60,
+    staleTime: 1000 * 30,
+    refetchOnMount: 'always',
+    refetchInterval: 1000 * 60,
   });
 }
 
@@ -22,7 +24,9 @@ export function useInboxSharedFolders() {
   return useQuery({
     queryKey: ['inbox', 'shared-folders'],
     queryFn: () => inboxApi.sharedFolders().then((r) => r.data.data.items),
-    staleTime: 1000 * 60,
+    staleTime: 1000 * 30,
+    refetchOnMount: 'always',
+    refetchInterval: 1000 * 60,
   });
 }
 
