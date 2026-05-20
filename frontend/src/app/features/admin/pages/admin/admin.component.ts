@@ -14,6 +14,7 @@ import {
   SuggestionDetail,
   PaginatedData,
 } from '../../../../shared/models/api.models';
+import { formatSize } from '../../../../shared/utils/format';
 
 type AdminTab = 'stats' | 'users' | 'support' | 'suggestions';
 
@@ -505,13 +506,7 @@ export class AdminComponent {
     navigator.clipboard.writeText(text).catch(() => {});
   }
 
-  formatSize(bytes: number): string {
-    if (bytes === 0) return '0 Б';
-    if (bytes < 1024) return `${bytes} Б`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
-    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} ГБ`;
-  }
+  formatSize(bytes: number): string { return formatSize(bytes); }
 
   formatDate(iso: string | null): string {
     if (!iso) return '—';

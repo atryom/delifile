@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Tariff;
 
+use App\Enums\FileStatus;
 use App\Enums\TariffPlan;
 use App\Http\Controllers\Controller;
 use App\Models\DeviceSession;
@@ -36,13 +37,13 @@ class TariffController extends Controller
         $plan  = $user->getPlan();
 
         $storageUsed   = (int) File::where('owner_id', $user->id)
-            ->whereNotIn('status', ['deleted', 'uploading'])
+            ->whereNotIn('status', [FileStatus::Deleted->value, FileStatus::Uploading->value])
             ->sum('size');
 
         $deviceCount   = DeviceSession::where('user_id', $user->id)->count();
 
         $maxFileSize   = (int) File::where('owner_id', $user->id)
-            ->whereNotIn('status', ['deleted'])
+            ->whereNotIn('status', [FileStatus::Deleted->value])
             ->max('size') ?? 0;
 
         return $this->success('Использование тарифа получено', [

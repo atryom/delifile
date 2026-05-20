@@ -177,13 +177,10 @@ class FileController extends Controller
             return $this->notFound('File not found');
         }
 
-        $access = \App\Models\FileUserAccess::where('file_id', $file->id)
-            ->where('user_id', $request->user()->id)
-            ->first();
-
-        if (!$access) {
-            return $this->notFound('Access not found');
-        }
+        $access = FileUserAccess::firstOrCreate(
+            ['file_id' => $file->id, 'user_id' => $request->user()->id],
+            ['access_type' => AccessType::Saved->value]
+        );
 
         $access->update(['description' => $request->input('description')]);
 
@@ -255,7 +252,7 @@ class FileController extends Controller
     {
         $file = File::find($fileId);
 
-        if (!$file || !$file->isAvailable()) {
+        if (!$file || !$file->isAvailable() || $file->isUrlFile()) {
             abort(404);
         }
 
@@ -276,7 +273,7 @@ class FileController extends Controller
     {
         $file = File::find($fileId);
 
-        if (!$file || !$file->isAvailable()) {
+        if (!$file || !$file->isAvailable() || $file->isUrlFile()) {
             abort(404);
         }
 
@@ -355,7 +352,10 @@ class FileController extends Controller
      */
     public function moveFolder(Request $request, string $fileId): JsonResponse
     {
-        $request->validate(['folder_id' => 'nullable|string']);
+        $userId = $request->user()->id;
+        $request->validate([
+            'folder_id' => ['nullable', 'string', 'exists:folders,id,user_id,' . $userId],
+        ]);
 
         $file = File::find($fileId);
         if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
@@ -436,7 +436,7 @@ class FileController extends Controller
             ->get()
             ->map(fn ($p) => [
                 'id'          => $p->id,
-                'access_type' => 'shared',
+                'access_type' => AccessType::Shared->value,
                 'user'        => $p->recipient ? [
                     'id'    => $p->recipient->id,
                     'email' => $p->recipient->email,

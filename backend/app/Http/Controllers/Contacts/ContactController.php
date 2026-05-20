@@ -162,18 +162,21 @@ class ContactController extends Controller
         $request->validate([
             'contacts'         => 'required|array|min:1|max:500',
             'contacts.*.name'  => 'required|string|max:255',
-            'contacts.*.email' => 'nullable|email|max:255',
-            'contacts.*.phone' => 'nullable|string|max:20',
+            'contacts.*.email' => 'nullable|email|max:255|required_without:contacts.*.phone',
+            'contacts.*.phone' => 'nullable|string|max:20|required_without:contacts.*.email',
         ]);
 
         $user    = $request->user();
         $created = 0;
 
-        DB::transaction(function () use ($request, $user, &$created) {
+        $emails  = array_filter(array_column($request->contacts, 'email'));
+        $byEmail = $emails
+            ? User::whereIn('email', $emails)->get()->keyBy('email')
+            : collect();
+
+        DB::transaction(function () use ($request, $user, $byEmail, &$created) {
             foreach ($request->contacts as $item) {
-                $resolved = !empty($item['email'])
-                    ? User::where('email', $item['email'])->first()
-                    : null;
+                $resolved = !empty($item['email']) ? $byEmail->get($item['email']) : null;
 
                 $key = !empty($item['email'])
                     ? ['user_id' => $user->id, 'email' => $item['email']]
@@ -203,20 +206,26 @@ class ContactController extends Controller
             ->whereNull('resolved_user_id')
             ->get();
 
-        $resolved = 0;
+        $emails = $contacts->pluck('email')->filter()->unique()->all();
+        $phones = $contacts->pluck('phone')->filter()->unique()->all();
+
+        $byEmail = $emails ? User::whereIn('email', $emails)->get()->keyBy('email') : collect();
+        $byPhone = $phones ? User::whereIn('phone', $phones)->get()->keyBy('phone') : collect();
+
+        $byResolvedUser = [];
         foreach ($contacts as $contact) {
-            $user = null;
-            if ($contact->email) {
-                $user = User::where('email', $contact->email)->first();
-            }
-            if (!$user && $contact->phone) {
-                $user = User::where('phone', $contact->phone)->first();
-            }
-            if ($user) {
-                $contact->update(['resolved_user_id' => $user->id]);
-                $resolved++;
+            $resolvedUser = ($contact->email ? $byEmail[$contact->email] ?? null : null)
+                         ?? ($contact->phone ? $byPhone[$contact->phone] ?? null : null);
+            if ($resolvedUser) {
+                $byResolvedUser[$resolvedUser->id][] = $contact->id;
             }
         }
+
+        foreach ($byResolvedUser as $resolvedUserId => $contactIds) {
+            Contact::whereIn('id', $contactIds)->update(['resolved_user_id' => $resolvedUserId]);
+        }
+
+        $resolved = array_sum(array_map('count', $byResolvedUser));
 
         return $this->success(__('messages.contacts.resolved'), [
             'newly_resolved' => $resolved,

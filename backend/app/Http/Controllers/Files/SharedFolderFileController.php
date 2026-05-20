@@ -6,32 +6,39 @@ use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\SharedFolder;
+use App\Enums\SharedFolderAccessType;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
 use App\Models\User;
+use App\Services\FileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class SharedFolderFileController extends Controller
 {
+    public function __construct(private readonly FileService $fileService) {}
     /**
      * Check folder access with ancestor inheritance — mirrors SharedFolderController::canAccess().
      */
-    private function canAccessSharedFolder(User $user, SharedFolder $folder, string $requiredType = 'view'): bool
+    private function canAccessSharedFolder(User $user, SharedFolder $folder, string $requiredType = SharedFolderAccessType::View->value): bool
     {
         $current = $folder;
+        $visited = [];
         while ($current) {
+            if (isset($visited[$current->id])) break;
+            $visited[$current->id] = true;
+
             if ($current->owner_id === $user->id) return true;
 
             $query = SharedFolderAccess::where('shared_folder_id', $current->id)
                 ->where('user_id', $user->id);
-            if ($requiredType === 'edit') {
-                $query->where('access_type', 'edit');
+            if ($requiredType === SharedFolderAccessType::Edit->value) {
+                $query->where('access_type', SharedFolderAccessType::Edit->value);
             }
             if ($query->exists()) return true;
 
-            $current = $current->parent_id ? SharedFolder::find($current->parent_id) : null;
+            $current = $current->parent;
         }
         return false;
     }
@@ -76,7 +83,7 @@ class SharedFolderFileController extends Controller
         }
 
         $hasAccess = $file->isOwnedBy($user)
-            || FileUserAccess::where('file_id', $file->id)->where('user_id', $user->id)->exists();
+            || $this->fileService->canAccess($user, $file);
 
         if (!$hasAccess || $file->shared_folder_only) {
             return $this->forbidden('File must be accessible and not shared_folder_only');
@@ -100,7 +107,7 @@ class SharedFolderFileController extends Controller
         $editableIds = [];
         foreach ($allFolderIds as $folderId) {
             $folder = $allFolders->get($folderId);
-            if ($folder && $this->canAccessSharedFolder($user, $folder, 'edit')) {
+            if ($folder && $this->canAccessSharedFolder($user, $folder, SharedFolderAccessType::Edit->value)) {
                 $editableIds[] = $folderId;
             }
         }
@@ -114,11 +121,18 @@ class SharedFolderFileController extends Controller
                     ->whereIn('shared_folder_id', $toRemove)
                     ->delete();
             }
-            foreach ($toAdd as $folderId) {
-                SharedFolderFile::firstOrCreate([
-                    'shared_folder_id' => $folderId,
-                    'file_id'          => $file->id,
-                ], ['added_by' => $user->id]);
+            if (!empty($toAdd)) {
+                $now = now();
+                DB::table('shared_folder_files')->insertOrIgnore(
+                    array_map(fn ($folderId) => [
+                        'id'               => (string) \Illuminate\Support\Str::ulid(),
+                        'shared_folder_id' => $folderId,
+                        'file_id'          => $file->id,
+                        'added_by'         => $user->id,
+                        'created_at'       => $now,
+                        'updated_at'       => $now,
+                    ], $toAdd)
+                );
             }
         });
 
@@ -145,7 +159,15 @@ class SharedFolderFileController extends Controller
             return $this->notFound('File not found');
         }
 
-        if (!$this->canAccessSharedFolder($user, $folder, 'edit')) {
+        if (!$this->fileService->canAccess($user, $file)) {
+            return $this->forbidden('You do not have access to this file');
+        }
+
+        if (!$file->isAvailable()) {
+            return $this->error('File is not available', 'FILE_NOT_AVAILABLE', [], 422);
+        }
+
+        if (!$this->canAccessSharedFolder($user, $folder, SharedFolderAccessType::Edit->value)) {
             return $this->forbidden('Edit access required to add files');
         }
 
@@ -176,7 +198,7 @@ class SharedFolderFileController extends Controller
 
         $isFileOwner = $file->isOwnedBy($user);
 
-        if (!$this->canAccessSharedFolder($user, $folder, 'edit') && !$isFileOwner) {
+        if (!$this->canAccessSharedFolder($user, $folder, SharedFolderAccessType::Edit->value) && !$isFileOwner) {
             return $this->forbidden('You do not have permission to remove this file');
         }
 

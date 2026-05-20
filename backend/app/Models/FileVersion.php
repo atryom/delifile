@@ -22,6 +22,7 @@ class FileVersion extends Model
         'mime_type',
         'is_active',
         'status',
+        'expires_at',
     ];
 
     protected function casts(): array
@@ -30,6 +31,7 @@ class FileVersion extends Model
             'version_number' => 'integer',
             'size'           => 'integer',
             'is_active'      => 'boolean',
+            'expires_at'     => 'datetime',
         ];
     }
 

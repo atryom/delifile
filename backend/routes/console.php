@@ -21,3 +21,7 @@ Schedule::command('auth:block-unverified')->everyFifteenMinutes()
 Schedule::command('support:auto-close-tickets')->hourly()
     ->name('auto-close-tickets')
     ->withoutOverlapping();
+
+Schedule::command('locks:clean')->everyFiveMinutes()
+    ->name('clean-expired-locks')
+    ->withoutOverlapping();

@@ -6,6 +6,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
+import { formatSize } from '../../../../shared/utils/format';
 import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { FileUploadService } from '../../services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
@@ -200,10 +201,5 @@ export class FileListComponent implements OnInit {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024)        return `${bytes} B`;
-    if (bytes < 1024 ** 2)   return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 ** 3)   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  }
+  formatSize(bytes: number): string { return formatSize(bytes, 'en'); }
 }

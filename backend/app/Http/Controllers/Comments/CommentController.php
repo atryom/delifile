@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Comments;
 
+use App\Enums\AccessType;
 use App\Enums\CommentScope;
 use App\Enums\CommentTargetType;
+use App\Enums\SharedFolderAccessType;
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
 use App\Models\CommentThread;
@@ -54,7 +56,7 @@ class CommentController extends Controller
         } else {
             $type      = CommentTargetType::from($data['targetType']);
             $targetId  = $data['targetId'];
-            $scope     = CommentScope::from($data['scope'] ?? 'shared');
+            $scope     = CommentScope::from($data['scope'] ?? CommentScope::Shared->value);
 
             if (!$this->commentService->canAccessTarget($user, $type, $targetId, $data['contextSharedFolderId'] ?? null)) {
                 return $this->forbidden();

@@ -2,17 +2,20 @@
 
 namespace App\Http\Controllers\Organization;
 
+use App\Enums\AccessType;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\Folder;
 use App\Models\Tag;
+use App\Services\FileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class OrganizationController extends Controller
 {
+    public function __construct(private readonly FileService $fileService) {}
     // ─── Folders ────────────────────────────────────────────────────────────
 
     /**
@@ -32,7 +35,7 @@ class OrganizationController extends Controller
                     ->where('file_user_access.user_id', $userId)
                     ->where(function ($q) use ($userId) {
                         $q->where(fn ($q2) => $q2->where('files.owner_id', $userId)->where('files.shared_folder_only', false))
-                          ->orWhereIn('file_user_access.access_type', ['shared', 'saved']);
+                          ->orWhereIn('file_user_access.access_type', [AccessType::Shared->value, AccessType::Saved->value]);
                     }),
             ])
             ->orderBy('sort_order')
@@ -61,7 +64,7 @@ class OrganizationController extends Controller
                     ->where('file_user_access.user_id', $userId)
                     ->where(function ($q) use ($userId) {
                         $q->where(fn ($q2) => $q2->where('files.owner_id', $userId)->where('files.shared_folder_only', false))
-                          ->orWhereIn('file_user_access.access_type', ['shared', 'saved']);
+                          ->orWhereIn('file_user_access.access_type', [AccessType::Shared->value, AccessType::Saved->value]);
                     }),
             ])
             ->orderBy('sort_order')
@@ -322,9 +325,14 @@ class OrganizationController extends Controller
 
         $user = $request->user();
         $file = File::find($fileId);
-        if (!$file || !$file->hasAccessFor($user)) {
+        if (!$file || !$this->fileService->canAccess($user, $file)) {
             return $this->notFound('File not found');
         }
+
+        $validTagIds = Tag::where('user_id', $user->id)
+            ->whereIn('id', $request->tag_ids)
+            ->pluck('id')
+            ->toArray();
 
         $existing = DB::table('file_tags')
             ->where('file_id', $file->id)
@@ -332,12 +340,14 @@ class OrganizationController extends Controller
             ->pluck('tag_id')
             ->toArray();
 
-        foreach (array_diff($request->tag_ids, $existing) as $tagId) {
-            DB::table('file_tags')->insert([
-                'file_id' => $file->id,
-                'tag_id'  => $tagId,
-                'user_id' => $user->id,
-            ]);
+        $toInsert = array_map(fn ($tagId) => [
+            'file_id' => $file->id,
+            'tag_id'  => $tagId,
+            'user_id' => $user->id,
+        ], array_diff($validTagIds, $existing));
+
+        if (!empty($toInsert)) {
+            DB::table('file_tags')->insert($toInsert);
         }
 
         $tags = DB::table('file_tags')
@@ -359,7 +369,7 @@ class OrganizationController extends Controller
 
         $user = $request->user();
         $file = File::find($fileId);
-        if (!$file || !$file->hasAccessFor($user)) {
+        if (!$file || !$this->fileService->canAccess($user, $file)) {
             return $this->notFound('File not found');
         }
 

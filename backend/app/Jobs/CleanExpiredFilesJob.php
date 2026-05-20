@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Enums\AccessType;
 use App\Enums\FileStatus;
+use App\Enums\ShareLinkStatus;
 use App\Models\File;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,21 +36,40 @@ class CleanExpiredFilesJob implements ShouldQueue
             ->whereIn('status', [FileStatus::Available->value, FileStatus::Uploading->value])
             ->where('expires_at', '<', now())
             ->whereNull('deleted_at')
+            ->whereDoesntHave('accesses', fn ($q) => $q->where('access_type', AccessType::Saved->value))
+            ->whereDoesntHave('shareLinks', fn ($q) => $q->where('status', ShareLinkStatus::Active->value))
             ->get();
 
         foreach ($files as $file) {
-            if ($file->canBeDeleted()) {
-                // Remove from S3
-                try {
-                    Storage::disk('s3')->delete($file->storage_key);
-                } catch (\Exception $e) {
-                    // Log but continue
-                    logger()->error("S3 delete failed for file {$file->id}: " . $e->getMessage());
-                }
-
-                $file->update(['status' => FileStatus::Expired]);
-                $file->delete();
+            try {
+                $keys = array_filter([$file->storage_key, $file->thumbnail_key]);
+                if ($keys) Storage::disk('s3')->delete(array_values($keys));
+            } catch (\Exception $e) {
+                logger()->error("S3 delete failed for file {$file->id}: " . $e->getMessage());
             }
+
+            $file->update(['status' => FileStatus::Expired]);
+            $file->delete();
+        }
+
+        // Clean uploading-orphans: stuck in Uploading with no expires_at for over 24 hours
+        $orphans = File::query()
+            ->where('status', FileStatus::Uploading->value)
+            ->whereNull('expires_at')
+            ->where('created_at', '<', now()->subHours(24))
+            ->whereNull('deleted_at')
+            ->get();
+
+        foreach ($orphans as $file) {
+            try {
+                $keys = array_filter([$file->storage_key, $file->thumbnail_key]);
+                if ($keys) Storage::disk('s3')->delete(array_values($keys));
+            } catch (\Exception $e) {
+                logger()->error("S3 delete failed for orphan {$file->id}: " . $e->getMessage());
+            }
+
+            $file->update(['status' => FileStatus::Deleted]);
+            $file->delete();
         }
     }
 }

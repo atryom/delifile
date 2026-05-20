@@ -8,12 +8,14 @@ use App\Models\FileUserAccess;
 use App\Models\PendingReceivedFile;
 use App\Models\PendingReceivedSharedFolder;
 use App\Models\SharedFolderAccess;
+use App\Services\S3UrlService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class InboxController extends Controller
 {
+    public function __construct(private readonly S3UrlService $s3) {}
     /**
      * GET /api/v1/inbox/files
      */
@@ -29,10 +31,9 @@ class InboxController extends Controller
                 'file'        => $p->file ? [
                     'id'            => $p->file->id,
                     'original_name' => $p->file->original_name,
-                    'description'   => $p->file->description,
                     'size'          => $p->file->size,
                     'mime_type'     => $p->file->mime_type,
-                    'thumbnail_url' => $p->file->thumbnail_url ?? null,
+                    'thumbnail_url' => $this->s3->resolveListPreviewUrl($p->file),
                 ] : null,
                 'sender'      => $p->sender ? [
                     'id'    => $p->sender->id,
@@ -63,16 +64,28 @@ class InboxController extends Controller
             ->get();
 
         DB::transaction(function () use ($pending, $user) {
-            foreach ($pending as $p) {
-                FileUserAccess::firstOrCreate([
+            $existingFileIds = FileUserAccess::whereIn('file_id', $pending->pluck('file_id'))
+                ->where('user_id', $user->id)
+                ->pluck('file_id')
+                ->toArray();
+
+            $now = now();
+            $toInsert = $pending->filter(fn ($p) => !in_array($p->file_id, $existingFileIds))
+                ->map(fn ($p) => [
+                    'id'          => (string) \Illuminate\Support\Str::ulid(),
                     'file_id'     => $p->file_id,
                     'user_id'     => $user->id,
-                    'access_type' => AccessType::Shared,
-                ], [
-                    'can_edit' => (bool) $p->can_edit,
-                ]);
-                $p->delete();
+                    'access_type' => AccessType::Shared->value,
+                    'can_edit'    => (bool) $p->can_edit,
+                    'created_at'  => $now,
+                    'updated_at'  => $now,
+                ])->values()->toArray();
+
+            if (!empty($toInsert)) {
+                DB::table('file_user_access')->insert($toInsert);
             }
+
+            PendingReceivedFile::whereIn('id', $pending->pluck('id'))->delete();
         });
 
         return $this->success('Файлы приняты');
@@ -140,15 +153,27 @@ class InboxController extends Controller
             ->get();
 
         DB::transaction(function () use ($pending, $user) {
-            foreach ($pending as $p) {
-                SharedFolderAccess::firstOrCreate([
+            $existingFolderIds = SharedFolderAccess::whereIn('shared_folder_id', $pending->pluck('shared_folder_id'))
+                ->where('user_id', $user->id)
+                ->pluck('shared_folder_id')
+                ->toArray();
+
+            $now = now();
+            $toInsert = $pending->filter(fn ($p) => !in_array($p->shared_folder_id, $existingFolderIds))
+                ->map(fn ($p) => [
+                    'id'               => (string) \Illuminate\Support\Str::ulid(),
                     'shared_folder_id' => $p->shared_folder_id,
                     'user_id'          => $user->id,
-                ], [
-                    'access_type' => $p->access_type,
-                ]);
-                $p->delete();
+                    'access_type'      => $p->access_type instanceof \BackedEnum ? $p->access_type->value : $p->access_type,
+                    'created_at'       => $now,
+                    'updated_at'       => $now,
+                ])->values()->toArray();
+
+            if (!empty($toInsert)) {
+                DB::table('shared_folder_accesses')->insert($toInsert);
             }
+
+            PendingReceivedSharedFolder::whereIn('id', $pending->pluck('id'))->delete();
         });
 
         return $this->success('Папки приняты');

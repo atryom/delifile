@@ -50,7 +50,7 @@ class SharingController extends Controller
         $canEdit = $request->boolean('can_edit', false);
 
         $file = File::find($fileId);
-        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
+        if (!$file || !$file->isOwnedBy($request->user())) {
             return $this->notFound('File not found');
         }
 
@@ -230,7 +230,7 @@ class SharingController extends Controller
         ]);
 
         $file = File::find($fileId);
-        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
+        if (!$file || !$file->isOwnedBy($request->user())) {
             return $this->notFound('File not found');
         }
 

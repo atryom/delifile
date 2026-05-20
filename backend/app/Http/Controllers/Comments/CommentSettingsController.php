@@ -8,6 +8,7 @@ use App\Models\FileCommentSettings;
 use App\Models\Folder;
 use App\Models\LocalFolderCommentSettings;
 use App\Models\SharedFolder;
+use App\Enums\SharedFolderAccessType;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderCommentSettings;
 use App\Services\CommentService;
@@ -179,11 +180,20 @@ class CommentSettingsController extends Controller
 
     private function canManageSharedFolder(int $userId, SharedFolder $folder): bool
     {
-        if ($folder->owner_id === $userId) return true;
-        return SharedFolderAccess::where('shared_folder_id', $folder->id)
-            ->where('user_id', $userId)
-            ->where('access_type', 'edit')
-            ->exists();
+        $current = $folder;
+        $visited = [];
+        while ($current) {
+            if (isset($visited[$current->id])) break;
+            $visited[$current->id] = true;
+            if ($current->owner_id === $userId) return true;
+            if (SharedFolderAccess::where('shared_folder_id', $current->id)
+                ->where('user_id', $userId)
+                ->where('access_type', SharedFolderAccessType::Edit->value)->exists()) {
+                return true;
+            }
+            $current = $current->parent;
+        }
+        return false;
     }
 
     private function formatFileSettings(FileCommentSettings $s): array

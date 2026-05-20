@@ -38,11 +38,11 @@ class SharedFolder extends Model
      */
     public function ancestorIds(): array
     {
-        $ids = [];
-        $current = $this->parent_id ? SharedFolder::find($this->parent_id) : null;
+        $ids     = [];
+        $current = $this->parent;
         while ($current) {
-            $ids[] = $current->id;
-            $current = $current->parent_id ? SharedFolder::find($current->parent_id) : null;
+            $ids[]   = $current->id;
+            $current = $current->parent;
         }
         return array_reverse($ids);
     }
@@ -53,10 +53,8 @@ class SharedFolder extends Model
     public function rootFolder(): SharedFolder
     {
         $current = $this;
-        while ($current->parent_id) {
-            $parent = SharedFolder::find($current->parent_id);
-            if (!$parent) break;
-            $current = $parent;
+        while ($current->parent) {
+            $current = $current->parent;
         }
         return $current;
     }

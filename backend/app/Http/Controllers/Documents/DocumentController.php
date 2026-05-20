@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Documents;
 
+use App\Enums\AccessType;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\FileUserAccess;
@@ -98,6 +99,10 @@ class DocumentController extends Controller
             return $this->error('Storage quota exceeded', 'QUOTA_EXCEEDED', [], 413);
         }
 
+        if (!empty($result['s3_error'])) {
+            return $this->error('Failed to save document, please try again', 'STORAGE_ERROR', [], 503);
+        }
+
         if ($result['conflict']) {
             return response()->json([
                 'result'  => 'error',
@@ -139,7 +144,7 @@ class DocumentController extends Controller
 
         $access = FileUserAccess::where('id', $accessId)
             ->where('file_id', $fileId)
-            ->whereIn('access_type', ['shared'])
+            ->whereIn('access_type', [AccessType::Shared->value])
             ->first();
 
         if (!$access) {

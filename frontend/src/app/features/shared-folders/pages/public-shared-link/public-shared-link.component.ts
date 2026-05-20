@@ -6,6 +6,7 @@ import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api
 import { SharedFolder, SharedFolderAccessType, SharedFolderFileItem } from '../../../../shared/models/api.models';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { formatSize } from '../../../../shared/utils/format';
+import { classifyMimeType } from '../../../../shared/utils/file';
 
 @Component({
   selector: 'app-public-shared-link',
@@ -180,12 +181,8 @@ export class PublicSharedLinkComponent implements OnInit {
   nextPage(): void { if (this.page() < this.totalPages()) this.loadFiles(this.page() + 1); }
 
   mimeIcon(mime: string | null): string {
-    if (!mime) return '📎';
-    if (mime.startsWith('image/')) return '🖼️';
-    if (mime.startsWith('video/')) return '🎬';
-    if (mime.startsWith('audio/')) return '🎵';
-    if (mime.includes('pdf')) return '📄';
-    return '📎';
+    const ICONS: Record<string, string> = { image: '🖼️', video: '🎬', audio: '🎵', pdf: '📄' };
+    return ICONS[classifyMimeType(null, mime)] ?? '📎';
   }
 
   readonly formatSize = formatSize;

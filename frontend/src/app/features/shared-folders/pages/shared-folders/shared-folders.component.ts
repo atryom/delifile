@@ -13,16 +13,11 @@ import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { FileUploadService } from '../../../files/services/file-upload.service';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 import { formatSize } from '../../../../shared/utils/format';
-import { canViewInBrowser } from '../../../../shared/utils/file';
+import { classifyMimeType, canViewInBrowser } from '../../../../shared/utils/file';
 
+const MIME_ICONS: Record<string, string> = { image: '🖼️', video: '🎬', audio: '🎵', pdf: '📄', archive: '🗜️' };
 function mimeIcon(mime: string): string {
-  if (!mime) return '📎';
-  if (mime.startsWith('image/')) return '🖼️';
-  if (mime.startsWith('video/')) return '🎬';
-  if (mime.startsWith('audio/')) return '🎵';
-  if (mime.includes('pdf')) return '📄';
-  if (mime.includes('zip') || mime.includes('rar') || mime.includes('7z')) return '🗜️';
-  return '📎';
+  return MIME_ICONS[classifyMimeType(null, mime)] ?? '📎';
 }
 
 @Component({

@@ -21,6 +21,7 @@ import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialo
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 import { formatSize } from '../../../../shared/utils/format';
 import { flattenTree } from '../../../../shared/utils/tree';
+import { classifyMimeType } from '../../../../shared/utils/file';
 
 interface SharedFolderMoveItem { folder: SharedFolder; depth: number; }
 
@@ -1126,16 +1127,7 @@ export class FoldersTreeComponent implements OnInit {
   readonly formatSize = formatSize;
 
   fileIconType(file: AnyFile): string {
-    if (file.content_kind === 'url_file') return 'link';
-    const mime = file.mime_type ?? '';
-    if (mime.startsWith('image/'))  return 'image';
-    if (mime.startsWith('video/'))  return 'video';
-    if (mime.startsWith('audio/'))  return 'audio';
-    if (mime.includes('pdf'))       return 'pdf';
-    if (mime.includes('spreadsheet') || mime.includes('excel'))       return 'xlsx';
-    if (mime.includes('presentation') || mime.includes('powerpoint')) return 'pptx';
-    if (mime.includes('zip') || mime.includes('rar') || mime.includes('tar') || mime.includes('gzip')) return 'archive';
-    return 'file';
+    return classifyMimeType(file.content_kind, file.mime_type);
   }
 
   fileDisplayName(file: AnyFile): string {

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\AccessType;
 use App\Enums\FileStatus;
+use App\Enums\ShareLinkStatus;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -142,7 +144,7 @@ class File extends Model
 
     public function canBeDeleted(): bool
     {
-        return !$this->accesses()->where('access_type', 'saved')->exists()
-            && !$this->shareLinks()->where('status', 'active')->exists();
+        return !$this->accesses()->where('access_type', AccessType::Saved->value)->exists()
+            && !$this->shareLinks()->where('status', ShareLinkStatus::Active->value)->exists();
     }
 }

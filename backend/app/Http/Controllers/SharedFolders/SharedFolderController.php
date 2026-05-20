@@ -4,16 +4,20 @@ namespace App\Http\Controllers\SharedFolders;
 
 use App\Enums\AccessType;
 use App\Enums\FileStatus;
+use App\Enums\SharedFolderAccessType;
+use App\Enums\ShareLinkStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\PendingReceivedSharedFolder;
 use App\Models\SharedFolder;
+use App\Models\SharedFolderCommentSettings;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
 use App\Models\SharedFolderLink;
 use App\Models\User;
+use App\Services\FileCardBuilder;
 use App\Services\FileService;
 use App\Services\LinkPreviewService;
 use App\Services\PushNotificationService;
@@ -26,6 +30,7 @@ class SharedFolderController extends Controller
 {
     public function __construct(
         private readonly FileService             $fileService,
+        private readonly FileCardBuilder         $cardBuilder,
         private readonly LinkPreviewService      $previewService,
         private readonly PushNotificationService $pushService,
     ) {}
@@ -40,7 +45,18 @@ class SharedFolderController extends Controller
      * Nested folders inherit access from ancestors; they can also have their own
      * additional participants that narrow or widen the inherited set.
      */
-    private function canAccess(User $user, SharedFolder $folder, string $requiredType = 'view'): bool
+    private function collectDescendantIds(string $folderId): array
+    {
+        $ids = [];
+        $children = SharedFolder::where('parent_id', $folderId)->pluck('id')->toArray();
+        foreach ($children as $childId) {
+            $ids[] = $childId;
+            array_push($ids, ...$this->collectDescendantIds($childId));
+        }
+        return $ids;
+    }
+
+    private function canAccess(User $user, SharedFolder $folder, string $requiredType = SharedFolderAccessType::View->value): bool
     {
         // Walk from this folder up to root
         $current = $folder;
@@ -58,8 +74,8 @@ class SharedFolderController extends Controller
             $query = SharedFolderAccess::where('shared_folder_id', $current->id)
                 ->where('user_id', $user->id);
 
-            if ($requiredType === 'edit') {
-                $query->where('access_type', 'edit');
+            if ($requiredType === SharedFolderAccessType::Edit->value) {
+                $query->where('access_type', SharedFolderAccessType::Edit->value);
             }
 
             if ($query->exists()) {
@@ -87,40 +103,6 @@ class SharedFolderController extends Controller
         ];
     }
 
-    private function formatFileCard(File $file, User $user, int $addedBy): array
-    {
-        $isUrlFile = ($file->content_kind === 'url_file');
-
-        $item = [
-            'id'                 => $file->id,
-            'original_name'      => $file->original_name,
-            'content_kind'       => $file->content_kind ?? 'binary_file',
-            'size'               => $file->size,
-            'mime_type'          => $file->mime_type,
-            'status'             => $file->status->value,
-            'expires_at'         => $file->expires_at?->toIso8601String(),
-            'uploaded_at'        => $file->created_at?->toIso8601String(),
-            'preview_url'        => null,
-            'link_url'           => $isUrlFile ? $file->link_url : null,
-            'link_title'         => $isUrlFile ? $file->link_title : null,
-            'link_image_url'     => $isUrlFile ? $file->link_image_url : null,
-            'link_site_name'     => $isUrlFile ? $file->link_site_name : null,
-            'is_owner'           => $file->owner_id === $user->id,
-            'added_by'           => $addedBy,
-            'shared_folder_only' => (bool) $file->shared_folder_only,
-        ];
-
-        $item['view_url'] = null;
-
-        if ($file->content_kind !== 'url_file' && $file->storage_key && $file->isAvailable()) {
-            $mime = $file->mime_type ?? '';
-            [$previewUrl, $viewUrl] = $this->fileService->resolvePreviewAndViewUrls($file, $mime);
-            $item['preview_url'] = $previewUrl;
-            $item['view_url']    = $viewUrl;
-        }
-
-        return $item;
-    }
 
     // ─── Folder CRUD ─────────────────────────────────────────────────────────
 
@@ -278,7 +260,7 @@ class SharedFolderController extends Controller
             return $this->notFound('Shared folder not found');
         }
 
-        if (!$this->canAccess($request->user(), $parent, 'edit')) {
+        if (!$this->canAccess($request->user(), $parent, SharedFolderAccessType::Edit->value)) {
             return $this->forbidden('Edit access required to create subfolders');
         }
 
@@ -368,7 +350,17 @@ class SharedFolderController extends Controller
             return $this->forbidden('Only the owner can delete this folder');
         }
 
-        $folder->delete();
+        DB::transaction(function () use ($folder) {
+            $allIds = $this->collectDescendantIds($folder->id);
+            $allIds[] = $folder->id;
+
+            SharedFolderFile::whereIn('shared_folder_id', $allIds)->delete();
+            SharedFolderAccess::whereIn('shared_folder_id', $allIds)->delete();
+            SharedFolderLink::whereIn('shared_folder_id', $allIds)->delete();
+            SharedFolderCommentSettings::whereIn('shared_folder_id', $allIds)->delete();
+            PendingReceivedSharedFolder::whereIn('shared_folder_id', $allIds)->delete();
+            SharedFolder::whereIn('id', $allIds)->delete();
+        });
 
         return $this->success('Shared folder deleted');
     }
@@ -430,7 +422,7 @@ class SharedFolderController extends Controller
         }
 
         $user = $request->user();
-        if (!$this->canAccess($user, $folder, 'view')) {
+        if (!$this->canAccess($user, $folder, SharedFolderAccessType::View->value)) {
             return $this->forbidden();
         }
 
@@ -447,7 +439,7 @@ class SharedFolderController extends Controller
 
         $items = $sharedFiles
             ->filter(fn (SharedFolderFile $sf) => $sf->file !== null)
-            ->map(fn (SharedFolderFile $sf) => $this->formatFileCard($sf->file, $user, $sf->added_by))
+            ->map(fn (SharedFolderFile $sf) => $this->cardBuilder->buildListItem($sf->file, $user, $sf->added_by))
             ->values();
 
         return $this->success('Files fetched', [
@@ -471,7 +463,7 @@ class SharedFolderController extends Controller
         }
 
         $user = $request->user();
-        if (!$this->canAccess($user, $folder, 'edit')) {
+        if (!$this->canAccess($user, $folder, SharedFolderAccessType::Edit->value)) {
             return $this->forbidden('Edit access required');
         }
 
@@ -522,7 +514,7 @@ class SharedFolderController extends Controller
         }
 
         $user = $request->user();
-        if (!$this->canAccess($user, $folder, 'edit')) {
+        if (!$this->canAccess($user, $folder, SharedFolderAccessType::Edit->value)) {
             return $this->forbidden('Edit access required');
         }
 
@@ -556,7 +548,7 @@ class SharedFolderController extends Controller
         }
 
         $user = $request->user();
-        if (!$this->canAccess($user, $folder, 'edit')) {
+        if (!$this->canAccess($user, $folder, SharedFolderAccessType::Edit->value)) {
             return $this->forbidden('Edit access required');
         }
 
@@ -639,7 +631,7 @@ class SharedFolderController extends Controller
 
         $data = $request->validate([
             'contact_id'  => 'required|string',
-            'access_type' => 'required|in:view,edit',
+            'access_type' => 'required|in:' . SharedFolderAccessType::View->value . ',' . SharedFolderAccessType::Edit->value,
         ]);
 
         // Find contact belonging to the folder owner
@@ -712,7 +704,7 @@ class SharedFolderController extends Controller
 
         if ($access->user) {
             $senderName = $request->user()->name ?? $request->user()->email;
-            $accessLabel = $data['access_type'] === 'edit' ? 'редактирование' : 'просмотр';
+            $accessLabel = $data['access_type'] === SharedFolderAccessType::Edit->value ? 'редактирование' : 'просмотр';
             $this->pushService->sendToUser(
                 $access->user,
                 'Доступ к общей папке',
@@ -808,7 +800,7 @@ class SharedFolderController extends Controller
         }
 
         $data = $request->validate([
-            'access_type' => 'required|in:view,edit',
+            'access_type' => 'required|in:' . SharedFolderAccessType::View->value . ',' . SharedFolderAccessType::Edit->value,
             'ttl_hours'   => 'required|integer|in:1,6,12,24,72,168,720',
             'allow_save'  => 'nullable|boolean',
         ]);
@@ -818,7 +810,7 @@ class SharedFolderController extends Controller
             'created_by'       => $request->user()->id,
             'access_type'      => $data['access_type'],
             'allow_save'       => $data['allow_save'] ?? false,
-            'status'           => 'active',
+            'status'           => ShareLinkStatus::Active->value,
             'ttl_hours'        => $data['ttl_hours'],
             'expires_at'       => now()->addHours($data['ttl_hours']),
         ]);
@@ -859,7 +851,7 @@ class SharedFolderController extends Controller
             return $this->notFound('Link not found');
         }
 
-        $link->update(['status' => 'disabled']);
+        $link->update(['status' => ShareLinkStatus::Disabled->value]);
 
         return $this->success('Link disabled');
     }
@@ -891,34 +883,8 @@ class SharedFolderController extends Controller
 
         $items = $sharedFiles
             ->filter(fn (SharedFolderFile $sf) => $sf->file !== null)
-            ->map(function (SharedFolderFile $sf) {
-            $file = $sf->file;
-            $item = [
-                'id'            => $file->id,
-                'original_name' => $file->original_name,
-                'content_kind'  => $file->content_kind ?? 'binary_file',
-                'size'          => $file->size,
-                'mime_type'     => $file->mime_type,
-                'status'        => $file->status->value,
-                'expires_at'    => $file->expires_at?->toIso8601String(),
-                'uploaded_at'   => $file->created_at?->toIso8601String(),
-                'preview_url'   => null,
-                'view_url'      => null,
-                'link_url'      => $file->link_url,
-                'link_title'    => $file->link_title,
-                'link_image_url' => $file->link_image_url,
-                'link_site_name' => $file->link_site_name,
-            ];
-
-            if ($file->content_kind !== 'url_file' && $file->storage_key && $file->isAvailable()) {
-                $mime = $file->mime_type ?? '';
-                [$previewUrl, $viewUrl] = $this->fileService->resolvePreviewAndViewUrls($file, $mime);
-                $item['preview_url'] = $previewUrl;
-                $item['view_url']    = $viewUrl;
-            }
-
-            return $item;
-        })->values();
+            ->map(fn (SharedFolderFile $sf) => $this->cardBuilder->buildPublicItem($sf->file))
+            ->values();
 
         return $this->success('Files fetched', [
             'items'      => $items,

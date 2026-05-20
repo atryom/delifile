@@ -8,6 +8,10 @@ use App\Enums\FileStatus;
 use App\Models\DocumentLock;
 use App\Models\File;
 use App\Models\FileUserAccess;
+use App\Enums\SharedFolderAccessType;
+use App\Models\SharedFolder;
+use App\Models\SharedFolderAccess;
+use App\Models\SharedFolderFile;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -44,12 +48,17 @@ class DocumentService
             'editor_type'  => self::EDITOR_TYPE,
         ]);
 
-        Storage::disk('s3')->put($storageKey, '', [
-            'ContentType' => self::MIME_TYPE,
-        ]);
+        try {
+            Storage::disk('s3')->put($storageKey, '', [
+                'ContentType' => self::MIME_TYPE,
+            ]);
+        } catch (\Throwable $e) {
+            $file->forceDelete();
+            throw $e;
+        }
 
         // Obtain ETag from S3
-        $etag = $this->fetchEtagFromS3($storageKey);
+        $etag = $this->s3->fetchEtag($storageKey);
 
         $file->update(['etag' => $etag, 'updated_by' => $user->id]);
 
@@ -71,7 +80,7 @@ class DocumentService
      */
     public function promoteToDocument(File $file): void
     {
-        $etag = $this->fetchEtagFromS3($file->storage_key);
+        $etag = $this->s3->fetchEtag($file->storage_key);
 
         if (!$etag) {
             try {
@@ -126,11 +135,16 @@ class DocumentService
         // Normalize any presigned S3 URLs back to stable /api/v1/files/{id}/content paths.
         $content = $this->normalizeImageUrls($content);
 
-        Storage::disk('s3')->put($file->storage_key, $content, [
-            'ContentType' => self::MIME_TYPE,
-        ]);
+        try {
+            Storage::disk('s3')->put($file->storage_key, $content, [
+                'ContentType' => self::MIME_TYPE,
+            ]);
+        } catch (\Throwable $e) {
+            logger()->error("S3 put failed for document {$file->id}: " . $e->getMessage());
+            return ['s3_error' => true];
+        }
 
-        $newEtag = $this->fetchEtagFromS3($file->storage_key);
+        $newEtag = $this->s3->fetchEtag($file->storage_key);
 
         $file->update([
             'size'       => strlen($content),
@@ -144,7 +158,7 @@ class DocumentService
             'conflict'  => false,
             'id'        => $file->id,
             'etag'      => $newEtag,
-            'updatedAt' => $file->fresh()->updated_at?->toIso8601String(),
+            'updatedAt' => $file->refresh()->updated_at?->toIso8601String(),
             'updatedBy' => $this->formatUser($user),
         ];
     }
@@ -160,7 +174,29 @@ class DocumentService
             ->where('access_type', AccessType::Shared)
             ->first();
 
-        return $access?->can_edit === true;
+        if ($access?->can_edit === true) {
+            return true;
+        }
+
+        // Check edit access via shared folders (respects ancestor chain)
+        $sharedFolderIds = SharedFolderFile::where('file_id', $file->id)->pluck('shared_folder_id');
+        foreach ($sharedFolderIds as $folderId) {
+            $current = SharedFolder::find($folderId);
+            $visited = [];
+            while ($current) {
+                if (isset($visited[$current->id])) break;
+                $visited[$current->id] = true;
+                if ($current->owner_id === $user->id) return true;
+                if (SharedFolderAccess::where('shared_folder_id', $current->id)
+                    ->where('user_id', $user->id)
+                    ->where('access_type', SharedFolderAccessType::Edit->value)->exists()) {
+                    return true;
+                }
+                $current = $current->parent;
+            }
+        }
+
+        return false;
     }
 
     public function canViewDocument(User $user, File $file): bool
@@ -251,10 +287,8 @@ class DocumentService
 
     public function getAccessibleImages(User $user, ?string $search, int $perPage, ?string $cursor): array
     {
-        $imageMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
-
         $query = File::query()
-            ->whereIn('mime_type', $imageMimes)
+            ->where('mime_type', 'like', 'image/%')
             ->where('status', FileStatus::Available)
             ->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
@@ -455,20 +489,4 @@ class DocumentService
         }, $content) ?? $content;
     }
 
-    private function fetchEtagFromS3(string $storageKey): ?string
-    {
-        try {
-            $client = Storage::disk('s3')->getClient();
-            $bucket = config('filesystems.disks.s3.bucket');
-
-            $result = $client->headObject([
-                'Bucket' => $bucket,
-                'Key'    => $storageKey,
-            ]);
-
-            return $result['ETag'] ?? null;
-        } catch (\Throwable) {
-            return null;
-        }
-    }
 }

@@ -17,6 +17,7 @@ import {
   SupportAttachmentItem,
   PaginatedData,
 } from '../../../../shared/models/api.models';
+import { formatSize } from '../../../../shared/utils/format';
 
 type SupportTab = 'tickets' | 'suggestions';
 
@@ -405,11 +406,7 @@ export class SupportComponent implements OnInit {
     });
   }
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} Б`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} МБ`;
-  }
+  formatSize(bytes: number): string { return formatSize(bytes); }
 
   trackById(_: number, item: { id: string }): string {
     return item.id;

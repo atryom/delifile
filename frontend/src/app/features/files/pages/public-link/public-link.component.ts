@@ -2,6 +2,8 @@ import { Component, inject, signal, computed, OnInit, input, ChangeDetectionStra
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
+import { formatSize } from '../../../../shared/utils/format';
+import { classifyMimeType } from '../../../../shared/utils/file';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 
 @Component({
@@ -101,18 +103,11 @@ export class PublicLinkComponent implements OnInit {
   }
 
   fileIcon(): string {
-    const mime = this.fileInfo()?.mime_type ?? '';
-    if (mime.startsWith('image/')) return '🖼️';
-    if (mime.startsWith('video/')) return '🎬';
-    if (mime.startsWith('audio/')) return '🎵';
-    if (mime.includes('pdf'))      return '📄';
-    return '📎';
+    const info = this.fileInfo();
+    const type = classifyMimeType(info?.content_kind, info?.mime_type);
+    const ICONS: Record<string, string> = { image: '🖼️', video: '🎬', audio: '🎵', pdf: '📄' };
+    return ICONS[type] ?? '📎';
   }
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024)       return `${bytes} B`;
-    if (bytes < 1024 ** 2)  return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 ** 3)  return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  }
+  formatSize(bytes: number): string { return formatSize(bytes, 'en'); }
 }

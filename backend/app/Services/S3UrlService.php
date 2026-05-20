@@ -159,4 +159,16 @@ class S3UrlService
             return null;
         }
     }
+
+    public function fetchEtag(string $storageKey): ?string
+    {
+        try {
+            $client = Storage::disk('s3')->getClient();
+            $bucket = config('filesystems.disks.s3.bucket');
+            $result = $client->headObject(['Bucket' => $bucket, 'Key' => $storageKey]);
+            return $result['ETag'] ?? null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 }

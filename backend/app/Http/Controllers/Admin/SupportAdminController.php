@@ -28,24 +28,24 @@ class SupportAdminController extends Controller
         $perPage = 20;
         $status  = $request->get('status');
 
-        $query = SupportTicket::with(['user:id,email,name'])
+        $baseQuery = fn() => SupportTicket::query()->when($status, fn($q) => $q->where('status', $status));
+
+        $total = $baseQuery()->count();
+
+        $tickets = $baseQuery()
+            ->with(['user:id,email,name'])
             ->withCount(['messages as unread_count' => fn($q) =>
                 $q->where('is_admin_message', false)->whereNull('read_at')
-            ]);
-
-        if ($status) {
-            $query->where('status', $status);
-        }
-
-        $total = $query->count();
-
-        $tickets = $query->get()
-            ->sortByDesc(function ($t) {
-                $lastMsg = SupportMessage::where('ticket_id', $t->id)->latest()->first();
-                return $lastMsg?->created_at ?? $t->updated_at;
-            })
+            ])
+            ->addSelect([
+                'last_message_at' => SupportMessage::select('created_at')
+                    ->whereColumn('ticket_id', 'support_tickets.id')
+                    ->latest()
+                    ->limit(1),
+            ])
+            ->orderByRaw('COALESCE(last_message_at, updated_at) DESC')
             ->forPage($page, $perPage)
-            ->values();
+            ->get();
 
         return $this->success('Обращения получены', [
             'items'      => $tickets->map(fn($t) => $this->formatListItem($t))->values(),
@@ -222,14 +222,17 @@ class SupportAdminController extends Controller
 
     private function formatListItem(SupportTicket $t): array
     {
-        $lastMsg = SupportMessage::where('ticket_id', $t->id)->latest()->first();
+        $lastEventAt = $t->last_message_at
+            ? \Carbon\Carbon::parse($t->last_message_at)->toIso8601String()
+            : $t->updated_at?->toIso8601String();
+
         return [
             'id'            => $t->id,
             'status'        => $t->status,
             'unread_count'  => $t->unread_count ?? 0,
             'user'          => $t->user ? ['id' => $t->user->id, 'email' => $t->user->email, 'name' => $t->user->name] : null,
             'created_at'    => $t->created_at?->toIso8601String(),
-            'last_event_at' => $lastMsg?->created_at?->toIso8601String() ?? $t->updated_at?->toIso8601String(),
+            'last_event_at' => $lastEventAt,
         ];
     }
 

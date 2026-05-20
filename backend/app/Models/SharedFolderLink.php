@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ShareLinkStatus;
 use App\Enums\SharedFolderAccessType;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,6 +29,7 @@ class SharedFolderLink extends Model
     {
         return [
             'access_type' => SharedFolderAccessType::class,
+            'status'      => ShareLinkStatus::class,
             'allow_save'  => 'boolean',
             'expires_at'  => 'datetime',
             'ttl_hours'   => 'integer',
@@ -51,7 +53,7 @@ class SharedFolderLink extends Model
 
     public function isValid(): bool
     {
-        return $this->status === 'active'
+        return $this->status === ShareLinkStatus::Active
             && ($this->expires_at === null || $this->expires_at->isFuture());
     }
 

@@ -12,6 +12,7 @@ use App\Models\FileVersion;
 use App\Models\SharedFolder;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -140,6 +141,10 @@ class FileService
      */
     public function cancelUpload(File $file): void
     {
+        if ($file->status !== FileStatus::Uploading) {
+            return;
+        }
+
         $file->update(['status' => FileStatus::Deleted]);
 
         if ($file->storage_key) {
@@ -198,11 +203,27 @@ class FileService
      */
     public function deleteFile(File $file, User $user): void
     {
+        // Collect all S3 keys before soft-delete so they're still accessible
+        $s3Keys = array_filter([$file->storage_key, $file->thumbnail_key]);
+
+        if ($file->has_versions) {
+            $versionKeys = $file->versions()
+                ->whereIn('status', [FileStatus::Available->value, FileStatus::Uploading->value])
+                ->get(['storage_key', 'thumbnail_key'])
+                ->flatMap(fn ($v) => array_filter([$v->storage_key, $v->thumbnail_key]))
+                ->toArray();
+            $s3Keys = array_merge($s3Keys, $versionKeys);
+        }
+
         DB::transaction(function () use ($file, $user) {
             $file->update(['status' => FileStatus::Deleted]);
             $file->delete(); // soft delete
             $this->activityService->log($file, $user, ActivityType::Deleted);
         });
+
+        if (!empty($s3Keys)) {
+            CleanOrphanedS3ObjectJob::dispatch(array_unique($s3Keys))->delay(now()->addMinutes(5));
+        }
     }
 
     /**
@@ -244,32 +265,22 @@ class FileService
     public function pin(File $file, User $user): void
     {
         DB::transaction(function () use ($file, $user) {
-            $access = FileUserAccess::where('file_id', $file->id)
-                ->where('user_id', $user->id)
-                ->first();
+            $access = FileUserAccess::firstOrCreate(
+                ['file_id' => $file->id, 'user_id' => $user->id],
+                ['access_type' => AccessType::Saved, 'saved_at' => now(), 'pinned_at' => now()]
+            );
 
-            if ($access) {
-                // If recipient pins = they "save" the file forever
+            if (!$access->wasRecentlyCreated) {
                 if ($access->access_type === AccessType::Shared) {
                     $access->update([
                         'access_type' => AccessType::Saved,
                         'saved_at'    => now(),
+                        'pinned_at'   => now(),
                     ]);
-                    $access->update(['pinned_at' => now()]);
-                    // Notify owner
                     $this->activityService->log($file, $user, ActivityType::SavedByRecipient);
                 } else {
                     $access->update(['pinned_at' => now()]);
                 }
-            } else {
-                // Owner or someone with direct access
-                FileUserAccess::create([
-                    'file_id'     => $file->id,
-                    'user_id'     => $user->id,
-                    'access_type' => AccessType::Saved,
-                    'pinned_at'   => now(),
-                    'saved_at'    => now(),
-                ]);
             }
 
             $this->activityService->log($file, $user, ActivityType::Pinned);
@@ -300,13 +311,12 @@ class FileService
      */
     public function setFavorite(File $file, User $user, bool $isFavorite): void
     {
-        $access = FileUserAccess::where('file_id', $file->id)
-            ->where('user_id', $user->id)
-            ->first();
+        $access = FileUserAccess::firstOrCreate(
+            ['file_id' => $file->id, 'user_id' => $user->id],
+            ['access_type' => AccessType::Saved, 'saved_at' => now()]
+        );
 
-        if ($access) {
-            $access->update(['is_favorite' => $isFavorite]);
-        }
+        $access->update(['is_favorite' => $isFavorite]);
 
         $type = $isFavorite ? ActivityType::Favorited : ActivityType::Unfavorited;
         $this->activityService->log($file, $user, $type);
@@ -331,25 +341,34 @@ class FileService
      */
     public function setTags(File $file, User $user, array $tagIds): void
     {
-        DB::table('file_tags')
-            ->where('file_id', $file->id)
-            ->where('user_id', $user->id)
-            ->whereNotIn('tag_id', $tagIds)
-            ->delete();
-
-        $existing = DB::table('file_tags')
-            ->where('file_id', $file->id)
-            ->where('user_id', $user->id)
-            ->pluck('tag_id')
+        $tagIds = Tag::where('user_id', $user->id)
+            ->whereIn('id', $tagIds)
+            ->pluck('id')
             ->toArray();
 
-        foreach (array_diff($tagIds, $existing) as $tagId) {
-            DB::table('file_tags')->insert([
+        DB::transaction(function () use ($file, $user, $tagIds) {
+            DB::table('file_tags')
+                ->where('file_id', $file->id)
+                ->where('user_id', $user->id)
+                ->whereNotIn('tag_id', $tagIds)
+                ->delete();
+
+            $existing = DB::table('file_tags')
+                ->where('file_id', $file->id)
+                ->where('user_id', $user->id)
+                ->pluck('tag_id')
+                ->toArray();
+
+            $toInsert = array_map(fn ($tagId) => [
                 'file_id' => $file->id,
                 'tag_id'  => $tagId,
                 'user_id' => $user->id,
-            ]);
-        }
+            ], array_diff($tagIds, $existing));
+
+            if (!empty($toInsert)) {
+                DB::table('file_tags')->insert($toInsert);
+            }
+        });
 
         $this->activityService->log($file, $user, ActivityType::TagUpdated, [
             'tag_ids' => $tagIds,
@@ -419,13 +438,13 @@ class FileService
      */
     public function listFiles(User $user, string $filter, ?string $search, int $page, int $perPage, array $options = []): array
     {
-        $query = File::query()->whereNull('deleted_at');
+        $query = File::query()->whereNull('deleted_at')->where('status', FileStatus::Available);
 
         if ($filter === 'mine') {
             $query->where('owner_id', $user->id)->where('shared_folder_only', false);
         } elseif ($filter === 'received') {
             $query->whereHas('accesses', fn ($q) =>
-                $q->where('user_id', $user->id)->whereIn('access_type', ['shared', 'saved'])
+                $q->where('user_id', $user->id)->whereIn('access_type', [AccessType::Shared->value, AccessType::Saved->value])
             );
         } elseif ($filter === 'favorites') {
             $query->whereHas('accesses', fn ($q) =>
@@ -435,7 +454,7 @@ class FileService
             $query->where(function ($q) use ($user) {
                 $q->where(fn ($q2) => $q2->where('owner_id', $user->id)->where('shared_folder_only', false))
                   ->orWhereHas('accesses', fn ($q2) =>
-                      $q2->where('user_id', $user->id)->whereIn('access_type', ['shared', 'saved'])
+                      $q2->where('user_id', $user->id)->whereIn('access_type', [AccessType::Shared->value, AccessType::Saved->value])
                   );
             });
         } else {

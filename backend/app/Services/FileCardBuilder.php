@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\FileStatus;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\FileVersion;
@@ -33,11 +34,11 @@ class FileCardBuilder
             'mime_type'          => $file->mime_type,
             'status'             => $file->status->value,
             'uploaded_at'        => $file->created_at?->toIso8601String(),
-            'expires_at'         => null,
+            'expires_at'         => $file->expires_at?->toIso8601String(),
             'is_owner'           => $file->isOwnedBy($user),
             'access_type'        => $access?->access_type?->value,
             'is_favorite'        => $access?->is_favorite ?? false,
-            'is_pinned'          => false,
+            'is_pinned'          => $access?->pinned_at !== null,
             'description'        => $access?->description,
             'folder_id'          => $access?->folder_id,
             'shared_folder_only' => (bool) $file->shared_folder_only,
@@ -79,13 +80,15 @@ class FileCardBuilder
      * Includes is_owner, access_type, is_favorite so the frontend does not need
      * to open the full card to render access state and star icon.
      */
-    public function buildListItem(File $file, ?User $user = null): array
+    public function buildListItem(File $file, ?User $user = null, ?int $addedBy = null): array
     {
         $access = $user
             ? ($file->relationLoaded('accesses')
                 ? $file->accesses->firstWhere('user_id', $user->id)
                 : FileUserAccess::where('file_id', $file->id)->where('user_id', $user->id)->first())
             : null;
+
+        $inSharedFolderContext = $addedBy !== null;
 
         $item = [
             'id'            => $file->id,
@@ -105,13 +108,25 @@ class FileCardBuilder
             'preview_url'   => null,
         ];
 
+        if ($inSharedFolderContext) {
+            $item['added_by']           = $addedBy;
+            $item['shared_folder_only'] = (bool) $file->shared_folder_only;
+            $item['view_url']           = null;
+        }
+
         if ($file->content_kind === 'url_file') {
             $item['link_url']       = $file->link_url;
             $item['link_title']     = $file->link_title;
             $item['link_image_url'] = $file->link_image_url;
             $item['link_site_name'] = $file->link_site_name;
         } elseif ($file->storage_key && $file->isAvailable()) {
-            $item['preview_url'] = $this->s3->resolveListPreviewUrl($file);
+            if ($inSharedFolderContext) {
+                [$previewUrl, $viewUrl] = $this->s3->resolvePreviewAndViewUrls($file, $file->mime_type ?? '');
+                $item['preview_url'] = $previewUrl;
+                $item['view_url']    = $viewUrl;
+            } else {
+                $item['preview_url'] = $this->s3->resolveListPreviewUrl($file);
+            }
         }
 
         return $item;
@@ -132,6 +147,9 @@ class FileCardBuilder
             'original_name' => $file->original_name,
             'size'          => $file->size,
             'mime_type'     => $file->mime_type,
+            'status'        => $file->status->value,
+            'expires_at'    => $file->expires_at?->toIso8601String(),
+            'uploaded_at'   => $file->created_at?->toIso8601String(),
             'preview_url'   => $previewUrl,
             'view_url'      => $viewUrl,
         ];
@@ -153,7 +171,7 @@ class FileCardBuilder
     public function buildVersionsList(File $file): array
     {
         return FileVersion::where('file_id', $file->id)
-            ->where('status', 'available')
+            ->where('status', FileStatus::Available->value)
             ->orderBy('version_number')
             ->get()
             ->map(fn($v) => $this->buildVersionItem($v))

@@ -4,12 +4,15 @@ namespace App\Services;
 
 use App\Models\SupportAttachment;
 use App\Models\SuggestionAttachment;
+use App\Services\S3UrlService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class SupportAttachmentService
 {
+    public function __construct(private readonly S3UrlService $s3) {}
+
     private const USER_ALLOWED_MIME = [
         'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
     ];
@@ -56,18 +59,34 @@ class SupportAttachmentService
      */
     public function storeSupportAttachments(string $messageId, array $files): void
     {
-        foreach ($files as $file) {
-            /** @var UploadedFile $file */
-            $storageKey = 'support/' . $messageId . '/' . Str::ulid() . '/' . $file->getClientOriginalName();
-            Storage::disk(config('filesystems.default'))->put($storageKey, file_get_contents($file->getRealPath()));
-
-            SupportAttachment::create([
-                'message_id'    => $messageId,
-                'original_name' => $file->getClientOriginalName(),
-                'storage_key'   => $storageKey,
-                'mime_type'     => $file->getMimeType(),
-                'size'          => $file->getSize(),
-            ]);
+        $rows        = [];
+        $uploadedKeys = [];
+        $now         = now();
+        try {
+            foreach ($files as $file) {
+                /** @var UploadedFile $file */
+                $storageKey = 'support/' . $messageId . '/' . Str::ulid() . '/' . $file->getClientOriginalName();
+                Storage::disk('s3')->put($storageKey, file_get_contents($file->getRealPath()));
+                $uploadedKeys[] = $storageKey;
+                $rows[] = [
+                    'id'            => Str::ulid(),
+                    'message_id'    => $messageId,
+                    'original_name' => $file->getClientOriginalName(),
+                    'storage_key'   => $storageKey,
+                    'mime_type'     => $file->getMimeType(),
+                    'size'          => $file->getSize(),
+                    'created_at'    => $now,
+                    'updated_at'    => $now,
+                ];
+            }
+            if (!empty($rows)) {
+                SupportAttachment::insert($rows);
+            }
+        } catch (\Throwable $e) {
+            if (!empty($uploadedKeys)) {
+                Storage::disk('s3')->delete($uploadedKeys);
+            }
+            throw $e;
         }
     }
 
@@ -76,32 +95,42 @@ class SupportAttachmentService
      */
     public function storeSuggestionAttachments(string $suggestionId, array $files): void
     {
-        foreach ($files as $file) {
-            /** @var UploadedFile $file */
-            $storageKey = 'suggestions/' . $suggestionId . '/' . Str::ulid() . '/' . $file->getClientOriginalName();
-            Storage::disk(config('filesystems.default'))->put($storageKey, file_get_contents($file->getRealPath()));
-
-            SuggestionAttachment::create([
-                'suggestion_id' => $suggestionId,
-                'original_name' => $file->getClientOriginalName(),
-                'storage_key'   => $storageKey,
-                'mime_type'     => $file->getMimeType(),
-                'size'          => $file->getSize(),
-            ]);
+        $rows         = [];
+        $uploadedKeys = [];
+        $now          = now();
+        try {
+            foreach ($files as $file) {
+                /** @var UploadedFile $file */
+                $storageKey = 'suggestions/' . $suggestionId . '/' . Str::ulid() . '/' . $file->getClientOriginalName();
+                Storage::disk('s3')->put($storageKey, file_get_contents($file->getRealPath()));
+                $uploadedKeys[] = $storageKey;
+                $rows[] = [
+                    'id'            => Str::ulid(),
+                    'suggestion_id' => $suggestionId,
+                    'original_name' => $file->getClientOriginalName(),
+                    'storage_key'   => $storageKey,
+                    'mime_type'     => $file->getMimeType(),
+                    'size'          => $file->getSize(),
+                    'created_at'    => $now,
+                    'updated_at'    => $now,
+                ];
+            }
+            if (!empty($rows)) {
+                SuggestionAttachment::insert($rows);
+            }
+        } catch (\Throwable $e) {
+            if (!empty($uploadedKeys)) {
+                Storage::disk('s3')->delete($uploadedKeys);
+            }
+            throw $e;
         }
     }
 
     /**
      * Generate a short-lived presigned download URL for an attachment.
      */
-    public function downloadUrl(string $storageKey): string
+    public function downloadUrl(string $storageKey): ?string
     {
-        $disk = Storage::disk(config('filesystems.default'));
-
-        if (method_exists($disk, 'temporaryUrl')) {
-            return $disk->temporaryUrl($storageKey, now()->addMinutes(30));
-        }
-
-        return $disk->url($storageKey);
+        return $this->s3->tryTemporaryUrl($storageKey, 30);
     }
 }

@@ -15,6 +15,7 @@ use App\Models\File;
 use App\Models\FileCommentSettings;
 use App\Models\Folder;
 use App\Models\SharedFolder;
+use App\Enums\SharedFolderAccessType;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderCommentSettings;
 use App\Models\SharedFolderFile;
@@ -91,7 +92,7 @@ class CommentService
             'shared_comments_allowed'   => $allowed,
             'source'                    => $source,
             'shared_comments_mode'      => $contextSharedFolderId
-                ? (SharedFolderCommentSettings::find($contextSharedFolderId)?->shared_comments_mode?->value ?? 'enabled')
+                ? ($folderSettings->shared_comments_mode?->value ?? 'enabled')
                 : null,
             'file_override'             => $settings->shared_comments_override?->value ?? 'inherit',
             'shared_comments_enabled'   => $settings->shared_comments_enabled ?? true,
@@ -298,16 +299,25 @@ class CommentService
      */
     public function processMentions(Comment $comment, array $mentionedUserIds, string $targetUrl): void
     {
+        if (empty($mentionedUserIds)) {
+            return;
+        }
+
         $author = $comment->author;
+        $users  = User::whereIn('id', $mentionedUserIds)->get()->keyBy('id');
+        $now    = now();
 
+        CommentMention::insert(array_map(fn ($uid) => [
+            'id'                => \Illuminate\Support\Str::ulid(),
+            'comment_id'        => $comment->id,
+            'mentioned_user_id' => $uid,
+            'created_at'        => $now,
+            'updated_at'        => $now,
+        ], $mentionedUserIds));
+
+        $delivered = [];
         foreach ($mentionedUserIds as $uid) {
-            $mention = CommentMention::create([
-                'comment_id'        => $comment->id,
-                'mentioned_user_id' => $uid,
-                'created_at'        => now(),
-            ]);
-
-            $mentioned = User::find($uid);
+            $mentioned = $users[$uid] ?? null;
             if (!$mentioned) continue;
 
             $this->pushService->sendToUser(
@@ -316,8 +326,13 @@ class CommentService
                 ($author?->name ?? 'Пользователь') . ' упомянул вас в обсуждении',
                 $targetUrl,
             );
+            $delivered[] = $uid;
+        }
 
-            $mention->update(['delivered_at' => now()]);
+        if (!empty($delivered)) {
+            CommentMention::where('comment_id', $comment->id)
+                ->whereIn('mentioned_user_id', $delivered)
+                ->update(['delivered_at' => $now]);
         }
     }
 
@@ -338,8 +353,9 @@ class CommentService
             ->pluck('author_user_id')
             ->all();
 
+        $users = User::whereIn('id', $participantIds)->get()->keyBy('id');
         foreach ($participantIds as $uid) {
-            $user = User::find($uid);
+            $user = $users[$uid] ?? null;
             if ($user) {
                 $this->pushService->sendToUser($user, $title, $body, $targetUrl);
             }
@@ -365,12 +381,19 @@ class CommentService
 
     private function canAccessSharedFolder(User $user, string $folderId): bool
     {
-        $folder = SharedFolder::find($folderId);
-        if (!$folder) return false;
-        if ($folder->owner_id === $user->id) return true;
-        return SharedFolderAccess::where('shared_folder_id', $folderId)
-            ->where('user_id', $user->id)
-            ->exists();
+        $current = SharedFolder::find($folderId);
+        $visited = [];
+        while ($current) {
+            if (isset($visited[$current->id])) break;
+            $visited[$current->id] = true;
+            if ($current->owner_id === $user->id) return true;
+            if (SharedFolderAccess::where('shared_folder_id', $current->id)
+                ->where('user_id', $user->id)->exists()) {
+                return true;
+            }
+            $current = $current->parent;
+        }
+        return false;
     }
 
     private function canAccessLocalFolder(User $user, string $folderId): bool

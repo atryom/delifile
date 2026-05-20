@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Files;
 
+use App\Enums\FileStatus;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\FileVersion;
@@ -53,6 +54,10 @@ class FileVersionController extends Controller
             );
         }
 
+        if ($error = $this->fileService->validateFileSizeLimit($request->user(), $data['size'])) {
+            return $this->error('Файл превышает допустимый размер', $error['code'], $error['data'] ?? [], 422);
+        }
+
         if ($error = $this->fileService->validateStorageQuota($request->user(), $data['size'])) {
             return $this->error('Превышен лимит хранилища', $error['code'], [], 422);
         }
@@ -68,11 +73,12 @@ class FileVersionController extends Controller
                 'original_name'  => $data['original_name'],
                 'size'           => $data['size'],
                 'mime_type'      => $data['mime_type'],
-                'status'         => 'uploading',
+                'status'         => FileStatus::Uploading->value,
+                'expires_at'     => now()->addHour(),
             ]);
 
             $result = [
-                'version' => ['id' => $version->id, 'status' => 'uploading'],
+                'version' => ['id' => $version->id, 'status' => FileStatus::Uploading->value],
                 'upload'  => [
                     'method'  => 'PUT',
                     'url'     => $this->fileService->generatePresignedPutUrl($storageKey, $data['mime_type']),
@@ -111,7 +117,7 @@ class FileVersionController extends Controller
 
         $version = FileVersion::where('id', $data['version_id'])
             ->where('file_id', $file->id)
-            ->where('status', 'uploading')
+            ->where('status', FileStatus::Uploading->value)
             ->first();
 
         if (!$version) {
@@ -119,7 +125,13 @@ class FileVersionController extends Controller
         }
 
         return DB::transaction(function () use ($file, $version, $data) {
-            if (!$file->has_versions) {
+            $isFirst = File::where('id', $file->id)
+                ->where('has_versions', false)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($isFirst) {
+                File::where('id', $file->id)->update(['has_versions' => true]);
                 FileVersion::create([
                     'file_id'        => $file->id,
                     'version_number' => 1,
@@ -129,12 +141,12 @@ class FileVersionController extends Controller
                     'size'           => $file->size,
                     'mime_type'      => $file->mime_type,
                     'is_active'      => true,
-                    'status'         => 'available',
+                    'status'         => FileStatus::Available->value,
                 ]);
                 $nextNumber = 2;
             } else {
                 $nextNumber = FileVersion::where('file_id', $file->id)
-                    ->where('status', 'available')
+                    ->where('status', FileStatus::Available->value)
                     ->max('version_number') + 1;
             }
 
@@ -142,7 +154,7 @@ class FileVersionController extends Controller
             $version->update([
                 'version_number' => $nextNumber,
                 'thumbnail_key'  => $thumbKey,
-                'status'         => 'available',
+                'status'         => FileStatus::Available->value,
                 'is_active'      => true,
             ]);
 
@@ -159,7 +171,7 @@ class FileVersionController extends Controller
                 'version' => [
                     'id'             => $version->id,
                     'version_number' => $nextNumber,
-                    'status'         => 'available',
+                    'status'         => FileStatus::Available->value,
                 ],
                 'file' => ['id' => $file->id, 'has_versions' => true],
             ]);
@@ -178,7 +190,7 @@ class FileVersionController extends Controller
 
         $version = FileVersion::where('id', $versionId)
             ->where('file_id', $file->id)
-            ->where('status', 'available')
+            ->where('status', FileStatus::Available->value)
             ->first();
 
         if (!$version) {
@@ -246,7 +258,7 @@ class FileVersionController extends Controller
 
         $version = FileVersion::where('id', $versionId)
             ->where('file_id', $file->id)
-            ->where('status', 'available')
+            ->where('status', FileStatus::Available->value)
             ->first();
 
         if (!$version) {

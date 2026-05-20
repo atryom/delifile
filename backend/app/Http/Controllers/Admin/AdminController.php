@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\FileStatus;
 use App\Http\Controllers\Controller;
 use App\Mail\AdminNotificationMail;
 use App\Models\DeviceSession;
@@ -26,26 +27,26 @@ class AdminController extends Controller
     public function users(): JsonResponse
     {
         $users = User::select('id', 'email', 'name', 'account_status', 'email_verified_at', 'plan', 'is_superuser', 'notifications_enabled', 'created_at')
+            ->addSelect([
+                'last_login_at' => DeviceSession::select('last_active_at')
+                    ->whereColumn('user_id', 'users.id')
+                    ->orderByDesc('last_active_at')
+                    ->limit(1),
+            ])
             ->orderByDesc('created_at')
             ->get()
-            ->map(function (User $user) {
-                $lastActive = DeviceSession::where('user_id', $user->id)
-                    ->orderByDesc('last_active_at')
-                    ->value('last_active_at');
-
-                return [
-                    'id'                    => $user->id,
-                    'email'                 => $user->email,
-                    'name'                  => $user->name,
-                    'account_status'        => $user->account_status,
-                    'email_verified'        => $user->isEmailVerified(),
-                    'plan'                  => $user->plan?->value,
-                    'is_superuser'          => $user->is_superuser,
-                    'notifications_enabled' => (bool) $user->notifications_enabled,
-                    'last_login_at'         => $lastActive?->toIso8601String(),
-                    'created_at'            => $user->created_at?->toIso8601String(),
-                ];
-            });
+            ->map(fn (User $user) => [
+                'id'                    => $user->id,
+                'email'                 => $user->email,
+                'name'                  => $user->name,
+                'account_status'        => $user->account_status,
+                'email_verified'        => $user->isEmailVerified(),
+                'plan'                  => $user->plan?->value,
+                'is_superuser'          => $user->is_superuser,
+                'notifications_enabled' => (bool) $user->notifications_enabled,
+                'last_login_at'         => $user->last_login_at ? \Carbon\Carbon::parse($user->last_login_at)->toIso8601String() : null,
+                'created_at'            => $user->created_at?->toIso8601String(),
+            ]);
 
         return $this->success('Список пользователей получен', ['items' => $users]);
     }
@@ -184,21 +185,23 @@ class AdminController extends Controller
     {
         $totalUsers = User::count();
 
-        $totalFiles = File::whereNotIn('status', ['deleted'])->count();
-        $totalSize  = (int) File::whereNotIn('status', ['deleted'])->sum('size');
+        $allStats = File::whereNot('status', FileStatus::Deleted->value)
+            ->selectRaw('COUNT(*) as total, COALESCE(SUM(size), 0) as total_size')
+            ->first();
+        $totalFiles = (int) $allStats->total;
+        $totalSize  = (int) $allStats->total_size;
 
         $pinnedFileIds = FileUserAccess::whereNotNull('pinned_at')
             ->pluck('file_id')
             ->unique()
             ->values();
 
-        $pinnedFiles = File::whereIn('id', $pinnedFileIds)
-            ->whereNotIn('status', ['deleted'])
-            ->count();
-
-        $pinnedSize = (int) File::whereIn('id', $pinnedFileIds)
-            ->whereNotIn('status', ['deleted'])
-            ->sum('size');
+        $pinnedStats = File::whereIn('id', $pinnedFileIds)
+            ->whereNot('status', FileStatus::Deleted->value)
+            ->selectRaw('COUNT(*) as total, COALESCE(SUM(size), 0) as total_size')
+            ->first();
+        $pinnedFiles = (int) $pinnedStats->total;
+        $pinnedSize  = (int) $pinnedStats->total_size;
 
         return $this->success('Статистика получена', [
             'total_users'  => $totalUsers,

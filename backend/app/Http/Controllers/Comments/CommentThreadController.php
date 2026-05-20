@@ -47,7 +47,7 @@ class CommentThreadController extends Controller
 
         $result = ['policy' => $policy, 'threads' => []];
 
-        if (in_array($scope, ['shared', 'all']) && $policy['shared_comments_allowed'] && $type !== CommentTargetType::LocalFolder) {
+        if (in_array($scope, [CommentScope::Shared->value, 'all']) && $policy['shared_comments_allowed'] && $type !== CommentTargetType::LocalFolder) {
             $sharedThread = CommentThread::where('target_type', $type->value)
                 ->where('target_id', $targetId)
                 ->where('scope', CommentScope::Shared->value)
@@ -60,7 +60,7 @@ class CommentThreadController extends Controller
             ] : null;
         }
 
-        if (in_array($scope, ['private', 'all'])) {
+        if (in_array($scope, [CommentScope::Private->value, 'all'])) {
             $privateThread = CommentThread::where('target_type', $type->value)
                 ->where('target_id', $targetId)
                 ->where('scope', CommentScope::Private->value)
