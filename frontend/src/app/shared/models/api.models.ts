@@ -16,7 +16,7 @@ export interface ApiError {
   };
 }
 
-export type FileTypeGroup = 'image' | 'video' | 'audio' | 'document' | 'archive' | 'link' | 'other';
+export type FileTypeGroup = 'image' | 'video' | 'audio' | 'document' | 'archive' | 'link' | 'note' | 'other';
 export type SortBy = 'date' | 'extension' | 'size';
 export type SortOrder = 'asc' | 'desc';
 

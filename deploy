@@ -38,7 +38,7 @@ ok "Caches cleared"
 # ── 2. Frontend: npm ci + build ───────────────────────────────────────────────
 info "Frontend: npm ci..."
 cd "$FRONTEND"
-npm ci --silent
+npm ci --silent --legacy-peer-deps
 ok "npm ci done"
 
 info "Frontend: bumping version..."

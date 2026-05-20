@@ -65,6 +65,30 @@ class DocumentService
         return $this->buildDocumentResponse($file, $user, '');
     }
 
+    /**
+     * Promote a plain uploaded .md file to an editable document by setting
+     * is_editable, editor_type, and fetching/computing an initial etag.
+     */
+    public function promoteToDocument(File $file): void
+    {
+        $etag = $this->fetchEtagFromS3($file->storage_key);
+
+        if (!$etag) {
+            try {
+                $content = Storage::disk('s3')->get($file->storage_key) ?? '';
+                $etag    = '"' . md5($content) . '"';
+            } catch (\Throwable) {
+                $etag = '"' . Str::uuid() . '"';
+            }
+        }
+
+        $file->update([
+            'is_editable' => true,
+            'editor_type' => self::EDITOR_TYPE,
+            'etag'        => $etag,
+        ]);
+    }
+
     public function getDocument(File $file, User $user): array
     {
         try {

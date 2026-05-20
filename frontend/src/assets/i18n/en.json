@@ -11,7 +11,8 @@
     "phone_format_error": "Enter phone in format +7 (999) 888-77-66",
     "close": "Close",
     "show": "Expand",
-    "hide": "Collapse"
+    "hide": "Collapse",
+    "saving": "Saving..."
   },
   "auth": {
     "login": {

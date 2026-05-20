@@ -579,11 +579,14 @@ class FileService
                         ->orWhere('mime_type', 'like', '%gzip%')
                         ->orWhere('mime_type', 'like', '%bzip%');
                   });
+        } elseif ($group === 'note') {
+            $query->where('mime_type', 'text/markdown');
         } elseif ($group === 'other') {
             $query->where('content_kind', 'binary_file')
                   ->where('mime_type', 'not like', 'image/%')
                   ->where('mime_type', 'not like', 'video/%')
                   ->where('mime_type', 'not like', 'audio/%')
+                  ->where('mime_type', '!=', 'text/markdown')
                   ->where(function ($q) {
                       $q->where('mime_type', 'not like', '%pdf%')
                         ->where('mime_type', 'not like', '%msword%')
@@ -620,6 +623,7 @@ class FileService
     private function classifyMimeType(string $contentKind, string $mimeType): string
     {
         if ($contentKind === 'url_file') return 'link';
+        if ($mimeType === 'text/markdown') return 'note';
         if (str_starts_with($mimeType, 'image/')) return 'image';
         if (str_starts_with($mimeType, 'video/')) return 'video';
         if (str_starts_with($mimeType, 'audio/')) return 'audio';

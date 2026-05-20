@@ -382,6 +382,11 @@
   font-family: inherit;
   transition: v.$transition-fast;
   &:focus { border-color: var(--accent); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+.folder-saving-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
@@ -772,6 +777,5 @@
   .tag-search { width: 100%; }
   .link-meta { word-break: break-word; white-space: normal; }
   .folder-block { flex-direction: column; align-items: stretch; }
-  .folder-block .btn-save { align-self: flex-start; }
   .file-card-actions { padding-left: 8px; min-height: 60px; }
 }

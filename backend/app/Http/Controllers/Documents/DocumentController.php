@@ -42,12 +42,18 @@ class DocumentController extends Controller
     {
         $file = File::find($id);
 
-        if (!$file || !$file->isMarkdownDocument()) {
+        if (!$file || $file->mime_type !== 'text/markdown') {
             return $this->notFound('Document not found');
         }
 
         if (!$this->documentService->canViewDocument($request->user(), $file)) {
             return $this->forbidden();
+        }
+
+        // Auto-promote plain uploaded .md files to editable documents
+        if (!$file->isMarkdownDocument()) {
+            $this->documentService->promoteToDocument($file);
+            $file->refresh();
         }
 
         $doc = $this->documentService->getDocument($file, $request->user());
@@ -67,7 +73,7 @@ class DocumentController extends Controller
 
         $file = File::find($id);
 
-        if (!$file || !$file->isMarkdownDocument()) {
+        if (!$file || $file->mime_type !== 'text/markdown') {
             return $this->notFound('Document not found');
         }
 

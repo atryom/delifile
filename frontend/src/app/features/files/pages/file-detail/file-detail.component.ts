@@ -379,6 +379,7 @@ export class FileDetailComponent implements OnInit {
   onFolderSelect(e: Event): void {
     const folderId = (e.target as HTMLSelectElement).value || null;
     this.pendingFolderId.set(folderId);
+    this.saveFolderSelection();
   }
 
   saveFolderSelection(): void {

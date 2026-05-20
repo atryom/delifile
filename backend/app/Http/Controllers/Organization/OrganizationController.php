@@ -22,7 +22,19 @@ class OrganizationController extends Controller
     {
         $userId = $request->user()->id;
         $folders = Folder::where('user_id', $userId)
-            ->withCount(['userAccesses as files_count' => fn($q) => $q->where('user_id', $userId)])
+            ->addSelect([
+                'files_count' => FileUserAccess::selectRaw('COUNT(DISTINCT file_user_access.file_id)')
+                    ->join('files', function ($join) {
+                        $join->on('files.id', '=', 'file_user_access.file_id')
+                             ->whereNull('files.deleted_at');
+                    })
+                    ->whereColumn('file_user_access.folder_id', 'folders.id')
+                    ->where('file_user_access.user_id', $userId)
+                    ->where(function ($q) use ($userId) {
+                        $q->where(fn ($q2) => $q2->where('files.owner_id', $userId)->where('files.shared_folder_only', false))
+                          ->orWhereIn('file_user_access.access_type', ['shared', 'saved']);
+                    }),
+            ])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -37,8 +49,21 @@ class OrganizationController extends Controller
      */
     public function listFolders(Request $request): JsonResponse
     {
-        $folders = Folder::where('user_id', $request->user()->id)
-            ->withCount('files')
+        $userId = $request->user()->id;
+        $folders = Folder::where('user_id', $userId)
+            ->addSelect([
+                'files_count' => FileUserAccess::selectRaw('COUNT(DISTINCT file_user_access.file_id)')
+                    ->join('files', function ($join) {
+                        $join->on('files.id', '=', 'file_user_access.file_id')
+                             ->whereNull('files.deleted_at');
+                    })
+                    ->whereColumn('file_user_access.folder_id', 'folders.id')
+                    ->where('file_user_access.user_id', $userId)
+                    ->where(function ($q) use ($userId) {
+                        $q->where(fn ($q2) => $q2->where('files.owner_id', $userId)->where('files.shared_folder_only', false))
+                          ->orWhereIn('file_user_access.access_type', ['shared', 'saved']);
+                    }),
+            ])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()

@@ -20,6 +20,10 @@ import { ResizableImage } from '../markdown-editor/resizable-image.extension';
 import { Link } from '@tiptap/extension-link';
 import { TaskList } from '@tiptap/extension-task-list';
 import { TaskItem } from '@tiptap/extension-task-item';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
 import { Markdown } from 'tiptap-markdown';
 import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { DocumentLockService } from '../../services/document-lock.service';
@@ -183,6 +187,17 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'quota';
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m9 9-3 3 3 3"/><path d="m15 9 3 3-3 3"/></svg>
           </button>
 
+          <span class="ep-sep" aria-hidden="true"></span>
+
+          <!-- Таблица -->
+          <button type="button" class="ep-tb-btn" [class.active]="isInTable()"
+            (click)="insertTable()" aria-label="Вставить таблицу" title="Вставить таблицу 3×3">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+            </svg>
+          </button>
+
           @if (doc()?.capabilities?.canInsertImages) {
             <span class="ep-sep" aria-hidden="true"></span>
             <button type="button" class="ep-tb-btn" (click)="openImagePicker()" aria-label="Вставить изображение" title="Вставить изображение">
@@ -215,6 +230,37 @@ type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'quota';
             aria-label="Ширина изображения в пикселях"
           >
           <span class="ep-img-bar-px">px</span>
+        </div>
+      }
+
+      <!-- Table context bar (visible when cursor is inside a table) -->
+      @if (canEdit() && isInTable()) {
+        <div class="ep-table-bar" role="toolbar" aria-label="Управление таблицей">
+          <span class="ep-table-bar-label">Строки:</span>
+          <button type="button" class="ep-tb-btn" (click)="tableCmd('addRowBefore')" aria-label="Строка выше" title="Строка выше">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+          </button>
+          <button type="button" class="ep-tb-btn" (click)="tableCmd('addRowAfter')" aria-label="Строка ниже" title="Строка ниже">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+          </button>
+          <button type="button" class="ep-tb-btn ep-tb-btn--danger" (click)="tableCmd('deleteRow')" aria-label="Удалить строку" title="Удалить строку">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+          <span class="ep-sep" aria-hidden="true"></span>
+          <span class="ep-table-bar-label">Столбцы:</span>
+          <button type="button" class="ep-tb-btn" (click)="tableCmd('addColumnBefore')" aria-label="Столбец слева" title="Столбец слева">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="m12 5-7 7 7 7"/></svg>
+          </button>
+          <button type="button" class="ep-tb-btn" (click)="tableCmd('addColumnAfter')" aria-label="Столбец справа" title="Столбец справа">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 19 7-7-7-7"/></svg>
+          </button>
+          <button type="button" class="ep-tb-btn ep-tb-btn--danger" (click)="tableCmd('deleteColumn')" aria-label="Удалить столбец" title="Удалить столбец">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+          <span class="ep-sep" aria-hidden="true"></span>
+          <button type="button" class="ep-tb-btn ep-tb-btn--danger ep-tb-text" (click)="tableCmd('deleteTable')" aria-label="Удалить таблицу" title="Удалить таблицу">
+            ✕ таблицу
+          </button>
         </div>
       }
 
@@ -292,6 +338,7 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
   readonly isImageSelected  = signal(false);
   readonly selectedImgWidth = signal<string | null>(null);
   readonly imgWidthPx       = signal('');
+  readonly isInTable        = signal(false);
 
   readonly lockState = this.lockService.lockState;
 
@@ -382,6 +429,10 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
           Link.configure({ openOnClick: false }),
           TaskList,
           TaskItem.configure({ nested: true }),
+          Table.configure({ resizable: false }),
+          TableRow,
+          TableHeader,
+          TableCell,
           Markdown.configure({ transformPastedText: true }),
         ],
         content: '',
@@ -409,6 +460,7 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
               this.selectedImgWidth.set(null);
               this.imgWidthPx.set('');
             }
+            this.isInTable.set(editor.isActive('table'));
           });
         },
       });
@@ -517,6 +569,18 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
   onImgWidthChange(event: Event): void {
     const val = Math.round(+(event.target as HTMLInputElement).value);
     if (val >= 40 && val <= 2000) this.setImgWidth(val);
+  }
+
+  insertTable(): void {
+    if (!this.editor || !this.canEdit()) return;
+    this.editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+  }
+
+  tableCmd(command: string): void {
+    if (!this.editor || !this.canEdit()) return;
+    const chain = this.editor.chain().focus();
+    (chain as unknown as Record<string, () => unknown>)[command]?.();
+    chain.run();
   }
 
   close(): void {

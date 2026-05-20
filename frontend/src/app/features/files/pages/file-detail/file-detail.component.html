@@ -418,7 +418,7 @@
             <div class="sidebar-section">
               <h3 class="section-title">{{ 'files.detail.folders' | translate }}</h3>
               <div class="folder-block">
-                <select class="folder-select" (change)="onFolderSelect($event)">
+                <select class="folder-select" (change)="onFolderSelect($event)" [disabled]="savingFolder()">
                   <option value="">{{ 'files.detail.no_folder' | translate }}</option>
                   @for (node of flatFolders(); track node.id) {
                     <option [value]="node.id" [selected]="node.id === pendingFolderId()">
@@ -426,10 +426,9 @@
                     </option>
                   }
                 </select>
-                <button class="btn-save" (click)="saveFolderSelection()" [disabled]="savingFolder()">
-                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-                  {{ 'common.save' | translate }}
-                </button>
+                @if (savingFolder()) {
+                  <span class="folder-saving-hint">{{ 'common.saving' | translate }}</span>
+                }
               </div>
             </div>
 

@@ -265,3 +265,62 @@
   color: var(--text-muted);
   font-size: 0.9rem;
 }
+
+// ── Danger toolbar button variant ─────────────────────────────────────────────
+.ep-tb-btn--danger {
+  color: var(--danger, #c0392b);
+  &:hover { background: color-mix(in srgb, var(--danger, #c0392b) 12%, transparent); }
+}
+
+// ── Table context bar ─────────────────────────────────────────────────────────
+.ep-table-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 10px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.ep-table-bar-label {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+// ── Table styles inside the editor ───────────────────────────────────────────
+// ::ng-deep is required because TipTap injects table DOM dynamically (no Angular _ngcontent attr)
+.ep-content ::ng-deep {
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    display: block;
+  }
+
+  th, td {
+    border: 1px solid color-mix(in srgb, var(--text, #000) 22%, transparent);
+    padding: 7px 12px;
+    text-align: left;
+    min-width: 80px;
+    vertical-align: top;
+  }
+
+  th {
+    background: color-mix(in srgb, var(--text, #000) 6%, transparent);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  td { background: transparent; }
+
+  tr:hover td { background: color-mix(in srgb, var(--accent, #3b82f6) 5%, transparent); }
+
+  .selectedCell {
+    background: color-mix(in srgb, var(--accent, #3b82f6) 12%, transparent) !important;
+  }
+}

@@ -261,6 +261,7 @@ export class FoldersTreeComponent implements OnInit {
     { key: 'document', label: 'Документы' },
     { key: 'archive',  label: 'Архивы' },
     { key: 'link',     label: 'Ссылки' },
+    { key: 'note',     label: 'Заметки' },
     { key: 'other',    label: 'Прочее' },
   ];
 
