@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { TranslateModule } from '@ngx-translate/core';
 import { InboxApiService } from '../../../../core/api/inbox-api.service';
 import { InboxFile, InboxSharedFolder } from '../../../../shared/models/api.models';
+import { formatSize } from '../../../../shared/utils/format';
 
 type ActiveTab = 'files' | 'folders';
 
@@ -154,10 +155,5 @@ export class InboxComponent implements OnInit {
     this.selectedFolderIds.set(new Set());
   }
 
-  formatSize(bytes: number | null): string {
-    if (!bytes) return '—';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-  }
+  readonly formatSize = formatSize;
 }

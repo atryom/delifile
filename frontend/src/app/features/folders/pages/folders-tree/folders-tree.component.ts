@@ -1,8 +1,7 @@
 import {
   Component, inject, signal, computed, OnInit, ChangeDetectionStrategy, viewChild, ElementRef,
 } from '@angular/core';
-import { forkJoin, Observable, of, from, switchMap } from 'rxjs';
-import { HttpClient, HttpEventType, HttpEvent } from '@angular/common/http';
+import { forkJoin } from 'rxjs';
 import { DatePipe } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -12,22 +11,16 @@ import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api
 import { FilesApiService, FileFilter } from '../../../../core/api/files-api.service';
 import { TariffApiService } from '../../../../core/api/tariff-api.service';
 import { FileUploadService } from '../../../files/services/file-upload.service';
-import { VideoThumbnailService } from '../../../files/services/video-thumbnail.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import {
   FolderTreeNode, SharedFolder, FileListItem, SharedFolderFileItem,
-  Tag, TariffUsage, FileTypeGroup, LinkPreview, InitUploadRequest,
+  Tag, TariffUsage, FileTypeGroup, LinkPreview,
 } from '../../../../shared/models/api.models';
-
-const PLAN_FILE_LIMITS: Record<string, number> = {
-  free:   50  * 1024 * 1024,
-  silver: 100 * 1024 * 1024,
-  gold:   150 * 1024 * 1024,
-};
 import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialogs/access/shared-folder-access-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
-import { AuthStateService } from '../../../../core/auth/auth-state.service';
+import { formatSize } from '../../../../shared/utils/format';
+import { flattenTree } from '../../../../shared/utils/tree';
 
 interface SharedFolderMoveItem { folder: SharedFolder; depth: number; }
 
@@ -72,12 +65,9 @@ export class FoldersTreeComponent implements OnInit {
   private readonly tariffApi    = inject(TariffApiService);
   private readonly uploadSvc    = inject(FileUploadService);
   private readonly urlFilesApi  = inject(UrlFilesApiService);
-  private readonly thumbnailSvc = inject(VideoThumbnailService);
-  private readonly http         = inject(HttpClient);
   private readonly router       = inject(Router);
   private readonly route        = inject(ActivatedRoute);
   private readonly fb           = inject(FormBuilder);
-  private readonly authState    = inject(AuthStateService);
   private readonly docsApi      = inject(DocumentsApiService);
 
   readonly creatingDoc    = signal(false);
@@ -164,11 +154,6 @@ export class FoldersTreeComponent implements OnInit {
   // ── Upload state ──────────────────────────────────────────────────────────
   readonly uploadState = this.uploadSvc.state;
 
-  // ── Shared folder upload state ────────────────────────────────────────────
-  readonly sfUploadPhase    = signal<'idle' | 'uploading' | 'done' | 'error'>('idle');
-  readonly sfUploadProgress = signal(0);
-  readonly sfUploadError    = signal<string | null>(null);
-
   // ── Multi-select ──────────────────────────────────────────────────────────
   readonly selectedFileIds   = signal<ReadonlySet<string>>(new Set<string>());
   readonly selectedCount     = computed(() => this.selectedFileIds().size);
@@ -220,7 +205,9 @@ export class FoldersTreeComponent implements OnInit {
   readonly deletingBulk         = signal(false);
 
   // ── Flattened local folder tree (for move dialog) ─────────────────────────
-  readonly flattenedFolders = computed(() => this.flattenTree(this.fullTree(), 0));
+  readonly flattenedFolders = computed(() =>
+    flattenTree(this.fullTree()).map(({ node, depth }) => ({ folder: node, depth }))
+  );
 
   // ── Add modal ─────────────────────────────────────────────────────────────
   readonly addModalOpen = signal(false);
@@ -867,9 +854,6 @@ export class FoldersTreeComponent implements OnInit {
     this.linkPreview.set(null);
     this.linkError.set(null);
     this.uploadSvc.reset();
-    this.sfUploadPhase.set('idle');
-    this.sfUploadProgress.set(0);
-    this.sfUploadError.set(null);
   }
 
   // ── Upload ────────────────────────────────────────────────────────────────
@@ -902,12 +886,14 @@ export class FoldersTreeComponent implements OnInit {
 
   private uploadFile(file: File): void {
     const sfId = this.currentSharedFolderId();
-    if (this.activeTab() === 'shared' && sfId) {
-      this.uploadToSharedFolder(file, sfId);
-      return;
-    }
-    this.uploadSvc.upload(file).subscribe({
+    const options = this.activeTab() === 'shared' && sfId ? { sharedFolderId: sfId } : undefined;
+    this.uploadSvc.upload(file, options).subscribe({
       next: (fileId) => {
+        if (options?.sharedFolderId) {
+          this.closeAddModal();
+          this.loadFiles();
+          return;
+        }
         const folderId = this.currentLocalFolderId();
         const done = () => { this.closeAddModal(); this.loadFiles(); };
         if (folderId) {
@@ -917,80 +903,6 @@ export class FoldersTreeComponent implements OnInit {
         }
       },
       error: () => {},
-    });
-  }
-
-  private uploadToSharedFolder(file: File, sfId: string): void {
-    const plan = this.authState.plan() ?? 'free';
-    const limitBytes = PLAN_FILE_LIMITS[plan] ?? PLAN_FILE_LIMITS['free'];
-    if (file.size > limitBytes) {
-      const mb = Math.round(limitBytes / 1024 / 1024);
-      this.sfUploadError.set(`Размер файла превышает лимит тарифа (${mb} МБ)`);
-      this.sfUploadPhase.set('error');
-      return;
-    }
-
-    this.sfUploadPhase.set('uploading');
-    this.sfUploadProgress.set(0);
-    this.sfUploadError.set(null);
-
-    const isVideo = file.type.startsWith('video/');
-    const prep$: Observable<{ file: File; blob: Blob; objectUrl: string } | null> = isVideo
-      ? from(this.thumbnailSvc.generateFromFile(file).catch(() => null))
-      : of(null);
-
-    prep$.pipe(
-      switchMap((thumb) => {
-        const req: InitUploadRequest = {
-          original_name: file.name,
-          size: file.size,
-          mime_type: file.type || 'application/octet-stream',
-        };
-        if (thumb) {
-          req.thumbnail_name = thumb.file.name;
-          req.thumbnail_size = thumb.blob.size;
-          req.thumbnail_mime = 'image/jpeg';
-        }
-        return this.sfApi.initUpload(sfId, req).pipe(
-          switchMap((initRes) => {
-            if (initRes.result !== 'success') throw new Error(initRes.message);
-            const fileId = initRes.data.file.id;
-            const thumbInfo = initRes.data.thumbnail;
-
-            const thumbUpload$: Observable<unknown> = thumb && thumbInfo
-              ? this.http.put(thumbInfo.url, thumb.blob, { headers: thumbInfo.headers, withCredentials: false })
-              : of(null);
-
-            return thumbUpload$.pipe(
-              switchMap(() => this.http.put(initRes.data.upload.url, file, {
-                headers: initRes.data.upload.headers,
-                reportProgress: true,
-                observe: 'events',
-                withCredentials: false,
-              }) as Observable<HttpEvent<unknown>>),
-              switchMap((evt) => {
-                if (evt.type === HttpEventType.UploadProgress) {
-                  const pe = evt as { loaded: number; total?: number };
-                  this.sfUploadProgress.set(pe.total ? Math.round(100 * pe.loaded / pe.total) : 0);
-                }
-                if (evt.type !== HttpEventType.Response) return of(null);
-                return this.sfApi.completeUpload(sfId, fileId, thumbInfo?.key);
-              }),
-            );
-          }),
-        );
-      }),
-    ).subscribe({
-      next: (res) => {
-        if (!res) return;
-        this.sfUploadPhase.set('done');
-        this.closeAddModal();
-        this.loadFiles();
-      },
-      error: (err: Error) => {
-        this.sfUploadError.set(err.message ?? 'Ошибка загрузки');
-        this.sfUploadPhase.set('error');
-      },
     });
   }
 
@@ -1210,24 +1122,8 @@ export class FoldersTreeComponent implements OnInit {
     });
   }
 
-  // ── Flatten folder tree ───────────────────────────────────────────────────
-  private flattenTree(nodes: FolderTreeNode[], depth: number): { folder: FolderTreeNode; depth: number }[] {
-    const result: { folder: FolderTreeNode; depth: number }[] = [];
-    for (const node of nodes) {
-      result.push({ folder: node, depth });
-      result.push(...this.flattenTree(node.children, depth + 1));
-    }
-    return result;
-  }
-
   // ── Utilities ─────────────────────────────────────────────────────────────
-  formatSize(bytes: number): string {
-    if (!bytes || bytes === 0) return '—';
-    const mb = bytes / (1024 * 1024);
-    if (mb >= 1024) return (mb / 1024).toFixed(1) + ' ГБ';
-    if (mb >= 1)    return mb.toFixed(1) + ' МБ';
-    return (bytes / 1024).toFixed(1) + ' КБ';
-  }
+  readonly formatSize = formatSize;
 
   fileIconType(file: AnyFile): string {
     if (file.content_kind === 'url_file') return 'link';

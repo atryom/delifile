@@ -12,15 +12,16 @@ use App\Models\FileUserAccess;
 use App\Models\PendingReceivedFile;
 use App\Services\FileService;
 use App\Services\ActivityService;
+use App\Services\S3UrlService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class FileController extends Controller
 {
     public function __construct(
         private readonly FileService     $fileService,
-        private readonly ActivityService $activityService
+        private readonly ActivityService $activityService,
+        private readonly S3UrlService    $s3,
     ) {}
 
     /**
@@ -118,21 +119,19 @@ class FileController extends Controller
      */
     public function initUpload(InitUploadRequest $request): JsonResponse
     {
-        $fileSize    = $request->validated()['size'];
-        $plan        = $request->user()->getPlan();
-        $fileSizeMax = $plan->fileSizeLimitBytes();
+        $fileSize = $request->validated()['size'];
 
-        if ($fileSize > $fileSizeMax) {
+        if ($error = $this->fileService->validateFileSizeLimit($request->user(), $fileSize)) {
             return $this->error(
                 'Размер файла превышает допустимый лимит для вашего тарифа',
-                'FILE_SIZE_LIMIT_EXCEEDED',
-                ['limit_bytes' => $fileSizeMax],
+                $error['code'],
+                $error['data'],
                 422
             );
         }
 
-        if (!$this->fileService->checkStorageQuota($request->user(), $fileSize)) {
-            return $this->error('Превышен лимит хранилища вашего тарифного плана', 'STORAGE_LIMIT_EXCEEDED', [], 422);
+        if ($error = $this->fileService->validateStorageQuota($request->user(), $fileSize)) {
+            return $this->error('Превышен лимит хранилища вашего тарифного плана', $error['code'], [], 422);
         }
 
         $result = $this->fileService->initUpload($request->user(), $request->validated());
@@ -264,7 +263,7 @@ class FileController extends Controller
             abort(403);
         }
 
-        $url = Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addMinutes(15));
+        $url = $this->s3->contentRedirectUrl($file->storage_key);
 
         return redirect()->away($url);
     }
@@ -286,7 +285,7 @@ class FileController extends Controller
         }
 
         $key = $file->thumbnail_key ?? $file->storage_key;
-        $url = Storage::disk('s3')->temporaryUrl($key, now()->addMinutes(60));
+        $url = $this->s3->previewRedirectUrl($key);
 
         return redirect()->away($url);
     }

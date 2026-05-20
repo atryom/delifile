@@ -13,7 +13,8 @@ class FileUploadTest extends TestCase
     public function test_init_upload_returns_presigned_url(): void
     {
         $mock = \Mockery::mock(FileService::class);
-        $mock->shouldReceive('checkStorageQuota')->andReturn(true);
+        $mock->shouldReceive('validateFileSizeLimit')->andReturn(null);
+        $mock->shouldReceive('validateStorageQuota')->andReturn(null);
         $mock->shouldReceive('initUpload')->andReturn([
             'file'       => ['id' => 'mock-id', 'status' => 'uploading'],
             'upload_url' => 'https://fake-s3.example.com/upload',

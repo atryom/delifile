@@ -15,19 +15,24 @@ use App\Models\PendingReceivedFile;
 use App\Models\ShareLink;
 use App\Models\User;
 use App\Services\ActivityService;
+use App\Services\FileCardBuilder;
 use App\Services\FileService;
+use App\Services\MimeService;
 use App\Services\PushNotificationService;
+use App\Services\S3UrlService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class SharingController extends Controller
 {
     public function __construct(
         private readonly FileService             $fileService,
         private readonly ActivityService         $activityService,
+        private readonly S3UrlService            $s3,
+        private readonly MimeService             $mime,
+        private readonly FileCardBuilder         $cardBuilder,
         private readonly PushNotificationService $pushService,
     ) {}
 
@@ -334,39 +339,7 @@ class SharingController extends Controller
         $viewUrl    = null;
         $mime       = $link->file->mime_type ?? '';
 
-        if ($link->file->storage_key && $link->file->isAvailable()) {
-            try {
-                if (str_starts_with($mime, 'image/')) {
-                    $previewUrl = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
-                        $link->file->storage_key,
-                        now()->addMinutes(60)
-                    );
-                } elseif (str_starts_with($mime, 'video/') || str_starts_with($mime, 'audio/')) {
-                    $viewUrl = \Illuminate\Support\Facades\Storage::disk('s3')->temporaryUrl(
-                        $link->file->storage_key,
-                        now()->addMinutes(60)
-                    );
-                }
-            } catch (\Throwable) {}
-        }
-
-        $fileData = [
-            'id'            => $link->file->id,
-            'content_kind'  => $link->file->content_kind ?? 'binary_file',
-            'original_name' => $link->file->original_name,
-            'size'          => $link->file->size,
-            'mime_type'     => $link->file->mime_type,
-            'preview_url'   => $previewUrl,
-            'view_url'      => $viewUrl,
-        ];
-
-        if ($link->file->content_kind === 'url_file') {
-            $fileData['link_url']         = $link->file->link_url;
-            $fileData['link_title']       = $link->file->link_title;
-            $fileData['link_description'] = $link->file->link_description;
-            $fileData['link_image_url']   = $link->file->link_image_url;
-            $fileData['link_site_name']   = $link->file->link_site_name;
-        }
+        $fileData = $this->cardBuilder->buildPublicItem($link->file);
 
         return $this->success(__('messages.sharing.link_resolved'), [
             'file' => $fileData,
@@ -500,20 +473,7 @@ class SharingController extends Controller
 
     private function buildOgDescription(string $mime, int $size): string
     {
-        $category = match(true) {
-            str_starts_with($mime, 'image/')       => 'Изображение',
-            str_starts_with($mime, 'video/')       => 'Видео',
-            str_starts_with($mime, 'audio/')       => 'Аудио',
-            str_contains($mime, 'pdf')             => 'PDF-документ',
-            str_contains($mime, 'spreadsheet') ||
-            str_contains($mime, 'excel')           => 'Таблица',
-            str_contains($mime, 'word') ||
-            str_contains($mime, 'document')        => 'Документ',
-            str_contains($mime, 'zip') ||
-            str_contains($mime, 'archive') ||
-            str_contains($mime, 'rar')             => 'Архив',
-            default                                => 'Файл',
-        };
+        $category = $this->mime->label($mime);
 
         $sizeStr = match(true) {
             $size >= 1024 ** 3 => round($size / 1024 ** 3, 1) . ' ГБ',
@@ -527,19 +487,7 @@ class SharingController extends Controller
 
     private function buildOgImage(File $file, string $mime): string
     {
-        if (!$file->isAvailable()) return '';
-
-        // Prefer thumbnail; fall back to original only for images
-        $key = $file->thumbnail_key
-            ?? (str_starts_with($mime, 'image/') ? $file->storage_key : null);
-
-        if (!$key) return '';
-
-        try {
-            return Storage::disk('s3')->temporaryUrl($key, now()->addMinutes(60));
-        } catch (\Throwable) {
-            return '';
-        }
+        return $this->s3->resolveOgImageUrl($file, $mime);
     }
 
     private function renderOgTags(string $title, string $description, string $image, string $url): string

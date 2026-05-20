@@ -315,13 +315,14 @@ describe('MarkdownEditorComponent', () => {
 
   it('ngOnDestroy releases lock and destroys editor when lock is held', () => {
     fixture.detectChanges();
-    component.editor = createMockEditor();
+    const mockEditor = createMockEditor();
+    component.editor = mockEditor;
 
     const lockServiceMock = TestBed.inject(DocumentLockService) as unknown as Record<string, ReturnType<typeof vi.fn>>;
     component.ngOnDestroy();
 
     expect(lockServiceMock['release']).toHaveBeenCalledWith('doc_1');
-    expect(component.editor?.destroy).toHaveBeenCalled();
+    expect(mockEditor.destroy).toHaveBeenCalled();
   });
 
   // ── Autosave ──────────────────────────────────────────────────────────────────

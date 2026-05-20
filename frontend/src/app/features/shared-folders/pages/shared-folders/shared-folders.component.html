@@ -111,7 +111,7 @@
     <!-- Upload section -->
     @if (uploadExpanded() && canEdit()) {
 
-      @if (uploadPhase() === 'idle' || uploadPhase() === 'error') {
+      @if (uploadState().phase === 'idle' || uploadState().phase === 'error') {
 
         <label
           class="upload-zone"
@@ -126,9 +126,9 @@
           <span class="btn-upload-label">{{ 'shared_folders.upload_btn' | translate }}</span>
         </label>
 
-        @if (uploadPhase() === 'error') {
+        @if (uploadState().phase === 'error') {
           <div class="upload-error-card">
-            <span>⚠️ {{ uploadError() }}</span>
+            <span>⚠️ {{ uploadState().error }}</span>
             <button class="btn-retry" (click)="resetUpload()">Повторить</button>
           </div>
         }
@@ -168,14 +168,14 @@
         </div>
       }
 
-      @if (uploadPhase() === 'uploading') {
+      @if (uploadState().phase === 'uploading' || uploadState().phase === 'init' || uploadState().phase === 'completing') {
         <div class="upload-progress-card">
-          <p>Загрузка... {{ uploadProgress() }}%</p>
-          <div class="progress-bar"><div class="progress-fill" [style.width.%]="uploadProgress()"></div></div>
+          <p>Загрузка... {{ uploadState().progress }}%</p>
+          <div class="progress-bar"><div class="progress-fill" [style.width.%]="uploadState().progress"></div></div>
         </div>
       }
 
-      @if (uploadPhase() === 'done') {
+      @if (uploadState().phase === 'done') {
         <div class="upload-done-card">
           ✅ Файл загружен!
           <button class="btn-mini" (click)="resetUpload()">Загрузить ещё</button>

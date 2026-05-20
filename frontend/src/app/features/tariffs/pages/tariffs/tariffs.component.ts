@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { TariffApiService } from '../../../../core/api/tariff-api.service';
 import { TariffUsage } from '../../../../shared/models/api.models';
+import { formatSize } from '../../../../shared/utils/format';
 
 @Component({
   selector: 'app-tariffs',
@@ -44,9 +45,6 @@ export class TariffsComponent {
   }
 
   formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 МБ';
-    const mb = bytes / (1024 * 1024);
-    if (mb >= 1024) return `${(mb / 1024).toFixed(1)} ГБ`;
-    return `${mb.toFixed(1)} МБ`;
+    return bytes === 0 ? '0 МБ' : formatSize(bytes);
   }
 }

@@ -2,15 +2,15 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpEventType, HttpEvent } from '@angular/common/http';
 import { Observable, from, of, switchMap, tap, throwError } from 'rxjs';
 import { FilesApiService } from '../../../core/api/files-api.service';
+import { SharedFoldersApiService } from '../../../core/api/shared-folders-api.service';
 import { AuthStateService } from '../../../core/auth/auth-state.service';
 import { VideoThumbnailService, GeneratedThumbnail } from './video-thumbnail.service';
 import { InitUploadRequest, InitUploadResponse } from '../../../shared/models/api.models';
+import { PLAN_FILE_LIMITS } from '../../../shared/constants/limits';
 
-const PLAN_FILE_LIMITS: Record<string, number> = {
-  free:   50  * 1024 * 1024,
-  silver: 100 * 1024 * 1024,
-  gold:   150 * 1024 * 1024,
-};
+export interface UploadOptions {
+  sharedFolderId?: string;
+}
 
 export interface UploadState {
   phase: 'idle' | 'init' | 'uploading' | 'completing' | 'done' | 'error';
@@ -22,6 +22,7 @@ export interface UploadState {
 @Injectable({ providedIn: 'root' })
 export class FileUploadService {
   private readonly filesApi         = inject(FilesApiService);
+  private readonly sfApi            = inject(SharedFoldersApiService);
   private readonly http             = inject(HttpClient);
   private readonly authState        = inject(AuthStateService);
   private readonly thumbnailService = inject(VideoThumbnailService);
@@ -32,7 +33,7 @@ export class FileUploadService {
 
   readonly state = this._state.asReadonly();
 
-  upload(file: File): Observable<string> {
+  upload(file: File, options?: UploadOptions): Observable<string> {
     const plan = this.authState.plan() ?? 'free';
     const limitBytes = PLAN_FILE_LIMITS[plan] ?? PLAN_FILE_LIMITS['free'];
     if (file.size > limitBytes) {
@@ -43,6 +44,7 @@ export class FileUploadService {
 
     this._setState({ phase: 'init', progress: 0, fileId: null, error: null });
 
+    const sfId = options?.sharedFolderId;
     const isVideo = file.type.startsWith('video/');
     const prep$: Observable<GeneratedThumbnail | null> = isVideo
       ? from(this.thumbnailService.generateFromFile(file).catch(() => null))
@@ -61,7 +63,11 @@ export class FileUploadService {
           initReq.thumbnail_mime = 'image/jpeg';
         }
 
-        return this.filesApi.initUpload(initReq).pipe(
+        const init$ = sfId
+          ? this.sfApi.initUpload(sfId, initReq)
+          : this.filesApi.initUpload(initReq);
+
+        return init$.pipe(
           switchMap((initRes) => {
             if (initRes.result !== 'success') throw new Error(initRes.message);
 
@@ -91,7 +97,10 @@ export class FileUploadService {
               switchMap((event: HttpEvent<unknown>) => {
                 if (event.type !== HttpEventType.Response) return of<string>();
                 this._setState({ phase: 'completing', progress: 100 });
-                return this.filesApi.completeUpload(fileId, thumbInfo?.key).pipe(
+                const complete$ = sfId
+                  ? this.sfApi.completeUpload(sfId, fileId, thumbInfo?.key)
+                  : this.filesApi.completeUpload(fileId, thumbInfo?.key);
+                return complete$.pipe(
                   tap((completeRes) => {
                     if (completeRes.result !== 'success') throw new Error(completeRes.message);
                     this._setState({ phase: 'done', fileId });

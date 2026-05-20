@@ -12,29 +12,15 @@ import {
   input,
   output,
   ChangeDetectionStrategy,
-  NgZone,
 } from '@angular/core';
-import { Editor } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import { ResizableImage } from '../markdown-editor/resizable-image.extension';
-import { Link } from '@tiptap/extension-link';
-import { TaskList } from '@tiptap/extension-task-list';
-import { TaskItem } from '@tiptap/extension-task-item';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableHeader } from '@tiptap/extension-table-header';
-import { TableCell } from '@tiptap/extension-table-cell';
-import { Markdown } from 'tiptap-markdown';
-import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { DocumentLockService } from '../../services/document-lock.service';
-import { Document as DocModel, ImageAsset } from '../../../../shared/models/api.models';
+import { MarkdownEditorService } from '../../services/markdown-editor.service';
 import { ImagePickerComponent } from '../markdown-editor/image-picker.component';
-
-type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'quota';
 
 @Component({
   selector: 'app-markdown-editor-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [MarkdownEditorService],
   imports: [ImagePickerComponent],
   host: { '[class.is-expanded]': 'expanded()' },
   template: `
@@ -299,60 +285,25 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
 
   @ViewChild('editorEl') editorEl!: ElementRef<HTMLElement>;
 
-  private readonly docsApi = inject(DocumentsApiService);
-  readonly lockService     = inject(DocumentLockService);
-  private readonly zone    = inject(NgZone);
+  private readonly editorSvc = inject(MarkdownEditorService);
+  readonly lockService        = this.editorSvc.lockService;
 
-  editor: Editor | null = null;
+  // Forward service state to component surface for template + test access
+  readonly doc              = this.editorSvc.doc;
+  readonly loading          = this.editorSvc.loading;
+  readonly saveStatus       = this.editorSvc.saveStatus;
+  readonly originalContent  = this.editorSvc.originalContent;
+  readonly conflictError    = this.editorSvc.conflictError;
+  readonly isImageSelected  = this.editorSvc.isImageSelected;
+  readonly selectedImgWidth = this.editorSvc.selectedImgWidth;
+  readonly imgWidthPx       = this.editorSvc.imgWidthPx;
+  readonly isInTable        = this.editorSvc.isInTable;
+  readonly lockState        = this.editorSvc.lockState;
+  readonly canEdit          = this.editorSvc.canEdit;
+  readonly lockedByOther    = this.editorSvc.lockedByOther;
 
-  private periodicSaveTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly AUTO_SAVE_INTERVAL = 30_000;
-
-  private readonly onBeforeUnload = (): void => {
-    if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
-      this.save();
-    }
-  };
-
-  constructor() {
-    effect(() => {
-      this.editor?.setEditable(this.canEdit());
-    });
-    effect(() => {
-      const trigger = this.refreshTrigger();
-      if (trigger > 0) {
-        this.lockService.reset();
-        this.loadDocument();
-      }
-    });
-  }
-
-  readonly doc              = signal<DocModel | null>(null);
-  readonly loading          = signal(true);
-  readonly saveStatus       = signal<SaveStatus>('saved');
-  readonly originalContent  = signal<string>('');
-  readonly collapsed        = signal(false);
-  readonly editorEmpty      = signal(true);
-  readonly showImagePicker  = signal(false);
-  readonly conflictError    = signal(false);
-  readonly isImageSelected  = signal(false);
-  readonly selectedImgWidth = signal<string | null>(null);
-  readonly imgWidthPx       = signal('');
-  readonly isInTable        = signal(false);
-
-  readonly lockState = this.lockService.lockState;
-
-  readonly canEdit = computed(() => {
-    const s = this.lockState();
-    return this.doc()?.capabilities?.canEdit === true && s === 'held';
-  });
-
-  readonly lockedByOther = computed(() => {
-    const d = this.doc();
-    if (!d?.lock?.isLocked) return false;
-    const ls = this.lockState();
-    return ls !== 'held' && ls !== 'acquiring';
-  });
+  readonly collapsed       = signal(false);
+  readonly showImagePicker = signal(false);
 
   readonly saveStatusLabel = computed(() => {
     switch (this.saveStatus()) {
@@ -364,9 +315,43 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
     }
   });
 
+  // Forwarded for test compatibility
+  get editor() { return this.editorSvc.editor; }
+  set editor(e: typeof this.editorSvc.editor) { this.editorSvc.editor = e; }
+
+  get periodicSaveTimer() { return this.editorSvc.periodicSaveTimer; }
+  set periodicSaveTimer(v: ReturnType<typeof setInterval> | null) { this.editorSvc.periodicSaveTimer = v; }
+
+  private readonly onBeforeUnload = (): void => {
+    if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
+      this.save();
+    }
+  };
+
+  constructor() {
+    effect(() => {
+      this.editorSvc.editor?.setEditable(this.canEdit());
+    });
+    effect(() => {
+      const trigger = this.refreshTrigger();
+      if (trigger > 0) {
+        this.lockService.reset();
+        this.editorSvc.loadDocument(
+          this.fileId(),
+          () => this.editorEl?.nativeElement ?? null,
+          { withTable: true },
+        );
+      }
+    });
+  }
+
   ngOnInit(): void {
     window.addEventListener('beforeunload', this.onBeforeUnload);
-    this.loadDocument();
+    this.editorSvc.loadDocument(
+      this.fileId(),
+      () => this.editorEl?.nativeElement ?? null,
+      { withTable: true },
+    );
   }
 
   ngAfterViewInit(): void {}
@@ -379,211 +364,48 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
     if (this.lockState() === 'held') {
       this.lockService.release(this.fileId());
     }
-    this.teardownEditor();
+    this.editorSvc.teardown();
     this.lockService.reset();
   }
 
-  private teardownEditor(): void {
-    if (this.periodicSaveTimer !== null) {
-      clearInterval(this.periodicSaveTimer);
-      this.periodicSaveTimer = null;
-    }
-    this.editor?.destroy();
-    this.editor = null;
-  }
+  save(): void    { this.editorSvc.save(this.fileId()); }
+  revert(): void  { this.editorSvc.revert(); }
 
-  private loadDocument(): void {
-    this.teardownEditor();
-    this.loading.set(true);
-    this.docsApi.get(this.fileId()).subscribe({
-      next: async (res) => {
-        this.doc.set(res.data.document);
-        this.originalContent.set(res.data.document.content ?? '');
-        this.loading.set(false);
+  cmd(command: string): void            { this.editorSvc.cmd(command); }
+  cmdHeading(level: 1 | 2 | 3): void   { this.editorSvc.cmdHeading(level); }
+  setImgWidth(w: number | null): void   { this.editorSvc.setImgWidth(w); }
+  onImgWidthChange(e: Event): void      { this.editorSvc.onImgWidthChange(e); }
 
-        if (res.data.document.capabilities.canEdit) {
-          // Always try to acquire — backend returns 201 if same user re-acquires
-          // their own lock (e.g. after page refresh), 423 if held by another user.
-          await this.lockService.acquire(this.fileId());
-        } else {
-          this.lockService.lockState.set('readonly');
-        }
+  openImagePicker(): void { this.showImagePicker.set(true); }
 
-        setTimeout(() => this.initEditor(res.data.document.content), 0);
-      },
-      error: () => {
-        this.loading.set(false);
-      },
-    });
-  }
-
-  private initEditor(content: string): void {
-    if (!this.editorEl) return;
-
-    this.zone.runOutsideAngular(() => {
-      this.editor = new Editor({
-        element: this.editorEl.nativeElement,
-        extensions: [
-          StarterKit,
-          ResizableImage.configure({ allowBase64: false }),
-          Link.configure({ openOnClick: false }),
-          TaskList,
-          TaskItem.configure({ nested: true }),
-          Table.configure({ resizable: false }),
-          TableRow,
-          TableHeader,
-          TableCell,
-          Markdown.configure({ transformPastedText: true }),
-        ],
-        content: '',
-        editable: this.canEdit(),
-        onUpdate: ({ editor }) => {
-          this.zone.run(() => {
-            this.editorEmpty.set(editor.isEmpty);
-            if (this.canEdit()) {
-              this.saveStatus.set('unsaved');
-            }
-          });
-        },
-        onSelectionUpdate: ({ editor }) => {
-          this.zone.run(() => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const sel = editor.state.selection as any;
-            const imgNode = sel.node?.type?.name === 'image' ? sel.node : null;
-            if (imgNode) {
-              this.isImageSelected.set(true);
-              const w: string | null = imgNode.attrs['width'] ?? null;
-              this.selectedImgWidth.set(w);
-              this.imgWidthPx.set(w ?? '');
-            } else {
-              this.isImageSelected.set(false);
-              this.selectedImgWidth.set(null);
-              this.imgWidthPx.set('');
-            }
-            this.isInTable.set(editor.isActive('table'));
-          });
-        },
-      });
-
-      if (content) {
-        this.editor.commands.setContent(content);
-        this.zone.run(() => this.editorEmpty.set(this.editor?.isEmpty ?? true));
-      }
-
-      this.periodicSaveTimer = setInterval(() => {
-        this.zone.run(() => {
-          if (this.canEdit() && this.saveStatus() === 'unsaved' && !this.conflictError()) {
-            this.save();
-          }
-        });
-      }, this.AUTO_SAVE_INTERVAL);
-    });
-  }
-
-  save(): void {
-    if (!this.editor || !this.doc()) return;
-
-    const etag = this.doc()!.etag;
-    if (!etag) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw: string = (this.editor.storage as any)['markdown']?.getMarkdown?.() ?? '';
-
-    this.conflictError.set(false);
-    this.saveStatus.set('saving');
-    this.docsApi.save(this.fileId(), raw, etag).subscribe({
-      next: res => {
-        this.doc.update(d => d ? { ...d, etag: res.data.etag, updatedAt: res.data.updatedAt } : d);
-        this.saveStatus.set('saved');
-      },
-      error: err => {
-        if (err?.status === 409) {
-          this.saveStatus.set('error');
-          this.conflictError.set(true);
-        } else if (err?.status === 413) {
-          this.saveStatus.set('quota');
-        } else {
-          this.saveStatus.set('error');
-        }
-      },
-    });
-  }
-
-  revert(): void {
-    if (!confirm('Отменить все изменения и вернуться к исходному содержимому?')) return;
-    if (!this.editor) return;
-    this.editor.commands.setContent(this.originalContent());
-    this.saveStatus.set('saved');
-  }
-
-  cmd(command: string): void {
-    if (!this.editor || !this.canEdit()) return;
-    const chain = this.editor.chain().focus();
-    (chain as unknown as Record<string, () => unknown>)[command]?.();
-    chain.run();
-  }
-
-  cmdHeading(level: 1 | 2 | 3): void {
-    if (!this.editor || !this.canEdit()) return;
-    this.editor.chain().focus().toggleHeading({ level }).run();
-  }
-
-  openImagePicker(): void {
-    this.showImagePicker.set(true);
-  }
-
-  onImageSelected(img: ImageAsset): void {
+  onImageSelected(img: import('../../../../shared/models/api.models').ImageAsset): void {
     this.showImagePicker.set(false);
-    if (!this.editor) return;
-    this.editor
-      .chain()
-      .focus()
-      .setImage({ src: img.stableUrl, alt: img.fileName, title: img.fileName })
-      .run();
+    this.editorSvc.insertImage(img);
   }
 
   async reacquire(): Promise<void> {
-    await this.lockService.reacquire(this.fileId());
-    if (this.lockState() === 'held') {
-      this.editor?.setEditable(true);
-    }
+    await this.editorSvc.reacquire(this.fileId());
   }
 
   onBodyClick(e: MouseEvent): void {
-    if (!this.editor || !this.canEdit()) return;
+    if (!this.editorSvc.editor || !this.canEdit()) return;
     const target = e.target as HTMLElement;
-    // Если клик был НЕ внутри ProseMirror — фокусируем редактор в конец документа
     if (!target.closest('.ProseMirror')) {
-      this.editor.commands.focus('end');
+      this.editorSvc.editor.commands.focus('end');
     }
   }
 
-  setImgWidth(width: number | null): void {
-    if (!this.editor || !this.canEdit()) return;
-    const w = width ? String(width) : null;
-    this.editor.chain().focus().updateAttributes('image', { width: w }).run();
-    this.selectedImgWidth.set(w);
-    this.imgWidthPx.set(w ?? '');
-  }
-
-  onImgWidthChange(event: Event): void {
-    const val = Math.round(+(event.target as HTMLInputElement).value);
-    if (val >= 40 && val <= 2000) this.setImgWidth(val);
-  }
-
   insertTable(): void {
-    if (!this.editor || !this.canEdit()) return;
-    this.editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    if (!this.editorSvc.editor || !this.canEdit()) return;
+    this.editorSvc.editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
   }
 
   tableCmd(command: string): void {
-    if (!this.editor || !this.canEdit()) return;
-    const chain = this.editor.chain().focus();
+    if (!this.editorSvc.editor || !this.canEdit()) return;
+    const chain = this.editorSvc.editor.chain().focus();
     (chain as unknown as Record<string, () => unknown>)[command]?.();
     chain.run();
   }
 
-  close(): void {
-    this.closed.emit();
-  }
+  close(): void { this.closed.emit(); }
 }

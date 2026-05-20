@@ -5,21 +5,15 @@ import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
-import { HttpClient, HttpEventType, HttpEvent } from '@angular/common/http';
-import { Observable, of, switchMap, from } from 'rxjs';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { SharedFolderAccessDialogComponent } from '../../dialogs/access/shared-folder-access-dialog.component';
 import { FilesApiService } from '../../../../core/api/files-api.service';
 import { SharedFolder, SharedFolderFileItem, LinkPreview } from '../../../../shared/models/api.models';
-import { AuthStateService } from '../../../../core/auth/auth-state.service';
-import { VideoThumbnailService } from '../../../files/services/video-thumbnail.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
-import { InitUploadRequest } from '../../../../shared/models/api.models';
+import { FileUploadService } from '../../../files/services/file-upload.service';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
-
-const PLAN_FILE_LIMITS: Record<string, number> = {
-  free: 50 * 1024 * 1024, silver: 100 * 1024 * 1024, gold: 150 * 1024 * 1024,
-};
+import { formatSize } from '../../../../shared/utils/format';
+import { canViewInBrowser } from '../../../../shared/utils/file';
 
 function mimeIcon(mime: string): string {
   if (!mime) return '📎';
@@ -29,12 +23,6 @@ function mimeIcon(mime: string): string {
   if (mime.includes('pdf')) return '📄';
   if (mime.includes('zip') || mime.includes('rar') || mime.includes('7z')) return '🗜️';
   return '📎';
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
 @Component({
@@ -48,9 +36,7 @@ export class SharedFoldersComponent implements OnInit {
   private readonly sfApi          = inject(SharedFoldersApiService);
   private readonly filesApi       = inject(FilesApiService);
   private readonly urlFilesApi    = inject(UrlFilesApiService);
-  private readonly authState      = inject(AuthStateService);
-  private readonly thumbnailSvc   = inject(VideoThumbnailService);
-  private readonly http           = inject(HttpClient);
+  private readonly uploadSvc      = inject(FileUploadService);
   private readonly route          = inject(ActivatedRoute);
   private readonly router         = inject(Router);
   private readonly fb             = inject(FormBuilder);
@@ -74,10 +60,7 @@ export class SharedFoldersComponent implements OnInit {
 
   readonly uploadExpanded  = signal(false);
   readonly isDragOver      = signal(false);
-  readonly uploadPhase     = signal<'idle'|'uploading'|'done'|'error'>('idle');
-  readonly uploadProgress  = signal(0);
-  readonly uploadError     = signal<string|null>(null);
-  readonly uploadedFileId  = signal<string|null>(null);
+  readonly uploadState     = this.uploadSvc.state;
 
   readonly previewing      = signal(false);
   readonly savingLink      = signal(false);
@@ -220,68 +203,9 @@ export class SharedFoldersComponent implements OnInit {
   private upload(file: File): void {
     const folderId = this.selectedFolder()?.id;
     if (!folderId) return;
-
-    const plan = this.authState.plan() ?? 'free';
-    const limitBytes = PLAN_FILE_LIMITS[plan] ?? PLAN_FILE_LIMITS['free'];
-    if (file.size > limitBytes) {
-      const mb = Math.round(limitBytes / 1024 / 1024);
-      this.uploadError.set(`Размер файла превышает лимит тарифа (${mb} МБ)`);
-      this.uploadPhase.set('error');
-      return;
-    }
-
-    this.uploadPhase.set('uploading');
-    this.uploadProgress.set(0);
-    this.uploadError.set(null);
-
-    const isVideo = file.type.startsWith('video/');
-    const prep$: Observable<{ file: File; blob: Blob; objectUrl: string } | null> = isVideo
-      ? from(this.thumbnailSvc.generateFromFile(file).catch(() => null))
-      : of(null);
-
-    prep$.pipe(
-      switchMap((thumb) => {
-        const req: InitUploadRequest = {
-          original_name: file.name,
-          size: file.size,
-          mime_type: file.type || 'application/octet-stream',
-        };
-        if (thumb) { req.thumbnail_name = thumb.file.name; req.thumbnail_size = thumb.blob.size; req.thumbnail_mime = 'image/jpeg'; }
-
-        return this.sfApi.initUpload(folderId, req).pipe(
-          switchMap((initRes) => {
-            if (initRes.result !== 'success') throw new Error(initRes.message);
-            const fileId = initRes.data.file.id;
-            const thumbInfo = initRes.data.thumbnail;
-
-            const thumbUpload$: Observable<unknown> = thumb && thumbInfo
-              ? this.http.put(thumbInfo.url, thumb.blob, { headers: thumbInfo.headers, withCredentials: false })
-              : of(null);
-
-            return thumbUpload$.pipe(
-              switchMap(() => this.http.put(initRes.data.upload.url, file, {
-                headers: initRes.data.upload.headers,
-                reportProgress: true, observe: 'events', withCredentials: false,
-              }) as Observable<HttpEvent<unknown>>),
-              switchMap((evt) => {
-                if ((evt as {type: number}).type === HttpEventType.UploadProgress) {
-                  const pe = evt as { loaded: number; total?: number };
-                  this.uploadProgress.set(pe.total ? Math.round(100 * pe.loaded / pe.total) : 0);
-                }
-                if ((evt as {type: number}).type !== HttpEventType.Response) return of(null);
-                return this.sfApi.completeUpload(folderId, fileId, thumbInfo?.key);
-              }),
-            );
-          }),
-        );
-      }),
-    ).subscribe({
-      next: (res) => {
-        if (!res) return;
-        this.uploadPhase.set('done');
-        this.loadFiles(1);
-      },
-      error: (err) => { this.uploadError.set(err.message ?? 'Ошибка загрузки'); this.uploadPhase.set('error'); },
+    this.uploadSvc.upload(file, { sharedFolderId: folderId }).subscribe({
+      next: () => this.loadFiles(1),
+      error: () => {},
     });
   }
 
@@ -294,12 +218,7 @@ export class SharedFoldersComponent implements OnInit {
   }
 
   canViewInBrowser(file: SharedFolderFileItem): boolean {
-    if (file.content_kind === 'url_file') return false;
-    const mime = file.mime_type ?? '';
-    return !!file.view_url && (
-      mime.startsWith('image/') || mime.startsWith('video/') ||
-      mime.startsWith('audio/') || mime.includes('pdf')
-    );
+    return canViewInBrowser(file.mime_type, file.view_url, file.content_kind);
   }
 
   fileDetailLink(fileId: string): string[] {
@@ -346,10 +265,7 @@ export class SharedFoldersComponent implements OnInit {
   }
 
   resetUpload(): void {
-    this.uploadPhase.set('idle');
-    this.uploadProgress.set(0);
-    this.uploadError.set(null);
-    this.uploadedFileId.set(null);
+    this.uploadSvc.reset();
   }
 
   previewLink(): void {

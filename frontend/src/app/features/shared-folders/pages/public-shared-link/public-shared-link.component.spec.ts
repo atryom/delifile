@@ -95,9 +95,9 @@ describe('PublicSharedLinkComponent', () => {
   it('should format size', () => {
     const fixture = TestBed.createComponent(PublicSharedLinkComponent);
     fixture.componentRef.setInput('token', 'token-123');
-    expect(fixture.componentInstance.formatSize(500)).toBe('500 B');
-    expect(fixture.componentInstance.formatSize(2048)).toContain('KB');
-    expect(fixture.componentInstance.formatSize(1048576)).toContain('MB');
+    expect(fixture.componentInstance.formatSize(500)).toBe('500 Б');
+    expect(fixture.componentInstance.formatSize(2048)).toContain('КБ');
+    expect(fixture.componentInstance.formatSize(1048576)).toContain('МБ');
   });
 
   it('should return mime icon', () => {

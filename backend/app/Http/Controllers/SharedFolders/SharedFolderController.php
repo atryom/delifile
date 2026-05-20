@@ -44,7 +44,13 @@ class SharedFolderController extends Controller
     {
         // Walk from this folder up to root
         $current = $folder;
+        $visited = [];
         while ($current) {
+            if (isset($visited[$current->id])) {
+                break;
+            }
+            $visited[$current->id] = true;
+
             if ($current->owner_id === $user->id) {
                 return true;
             }
@@ -60,7 +66,7 @@ class SharedFolderController extends Controller
                 return true;
             }
 
-            $current = $current->parent_id ? SharedFolder::find($current->parent_id) : null;
+            $current = $current->parent;
         }
 
         return false;
@@ -74,7 +80,7 @@ class SharedFolderController extends Controller
             'owner_id'       => $folder->owner_id,
             'parent_id'      => $folder->parent_id,
             'files_count'    => $folder->files_count ?? 0,
-            'children_count' => $folder->children()->count(),
+            'children_count' => $folder->children_count ?? 0,
             'is_owner'       => $folder->owner_id === $user->id,
             'my_access_type' => $myAccess?->access_type?->value,
             'created_at'     => $folder->created_at?->toIso8601String(),
@@ -83,6 +89,8 @@ class SharedFolderController extends Controller
 
     private function formatFileCard(File $file, User $user, int $addedBy): array
     {
+        $isUrlFile = ($file->content_kind === 'url_file');
+
         $item = [
             'id'                 => $file->id,
             'original_name'      => $file->original_name,
@@ -93,10 +101,10 @@ class SharedFolderController extends Controller
             'expires_at'         => $file->expires_at?->toIso8601String(),
             'uploaded_at'        => $file->created_at?->toIso8601String(),
             'preview_url'        => null,
-            'link_url'           => $file->link_url,
-            'link_title'         => $file->link_title,
-            'link_image_url'     => $file->link_image_url,
-            'link_site_name'     => $file->link_site_name,
+            'link_url'           => $isUrlFile ? $file->link_url : null,
+            'link_title'         => $isUrlFile ? $file->link_title : null,
+            'link_image_url'     => $isUrlFile ? $file->link_image_url : null,
+            'link_site_name'     => $isUrlFile ? $file->link_site_name : null,
             'is_owner'           => $file->owner_id === $user->id,
             'added_by'           => $addedBy,
             'shared_folder_only' => (bool) $file->shared_folder_only,
@@ -191,7 +199,7 @@ class SharedFolderController extends Controller
         $showIds = array_unique($showIds);
 
         $folders = SharedFolder::whereIn('id', $showIds)
-            ->withCount('sharedFiles as files_count')
+            ->withCount(['sharedFiles as files_count', 'children'])
             ->get();
 
         $myAccesses = SharedFolderAccess::where('user_id', $user->id)
@@ -219,11 +227,11 @@ class SharedFolderController extends Controller
         $rootIds       = $ownedRootIds->merge($accessRootIds)->unique();
 
         // BFS to collect all descendants
-        $all       = SharedFolder::whereIn('id', $rootIds)->get();
+        $all       = SharedFolder::whereIn('id', $rootIds)->withCount('children')->get();
         $nextIds   = $all->pluck('id');
 
         while ($nextIds->isNotEmpty()) {
-            $children = SharedFolder::whereIn('parent_id', $nextIds)->get();
+            $children = SharedFolder::whereIn('parent_id', $nextIds)->withCount('children')->get();
             if ($children->isEmpty()) break;
             $all     = $all->merge($children);
             $nextIds = $children->pluck('id');
@@ -250,7 +258,8 @@ class SharedFolderController extends Controller
             'name'     => $data['name'],
         ]);
 
-        $folder->files_count = 0;
+        $folder->files_count    = 0;
+        $folder->children_count = 0;
 
         return $this->success('Shared folder created', [
             'folder' => $this->formatFolder($folder, $request->user()),
@@ -281,7 +290,8 @@ class SharedFolderController extends Controller
             'name'      => $data['name'],
         ]);
 
-        $folder->files_count = 0;
+        $folder->files_count    = 0;
+        $folder->children_count = 0;
 
         return $this->success('Subfolder created', [
             'folder' => $this->formatFolder($folder, $request->user()),
@@ -305,7 +315,7 @@ class SharedFolderController extends Controller
 
         $user = $request->user();
         $children = SharedFolder::where('parent_id', $id)
-            ->withCount('sharedFiles as files_count')
+            ->withCount(['sharedFiles as files_count', 'children'])
             ->get();
 
         $myAccesses = SharedFolderAccess::where('user_id', $user->id)
@@ -337,7 +347,7 @@ class SharedFolderController extends Controller
         $data = $request->validate(['name' => 'required|string|max:100']);
         $folder->update(['name' => $data['name']]);
 
-        $folder->loadCount('sharedFiles as files_count');
+        $folder->loadCount(['sharedFiles as files_count', 'children']);
 
         return $this->success('Shared folder updated', [
             'folder' => $this->formatFolder($folder, $request->user()),
@@ -475,20 +485,12 @@ class SharedFolderController extends Controller
             'thumbnail_mime' => 'nullable|string|max:100',
         ]);
 
-        $plan        = $user->getPlan();
-        $fileSizeMax = $plan->fileSizeLimitBytes();
-
-        if ($data['size'] > $fileSizeMax) {
-            return $this->error(
-                'File size exceeds plan limit',
-                'FILE_SIZE_LIMIT_EXCEEDED',
-                ['limit_bytes' => $fileSizeMax],
-                422
-            );
+        if ($error = $this->fileService->validateFileSizeLimit($user, $data['size'])) {
+            return $this->error('File size exceeds plan limit', $error['code'], $error['data'], 422);
         }
 
-        if (!$this->fileService->checkStorageQuota($user, $data['size'])) {
-            return $this->error('Storage quota exceeded', 'STORAGE_LIMIT_EXCEEDED', [], 422);
+        if ($error = $this->fileService->validateStorageQuota($user, $data['size'])) {
+            return $this->error('Storage quota exceeded', $error['code'], [], 422);
         }
 
         return DB::transaction(function () use ($user, $folder, $data): JsonResponse {

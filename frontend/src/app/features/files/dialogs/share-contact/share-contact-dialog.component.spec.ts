@@ -65,7 +65,7 @@ describe('ShareContactDialogComponent', () => {
     fixture.componentInstance['selectedId'].set('c1');
     fixture.componentInstance.submit();
 
-    expect(mockFilesApi.shareToContact).toHaveBeenCalledWith('file-1', 'c1');
+    expect(mockFilesApi.shareToContact).toHaveBeenCalledWith('file-1', 'c1', undefined);
   });
 
   it('should not submit without selection', () => {

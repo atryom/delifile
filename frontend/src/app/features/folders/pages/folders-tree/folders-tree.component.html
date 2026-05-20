@@ -741,14 +741,14 @@
       @if (addModalTab() === 'file') {
         <div class="add-modal-body" role="tabpanel">
 
-          @if (uploadState().phase === 'uploading' || uploadState().phase === 'init' || uploadState().phase === 'completing' || sfUploadPhase() === 'uploading') {
+          @if (uploadState().phase === 'uploading' || uploadState().phase === 'init' || uploadState().phase === 'completing') {
             <div class="modal-upload-progress">
               <div class="modal-upload-info">
                 <span>Загрузка файла…</span>
-                <span class="modal-upload-pct">{{ sfUploadPhase() === 'uploading' ? sfUploadProgress() : uploadState().progress }}%</span>
+                <span class="modal-upload-pct">{{ uploadState().progress }}%</span>
               </div>
               <div class="progress-track">
-                <div class="progress-fill" [style.width]="(sfUploadPhase() === 'uploading' ? sfUploadProgress() : uploadState().progress) + '%'"></div>
+                <div class="progress-fill" [style.width]="uploadState().progress + '%'"></div>
               </div>
             </div>
           } @else {
@@ -771,10 +771,7 @@
           @if (uploadState().phase === 'error') {
             <div class="modal-alert-error" role="alert">{{ uploadState().error }}</div>
           }
-          @if (sfUploadPhase() === 'error') {
-            <div class="modal-alert-error" role="alert">{{ sfUploadError() }}</div>
-          }
-          @if (uploadState().phase === 'done' || sfUploadPhase() === 'done') {
+          @if (uploadState().phase === 'done') {
             <div class="modal-alert-success" role="status">Файл загружен успешно</div>
           }
         </div>

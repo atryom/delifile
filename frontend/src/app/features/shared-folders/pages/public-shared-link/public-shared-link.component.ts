@@ -5,6 +5,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { SharedFolder, SharedFolderAccessType, SharedFolderFileItem } from '../../../../shared/models/api.models';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
+import { formatSize } from '../../../../shared/utils/format';
 
 @Component({
   selector: 'app-public-shared-link',
@@ -187,9 +188,5 @@ export class PublicSharedLinkComponent implements OnInit {
     return '📎';
   }
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  }
+  readonly formatSize = formatSize;
 }

@@ -8,13 +8,12 @@ use App\Enums\FileStatus;
 use App\Models\DocumentLock;
 use App\Models\File;
 use App\Models\FileUserAccess;
-use App\Models\SharedFolder;
-use App\Models\SharedFolderAccess;
-use App\Models\SharedFolderFile;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Services\FileService;
+// Storage facade still used for S3 put/get operations (not URL generation)
+use App\Services\S3UrlService;
 
 class DocumentService
 {
@@ -25,6 +24,7 @@ class DocumentService
     public function __construct(
         private readonly ActivityService $activityService,
         private readonly FileService     $fileService,
+        private readonly S3UrlService    $s3,
     ) {}
 
     public function createDocument(User $user, string $fileName): array
@@ -165,38 +165,7 @@ class DocumentService
 
     public function canViewDocument(User $user, File $file): bool
     {
-        if ($file->isOwnedBy($user)) {
-            return true;
-        }
-
-        if (FileUserAccess::where('file_id', $file->id)->where('user_id', $user->id)->exists()) {
-            return true;
-        }
-
-        // Access via shared folder
-        $sharedFolderIds = SharedFolderFile::where('file_id', $file->id)->pluck('shared_folder_id');
-
-        foreach ($sharedFolderIds as $folderId) {
-            $current = SharedFolder::find($folderId);
-            $visited = [];
-            while ($current) {
-                if (isset($visited[$current->id])) {
-                    break; // cycle guard
-                }
-                $visited[$current->id] = true;
-
-                if ($current->owner_id === $user->id) {
-                    return true;
-                }
-                if (SharedFolderAccess::where('shared_folder_id', $current->id)
-                    ->where('user_id', $user->id)->exists()) {
-                    return true;
-                }
-                $current = $current->parent;
-            }
-        }
-
-        return false;
+        return $this->fileService->canAccess($user, $file);
     }
 
     // ── Lock ─────────────────────────────────────────────────────────────────
@@ -381,11 +350,8 @@ class DocumentService
     {
         $previewKey = $file->thumbnail_key ?? $file->storage_key;
 
-        try {
-            $previewUrl = Storage::disk('s3')->temporaryUrl($previewKey, now()->addHour());
-        } catch (\Throwable) {
-            $previewUrl = '/api/v1/files/' . $file->id . '/preview';
-        }
+        $previewUrl = $this->s3->tryTemporaryUrl($previewKey, 60)
+            ?? '/api/v1/files/' . $file->id . '/preview';
 
         $stableUrl = '/api/v1/files/' . $file->id . '/content';
 
@@ -419,15 +385,14 @@ class DocumentService
         }
 
         $files = File::whereIn('id', $ids)->get()->keyBy('id');
-        $ttl   = now()->addHour();
 
         // Pre-generate presigned URLs for all found files.
+        $ttlMinutes  = 60;
         $presignedMap = [];
         foreach ($files as $id => $file) {
-            try {
-                $presignedMap[$id] = Storage::disk('s3')->temporaryUrl($file->storage_key, $ttl);
-            } catch (\Throwable) {
-                // Leave stable URL in place if S3 is unavailable.
+            $url = $this->s3->tryTemporaryUrl($file->storage_key, $ttlMinutes);
+            if ($url) {
+                $presignedMap[$id] = $url;
             }
         }
 

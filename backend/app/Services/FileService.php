@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AccessType;
 use App\Enums\ActivityType;
 use App\Enums\FileStatus;
+use App\Jobs\CleanOrphanedS3ObjectJob;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\FileVersion;
@@ -13,13 +14,15 @@ use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class FileService
 {
     public function __construct(
-        private readonly ActivityService $activityService
+        private readonly ActivityService  $activityService,
+        private readonly S3UrlService     $s3,
+        private readonly MimeService      $mime,
+        private readonly FileCardBuilder  $cardBuilder,
     ) {}
 
     /**
@@ -27,7 +30,15 @@ class FileService
      */
     public function checkStorageQuota(User $user, int $fileSize): bool
     {
-        $used = (int) File::where('owner_id', $user->id)->sum('size');
+        $filesSize = (int) File::where('owner_id', $user->id)
+            ->where('status', FileStatus::Available)
+            ->sum('size');
+
+        $versionsSize = (int) FileVersion::whereHas('file', fn($q) =>
+            $q->where('owner_id', $user->id)->where('status', FileStatus::Available)
+        )->sum('size');
+
+        $used = $filesSize + $versionsSize;
         return ($used + $fileSize) <= $user->getPlan()->storageLimitBytes();
     }
 
@@ -92,7 +103,20 @@ class FileService
             if ($thumbnailKey) {
                 $update['thumbnail_key'] = $thumbnailKey;
             }
-            $file->update($update);
+
+            // Optimistic lock: only transition from Uploading → Available once
+            $affected = File::where('id', $file->id)
+                ->where('status', FileStatus::Uploading)
+                ->update($update);
+
+            if (!$affected) {
+                return [
+                    'file' => [
+                        'id'     => $file->id,
+                        'status' => $file->fresh()->status->value,
+                    ],
+                ];
+            }
 
             FileUserAccess::firstOrCreate([
                 'file_id'     => $file->id,
@@ -105,7 +129,7 @@ class FileService
             return [
                 'file' => [
                     'id'     => $file->id,
-                    'status' => $file->fresh()->status->value,
+                    'status' => FileStatus::Available->value,
                 ],
             ];
         });
@@ -117,7 +141,12 @@ class FileService
     public function cancelUpload(File $file): void
     {
         $file->update(['status' => FileStatus::Deleted]);
-        // Optionally: dispatch job to clean S3 object
+
+        if ($file->storage_key) {
+            CleanOrphanedS3ObjectJob::dispatch(
+                array_filter([$file->storage_key, $file->thumbnail_key])
+            )->delay(now()->addMinutes(5));
+        }
     }
 
     /**
@@ -143,7 +172,13 @@ class FileService
 
         foreach ($sharedFolderIds as $folderId) {
             $current = SharedFolder::find($folderId);
+            $visited = [];
             while ($current) {
+                if (isset($visited[$current->id])) {
+                    break;
+                }
+                $visited[$current->id] = true;
+
                 if ($current->owner_id === $user->id) {
                     return true;
                 }
@@ -151,7 +186,7 @@ class FileService
                     ->where('user_id', $user->id)->exists()) {
                     return true;
                 }
-                $current = $current->parent_id ? SharedFolder::find($current->parent_id) : null;
+                $current = $current->parent;
             }
         }
 
@@ -171,18 +206,36 @@ class FileService
     }
 
     /**
+     * Validate that a file size fits within the plan's per-file limit.
+     * Returns null if OK, or ['code' => ..., 'data' => [...]] if exceeded.
+     */
+    public function validateFileSizeLimit(User $user, int $fileSize): ?array
+    {
+        $limit = $user->getPlan()->fileSizeLimitBytes();
+        if ($fileSize > $limit) {
+            return ['code' => 'FILE_SIZE_LIMIT_EXCEEDED', 'data' => ['limit_bytes' => $limit]];
+        }
+        return null;
+    }
+
+    /**
+     * Validate that there is enough storage quota for a new file of given size.
+     * Returns null if OK, or ['code' => 'STORAGE_LIMIT_EXCEEDED', 'data' => []] if exceeded.
+     */
+    public function validateStorageQuota(User $user, int $fileSize): ?array
+    {
+        if (!$this->checkStorageQuota($user, $fileSize)) {
+            return ['code' => 'STORAGE_LIMIT_EXCEEDED', 'data' => []];
+        }
+        return null;
+    }
+
+    /**
      * Generate a signed S3 download URL after access check.
      */
     public function generateDownloadUrl(File $file): string
     {
-        $ttl = config('filesystems.disks.s3.presigned_url_ttl', 3600);
-
-        // Using Laravel's Storage facade with S3 driver
-        return Storage::disk('s3')->temporaryUrl(
-            $file->storage_key,
-            now()->addSeconds($ttl),
-            ['ResponseContentDisposition' => 'attachment; filename="' . $file->original_name . '"']
-        );
+        return $this->s3->generateDownloadUrl($file);
     }
 
     /**
@@ -353,92 +406,12 @@ class FileService
      */
     public function buildFileCard(File $file, User $user): array
     {
-        $access = FileUserAccess::where('file_id', $file->id)
-            ->where('user_id', $user->id)
-            ->first();
-
-        $base = [
-            'id'            => $file->id,
-            'content_kind'  => $file->content_kind ?? 'binary_file',
-            'original_name' => $file->original_name,
-            'display_name'  => $file->display_name,
-            'has_versions'  => (bool) $file->has_versions,
-            'size'          => $file->size,
-            'mime_type'     => $file->mime_type,
-            'status'        => $file->status->value,
-            'uploaded_at'   => $file->created_at?->toIso8601String(),
-            'expires_at'    => null,
-            'is_owner'      => $file->isOwnedBy($user),
-            'access_type'   => $access?->access_type?->value,
-            'is_favorite'   => $access?->is_favorite ?? false,
-            'is_pinned'     => false,
-            'description'         => $access?->description,
-            'folder_id'           => $access?->folder_id,
-            'shared_folder_only'  => (bool) $file->shared_folder_only,
-            'tags'                => DB::table('file_tags')
-                ->join('tags', 'tags.id', '=', 'file_tags.tag_id')
-                ->where('file_tags.file_id', $file->id)
-                ->where('file_tags.user_id', $user->id)
-                ->select('tags.id', 'tags.name')
-                ->get()
-                ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])
-                ->values(),
-            'owner'         => [
-                'id'    => $file->owner->id,
-                'email' => $file->owner->email,
-                'name'  => $file->owner->name,
-            ],
-            'versions'      => $file->has_versions ? $this->buildVersionsList($file) : [],
-        ];
-
-        if ($file->isUrlFile()) {
-            $base['link_url']         = $file->link_url;
-            $base['link_title']       = $file->link_title;
-            $base['link_description'] = $file->link_description;
-            $base['link_image_url']   = $file->link_image_url;
-            $base['link_site_name']   = $file->link_site_name;
-            $base['preview_url']      = null;
-            $base['view_url']         = null;
-        } elseif ($file->storage_key && $file->isAvailable()) {
-            $mime = $file->mime_type ?? '';
-            [$previewUrl, $viewUrl] = $this->resolvePreviewAndViewUrls($file, $mime);
-            $base['preview_url'] = $previewUrl;
-            $base['view_url']    = $viewUrl;
-        } else {
-            $base['preview_url'] = null;
-            $base['view_url']    = null;
-        }
-
-        return $base;
+        return $this->cardBuilder->buildCard($file, $user);
     }
 
     public function resolvePreviewAndViewUrls(File $file, string $mime): array
     {
-        $previewUrl = null;
-        $viewUrl    = null;
-
-        try {
-            $isImage = str_starts_with($mime, 'image/');
-            $isVideo = str_starts_with($mime, 'video/');
-            $isAudio = str_starts_with($mime, 'audio/');
-            $isPdf   = str_contains($mime, 'pdf');
-
-            if ($isImage) {
-                $previewUrl = Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addMinutes(60));
-                $viewUrl    = $previewUrl;
-            } elseif ($isVideo) {
-                if ($file->thumbnail_key) {
-                    $previewUrl = Storage::disk('s3')->temporaryUrl($file->thumbnail_key, now()->addMinutes(60));
-                }
-                $viewUrl = Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addHours(2));
-            } elseif ($isAudio || $isPdf) {
-                $viewUrl = Storage::disk('s3')->temporaryUrl($file->storage_key, now()->addHours(2));
-            }
-        } catch (\Throwable) {
-            // ignore signing errors
-        }
-
-        return [$previewUrl, $viewUrl];
+        return $this->s3->resolvePreviewAndViewUrls($file, $mime);
     }
 
     /**
@@ -546,67 +519,7 @@ class FileService
 
     private function applyTypeGroupFilter($query, string $group): void
     {
-        if ($group === 'image') {
-            $query->where('mime_type', 'like', 'image/%');
-        } elseif ($group === 'video') {
-            $query->where('mime_type', 'like', 'video/%');
-        } elseif ($group === 'audio') {
-            $query->where('mime_type', 'like', 'audio/%');
-        } elseif ($group === 'link') {
-            $query->where('content_kind', 'url_file');
-        } elseif ($group === 'document') {
-            $query->where('content_kind', 'binary_file')
-                  ->where(function ($q) {
-                      $q->where('mime_type', 'like', '%pdf%')
-                        ->orWhere('mime_type', 'like', '%msword%')
-                        ->orWhere('mime_type', 'like', '%wordprocessingml%')
-                        ->orWhere('mime_type', 'like', '%spreadsheetml%')
-                        ->orWhere('mime_type', 'like', '%presentationml%')
-                        ->orWhere('mime_type', 'like', '%opendocument%')
-                        ->orWhere('mime_type', 'like', '%ms-excel%')
-                        ->orWhere('mime_type', 'like', '%ms-powerpoint%')
-                        ->orWhere('mime_type', 'like', 'text/plain')
-                        ->orWhere('mime_type', 'like', 'text/csv')
-                        ->orWhere('mime_type', 'like', 'text/rtf');
-                  });
-        } elseif ($group === 'archive') {
-            $query->where('content_kind', 'binary_file')
-                  ->where(function ($q) {
-                      $q->where('mime_type', 'like', '%zip%')
-                        ->orWhere('mime_type', 'like', '%x-rar%')
-                        ->orWhere('mime_type', 'like', '%x-7z%')
-                        ->orWhere('mime_type', 'like', '%x-tar%')
-                        ->orWhere('mime_type', 'like', '%gzip%')
-                        ->orWhere('mime_type', 'like', '%bzip%');
-                  });
-        } elseif ($group === 'note') {
-            $query->where('mime_type', 'text/markdown');
-        } elseif ($group === 'other') {
-            $query->where('content_kind', 'binary_file')
-                  ->where('mime_type', 'not like', 'image/%')
-                  ->where('mime_type', 'not like', 'video/%')
-                  ->where('mime_type', 'not like', 'audio/%')
-                  ->where('mime_type', '!=', 'text/markdown')
-                  ->where(function ($q) {
-                      $q->where('mime_type', 'not like', '%pdf%')
-                        ->where('mime_type', 'not like', '%msword%')
-                        ->where('mime_type', 'not like', '%wordprocessingml%')
-                        ->where('mime_type', 'not like', '%spreadsheetml%')
-                        ->where('mime_type', 'not like', '%presentationml%')
-                        ->where('mime_type', 'not like', '%opendocument%')
-                        ->where('mime_type', 'not like', '%ms-excel%')
-                        ->where('mime_type', 'not like', '%ms-powerpoint%')
-                        ->where('mime_type', 'not like', 'text/plain')
-                        ->where('mime_type', 'not like', 'text/csv')
-                        ->where('mime_type', 'not like', 'text/rtf')
-                        ->where('mime_type', 'not like', '%zip%')
-                        ->where('mime_type', 'not like', '%x-rar%')
-                        ->where('mime_type', 'not like', '%x-7z%')
-                        ->where('mime_type', 'not like', '%x-tar%')
-                        ->where('mime_type', 'not like', '%gzip%')
-                        ->where('mime_type', 'not like', '%bzip%');
-                  });
-        }
+        $this->mime->buildSqlTypeGroupFilter($query, $group);
     }
 
     private function computeAvailableTypeGroups($query): array
@@ -614,72 +527,15 @@ class FileService
         $rows = $query->select(['mime_type', 'content_kind'])->distinct()->get();
         $groups = [];
         foreach ($rows as $row) {
-            $g = $this->classifyMimeType($row->content_kind ?? 'binary_file', $row->mime_type ?? '');
+            $g = $this->mime->classify($row->content_kind ?? 'binary_file', $row->mime_type ?? '');
             $groups[$g] = true;
         }
         return array_keys($groups);
     }
 
-    private function classifyMimeType(string $contentKind, string $mimeType): string
-    {
-        if ($contentKind === 'url_file') return 'link';
-        if ($mimeType === 'text/markdown') return 'note';
-        if (str_starts_with($mimeType, 'image/')) return 'image';
-        if (str_starts_with($mimeType, 'video/')) return 'video';
-        if (str_starts_with($mimeType, 'audio/')) return 'audio';
-
-        foreach (['pdf', 'msword', 'wordprocessingml', 'spreadsheetml', 'presentationml', 'opendocument', 'ms-excel', 'ms-powerpoint', 'text/plain', 'text/csv', 'text/rtf'] as $pat) {
-            if (str_contains($mimeType, $pat)) return 'document';
-        }
-
-        foreach (['zip', 'x-rar', 'x-7z', 'x-tar', 'gzip', 'bzip'] as $pat) {
-            if (str_contains($mimeType, $pat)) return 'archive';
-        }
-
-        return 'other';
-    }
-
     private function buildListItem(File $f, ?User $user = null): array
     {
-        $access = $user ? $f->relationLoaded('accesses')
-            ? $f->accesses->firstWhere('user_id', $user->id)
-            : FileUserAccess::where('file_id', $f->id)->where('user_id', $user->id)->first()
-            : null;
-
-        $item = [
-            'id'            => $f->id,
-            'content_kind'  => $f->content_kind ?? 'binary_file',
-            'original_name' => $f->original_name,
-            'display_name'  => $f->display_name,
-            'has_versions'  => (bool) $f->has_versions,
-            'size'          => $f->size,
-            'mime_type'     => $f->mime_type,
-            'status'        => $f->status->value,
-            'expires_at'    => $f->expires_at?->toIso8601String(),
-            'uploaded_at'   => $f->created_at?->toIso8601String(),
-            'description'   => $access?->description,
-            'preview_url'   => null,
-        ];
-
-        if ($f->content_kind === 'url_file') {
-            $item['link_url']       = $f->link_url;
-            $item['link_title']     = $f->link_title;
-            $item['link_image_url'] = $f->link_image_url;
-            $item['link_site_name'] = $f->link_site_name;
-        } elseif ($f->storage_key && $f->isAvailable()) {
-            $mime = $f->mime_type ?? '';
-            if (str_starts_with($mime, 'image/')) {
-                try {
-                    $item['preview_url'] = Storage::disk('s3')->temporaryUrl($f->storage_key, now()->addMinutes(60));
-                } catch (\Throwable) {}
-            } elseif (str_starts_with($mime, 'video/') && $f->thumbnail_key) {
-                try {
-                    $item['preview_url'] = Storage::disk('s3')->temporaryUrl($f->thumbnail_key, now()->addMinutes(60));
-                } catch (\Throwable) {}
-            }
-        }
-
-        return $item;
+        return $this->cardBuilder->buildListItem($f, $user);
     }
 
     /**
@@ -687,39 +543,12 @@ class FileService
      */
     public function buildVersionsList(File $file): array
     {
-        return FileVersion::where('file_id', $file->id)
-            ->where('status', 'available')
-            ->orderBy('version_number')
-            ->get()
-            ->map(fn ($v) => $this->buildVersionItem($v))
-            ->values()
-            ->toArray();
+        return $this->cardBuilder->buildVersionsList($file);
     }
 
     public function buildVersionItem(FileVersion $version): array
     {
-        $previewUrl = null;
-        try {
-            $mime = $version->mime_type ?? '';
-            if (str_starts_with($mime, 'image/') && $version->storage_key) {
-                $previewUrl = Storage::disk('s3')->temporaryUrl($version->storage_key, now()->addMinutes(60));
-            } elseif (str_starts_with($mime, 'video/') && $version->thumbnail_key) {
-                $previewUrl = Storage::disk('s3')->temporaryUrl($version->thumbnail_key, now()->addMinutes(60));
-            }
-        } catch (\Throwable) {}
-
-        return [
-            'id'             => $version->id,
-            'version_number' => $version->version_number,
-            'version_label'  => $version->version_label,
-            'comment'        => $version->comment,
-            'original_name'  => $version->original_name,
-            'size'           => $version->size,
-            'mime_type'      => $version->mime_type,
-            'is_active'      => $version->is_active,
-            'preview_url'    => $previewUrl,
-            'created_at'     => $version->created_at?->toIso8601String(),
-        ];
+        return $this->cardBuilder->buildVersionItem($version);
     }
 
     /**
@@ -727,19 +556,6 @@ class FileService
      */
     public function generatePresignedPutUrl(string $key, string $mimeType): string
     {
-        // Uses AWS SDK via Storage facade
-        $client = Storage::disk('s3')->getClient();
-        $bucket = config('filesystems.disks.s3.bucket');
-        $ttl    = config('filesystems.disks.s3.presigned_url_ttl', 3600);
-
-        $cmd = $client->getCommand('PutObject', [
-            'Bucket'      => $bucket,
-            'Key'         => $key,
-            'ContentType' => $mimeType,
-        ]);
-
-        $request = $client->createPresignedRequest($cmd, '+' . $ttl . ' seconds');
-
-        return (string) $request->getUri();
+        return $this->s3->generatePresignedPutUrl($key, $mimeType);
     }
 }

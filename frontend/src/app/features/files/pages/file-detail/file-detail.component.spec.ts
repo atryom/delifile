@@ -285,8 +285,8 @@ describe('FileDetailComponent', () => {
 
   it('should format size', () => {
     const fixture = TestBed.createComponent(FileDetailComponent);
-    expect(fixture.componentInstance.formatSize(500)).toBe('500 B');
-    expect(fixture.componentInstance.formatSize(2048)).toContain('KB');
+    expect(fixture.componentInstance.formatSize(500)).toBe('500 Б');
+    expect(fixture.componentInstance.formatSize(2048)).toContain('КБ');
   });
 
   it('should return mime icon', () => {

@@ -11,26 +11,16 @@ import {
   ViewChild,
   input,
   ChangeDetectionStrategy,
-  NgZone,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { Editor } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
-import { ResizableImage } from './resizable-image.extension';
-import { Link } from '@tiptap/extension-link';
-import { TaskList } from '@tiptap/extension-task-list';
-import { TaskItem } from '@tiptap/extension-task-item';
-import { Markdown } from 'tiptap-markdown';
-import { DocumentsApiService } from '../../../../core/api/documents-api.service';
-import { DocumentLockService, LockState } from '../../services/document-lock.service';
-import { Document as DocModel, ImageAsset } from '../../../../shared/models/api.models';
+import { DocumentLockService } from '../../services/document-lock.service';
+import { MarkdownEditorService } from '../../services/markdown-editor.service';
 import { ImagePickerComponent } from './image-picker.component';
-
-type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'error' | 'quota';
 
 @Component({
   selector: 'app-markdown-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [MarkdownEditorService],
   imports: [ImagePickerComponent],
   template: `
     <div class="md-editor-shell">
@@ -168,50 +158,24 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
 
   @ViewChild('editorEl') editorEl!: ElementRef<HTMLElement>;
 
-  private readonly docsApi = inject(DocumentsApiService);
-  readonly lockService     = inject(DocumentLockService);
-  private readonly router  = inject(Router);
-  private readonly zone    = inject(NgZone);
+  private readonly editorSvc  = inject(MarkdownEditorService);
+  readonly lockService         = this.editorSvc.lockService;
+  private readonly router      = inject(Router);
 
-  editor: Editor | null = null;
+  // Forward service state to component surface for template + test access
+  readonly doc              = this.editorSvc.doc;
+  readonly loading          = this.editorSvc.loading;
+  readonly saveStatus       = this.editorSvc.saveStatus;
+  readonly originalContent  = this.editorSvc.originalContent;
+  readonly conflictError    = this.editorSvc.conflictError;
+  readonly isImageSelected  = this.editorSvc.isImageSelected;
+  readonly selectedImgWidth = this.editorSvc.selectedImgWidth;
+  readonly imgWidthPx       = this.editorSvc.imgWidthPx;
+  readonly lockState        = this.editorSvc.lockState;
+  readonly canEdit          = this.editorSvc.canEdit;
+  readonly lockedByOther    = this.editorSvc.lockedByOther;
 
-  private periodicSaveTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly AUTO_SAVE_INTERVAL = 30_000;
-
-  private readonly onBeforeUnload = (): void => {
-    if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
-      this.save();
-    }
-  };
-
-  constructor() {
-    effect(() => {
-      this.editor?.setEditable(this.canEdit());
-    });
-  }
-
-  readonly doc              = signal<DocModel | null>(null);
-  readonly loading          = signal(true);
-  readonly saveStatus       = signal<SaveStatus>('saved');
-  readonly originalContent  = signal<string>('');
-  readonly showImagePicker  = signal(false);
-  readonly conflictError    = signal(false);
-  readonly isImageSelected  = signal(false);
-  readonly selectedImgWidth = signal<string | null>(null);
-  readonly imgWidthPx       = signal('');
-
-  readonly lockState  = this.lockService.lockState;
-  readonly canEdit    = computed(() => {
-    const s = this.lockState();
-    return this.doc()?.capabilities?.canEdit === true && s === 'held';
-  });
-
-  readonly lockedByOther = computed(() => {
-    const d = this.doc();
-    if (!d?.lock?.isLocked) return false;
-    const lockState = this.lockState();
-    return lockState !== 'held' && lockState !== 'acquiring';
-  });
+  readonly showImagePicker = signal(false);
 
   readonly saveStatusLabel = computed(() => {
     switch (this.saveStatus()) {
@@ -223,215 +187,68 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
     }
   });
 
-  ngOnInit(): void {
-    window.addEventListener('beforeunload', this.onBeforeUnload);
-    this.loadDocument();
-  }
+  // Forwarded for test compatibility (tests access via (component as any).editor / .periodicSaveTimer)
+  get editor() { return this.editorSvc.editor; }
+  set editor(e: typeof this.editorSvc.editor) { this.editorSvc.editor = e; }
 
-  ngAfterViewInit(): void {
-    // Editor will be created after document loads
-  }
+  get periodicSaveTimer() { return this.editorSvc.periodicSaveTimer; }
+  set periodicSaveTimer(v: ReturnType<typeof setInterval> | null) { this.editorSvc.periodicSaveTimer = v; }
 
-  ngOnDestroy(): void {
-    window.removeEventListener('beforeunload', this.onBeforeUnload);
-    if (this.periodicSaveTimer !== null) {
-      clearInterval(this.periodicSaveTimer);
-      this.periodicSaveTimer = null;
-    }
+  private readonly onBeforeUnload = (): void => {
     if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
       this.save();
     }
-    const id = this.id();
-    if (this.lockState() === 'held') {
-      this.lockService.release(id);
+  };
+
+  constructor() {
+    effect(() => {
+      this.editorSvc.editor?.setEditable(this.canEdit());
+    });
+  }
+
+  ngOnInit(): void {
+    window.addEventListener('beforeunload', this.onBeforeUnload);
+    this.editorSvc.loadDocument(this.id(), () => this.editorEl?.nativeElement ?? null);
+  }
+
+  ngAfterViewInit(): void {}
+
+  ngOnDestroy(): void {
+    window.removeEventListener('beforeunload', this.onBeforeUnload);
+    if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
+      this.save();
     }
-    this.editor?.destroy();
+    if (this.lockState() === 'held') {
+      this.lockService.release(this.id());
+    }
+    this.editorSvc.teardown();
     this.lockService.reset();
   }
 
-  private loadDocument(): void {
-    this.docsApi.get(this.id()).subscribe({
-      next: async (res) => {
-        this.doc.set(res.data.document);
-        this.originalContent.set(res.data.document.content ?? '');
-        this.loading.set(false);
+  save(): void    { this.editorSvc.save(this.id()); }
+  revert(): void  { this.editorSvc.revert(); }
 
-        // Acquire lock BEFORE creating editor so canEdit() is settled.
-        // Always try — backend returns 201 for same-user re-acquisition (e.g. after
-        // page refresh), 423 only when another user genuinely holds the lock.
-        if (res.data.document.capabilities.canEdit) {
-          await this.lockService.acquire(this.id());
-        } else {
-          this.lockService.lockState.set('readonly');
-        }
+  cmd(command: string): void            { this.editorSvc.cmd(command); }
+  cmdHeading(level: 1 | 2 | 3): void   { this.editorSvc.cmdHeading(level); }
+  setImgWidth(w: number | null): void   { this.editorSvc.setImgWidth(w); }
+  onImgWidthChange(e: Event): void      { this.editorSvc.onImgWidthChange(e); }
 
-        // Init editor after view has updated (loading spinner replaced by editorEl)
-        setTimeout(() => this.initEditor(res.data.document.content), 0);
-      },
-      error: () => {
-        this.loading.set(false);
-      },
-    });
-  }
+  openImagePicker(): void { this.showImagePicker.set(true); }
 
-  private initEditor(content: string): void {
-    if (!this.editorEl) return;
-
-    this.zone.runOutsideAngular(() => {
-      this.editor = new Editor({
-        element: this.editorEl.nativeElement,
-        extensions: [
-          StarterKit,
-          ResizableImage.configure({ allowBase64: false }),
-          Link.configure({ openOnClick: false }),
-          TaskList,
-          TaskItem.configure({ nested: true }),
-          Markdown.configure({ transformPastedText: true }),
-        ],
-        content: '',
-        editable: this.canEdit(),
-        onUpdate: () => {
-          this.zone.run(() => {
-            if (this.canEdit()) {
-              this.saveStatus.set('unsaved');
-            }
-          });
-        },
-        onSelectionUpdate: ({ editor }) => {
-          this.zone.run(() => {
-            const sel = editor.state.selection as unknown as { node?: { type?: { name?: string }; attrs?: Record<string, unknown> } };
-            const imgNode = sel.node?.type?.name === 'image' ? sel.node : null;
-            if (imgNode) {
-              this.isImageSelected.set(true);
-              const w = (imgNode.attrs?.['width'] as string | null) ?? null;
-              this.selectedImgWidth.set(w);
-              this.imgWidthPx.set(w ?? '');
-            } else {
-              this.isImageSelected.set(false);
-              this.selectedImgWidth.set(null);
-              this.imgWidthPx.set('');
-            }
-          });
-        },
-      });
-
-      if (content) {
-        this.editor.commands.setContent(content);
-      }
-
-      this.periodicSaveTimer = setInterval(() => {
-        this.zone.run(() => {
-          if (this.canEdit() && this.saveStatus() === 'unsaved' && !this.conflictError()) {
-            this.save();
-          }
-        });
-      }, this.AUTO_SAVE_INTERVAL);
-    });
-  }
-
-  save(): void {
-    if (!this.editor || !this.doc()) return;
-
-    const etag = this.doc()!.etag;
-    if (!etag) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw: string = (this.editor.storage as any)['markdown']?.getMarkdown?.() ?? '';
-
-    this.conflictError.set(false);
-    this.saveStatus.set('saving');
-    this.docsApi.save(this.id(), raw, etag).subscribe({
-      next: res => {
-        this.doc.update(d => d ? { ...d, etag: res.data.etag, updatedAt: res.data.updatedAt } : d);
-        this.saveStatus.set('saved');
-      },
-      error: err => {
-        if (err?.status === 409) {
-          this.saveStatus.set('error');
-          this.conflictError.set(true);
-        } else if (err?.status === 413) {
-          this.saveStatus.set('quota');
-        } else {
-          this.saveStatus.set('error');
-        }
-      },
-    });
-  }
-
-  revert(): void {
-    if (!confirm('Отменить все изменения и вернуться к исходному содержимому?')) return;
-    if (!this.editor) return;
-    this.editor.commands.setContent(this.originalContent());
-    this.saveStatus.set('saved');
-  }
-
-  cmd(command: string): void {
-    if (!this.editor || !this.canEdit()) return;
-    const chain = this.editor.chain().focus();
-    (chain as unknown as Record<string, () => unknown>)[command]?.();
-    chain.run();
-  }
-
-  cmdHeading(level: 1 | 2 | 3): void {
-    if (!this.editor || !this.canEdit()) return;
-    this.editor.chain().focus().toggleHeading({ level }).run();
-  }
-
-  openImagePicker(): void {
-    this.showImagePicker.set(true);
-  }
-
-  onImageSelected(img: ImageAsset): void {
+  onImageSelected(img: import('../../../../shared/models/api.models').ImageAsset): void {
     this.showImagePicker.set(false);
-    if (!this.editor) return;
-
-    this.editor
-      .chain()
-      .focus()
-      .setImage({ src: img.stableUrl, alt: img.fileName, title: img.fileName })
-      .run();
+    this.editorSvc.insertImage(img);
   }
 
   async reacquire(): Promise<void> {
-    await this.lockService.reacquire(this.id());
-    if (this.lockState() === 'held') {
-      this.editor?.setEditable(true);
-    }
+    await this.editorSvc.reacquire(this.id());
   }
 
   takeover(): void {
     this.lockService.takeover(this.id()).then(ok => {
-      if (ok) {
-        this.editor?.setEditable(true);
-      }
+      if (ok) this.editorSvc.editor?.setEditable(true);
     });
   }
 
-  setImgWidth(width: number | null): void {
-    if (!this.editor) return;
-    const { state, dispatch } = this.editor.view;
-    const { selection } = state;
-    const attrs = width ? { width: String(width) } : { width: null };
-    dispatch(state.tr.setNodeMarkup(selection.from, undefined, {
-      ...(state.doc.nodeAt(selection.from)?.attrs ?? {}),
-      ...attrs,
-    }));
-    this.selectedImgWidth.set(attrs.width);
-    this.imgWidthPx.set(attrs.width ?? '');
-    this.saveStatus.set('unsaved');
-  }
-
-  onImgWidthChange(event: Event): void {
-    const val = (event.target as HTMLInputElement).value.trim();
-    const px = val ? parseInt(val, 10) : null;
-    if (px && px > 0) {
-      this.setImgWidth(px);
-    } else if (!val) {
-      this.setImgWidth(null);
-    }
-  }
-
-  goBack(): void {
-    this.router.navigate(['/files']);
-  }
+  goBack(): void { this.router.navigate(['/files']); }
 }

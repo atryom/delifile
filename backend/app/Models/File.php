@@ -142,18 +142,7 @@ class File extends Model
 
     public function canBeDeleted(): bool
     {
-        // Can only be physically deleted when:
-        // - TTL expired
-        // - No active share links
-        // - No 'saved' type accesses keeping it alive
-        $hasActiveSaved = $this->accesses()
-            ->where('access_type', 'saved')
-            ->exists();
-
-        $hasActiveLinks = $this->shareLinks()
-            ->where('status', 'active')
-            ->exists();
-
-        return !$hasActiveSaved && !$hasActiveLinks;
+        return !$this->accesses()->where('access_type', 'saved')->exists()
+            && !$this->shareLinks()->where('status', 'active')->exists();
     }
 }

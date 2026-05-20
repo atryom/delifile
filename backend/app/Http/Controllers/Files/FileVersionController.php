@@ -6,16 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\FileVersion;
 use App\Services\FileService;
+use App\Services\MimeService;
+use App\Services\S3UrlService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class FileVersionController extends Controller
 {
     public function __construct(
-        private readonly FileService $fileService
+        private readonly FileService  $fileService,
+        private readonly MimeService  $mime,
+        private readonly S3UrlService $s3,
     ) {}
 
     /**
@@ -39,8 +42,8 @@ class FileVersionController extends Controller
             'thumbnail_mime' => 'nullable|string|max:100',
         ]);
 
-        $parentGroup = $this->getMimeGroup($file->mime_type ?? '');
-        $newGroup    = $this->getMimeGroup($data['mime_type']);
+        $parentGroup = $this->mime->getGroup($file->mime_type ?? '');
+        $newGroup    = $this->mime->getGroup($data['mime_type']);
         if ($parentGroup !== 'other' && $parentGroup !== $newGroup) {
             return $this->error(
                 'Новая версия должна быть того же типа файла, что и исходный',
@@ -50,8 +53,8 @@ class FileVersionController extends Controller
             );
         }
 
-        if (!$this->fileService->checkStorageQuota($request->user(), $data['size'])) {
-            return $this->error('Превышен лимит хранилища', 'STORAGE_LIMIT_EXCEEDED', [], 422);
+        if ($error = $this->fileService->validateStorageQuota($request->user(), $data['size'])) {
+            return $this->error('Превышен лимит хранилища', $error['code'], [], 422);
         }
 
         return DB::transaction(function () use ($file, $data) {
@@ -250,24 +253,12 @@ class FileVersionController extends Controller
             return $this->notFound('Version not found');
         }
 
-        $ttl = config('filesystems.disks.s3.presigned_url_ttl', 3600);
-        $url = Storage::disk('s3')->temporaryUrl(
-            $version->storage_key,
-            now()->addSeconds($ttl),
-            ['ResponseContentDisposition' => 'attachment; filename="' . $version->original_name . '"']
-        );
+        $url = $this->s3->generateVersionDownloadUrl($version);
 
         return $this->success('Download URL generated', [
             'url'        => $url,
-            'expires_in' => $ttl,
+            'expires_in' => config('filesystems.disks.s3.presigned_url_ttl', 3600),
         ]);
     }
 
-    private function getMimeGroup(string $mimeType): string
-    {
-        if (str_starts_with($mimeType, 'image/')) return 'image';
-        if (str_starts_with($mimeType, 'video/')) return 'video';
-        if (str_starts_with($mimeType, 'audio/')) return 'audio';
-        return 'other';
-    }
 }

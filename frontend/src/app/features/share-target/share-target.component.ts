@@ -8,6 +8,7 @@ import { AuthStateService } from '../../core/auth/auth-state.service';
 import { FileUploadService } from '../files/services/file-upload.service';
 import { UrlFilesApiService } from '../../core/api/url-files-api.service';
 import { FilesApiService } from '../../core/api/files-api.service';
+import { formatSize } from '../../shared/utils/format';
 
 interface ShareMeta {
   title: string;
@@ -392,11 +393,7 @@ export class ShareTargetComponent implements OnInit {
 
   // ── Utilities ────────────────────────────────────────────────────────────
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024)       return `${bytes} Б`;
-    if (bytes < 1_048_576)  return `${(bytes / 1024).toFixed(1)} КБ`;
-    return `${(bytes / 1_048_576).toFixed(1)} МБ`;
-  }
+  readonly formatSize = formatSize;
 
   private isValidUrl(s: string): boolean {
     try { return /^https?:\/\//.test(new URL(s).href); } catch { return false; }

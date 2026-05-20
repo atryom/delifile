@@ -200,11 +200,9 @@ describe('SharedFoldersComponent', () => {
 
   it('should reset upload state', () => {
     const fixture = TestBed.createComponent(SharedFoldersComponent);
-    fixture.componentInstance.uploadPhase.set('done');
-    fixture.componentInstance.uploadProgress.set(100);
     fixture.componentInstance.resetUpload();
-    expect(fixture.componentInstance.uploadPhase()).toBe('idle');
-    expect(fixture.componentInstance.uploadProgress()).toBe(0);
+    expect(fixture.componentInstance.uploadState().phase).toBe('idle');
+    expect(fixture.componentInstance.uploadState().progress).toBe(0);
   });
 
   it('should check view in browser', () => {

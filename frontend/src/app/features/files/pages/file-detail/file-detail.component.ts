@@ -9,6 +9,9 @@ import { OrganizationApiService } from '../../../../core/api/organization-api.se
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode } from '../../../../shared/models/api.models';
+import { formatSize } from '../../../../shared/utils/format';
+import { canViewInBrowser } from '../../../../shared/utils/file';
+import { flattenTree } from '../../../../shared/utils/tree';
 import { ShareContactDialogComponent } from '../../dialogs/share-contact/share-contact-dialog.component';
 import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link-dialog.component';
 import { AddToSharedFolderDialogComponent } from '../../dialogs/add-to-shared-folder/add-to-shared-folder-dialog.component';
@@ -141,7 +144,7 @@ export class FileDetailComponent implements OnInit {
     this.orgApi.getTags().subscribe((r) => this.allTags.set(r.data.items));
     this.orgApi.getFolderTree().subscribe((r) => {
       this.allFolders.set(r.data.items);
-      this.flatFolders.set(this.flattenTree(r.data.items, 0));
+      this.flatFolders.set(this.toFlatFolders(r.data.items));
     });
   }
 
@@ -193,21 +196,16 @@ export class FileDetailComponent implements OnInit {
     if (found) { this.currentFolderName.set(found.name); return; }
     this.orgApi.getFolderTree().subscribe((r) => {
       this.allFolders.set(r.data.items);
-      const flat = this.flattenTree(r.data.items, 0);
+      const flat = this.toFlatFolders(r.data.items);
       this.flatFolders.set(flat);
       this.currentFolderName.set(flat.find((f) => f.id === folderId)?.name ?? null);
     });
   }
 
-  private flattenTree(nodes: FolderTreeNode[], depth: number): { id: string; name: string; indent: string }[] {
-    const result: { id: string; name: string; indent: string }[] = [];
-    for (const node of nodes) {
-      result.push({ id: node.id, name: node.name, indent: '  '.repeat(depth) });
-      if (node.children?.length) {
-        result.push(...this.flattenTree(node.children, depth + 1));
-      }
-    }
-    return result;
+  private toFlatFolders(nodes: FolderTreeNode[]): { id: string; name: string; indent: string }[] {
+    return flattenTree(nodes).map(({ node, depth }) => ({
+      id: node.id, name: node.name, indent: '  '.repeat(depth),
+    }));
   }
 
   download(): void {
@@ -237,14 +235,8 @@ export class FileDetailComponent implements OnInit {
 
   canViewInBrowser(): boolean {
     const f = this.file();
-    if (!f || f.content_kind === 'url_file') return false;
-    const mime = f.mime_type ?? '';
-    return !!f.view_url && (
-      mime.startsWith('image/') ||
-      mime.startsWith('video/') ||
-      mime.startsWith('audio/') ||
-      mime.includes('pdf')
-    );
+    if (!f) return false;
+    return canViewInBrowser(f.mime_type, f.view_url, f.content_kind);
   }
 
   saveDescription(): void {
@@ -522,12 +514,7 @@ export class FileDetailComponent implements OnInit {
     setTimeout(() => this.feedback.set(null), 3000);
   }
 
-  formatSize(bytes: number): string {
-    if (bytes < 1024)       return `${bytes} B`;
-    if (bytes < 1024 ** 2)  return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 ** 3)  return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  }
+  readonly formatSize = formatSize;
 
   mimeIcon(mime: string): string {
     if (mime?.startsWith('image/')) return '🖼️';
