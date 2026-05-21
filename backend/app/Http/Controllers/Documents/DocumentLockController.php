@@ -112,6 +112,10 @@ class DocumentLockController extends Controller
             return $this->notFound('Document not found');
         }
 
+        if (!$this->documentService->canEditDocument($request->user(), $file)) {
+            return $this->forbidden();
+        }
+
         $this->documentService->releaseLock($file, $request->user());
 
         return response()->noContent();

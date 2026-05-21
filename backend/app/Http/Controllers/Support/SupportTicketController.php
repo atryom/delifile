@@ -67,7 +67,7 @@ class SupportTicketController extends Controller
         if (!empty($files)) {
             $error = $this->attachmentService->validateUserFiles($files);
             if ($error) {
-                return $this->error($error, 422);
+                return $this->error($error, 'ATTACHMENT_INVALID', [], 422);
             }
         }
 
@@ -131,7 +131,7 @@ class SupportTicketController extends Controller
         }
 
         if ($ticket->isCompleted()) {
-            return $this->error('Обращение закрыто, отправка сообщений недоступна', 422);
+            return $this->error('Обращение закрыто, отправка сообщений недоступна', 'TICKET_CLOSED', [], 422);
         }
 
         $request->validate([
@@ -144,7 +144,7 @@ class SupportTicketController extends Controller
         if (!empty($files)) {
             $error = $this->attachmentService->validateUserFiles($files);
             if ($error) {
-                return $this->error($error, 422);
+                return $this->error($error, 'ATTACHMENT_INVALID', [], 422);
             }
         }
 
@@ -192,7 +192,7 @@ class SupportTicketController extends Controller
         }
 
         if ($ticket->status !== 'awaiting_confirmation') {
-            return $this->error('Обращение не ожидает подтверждения', 422);
+            return $this->error('Обращение не ожидает подтверждения', 'TICKET_INVALID_STATUS', [], 422);
         }
 
         $now = now();

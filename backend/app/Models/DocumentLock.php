@@ -16,7 +16,6 @@ class DocumentLock extends Model
         'file_id',
         'user_id',
         'expires_at',
-        'created_at',
     ];
 
     protected function casts(): array

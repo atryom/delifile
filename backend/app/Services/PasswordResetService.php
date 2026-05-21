@@ -19,8 +19,8 @@ class PasswordResetService
             return; // silent — don't reveal if email exists
         }
 
-        // Remove old tokens for this email
-        PasswordResetCode::where('email', $email)->delete();
+        // Remove expired tokens for this email (valid tokens are preserved until replaced by new ones)
+        PasswordResetCode::where('email', $email)->where('expires_at', '<', now())->delete();
 
         $token = Str::random(64);
         $code  = (string) random_int(100000, 999999);

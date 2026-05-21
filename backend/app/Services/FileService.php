@@ -175,27 +175,26 @@ class FileService
             return false;
         }
 
-        foreach ($sharedFolderIds as $folderId) {
-            $current = SharedFolder::find($folderId);
-            $visited = [];
-            while ($current) {
-                if (isset($visited[$current->id])) {
-                    break;
-                }
-                $visited[$current->id] = true;
+        $folders = SharedFolder::with(['parent.parent.parent.parent'])
+            ->whereIn('id', $sharedFolderIds)
+            ->get();
 
-                if ($current->owner_id === $user->id) {
-                    return true;
-                }
-                if (SharedFolderAccess::where('shared_folder_id', $current->id)
-                    ->where('user_id', $user->id)->exists()) {
-                    return true;
-                }
+        $ancestorIds = [];
+        foreach ($folders as $folder) {
+            $current = $folder;
+            $visited  = [];
+            while ($current) {
+                if (isset($visited[$current->id])) break;
+                $visited[$current->id] = true;
+                if ($current->owner_id === $user->id) return true;
+                $ancestorIds[] = $current->id;
                 $current = $current->parent;
             }
         }
 
-        return false;
+        return !empty($ancestorIds) && SharedFolderAccess::where('user_id', $user->id)
+            ->whereIn('shared_folder_id', $ancestorIds)
+            ->exists();
     }
 
     /**
@@ -254,7 +253,7 @@ class FileService
     /**
      * Generate a signed S3 download URL after access check.
      */
-    public function generateDownloadUrl(File $file): string
+    public function generateDownloadUrl(File $file): ?string
     {
         return $this->s3->generateDownloadUrl($file);
     }
@@ -380,23 +379,28 @@ class FileService
      */
     public function createUrlFile(User $user, string $url, array $preview): array
     {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            throw new \InvalidArgumentException('URL scheme must be http or https');
+        }
+
         return DB::transaction(function () use ($user, $url, $preview) {
             $hostname = $preview['hostname'] ?? parse_url($url, PHP_URL_HOST) ?? $url;
-            $title    = $preview['title'] ?? $hostname;
+            $title    = strip_tags(mb_substr($preview['title'] ?? $hostname, 0, 255));
 
             $file = File::create([
                 'owner_id'        => $user->id,
-                'original_name'   => mb_substr($title, 0, 255) . '.url',
+                'original_name'   => $title . '.url',
                 'storage_key'     => null,
                 'size'            => 0,
                 'mime_type'       => 'application/internet-shortcut',
                 'status'          => FileStatus::Available,
                 'content_kind'    => 'url_file',
                 'link_url'        => $url,
-                'link_title'      => $preview['title'] ?? null,
-                'link_description'=> $preview['description'] ?? null,
+                'link_title'      => $preview['title'] ? strip_tags(mb_substr($preview['title'], 0, 500)) : null,
+                'link_description'=> $preview['description'] ? strip_tags(mb_substr($preview['description'], 0, 1000)) : null,
                 'link_image_url'  => $preview['image_url'] ?? null,
-                'link_site_name'  => $preview['site_name'] ?? $hostname,
+                'link_site_name'  => strip_tags(mb_substr($preview['site_name'] ?? $hostname, 0, 255)),
                 'link_fetched_at' => now(),
             ]);
 

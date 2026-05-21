@@ -83,7 +83,7 @@ class SupportAdminController extends Controller
         }
 
         if ($ticket->status !== 'new') {
-            return $this->error('Обращение уже взято в работу', 422);
+            return $this->error('Обращение уже взято в работу', 'TICKET_INVALID_STATUS', [], 422);
         }
 
         $ticket->update(['status' => 'in_progress', 'taken_at' => now()]);
@@ -103,7 +103,7 @@ class SupportAdminController extends Controller
         }
 
         if ($ticket->status !== 'in_progress') {
-            return $this->error('Обращение должно быть в статусе «В работе»', 422);
+            return $this->error('Обращение должно быть в статусе «В работе»', 'TICKET_INVALID_STATUS', [], 422);
         }
 
         $now = now();
@@ -131,7 +131,7 @@ class SupportAdminController extends Controller
         }
 
         if ($ticket->isCompleted()) {
-            return $this->error('Обращение закрыто', 422);
+            return $this->error('Обращение закрыто', 'TICKET_CLOSED', [], 422);
         }
 
         $request->validate([
@@ -144,7 +144,7 @@ class SupportAdminController extends Controller
         if (!empty($files)) {
             $error = $this->attachmentService->validateAdminFiles($files);
             if ($error) {
-                return $this->error($error, 422);
+                return $this->error($error, 'ATTACHMENT_INVALID', [], 422);
             }
         }
 

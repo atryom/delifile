@@ -35,12 +35,11 @@ class EmailVerificationService
             return null;
         }
 
-        $user->update([
-            'email_verified_at'          => now(),
-            'email_verification_token'   => null,
-            'account_status'             => 'active',
-            'plan'                       => $user->plan?->value ?? 'free',
-        ]);
+        $user->email_verification_token = null;
+        $user->email_verified_at        = now();
+        $user->account_status           = 'active';
+        $user->plan                     = \App\Enums\TariffPlan::from($user->plan?->value ?? 'free');
+        $user->save();
 
         return $user;
     }

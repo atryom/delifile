@@ -14,7 +14,7 @@ class CompleteUploadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file_id'       => ['required', 'string'],
+            'file_id'       => ['required', 'string', 'exists:files,id'],
             'thumbnail_key' => ['nullable', 'string', 'max:500'],
         ];
     }

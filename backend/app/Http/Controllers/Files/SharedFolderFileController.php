@@ -23,24 +23,29 @@ class SharedFolderFileController extends Controller
      */
     private function canAccessSharedFolder(User $user, SharedFolder $folder, string $requiredType = SharedFolderAccessType::View->value): bool
     {
-        $current = $folder;
-        $visited = [];
+        $folder->loadMissing('parent.parent.parent.parent');
+
+        $ancestorIds = [];
+        $current     = $folder;
+        $visited     = [];
         while ($current) {
             if (isset($visited[$current->id])) break;
             $visited[$current->id] = true;
-
             if ($current->owner_id === $user->id) return true;
-
-            $query = SharedFolderAccess::where('shared_folder_id', $current->id)
-                ->where('user_id', $user->id);
-            if ($requiredType === SharedFolderAccessType::Edit->value) {
-                $query->where('access_type', SharedFolderAccessType::Edit->value);
-            }
-            if ($query->exists()) return true;
-
+            $ancestorIds[] = $current->id;
             $current = $current->parent;
         }
-        return false;
+
+        if (empty($ancestorIds)) return false;
+
+        $query = SharedFolderAccess::where('user_id', $user->id)
+            ->whereIn('shared_folder_id', $ancestorIds);
+
+        if ($requiredType === SharedFolderAccessType::Edit->value) {
+            $query->where('access_type', SharedFolderAccessType::Edit->value);
+        }
+
+        return $query->exists();
     }
 
     /**
@@ -205,6 +210,14 @@ class SharedFolderFileController extends Controller
         SharedFolderFile::where('shared_folder_id', $folderId)
             ->where('file_id', $fileId)
             ->delete();
+
+        // Resolve orphan: if this was the last shared folder, reset shared_folder_only
+        if ($file->shared_folder_only) {
+            $remainingCount = SharedFolderFile::where('file_id', $fileId)->count();
+            if ($remainingCount === 0) {
+                $file->update(['shared_folder_only' => false]);
+            }
+        }
 
         return $this->success('File removed from folder');
     }

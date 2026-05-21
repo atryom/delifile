@@ -10,9 +10,12 @@ const img = (id: string, name: string): ImageAsset => ({
   fileName: name,
   mimeType: 'image/png',
   size: 1024,
+  width: null,
+  height: null,
   previewUrl: `/preview/${id}`,
-  assetUrl: `/api/v1/files/${id}/content`,
+  embedUrl: `https://s3.example.com/presigned-${id}`,
   stableUrl: `/api/v1/files/${id}/content`,
+  updatedAt: null,
 });
 
 const makeResponse = (items: ImageAsset[], nextCursor: string | null = null) => ({

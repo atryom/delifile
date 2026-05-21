@@ -148,6 +148,8 @@ class OrganizationController extends Controller
                 return $this->notFound('Parent folder not found');
             }
 
+            $parent->loadMissing('parent.parent.parent.parent');
+
             // Check if new parent is a descendant of current folder
             if ($this->isDescendant($folder, $parent)) {
                 return $this->error('Обнаружена цикличная вложенность папок', 'CYCLE_DETECTED', [], 422);

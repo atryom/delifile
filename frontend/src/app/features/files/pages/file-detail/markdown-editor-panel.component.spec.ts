@@ -298,15 +298,16 @@ describe('MarkdownEditorPanelComponent', () => {
 
   // ── onImageSelected ──────────────────────────────────────────────────────────
 
-  it('onImageSelected inserts image using stableUrl', () => {
+  it('onImageSelected inserts image using embedUrl so browser <img> loads without auth', () => {
     fixture.detectChanges();
     const mockEditor = createMockEditor();
     component.editor = mockEditor;
 
     const img: ImageAsset = {
       id: 'img_1', fileName: 'photo.png', mimeType: 'image/png', size: 1024,
-      previewUrl: 'https://s3.example.com/presigned',
-      assetUrl: '/api/v1/files/img_1/content',
+      width: null, height: null, updatedAt: null,
+      previewUrl: 'https://s3.example.com/presigned-preview',
+      embedUrl: 'https://s3.example.com/presigned-embed?X-Amz-Signature=abc',
       stableUrl: '/api/v1/files/img_1/content',
     };
 
@@ -315,7 +316,7 @@ describe('MarkdownEditorPanelComponent', () => {
     const chainSpy = mockEditor.chain as ReturnType<typeof vi.fn>;
     const firstChainResult = chainSpy.mock.results[0]?.value;
     expect(firstChainResult?.setImage).toHaveBeenCalledWith(
-      expect.objectContaining({ src: '/api/v1/files/img_1/content' })
+      expect.objectContaining({ src: 'https://s3.example.com/presigned-embed?X-Amz-Signature=abc' })
     );
     expect(component.showImagePicker()).toBe(false);
   });

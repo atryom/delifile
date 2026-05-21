@@ -204,7 +204,7 @@ export class MarkdownEditorService {
     this.editor
       .chain()
       .focus()
-      .setImage({ src: img.stableUrl, alt: img.fileName, title: img.fileName })
+      .setImage({ src: img.embedUrl, alt: img.fileName, title: img.fileName })
       .run();
   }
 

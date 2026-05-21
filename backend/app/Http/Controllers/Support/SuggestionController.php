@@ -57,7 +57,7 @@ class SuggestionController extends Controller
         if (!empty($files)) {
             $error = $this->attachmentService->validateUserFiles($files);
             if ($error) {
-                return $this->error($error, 422);
+                return $this->error($error, 'ATTACHMENT_INVALID', [], 422);
             }
         }
 

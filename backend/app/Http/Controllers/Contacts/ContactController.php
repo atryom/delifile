@@ -59,13 +59,15 @@ class ContactController extends Controller
             return $this->error('Email или телефон обязателен', 'VALIDATION_ERROR', [], 422);
         }
 
-        // Duplicate check
-        $duplicateQuery = Contact::where('user_id', $request->user()->id);
-        if ($request->email) {
-            $duplicateQuery->where('email', $request->email);
-        } elseif ($request->phone) {
-            $duplicateQuery->where('phone', $request->phone);
-        }
+        // Duplicate check: test both email AND phone independently
+        $duplicateQuery = Contact::where('user_id', $request->user()->id)->where(function ($q) use ($request) {
+            if ($request->email) {
+                $q->where('email', $request->email);
+            }
+            if ($request->phone) {
+                $q->orWhere('phone', $request->phone);
+            }
+        });
         if ($duplicateQuery->exists()) {
             return $this->error(__('messages.contacts.already_exists'), 'CONTACT_DUPLICATE', [], 422);
         }
@@ -169,13 +171,21 @@ class ContactController extends Controller
         $user    = $request->user();
         $created = 0;
 
-        $emails  = array_filter(array_column($request->contacts, 'email'));
+        // Deduplicate by email then phone within the batch (last entry wins)
+        $deduped = [];
+        foreach ($request->contacts as $item) {
+            $key = !empty($item['email']) ? 'email:' . strtolower($item['email']) : 'phone:' . ($item['phone'] ?? '');
+            $deduped[$key] = $item;
+        }
+        $contacts = array_values($deduped);
+
+        $emails  = array_filter(array_column($contacts, 'email'));
         $byEmail = $emails
             ? User::whereIn('email', $emails)->get()->keyBy('email')
             : collect();
 
-        DB::transaction(function () use ($request, $user, $byEmail, &$created) {
-            foreach ($request->contacts as $item) {
+        DB::transaction(function () use ($contacts, $user, $byEmail, &$created) {
+            foreach ($contacts as $item) {
                 $resolved = !empty($item['email']) ? $byEmail->get($item['email']) : null;
 
                 $key = !empty($item['email'])

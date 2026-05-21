@@ -18,9 +18,7 @@ class Comment extends Model
         'body',
         'body_plain',
         'mentions_json',
-        'replies_count',
         'edited_at',
-        'deleted_at',
     ];
 
     protected function casts(): array

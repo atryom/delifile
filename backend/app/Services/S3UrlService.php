@@ -20,41 +20,47 @@ class S3UrlService
      */
     public function generatePresignedPutUrl(string $key, string $mimeType): string
     {
-        $client = Storage::disk('s3')->getClient();
-        $bucket = config('filesystems.disks.s3.bucket');
-        $ttl    = config('filesystems.disks.s3.presigned_url_ttl', 3600);
+        try {
+            $client = Storage::disk('s3')->getClient();
+            $bucket = config('filesystems.disks.s3.bucket');
+            $ttl    = config('filesystems.disks.s3.presigned_url_ttl', 3600);
 
-        $cmd = $client->getCommand('PutObject', [
-            'Bucket'      => $bucket,
-            'Key'         => $key,
-            'ContentType' => $mimeType,
-        ]);
+            $cmd = $client->getCommand('PutObject', [
+                'Bucket'      => $bucket,
+                'Key'         => $key,
+                'ContentType' => $mimeType,
+            ]);
 
-        return (string) $client->createPresignedRequest($cmd, '+' . $ttl . ' seconds')->getUri();
+            return (string) $client->createPresignedRequest($cmd, '+' . $ttl . ' seconds')->getUri();
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('Failed to generate presigned upload URL: ' . $e->getMessage(), 0, $e);
+        }
     }
 
     /**
      * Generate a download URL for a file (attachment disposition).
+     * Returns null if S3 is unavailable.
      */
-    public function generateDownloadUrl(File $file): string
+    public function generateDownloadUrl(File $file): ?string
     {
         $ttl = config('filesystems.disks.s3.presigned_url_ttl', 3600);
-        return Storage::disk('s3')->temporaryUrl(
+        return $this->tryTemporaryUrl(
             $file->storage_key,
-            now()->addSeconds($ttl),
+            (int) ceil($ttl / 60),
             ['ResponseContentDisposition' => 'attachment; filename="' . $file->original_name . '"']
         );
     }
 
     /**
      * Generate a download URL for a file version (attachment disposition).
+     * Returns null if S3 is unavailable.
      */
-    public function generateVersionDownloadUrl(FileVersion $version): string
+    public function generateVersionDownloadUrl(FileVersion $version): ?string
     {
         $ttl = config('filesystems.disks.s3.presigned_url_ttl', 3600);
-        return Storage::disk('s3')->temporaryUrl(
+        return $this->tryTemporaryUrl(
             $version->storage_key,
-            now()->addSeconds($ttl),
+            (int) ceil($ttl / 60),
             ['ResponseContentDisposition' => 'attachment; filename="' . $version->original_name . '"']
         );
     }
@@ -131,20 +137,20 @@ class S3UrlService
 
     /**
      * Generate a content redirect URL (/content endpoint).
-     * Throws on failure — caller must ensure the file key exists.
+     * Returns null if S3 is unavailable.
      */
-    public function contentRedirectUrl(string $key): string
+    public function contentRedirectUrl(string $key): ?string
     {
-        return Storage::disk('s3')->temporaryUrl($key, now()->addMinutes(self::TTL_CONTENT));
+        return $this->tryTemporaryUrl($key, self::TTL_CONTENT);
     }
 
     /**
      * Generate a preview redirect URL (/preview endpoint).
-     * Throws on failure — caller must ensure the file key exists.
+     * Returns null if S3 is unavailable.
      */
-    public function previewRedirectUrl(string $key): string
+    public function previewRedirectUrl(string $key): ?string
     {
-        return Storage::disk('s3')->temporaryUrl($key, now()->addMinutes(self::TTL_PREVIEW_REDIRECT));
+        return $this->tryTemporaryUrl($key, self::TTL_PREVIEW_REDIRECT);
     }
 
     /**

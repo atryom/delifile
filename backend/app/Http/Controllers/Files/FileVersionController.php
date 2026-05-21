@@ -267,6 +267,10 @@ class FileVersionController extends Controller
 
         $url = $this->s3->generateVersionDownloadUrl($version);
 
+        if (!$url) {
+            return $this->error('Storage service unavailable', 'S3_ERROR', [], 503);
+        }
+
         return $this->success('Download URL generated', [
             'url'        => $url,
             'expires_in' => config('filesystems.disks.s3.presigned_url_ttl', 3600),

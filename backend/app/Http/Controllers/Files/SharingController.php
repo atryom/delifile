@@ -276,7 +276,7 @@ class SharingController extends Controller
     public function listLinks(Request $request, string $fileId): JsonResponse
     {
         $file = File::find($fileId);
-        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
+        if (!$file || !$file->isOwnedBy($request->user())) {
             return $this->notFound('File not found');
         }
 
@@ -310,7 +310,7 @@ class SharingController extends Controller
             return $this->notFound('Link not found');
         }
 
-        if ($link->created_by !== $request->user()->id) {
+        if ($link->created_by !== $request->user()->id && !$link->file->isOwnedBy($request->user())) {
             return $this->forbidden();
         }
 
@@ -401,16 +401,16 @@ class SharingController extends Controller
             return $this->error('Это ваш файл.', 'OWN_FILE', [], 422);
         }
 
-        // Check if any access record already exists for this user+file
-        $existing = FileUserAccess::where('file_id', $link->file->id)
-            ->where('user_id', $user->id)
-            ->first();
+        $alreadySaved = DB::transaction(function () use ($link, $user) {
+            $existing = FileUserAccess::where('file_id', $link->file->id)
+                ->where('user_id', $user->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($existing) {
-            return $this->error('Файл уже есть в вашем аккаунте.', 'ALREADY_SAVED', [], 422);
-        }
+            if ($existing) {
+                return true;
+            }
 
-        DB::transaction(function () use ($link, $user) {
             FileUserAccess::create([
                 'file_id'     => $link->file->id,
                 'user_id'     => $user->id,
@@ -421,7 +421,13 @@ class SharingController extends Controller
             $this->activityService->log($link->file, $user, ActivityType::SavedViaLink, [
                 'link_id' => $link->id,
             ]);
+
+            return false;
         });
+
+        if ($alreadySaved) {
+            return $this->error('Файл уже есть в вашем аккаунте.', 'ALREADY_SAVED', [], 422);
+        }
 
         return $this->success('Файл сохранён в ваш аккаунт.', [
             'file_id' => $link->file->id,

@@ -22,9 +22,16 @@ class InvitationController extends Controller
     {
         $data = $request->validate([
             'email'   => 'required|email|max:255',
-            'file_id' => 'nullable|string',
+            'file_id' => 'nullable|string|exists:files,id',
             'comment' => 'nullable|string|max:1000',
         ]);
+
+        if (!empty($data['file_id'])) {
+            $file = \App\Models\File::find($data['file_id']);
+            if (!$file || !$file->isOwnedBy($request->user())) {
+                return $this->forbidden('You can only invite others to your own files');
+            }
+        }
 
         $invitation = $this->invitationService->send($request->user(), $data);
 
@@ -78,6 +85,10 @@ class InvitationController extends Controller
             return $this->error('Приглашение недоступно', $reason, [], 422);
         }
 
+        if (strtolower($request->user()->email) !== strtolower($invitation->target_email)) {
+            return $this->forbidden('This invitation was not sent to you');
+        }
+
         if (!$this->invitationService->accept($invitation, $request->user())) {
             return $this->error('Не удалось принять приглашение', 'ACCEPT_FAILED', [], 422);
         }
@@ -90,12 +101,20 @@ class InvitationController extends Controller
     /**
      * POST /api/v1/invitations/{token}/reject
      */
-    public function reject(string $token): JsonResponse
+    public function reject(Request $request, string $token): JsonResponse
     {
         $invitation = Invitation::where('token', $token)->first();
 
         if (!$invitation) {
             return $this->notFound('Invitation not found');
+        }
+
+        $user = $request->user();
+        $isSender    = $invitation->sender_user_id === $user->id;
+        $isRecipient = strtolower($invitation->target_email) === strtolower($user->email);
+
+        if (!$isSender && !$isRecipient) {
+            return $this->forbidden('You are not authorized to reject this invitation');
         }
 
         $this->invitationService->reject($invitation);

@@ -289,15 +289,18 @@ describe('MarkdownEditorComponent', () => {
 
   // ── onImageSelected ──────────────────────────────────────────────────────────
 
-  it('onImageSelected inserts image using stableUrl, not assetUrl', () => {
+  it('onImageSelected inserts image using embedUrl so browser <img> can load without auth', () => {
     fixture.detectChanges();
     const mockEditor = createMockEditor();
     component.editor = mockEditor;
 
     const img: ImageAsset = {
       id: 'img_1', fileName: 'photo.png', mimeType: 'image/png', size: 1024,
-      previewUrl: 'https://s3.example.com/presigned',
-      assetUrl: '/api/v1/files/img_1/content',
+      width: null, height: null, updatedAt: null,
+      previewUrl: 'https://s3.example.com/presigned-preview',
+      // embedUrl is a presigned S3 URL — no auth needed for browser <img> requests.
+      // stableUrl (/content) requires auth:sanctum; browser <img> cannot send Bearer tokens.
+      embedUrl: 'https://s3.example.com/presigned-embed?X-Amz-Signature=abc',
       stableUrl: '/api/v1/files/img_1/content',
     };
 
@@ -307,7 +310,7 @@ describe('MarkdownEditorComponent', () => {
     const chainSpy = mockEditor.chain as ReturnType<typeof vi.fn>;
     const firstChainResult = chainSpy.mock.results[0]?.value;
     expect(firstChainResult?.setImage).toHaveBeenCalledWith(
-      expect.objectContaining({ src: '/api/v1/files/img_1/content' })
+      expect.objectContaining({ src: 'https://s3.example.com/presigned-embed?X-Amz-Signature=abc' })
     );
   });
 

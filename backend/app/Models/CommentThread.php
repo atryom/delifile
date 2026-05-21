@@ -21,9 +21,6 @@ class CommentThread extends Model
         'owner_user_id',
         'context_shared_folder_id',
         'created_by',
-        'last_comment_id',
-        'comments_count',
-        'status',
     ];
 
     protected function casts(): array

@@ -55,6 +55,6 @@ class FileDownloadTest extends TestCase
         $response = $this->actingAs($other)
             ->postJson("/api/v1/files/{$file->id}/download");
 
-        $response->assertStatus(403);
+        $response->assertStatus(404);
     }
 }

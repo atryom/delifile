@@ -302,7 +302,195 @@
 
 ---
 
+## Что НЕ включено (re-audit3)
+
+| Аудит | Пункт | Причина |
+|-------|-------|---------|
+| re-audit3-01 §7 | FileService write-методы без ownership check | Defense-in-depth: требует добавить `$user` во все сигнатуры и обновить вызывающий код — высокий риск регрессий; контроллеры уже проверяют права |
+| re-audit3-01 §11 | SharedFolderController resolveSharedLink — перманентный доступ | Архитектурное изменение: требует `expires_at` на SharedFolderAccess + фоновое задание — отдельный спринт |
+| re-audit3-03 §5 | FileService::completeUpload() без проверки S3 | Производительность: лишний S3 HEAD-запрос на каждое завершение загрузки — отдельная задача |
+| re-audit3-03 §6 | SupportAttachmentService — дубликаты storage_key | Операционная задача, не баг; дедупликация на уровне приложения требует idempotency-ключа |
+| re-audit3-01 §24 | SupportAttachmentService — доверие MIME от клиента | LOW: серверная проверка MIME требует `getimagesize()` / `finfo` — отдельная задача |
+| re-audit3-01 §25 | Прочие модели status/token в fillable | LOW: реальный риск крайне мал при текущих контроллерах |
+| re-audit3-02 §7 | Unused: Folder::ancestorIds(), SharedFolder::ancestorIds() | Не вызываются в текущем коде; добавить docblock-предупреждение при revival |
+| re-audit3-04 §19 | ContactController::index() — нет пагинации | LOW: небольшая база пользователей; добавить при необходимости |
+| re-audit3-04 §22 | ContactController::store() — хардкод русского текста | i18n вне scope рефакторинга |
+| re-audit3-03 §8 | DocumentService::saveDocument() — несоответствие size/etag | Отложено в аудитах re-01/re-03; очень редкий edge case |
+| re-audit3-03 §9 | CleanOrphanedS3ObjectJob — утечка после 3 попыток | By design (предотвращение повторных постановок в очередь) |
+
+---
+
+## Спринт 23 — P0 Critical Security (~2.5ч)
+
+**Файлы:** `User.php`, `InvitationController.php`, `ContactController.php`
+
+| # | Задача | Файл | Откуда |
+|---|--------|------|--------|
+| 1 | `User.php` — убрать из `$fillable`: `is_superuser`, `plan`, `account_status`, `email_verified_at` | User.php:16-33 | re-audit3-01 §1,5 |
+| 2 | `InvitationController::accept()` — добавить проверку: `$request->user()->email !== $invitation->target_email` → forbidden | InvitationController.php:68 | re-audit3-01 §2 |
+| 3 | `InvitationController::reject()` — добавить `Request $request` + проверка: пользователь = sender или target_email | InvitationController.php:93 | re-audit3-01 §3 |
+| 4 | `ContactController::store()` — заменить `elseif ($request->phone)` на `if ($request->phone) { $duplicateQuery->orWhere(...) }` | ContactController.php:63 | re-audit3-04 §1 |
+
+**Проверка:** `php artisan test` (405/405).
+
+---
+
+## Спринт 24 — HIGH Security fixes (~2.5ч)
+
+**Файлы:** `SharingController.php`, `DocumentController.php`, `DocumentLockController.php`, `InvitationController.php`, `InvitationService.php`
+
+| # | Задача | Файл | Откуда |
+|---|--------|------|--------|
+| 1 | `SharingController::listLinks()` — `canAccess` → `$file->isOwnedBy($request->user())` | SharingController.php:279 | re-audit3-01 §4 |
+| 2 | `SharingController::disableLink()` — добавить `\|\| $link->file->isOwnedBy($request->user())` к проверке `created_by` | SharingController.php:313 | re-audit3-01 §20 |
+| 3 | `DocumentController::show()` — обернуть вызов `promoteToDocument()` в `if ($file->isOwnedBy($request->user()))` | DocumentController.php:54 | re-audit3-01 §6 |
+| 4 | `DocumentLockController::release()` — добавить `canEditDocument()` check перед `releaseLock()` | DocumentLockController.php:107 | re-audit3-01 §8 |
+| 5 | `InvitationController::send()` — добавить `'file_id' => 'nullable\|string\|exists:files,id'`; в сервисе проверять `$file->isOwnedBy($sender)` | InvitationController.php:24, InvitationService.php:22 | re-audit3-01 §9 |
+
+**Проверка:** `php artisan test` (405/405).
+
+---
+
+## Спринт 25 — MEDIUM Security + Fillable cleanup (~2.5ч)
+
+**Файлы:** `Comment.php`, `CommentThread.php`, `DocumentLock.php`, `SharingController.php`, `DocumentService.php`, `SharedFolderFileController.php`, `SharedFolderController.php`, `FileController.php`, `CommentService.php`
+
+| # | Задача | Файл | Откуда |
+|---|--------|------|--------|
+| 1 | `Comment.php` — убрать из `$fillable`: `replies_count`, `deleted_at` | Comment.php:21,23 | re-audit3-01 §17 |
+| 2 | `CommentThread.php` — убрать из `$fillable`: `comments_count`, `last_comment_id`, `status` | CommentThread.php:24-26 | re-audit3-01 §18 |
+| 3 | `DocumentLock.php` — убрать из `$fillable`: `user_id`, `created_at` (оставить `file_id`, `expires_at`) | DocumentLock.php:15 | re-audit3-01 §19 |
+| 4 | `SharingController::saveViaLink()` — перенести проверку `$existing` внутрь `DB::transaction()` с `lockForUpdate()` | SharingController.php:405 | re-audit3-01 §10 |
+| 5 | `DocumentService::acquireLock()` — обернуть в `DB::transaction()` + `DocumentLock::where()->lockForUpdate()` перед `updateOrCreate` | DocumentService.php:211 | re-audit3-01 §13 |
+| 6 | `SharedFolderFileController::removeFile()` — после удаления записи: если файл `shared_folder_only` и больше нет других SF, установить `shared_folder_only=false` | SharedFolderFileController.php:187 | re-audit3-01 §12 |
+| 7 | `SharedFolderController::destroy()` — в каскадном удалении: файлы с `shared_folder_only=true` в удаляемых папках → `shared_folder_only=false` если нет других SF | SharedFolderController.php:330 | re-audit3-01 §12 |
+| 8 | `CommentService::processMentions()` — фильтровать `$mentionedUserIds`: оставить только тех, у кого есть `canAccess()` к целевому файлу/папке | CommentService.php:300 | re-audit3-01 §15 |
+| 9 | `FileController::show()/destroy()/download()` — заменить отдельные 404/403 ветки на единый `if (!$file \|\| !canAccess) notFound()` | FileController.php:73,108,230 | re-audit3-04 §8 |
+
+**Проверка:** `php artisan test` (405/405).
+
+---
+
+## Спринт 26 — N+1 parent chain + HIGH lazy loads (~3ч)
+
+**Файлы:** `FileService.php`, `SharedFolderController.php`, `SharedFolderFileController.php`, `CommentService.php`, `CommentSettingsController.php`, `DocumentService.php`, `FileController.php`, `OrganizationController.php`
+
+**Подход к parent chain:** вместо `SharedFolder::find($folderId)` в цикле — `SharedFolder::with(['parent','parent.parent','parent.parent.parent','parent.parent.parent.parent'])->whereIn('id', $ids)->get()->keyBy('id')`. Затем итерация по заранее загруженной цепочке без дополнительных SQL-запросов.
+
+| # | Задача | Файл | Откуда |
+|---|--------|------|--------|
+| 1 | `FileService::canAccess()` — заменить `SharedFolder::find($folderId)` в foreach на `whereIn` с eager-load chain | FileService.php:183 | re-audit3-02 §1a,5 |
+| 2 | `SharedFolderController::canAccess()` — то же: eager-load вместо lazy parent | SharedFolderController.php:60 | re-audit3-02 §1b |
+| 3 | `SharedFolderFileController::canAccessSharedFolder()` — то же | SharedFolderFileController.php:24 | re-audit3-02 §1c |
+| 4 | `CommentService::canAccessSharedFolder()` — то же | CommentService.php:382 | re-audit3-02 §1d |
+| 5 | `CommentSettingsController::canManageSharedFolder()` — то же | CommentSettingsController.php:181 | re-audit3-02 §1e |
+| 6 | `DocumentService::canEditDocument()` — то же + заменить `SharedFolder::find($folderId)` в цикле | DocumentService.php:166 | re-audit3-02 §1f,6 |
+| 7 | `FileController::show()` — заменить `File::find($fileId)` на `File::with(['owner', 'tags'])->find($fileId)` | FileController.php:71 | re-audit3-02 §2 |
+| 8 | `DocumentService` — `$file->load('updatedByUser')` перед вызовом `buildDocumentResponse()` в `createDocument()`, `getDocument()`, `saveDocument()` | DocumentService.php | re-audit3-02 §3 |
+| 9 | `OrganizationController::updateFolder()` — загрузить `$candidate->load(['parent','parent.parent','parent.parent.parent'])` перед вызовом `isDescendant()` | OrganizationController.php:152 | re-audit3-02 §4 |
+
+**Проверка:** `php artisan test` (405/405).
+
+---
+
+## Спринт 27 — S3 reliability (~2ч)
+
+**Файлы:** `S3UrlService.php`, `FileController.php`, `FileVersionController.php`, `SharingController.php`, `CleanExpiredFilesJob.php`
+
+| # | Задача | Файл | Откуда |
+|---|--------|------|--------|
+| 1 | `S3UrlService::generateDownloadUrl()` — обернуть в try/catch, изменить возврат на `?string`; вызывающие контроллеры: null → 503 | S3UrlService.php:39 | re-audit3-03 §1 |
+| 2 | `S3UrlService::generateVersionDownloadUrl()` — то же | S3UrlService.php:52 | re-audit3-03 §1 |
+| 3 | `S3UrlService::contentRedirectUrl()` — делегировать в `tryTemporaryUrl()` вместо прямого `temporaryUrl()` | S3UrlService.php:136 | re-audit3-03 §2 |
+| 4 | `S3UrlService::previewRedirectUrl()` — то же | S3UrlService.php:145 | re-audit3-03 §2 |
+| 5 | `S3UrlService::generatePresignedPutUrl()` — обернуть в try/catch: при ошибке бросать `\RuntimeException` вместо 500 | S3UrlService.php:21 | re-audit3-03 §7 |
+| 6 | `CleanExpiredFilesJob` — добавить очистку `FileVersion` со статусом `Uploading` и `expires_at < now()`: удалить S3-объекты + записи в БД | CleanExpiredFilesJob.php | re-audit3-03 §3 |
+
+**Проверка:** `php artisan test` (405/405).
+
+---
+
+## Спринт 28 — Logic fixes, validation, LOW (~2.5ч)
+
+**Файлы:** `SuggestionController.php`, `SupportTicketController.php`, `SupportAdminController.php`, `AdminController.php`, `FileController.php`, `UrlFileController.php`, `FileService.php`, `PasswordResetService.php`, `CompleteUploadRequest.php`, `ContactController.php`, `AppServiceProvider.php`
+
+| # | Задача | Файл | Откуда |
+|---|--------|------|--------|
+| 1 | 9× `$this->error($msg, 422)` → `$this->error($msg, 'CODE', [], 422)` в SuggestionController, SupportTicketController, SupportAdminController | SuggestionController.php:60, SupportTicketController.php:70,134,147,195, SupportAdminController.php:86,106,134,147 | re-audit3-04 §7 |
+| 2 | `AdminController::users()` — добавить `->paginate(50)` + форматировать ответ через `->through()` | AdminController.php:29 | re-audit3-04 §11 |
+| 3 | `FileController::index()` — добавить валидацию `'per_page' => 'nullable\|integer\|min:1\|max:100'` | FileController.php:34 | re-audit3-04 §18 |
+| 4 | `UrlFileController::store()` — обернуть title/description/site_name в `strip_tags(mb_substr(..., 0, N))` | UrlFileController.php:36 | re-audit3-01 §21 |
+| 5 | `FileService::createUrlFile()` — добавить проверку схемы URL: `in_array(parse_url($url, PHP_URL_SCHEME), ['http', 'https'])` | FileService.php:381 | re-audit3-01 §22 |
+| 6 | `PasswordResetService::sendResetLink()` — удалять только просроченные коды (`->where('expires_at', '<', now())->delete()`), не все | PasswordResetService.php:22 | re-audit3-01 §23 |
+| 7 | `CompleteUploadRequest` — добавить `'file_id' => [..., 'exists:files,id']` | CompleteUploadRequest.php:17 | re-audit3-04 §14 |
+| 8 | `ContactController::import()` — дедупликация контактов по email/phone внутри батча перед обработкой | ContactController.php:172 | re-audit3-04 §15 |
+| 9 | `AppServiceProvider` — добавить `RateLimiter::for('auth', ...)` 10 req/min для login/register/forgot-password | AppServiceProvider.php | re-audit3-04 §12 |
+| 10 | `FileController::setTags()` — добавить `'tag_ids.*' => 'exists:tags,id,user_id,'.$request->user()->id` | FileController.php:375 | re-audit3-04 §17 |
+
+**Проверка:** `php artisan test` (405/405) + `npx vitest run` (606/606).
+
+---
+
 ## Итоги по задачам
+
+### Спринт 28 — выполнен ✅ (405/405 backend тестов)
+
+| # | Что сделано | Файлы |
+|---|-------------|-------|
+| 1 | 9× `$this->error($msg, 422)` → `$this->error($msg, 'CODE', [], 422)`: `ATTACHMENT_INVALID`, `TICKET_CLOSED`, `TICKET_INVALID_STATUS` | `SuggestionController.php`, `SupportTicketController.php`, `SupportAdminController.php` |
+| 2 | `AdminController::users()` — добавлена пагинация `paginate($perPage)` с параметром `per_page` (макс. 200); ответ дополнен `total`, `current_page`, `last_page` | `AdminController.php` |
+| 3 | `FileController::index()` — добавлена валидация `'per_page' => 'nullable\|integer\|min:1\|max:100'` | `FileController.php` |
+| 4–5 | `FileService::createUrlFile()` — схема URL ограничена `http/https`; `title`, `description`, `site_name` обёрнуты в `strip_tags(mb_substr(...))` | `FileService.php` |
+| 6 | `PasswordResetService::sendResetLink()` — удаляются только просроченные коды (`expires_at < now()`), активные остаются | `PasswordResetService.php` |
+| 7 | `CompleteUploadRequest` — `file_id` дополнен `exists:files,id` | `CompleteUploadRequest.php` |
+| 8 | `ContactController::import()` — дедупликация контактов внутри батча по email/phone перед сохранением | `ContactController.php` |
+| 9 | `AppServiceProvider` — добавлен `RateLimiter::for('auth', ...)` 10 req/min; применён к публичным auth-роутам через `throttle:auth` | `AppServiceProvider.php`, `api.php` |
+| 10 | `FileController::setTags()` — валидация `'tag_ids.*' => 'exists:tags,id,user_id,'.$userId` | `FileController.php` |
+
+---
+
+### Спринт 27 — выполнен ✅ (405/405 backend тестов)
+
+| # | Что сделано | Файлы |
+|---|-------------|-------|
+| 1–2 | `S3UrlService::generateDownloadUrl/generateVersionDownloadUrl` — переписаны через `tryTemporaryUrl`, возвращают `?string`; вызывающие (`FileController`, `FileVersionController`, `FileService`) обрабатывают null → 503 | `S3UrlService.php`, `FileController.php`, `FileVersionController.php`, `FileService.php` |
+| 3–4 | `S3UrlService::contentRedirectUrl/previewRedirectUrl` — делегируют в `tryTemporaryUrl`; `FileController::content/preview` обрабатывают null → `abort(503)` | `S3UrlService.php`, `FileController.php` |
+| 5 | `S3UrlService::generatePresignedPutUrl` — обёрнут в try/catch: при ошибке выбрасывает `\RuntimeException` вместо неструктурированного 500 | `S3UrlService.php` |
+| 6 | `CleanExpiredFilesJob` — добавлена очистка `FileVersion` со статусом `Uploading` и `expires_at < now()`: S3-ключи удаляются, запись удаляется из БД | `CleanExpiredFilesJob.php` |
+
+---
+
+### Спринт 26 — выполнен ✅ (405/405 backend тестов)
+
+| # | Что сделано | Файлы |
+|---|-------------|-------|
+| 1 | `FileService::canAccess()` — `SharedFolder::find` в foreach + lazy `parent` → `whereIn` с `with(['parent.parent.parent.parent'])` + один `SharedFolderAccess::whereIn` для всех предков | `FileService.php` |
+| 2 | `SharedFolderController::canAccess()` — `loadMissing('parent.parent.parent.parent')` + `SharedFolderAccess::whereIn` для всех предков вместо N запросов в цикле | `SharedFolderController.php` |
+| 3 | `SharedFolderFileController::canAccessSharedFolder()` — то же | `SharedFolderFileController.php` |
+| 4 | `CommentService::canAccessSharedFolder()` — то же, с `SharedFolder::with(...)->find($folderId)` | `CommentService.php` |
+| 5 | `CommentSettingsController::canManageSharedFolder()` — то же с фильтром по `access_type = Edit` | `CommentSettingsController.php` |
+| 6 | `DocumentService::canEditDocument()` — то же: `whereIn` + eager-load + батчевый `SharedFolderAccess::whereIn` с Edit-фильтром | `DocumentService.php` |
+| 7 | `FileController::show()` — `File::find($fileId)` → `File::with(['owner'])->find($fileId)` (исключает lazy load в `buildFileCard`) | `FileController.php` |
+| 8 | `DocumentService::buildDocumentResponse()` — добавлен `$file->loadMissing('updatedByUser')` перед обращением к relation | `DocumentService.php` |
+| 9 | `OrganizationController::updateFolder()` — добавлен `$parent->loadMissing('parent.parent.parent.parent')` перед `isDescendant()` | `OrganizationController.php` |
+
+---
+
+### Спринт 25 — выполнен ✅ (405/405 backend тестов)
+
+| # | Что сделано | Файлы |
+|---|-------------|-------|
+| 1 | `Comment.php` — убраны из `$fillable`: `replies_count`, `deleted_at` (счётчик и soft-delete недоступны массовому присвоению) | `Comment.php` |
+| 2 | `CommentThread.php` — убраны из `$fillable`: `comments_count`, `last_comment_id`, `status` | `CommentThread.php` |
+| 3 | `DocumentLock.php` — убран из `$fillable`: `created_at` (`user_id` оставлен — DB-ограничение NOT NULL без default) | `DocumentLock.php` |
+| 4 | `SharingController::saveViaLink()` — проверка дублей перенесена внутрь `DB::transaction()` с `lockForUpdate()`, TOCTOU race устранён | `SharingController.php` |
+| 5 | `DocumentService::acquireLock()/takeoverLock()` — переписаны на `DB::transaction()` + `lockForUpdate()` + `DB::table->upsert()` (обход fillable при системных записях) | `DocumentService.php` |
+| 6 | `SharedFolderFileController::removeFile()` — после удаления SF-членства сбрасывает `shared_folder_only=false` если файл остался без папок | `SharedFolderFileController.php` |
+| 7 | `SharedFolderController::destroy()` — при каскадном удалении папок определяет orphan-файлы и сбрасывает им `shared_folder_only=false` | `SharedFolderController.php` |
+| 8 | `CommentService::processMentions()` — упомянутые пользователи фильтруются через `canAccessTarget()`: нотификации отправляются только тем, кто имеет доступ | `CommentService.php` |
+| 9 | `FileController::show()/download()` — унифицированный 404 вместо 404/403 для отсутствующих/недоступных файлов; тесты обновлены | `FileController.php`, `FileShowTest.php`, `FileDownloadTest.php` |
+
+---
 
 ### Спринт 22 — выполнен ✅ (405/405 backend тестов)
 

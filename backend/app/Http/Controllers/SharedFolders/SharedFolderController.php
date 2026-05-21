@@ -58,34 +58,29 @@ class SharedFolderController extends Controller
 
     private function canAccess(User $user, SharedFolder $folder, string $requiredType = SharedFolderAccessType::View->value): bool
     {
-        // Walk from this folder up to root
-        $current = $folder;
-        $visited = [];
+        $folder->loadMissing('parent.parent.parent.parent');
+
+        $ancestorIds = [];
+        $current     = $folder;
+        $visited     = [];
         while ($current) {
-            if (isset($visited[$current->id])) {
-                break;
-            }
+            if (isset($visited[$current->id])) break;
             $visited[$current->id] = true;
-
-            if ($current->owner_id === $user->id) {
-                return true;
-            }
-
-            $query = SharedFolderAccess::where('shared_folder_id', $current->id)
-                ->where('user_id', $user->id);
-
-            if ($requiredType === SharedFolderAccessType::Edit->value) {
-                $query->where('access_type', SharedFolderAccessType::Edit->value);
-            }
-
-            if ($query->exists()) {
-                return true;
-            }
-
+            if ($current->owner_id === $user->id) return true;
+            $ancestorIds[] = $current->id;
             $current = $current->parent;
         }
 
-        return false;
+        if (empty($ancestorIds)) return false;
+
+        $query = SharedFolderAccess::where('user_id', $user->id)
+            ->whereIn('shared_folder_id', $ancestorIds);
+
+        if ($requiredType === SharedFolderAccessType::Edit->value) {
+            $query->where('access_type', SharedFolderAccessType::Edit->value);
+        }
+
+        return $query->exists();
     }
 
     private function formatFolder(SharedFolder $folder, User $user, ?SharedFolderAccess $myAccess = null): array
@@ -354,12 +349,28 @@ class SharedFolderController extends Controller
             $allIds = $this->collectDescendantIds($folder->id);
             $allIds[] = $folder->id;
 
+            // Find shared_folder_only files that will become orphans (not in any other SF)
+            $orphanFileIds = SharedFolderFile::whereIn('shared_folder_id', $allIds)
+                ->join('files', 'files.id', '=', 'shared_folder_files.file_id')
+                ->where('files.shared_folder_only', true)
+                ->whereNotIn('shared_folder_files.file_id', function ($q) use ($allIds) {
+                    $q->select('file_id')
+                      ->from('shared_folder_files')
+                      ->whereNotIn('shared_folder_id', $allIds);
+                })
+                ->pluck('shared_folder_files.file_id')
+                ->toArray();
+
             SharedFolderFile::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolderAccess::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolderLink::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolderCommentSettings::whereIn('shared_folder_id', $allIds)->delete();
             PendingReceivedSharedFolder::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolder::whereIn('id', $allIds)->delete();
+
+            if (!empty($orphanFileIds)) {
+                \App\Models\File::whereIn('id', $orphanFileIds)->update(['shared_folder_only' => false]);
+            }
         });
 
         return $this->success('Shared folder deleted');

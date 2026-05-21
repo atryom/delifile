@@ -7,6 +7,8 @@ use App\Enums\FileStatus;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\User;
+use App\Services\S3UrlService;
+use Mockery;
 use Tests\TestCase;
 
 class AssetControllerTest extends TestCase
@@ -27,7 +29,7 @@ class AssetControllerTest extends TestCase
         $response->assertOk()
             ->assertJsonStructure([
                 'data' => [
-                    'items' => [['id', 'fileName', 'mimeType', 'size', 'previewUrl', 'assetUrl']],
+                    'items' => [['id', 'fileName', 'mimeType', 'size', 'previewUrl', 'embedUrl', 'stableUrl']],
                     'nextCursor',
                 ],
             ]);
@@ -127,27 +129,8 @@ class AssetControllerTest extends TestCase
             ->assertUnauthorized();
     }
 
-    public function test_asset_url_uses_stable_application_path(): void
+    public function test_stable_url_is_always_auth_required_content_path(): void
     {
-        $user = User::factory()->create();
-
-        $image = File::factory()->create([
-            'owner_id'  => $user->id,
-            'mime_type' => 'image/png',
-            'status'    => FileStatus::Available,
-        ]);
-
-        $response = $this->actingAs($user)
-            ->getJson('/api/v1/assets/images');
-
-        $assetUrl = $response->json('data.items.0.assetUrl');
-        $this->assertStringContainsString('/api/v1/files/' . $image->id . '/content', $assetUrl);
-        $this->assertStringNotContainsString('X-Amz-Signature', $assetUrl);
-    }
-
-    public function test_stable_url_field_is_always_application_path(): void
-    {
-        // stableUrl must be stable regardless of S3 availability (not a presigned URL)
         $user = User::factory()->create();
 
         $image = File::factory()->create([
@@ -162,6 +145,61 @@ class AssetControllerTest extends TestCase
         $item = $response->json('data.items.0');
         $this->assertArrayHasKey('stableUrl', $item);
         $this->assertEquals('/api/v1/files/' . $image->id . '/content', $item['stableUrl']);
+    }
+
+    /**
+     * Regression test: embedUrl must be a presigned S3 URL so the browser <img> tag
+     * can load the image immediately after insertion without auth headers.
+     *
+     * Bug in Sprint 7-22: embedUrl (formerly assetUrl) was set to the same stable
+     * /content path as stableUrl. Because /content requires auth:sanctum and browser
+     * <img> tags cannot send Bearer tokens, the image showed as broken (401) after
+     * insertion and only appeared correctly after document reload (when hydrateImageUrls
+     * replaced stable URLs with presigned ones).
+     */
+    public function test_embed_url_is_presigned_when_s3_available(): void
+    {
+        $user  = User::factory()->create();
+        $image = File::factory()->create([
+            'owner_id'    => $user->id,
+            'mime_type'   => 'image/png',
+            'status'      => FileStatus::Available,
+            'storage_key' => 'files/' . $user->id . '/photo.png',
+        ]);
+
+        $fakePresigned = 'https://s3.example.com/bucket/files/' . $user->id
+            . '/photo.png?X-Amz-Algorithm=AWS4&X-Amz-Signature=deadbeef';
+
+        $s3Mock = Mockery::mock(S3UrlService::class);
+        $s3Mock->shouldReceive('tryTemporaryUrl')->andReturn($fakePresigned);
+        $this->app->instance(S3UrlService::class, $s3Mock);
+
+        $response = $this->actingAs($user)->getJson('/api/v1/assets/images');
+        $item     = $response->json('data.items.0');
+
+        $this->assertEquals($fakePresigned, $item['embedUrl']);
+        // embedUrl must differ from stableUrl — if they match the browser gets 401 on insert
+        $this->assertNotEquals($item['stableUrl'], $item['embedUrl']);
+    }
+
+    public function test_embed_url_falls_back_to_stable_url_when_s3_unavailable(): void
+    {
+        $user  = User::factory()->create();
+        $image = File::factory()->create([
+            'owner_id'  => $user->id,
+            'mime_type' => 'image/png',
+            'status'    => FileStatus::Available,
+        ]);
+
+        $s3Mock = Mockery::mock(S3UrlService::class);
+        $s3Mock->shouldReceive('tryTemporaryUrl')->andReturnNull();
+        $this->app->instance(S3UrlService::class, $s3Mock);
+
+        $response = $this->actingAs($user)->getJson('/api/v1/assets/images');
+        $item     = $response->json('data.items.0');
+
+        $this->assertEquals($item['stableUrl'], $item['embedUrl']);
+        $this->assertStringContainsString('/content', $item['embedUrl']);
     }
 
     public function test_cursor_pagination_returns_next_cursor_and_second_page(): void

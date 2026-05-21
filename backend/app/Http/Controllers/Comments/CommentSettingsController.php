@@ -180,20 +180,23 @@ class CommentSettingsController extends Controller
 
     private function canManageSharedFolder(int $userId, SharedFolder $folder): bool
     {
-        $current = $folder;
-        $visited = [];
+        $folder->loadMissing('parent.parent.parent.parent');
+
+        $ancestorIds = [];
+        $current     = $folder;
+        $visited     = [];
         while ($current) {
             if (isset($visited[$current->id])) break;
             $visited[$current->id] = true;
             if ($current->owner_id === $userId) return true;
-            if (SharedFolderAccess::where('shared_folder_id', $current->id)
-                ->where('user_id', $userId)
-                ->where('access_type', SharedFolderAccessType::Edit->value)->exists()) {
-                return true;
-            }
+            $ancestorIds[] = $current->id;
             $current = $current->parent;
         }
-        return false;
+
+        return !empty($ancestorIds) && SharedFolderAccess::where('user_id', $userId)
+            ->whereIn('shared_folder_id', $ancestorIds)
+            ->where('access_type', SharedFolderAccessType::Edit->value)
+            ->exists();
     }
 
     private function formatFileSettings(FileCommentSettings $s): array

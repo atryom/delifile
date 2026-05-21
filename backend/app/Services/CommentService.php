@@ -303,6 +303,19 @@ class CommentService
             return;
         }
 
+        // Filter out users who don't have access to the thread target
+        $thread = $comment->thread;
+        if ($thread) {
+            $ctxFolder = $thread->context_shared_folder_id;
+            $mentionedUserIds = array_values(array_filter($mentionedUserIds, function ($uid) use ($thread, $ctxFolder) {
+                $mentionedUser = User::find($uid);
+                return $mentionedUser && $this->canAccessTarget($mentionedUser, $thread->target_type, $thread->target_id, $ctxFolder);
+            }));
+            if (empty($mentionedUserIds)) {
+                return;
+            }
+        }
+
         $author = $comment->author;
         $users  = User::whereIn('id', $mentionedUserIds)->get()->keyBy('id');
         $now    = now();
@@ -381,19 +394,23 @@ class CommentService
 
     private function canAccessSharedFolder(User $user, string $folderId): bool
     {
-        $current = SharedFolder::find($folderId);
-        $visited = [];
+        $folder = SharedFolder::with(['parent.parent.parent.parent'])->find($folderId);
+        if (!$folder) return false;
+
+        $ancestorIds = [];
+        $current     = $folder;
+        $visited     = [];
         while ($current) {
             if (isset($visited[$current->id])) break;
             $visited[$current->id] = true;
             if ($current->owner_id === $user->id) return true;
-            if (SharedFolderAccess::where('shared_folder_id', $current->id)
-                ->where('user_id', $user->id)->exists()) {
-                return true;
-            }
+            $ancestorIds[] = $current->id;
             $current = $current->parent;
         }
-        return false;
+
+        return !empty($ancestorIds) && SharedFolderAccess::where('user_id', $user->id)
+            ->whereIn('shared_folder_id', $ancestorIds)
+            ->exists();
     }
 
     private function canAccessLocalFolder(User $user, string $folderId): bool

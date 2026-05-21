@@ -527,7 +527,7 @@ export interface ImageAsset {
   width: number | null;
   height: number | null;
   previewUrl: string;
-  assetUrl: string;
+  embedUrl: string;
   stableUrl: string;
   updatedAt: string | null;
 }

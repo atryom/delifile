@@ -43,7 +43,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
 
     // ─── Auth — Public ────────────────────────────────────────────────────────
-    Route::prefix('auth')->group(function () {
+    Route::prefix('auth')->middleware('throttle:auth')->group(function () {
         Route::post('register', [AuthController::class, 'register']);
         Route::post('login',    [AuthController::class, 'login']);
 

@@ -6,6 +6,7 @@ use App\Enums\AccessType;
 use App\Enums\FileStatus;
 use App\Enums\ShareLinkStatus;
 use App\Models\File;
+use App\Models\FileVersion;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -50,6 +51,23 @@ class CleanExpiredFilesJob implements ShouldQueue
 
             $file->update(['status' => FileStatus::Expired]);
             $file->delete();
+        }
+
+        // Clean stuck FileVersion uploads: Uploading status with expires_at in the past
+        $stuckVersions = FileVersion::query()
+            ->where('status', FileStatus::Uploading->value)
+            ->where('expires_at', '<', now())
+            ->get();
+
+        foreach ($stuckVersions as $version) {
+            try {
+                $keys = array_filter([$version->storage_key, $version->thumbnail_key]);
+                if ($keys) Storage::disk('s3')->delete(array_values($keys));
+            } catch (\Exception $e) {
+                logger()->error("S3 delete failed for version {$version->id}: " . $e->getMessage());
+            }
+
+            $version->delete();
         }
 
         // Clean uploading-orphans: stuck in Uploading with no expires_at for over 24 hours

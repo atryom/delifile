@@ -30,6 +30,8 @@ class FileController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $request->validate(['per_page' => 'nullable|integer|min:1|max:100']);
+
         $filter  = $request->get('filter', 'mine'); // mine | received | favorites
         $page    = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 20);
@@ -68,15 +70,11 @@ class FileController extends Controller
      */
     public function show(Request $request, string $fileId): JsonResponse
     {
-        $file = File::find($fileId);
-
-        if (!$file) {
-            return $this->notFound('File not found');
-        }
-
         $user = $request->user();
-        if (!$this->fileService->canAccess($user, $file)) {
-            return $this->forbidden();
+        $file = File::with(['owner'])->find($fileId);
+
+        if (!$file || !$this->fileService->canAccess($user, $file)) {
+            return $this->notFound('File not found');
         }
 
         return $this->success(__('messages.files.fetched_one'), [
@@ -211,12 +209,8 @@ class FileController extends Controller
     {
         $file = File::find($fileId);
 
-        if (!$file) {
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
             return $this->notFound('File not found');
-        }
-
-        if (!$this->fileService->canAccess($request->user(), $file)) {
-            return $this->forbidden();
         }
 
         if (!$file->isAvailable()) {
@@ -236,6 +230,10 @@ class FileController extends Controller
         }
 
         $url = $this->fileService->generateDownloadUrl($file);
+
+        if (!$url) {
+            return $this->error('Storage service unavailable', 'S3_ERROR', [], 503);
+        }
 
         return $this->success(__('messages.files.download_url'), [
             'url'        => $url,
@@ -261,6 +259,7 @@ class FileController extends Controller
         }
 
         $url = $this->s3->contentRedirectUrl($file->storage_key);
+        if (!$url) { abort(503); }
 
         return redirect()->away($url);
     }
@@ -283,6 +282,7 @@ class FileController extends Controller
 
         $key = $file->thumbnail_key ?? $file->storage_key;
         $url = $this->s3->previewRedirectUrl($key);
+        if (!$url) { abort(503); }
 
         return redirect()->away($url);
     }
@@ -372,7 +372,11 @@ class FileController extends Controller
      */
     public function setTags(Request $request, string $fileId): JsonResponse
     {
-        $request->validate(['tag_ids' => 'required|array']);
+        $userId = $request->user()->id;
+        $request->validate([
+            'tag_ids'   => 'required|array',
+            'tag_ids.*' => 'string|exists:tags,id,user_id,' . $userId,
+        ]);
 
         $file = File::find($fileId);
         if (!$file || !$this->fileService->canAccess($request->user(), $file)) {

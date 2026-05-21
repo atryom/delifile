@@ -108,7 +108,7 @@ class InvitationTest extends TestCase
         $sender = User::factory()->create();
         $invitation = Invitation::factory()->create(['sender_user_id' => $sender->id]);
 
-        $response = $this->actingAs(User::factory()->create())
+        $response = $this->actingAs($sender)
             ->postJson("/api/v1/invitations/{$invitation->token}/reject");
 
         $response->assertOk()

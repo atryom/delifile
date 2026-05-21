@@ -13,6 +13,7 @@ use App\Models\SharedFolder;
 use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Services\FileService;
@@ -180,19 +181,29 @@ class DocumentService
 
         // Check edit access via shared folders (respects ancestor chain)
         $sharedFolderIds = SharedFolderFile::where('file_id', $file->id)->pluck('shared_folder_id');
-        foreach ($sharedFolderIds as $folderId) {
-            $current = SharedFolder::find($folderId);
-            $visited = [];
-            while ($current) {
-                if (isset($visited[$current->id])) break;
-                $visited[$current->id] = true;
-                if ($current->owner_id === $user->id) return true;
-                if (SharedFolderAccess::where('shared_folder_id', $current->id)
-                    ->where('user_id', $user->id)
-                    ->where('access_type', SharedFolderAccessType::Edit->value)->exists()) {
-                    return true;
+        if ($sharedFolderIds->isNotEmpty()) {
+            $folders = SharedFolder::with(['parent.parent.parent.parent'])
+                ->whereIn('id', $sharedFolderIds)
+                ->get();
+
+            $ancestorIds = [];
+            foreach ($folders as $folder) {
+                $current = $folder;
+                $visited  = [];
+                while ($current) {
+                    if (isset($visited[$current->id])) break;
+                    $visited[$current->id] = true;
+                    if ($current->owner_id === $user->id) return true;
+                    $ancestorIds[] = $current->id;
+                    $current = $current->parent;
                 }
-                $current = $current->parent;
+            }
+
+            if (!empty($ancestorIds) && SharedFolderAccess::where('user_id', $user->id)
+                ->whereIn('shared_folder_id', $ancestorIds)
+                ->where('access_type', SharedFolderAccessType::Edit->value)
+                ->exists()) {
+                return true;
             }
         }
 
@@ -208,28 +219,34 @@ class DocumentService
 
     public function acquireLock(File $file, User $user): array
     {
-        $existing = DocumentLock::find($file->id);
+        return DB::transaction(function () use ($file, $user) {
+            $existing = DocumentLock::where('file_id', $file->id)->lockForUpdate()->first();
 
-        if ($existing && !$existing->isExpired() && !$existing->isOwnedBy($user)) {
+            if ($existing && !$existing->isExpired() && !$existing->isOwnedBy($user)) {
+                return [
+                    'acquired' => false,
+                    'lock'     => $this->formatLock($existing, $file, $user),
+                ];
+            }
+
+            DB::table('document_locks')->upsert(
+                [[
+                    'file_id'    => $file->id,
+                    'user_id'    => $user->id,
+                    'expires_at' => now()->addMinutes(self::LOCK_TTL_MINUTES),
+                    'created_at' => now(),
+                ]],
+                ['file_id'],
+                ['user_id', 'expires_at', 'created_at']
+            );
+
+            $lock = DocumentLock::find($file->id);
+
             return [
-                'acquired' => false,
-                'lock'     => $this->formatLock($existing, $file, $user),
+                'acquired' => true,
+                'lock'     => $this->formatLock($lock, $file, $user),
             ];
-        }
-
-        $lock = DocumentLock::updateOrCreate(
-            ['file_id' => $file->id],
-            [
-                'user_id'    => $user->id,
-                'expires_at' => now()->addMinutes(self::LOCK_TTL_MINUTES),
-                'created_at' => now(),
-            ]
-        );
-
-        return [
-            'acquired' => true,
-            'lock'     => $this->formatLock($lock, $file, $user),
-        ];
+        });
     }
 
     public function renewLock(File $file, User $user): string
@@ -264,14 +281,18 @@ class DocumentService
 
     public function takeoverLock(File $file, User $user): array
     {
-        $lock = DocumentLock::updateOrCreate(
-            ['file_id' => $file->id],
-            [
+        DB::table('document_locks')->upsert(
+            [[
+                'file_id'    => $file->id,
                 'user_id'    => $user->id,
                 'expires_at' => now()->addMinutes(self::LOCK_TTL_MINUTES),
                 'created_at' => now(),
-            ]
+            ]],
+            ['file_id'],
+            ['user_id', 'expires_at', 'created_at']
         );
+
+        $lock = DocumentLock::find($file->id);
 
         return $this->formatLock($lock, $file, $user);
     }
@@ -325,6 +346,7 @@ class DocumentService
 
     private function buildDocumentResponse(File $file, User $user, string $content): array
     {
+        $file->loadMissing('updatedByUser');
         $lock   = DocumentLock::find($file->id);
         $canEdit = $this->canEditDocument($user, $file);
 
@@ -383,11 +405,15 @@ class DocumentService
     private function formatImageItem(File $file): array
     {
         $previewKey = $file->thumbnail_key ?? $file->storage_key;
+        $stableUrl  = '/api/v1/files/' . $file->id . '/content';
 
         $previewUrl = $this->s3->tryTemporaryUrl($previewKey, 60)
             ?? '/api/v1/files/' . $file->id . '/preview';
 
-        $stableUrl = '/api/v1/files/' . $file->id . '/content';
+        // Presigned URL for the full image content — used by the editor to display
+        // the image immediately after insertion without requiring auth headers.
+        // Falls back to stableUrl if S3 is unavailable (editor will show broken img).
+        $embedUrl = $this->s3->tryTemporaryUrl($file->storage_key, 60) ?? $stableUrl;
 
         return [
             'id'         => $file->id,
@@ -397,7 +423,7 @@ class DocumentService
             'width'      => $file->width,
             'height'     => $file->height,
             'previewUrl' => $previewUrl,
-            'assetUrl'   => $stableUrl,
+            'embedUrl'   => $embedUrl,
             'stableUrl'  => $stableUrl,
             'updatedAt'  => $file->updated_at?->toIso8601String(),
         ];

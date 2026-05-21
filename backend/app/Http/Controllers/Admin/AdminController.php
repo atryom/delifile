@@ -24,9 +24,11 @@ class AdminController extends Controller
     /**
      * GET /api/v1/admin/users
      */
-    public function users(): JsonResponse
+    public function users(Request $request): JsonResponse
     {
-        $users = User::select('id', 'email', 'name', 'account_status', 'email_verified_at', 'plan', 'is_superuser', 'notifications_enabled', 'created_at')
+        $perPage = min((int) $request->get('per_page', 50), 200);
+
+        $paginator = User::select('id', 'email', 'name', 'account_status', 'email_verified_at', 'plan', 'is_superuser', 'notifications_enabled', 'created_at')
             ->addSelect([
                 'last_login_at' => DeviceSession::select('last_active_at')
                     ->whereColumn('user_id', 'users.id')
@@ -34,21 +36,27 @@ class AdminController extends Controller
                     ->limit(1),
             ])
             ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (User $user) => [
-                'id'                    => $user->id,
-                'email'                 => $user->email,
-                'name'                  => $user->name,
-                'account_status'        => $user->account_status,
-                'email_verified'        => $user->isEmailVerified(),
-                'plan'                  => $user->plan?->value,
-                'is_superuser'          => $user->is_superuser,
-                'notifications_enabled' => (bool) $user->notifications_enabled,
-                'last_login_at'         => $user->last_login_at ? \Carbon\Carbon::parse($user->last_login_at)->toIso8601String() : null,
-                'created_at'            => $user->created_at?->toIso8601String(),
-            ]);
+            ->paginate($perPage);
 
-        return $this->success('Список пользователей получен', ['items' => $users]);
+        $items = collect($paginator->items())->map(fn (User $user) => [
+            'id'                    => $user->id,
+            'email'                 => $user->email,
+            'name'                  => $user->name,
+            'account_status'        => $user->account_status,
+            'email_verified'        => $user->isEmailVerified(),
+            'plan'                  => $user->plan?->value,
+            'is_superuser'          => $user->is_superuser,
+            'notifications_enabled' => (bool) $user->notifications_enabled,
+            'last_login_at'         => $user->last_login_at ? \Carbon\Carbon::parse($user->last_login_at)->toIso8601String() : null,
+            'created_at'            => $user->created_at?->toIso8601String(),
+        ]);
+
+        return $this->success('Список пользователей получен', [
+            'items'        => $items,
+            'total'        => $paginator->total(),
+            'current_page' => $paginator->currentPage(),
+            'last_page'    => $paginator->lastPage(),
+        ]);
     }
 
     /**
@@ -65,7 +73,8 @@ class AdminController extends Controller
             return $this->notFound('Пользователь не найден');
         }
 
-        $user->update(['plan' => $request->plan]);
+        $user->plan = \App\Enums\TariffPlan::from($request->plan);
+        $user->save();
 
         return $this->success('Тарифный план изменён');
     }
@@ -81,7 +90,8 @@ class AdminController extends Controller
         }
 
         $newStatus = $user->account_status === 'active' ? 'blocked_unverified_email' : 'active';
-        $user->update(['account_status' => $newStatus]);
+        $user->account_status = $newStatus;
+        $user->save();
 
         return $this->success('Статус пользователя обновлён', ['account_status' => $newStatus]);
     }

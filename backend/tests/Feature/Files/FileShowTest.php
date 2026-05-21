@@ -53,7 +53,7 @@ class FileShowTest extends TestCase
         $response = $this->actingAs($other)
             ->getJson("/api/v1/files/{$file->id}");
 
-        $response->assertStatus(403);
+        $response->assertStatus(404);
     }
 
     public function test_nonexistent_file_returns_404(): void

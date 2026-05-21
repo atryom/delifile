@@ -20,9 +20,10 @@ class AuthService
         $user = User::create([
             'email'                          => $data['email'],
             'password'                       => $data['password'],
-            'account_status'                 => 'pending_email_verification',
             'email_verification_deadline_at' => now()->addHours(24),
         ]);
+        $user->account_status = 'pending_email_verification';
+        $user->save();
 
         // Send verification email
         $this->verificationService->send($user);
@@ -159,12 +160,11 @@ class AuthService
      */
     public function changeEmail(User $user, string $newEmail): void
     {
-        $user->update([
-            'email'                          => $newEmail,
-            'email_verified_at'              => null,
-            'account_status'                 => 'pending_email_verification',
-            'email_verification_deadline_at' => now()->addHours(24),
-        ]);
+        $user->email                          = $newEmail;
+        $user->email_verified_at              = null;
+        $user->account_status                 = 'pending_email_verification';
+        $user->email_verification_deadline_at = now()->addHours(24);
+        $user->save();
 
         $this->verificationService->send($user);
     }

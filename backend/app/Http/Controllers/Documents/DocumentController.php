@@ -51,8 +51,8 @@ class DocumentController extends Controller
             return $this->forbidden();
         }
 
-        // Auto-promote plain uploaded .md files to editable documents
-        if (!$file->isMarkdownDocument()) {
+        // Auto-promote plain uploaded .md files to editable documents (owner only)
+        if (!$file->isMarkdownDocument() && $file->isOwnedBy($request->user())) {
             $this->documentService->promoteToDocument($file);
             $file->refresh();
         }
