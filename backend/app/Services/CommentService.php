@@ -191,7 +191,7 @@ class CommentService
 
     public function formatThread(CommentThread $thread, int $currentUserId, int $page = 1, int $perPage = 30): array
     {
-        $query = $thread->allComments()
+        $query = $thread->comments()
             ->with('author')
             ->whereNull('parent_comment_id')
             ->orderBy('created_at')
@@ -202,6 +202,7 @@ class CommentService
         if ($rootIds) {
             $replies = Comment::with('author')
                 ->whereIn('parent_comment_id', $rootIds)
+                ->whereNull('deleted_at')
                 ->orderBy('created_at')
                 ->get();
             foreach ($replies as $reply) {
