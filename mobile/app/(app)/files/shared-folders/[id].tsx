@@ -151,6 +151,18 @@ export default function SharedFolderScreen() {
         }
         onRefresh={refetch}
         refreshing={isLoading}
+        ListHeaderComponent={
+          <TouchableOpacity
+            style={styles.commentsEntry}
+            onPress={() => router.push({
+              pathname: '/(app)/files/comments',
+              params: { targetType: 'shared_folder', targetId: id, targetName: folderTitle },
+            } as any)}
+          >
+            <Text style={styles.commentsEntryText}>💬 Комментарии к папке</Text>
+            <Text style={styles.commentsChevron}>›</Text>
+          </TouchableOpacity>
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>Папка пуста</Text>
@@ -297,4 +309,11 @@ const styles = StyleSheet.create({
     fontSize: 15, color: '#1E293B', borderWidth: 1, borderColor: '#2563EB',
   },
   renameConfirm: { fontSize: 18, color: '#2563EB', fontWeight: '700' },
+  commentsEntry: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#EFF6FF', marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14,
+  },
+  commentsEntryText: { fontSize: 15, color: '#2563EB', fontWeight: '500' },
+  commentsChevron: { fontSize: 20, color: '#2563EB' },
 });

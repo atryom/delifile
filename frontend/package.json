@@ -1,6 +1,6 @@
 {
   "name": "delifile",
-  "version": "0.5.67",
+  "version": "0.5.68",
   "description": "FileSpace MVP — Angular 21 SPA",
   "scripts": {
     "ng": "ng",

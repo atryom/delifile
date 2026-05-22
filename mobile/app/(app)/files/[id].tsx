@@ -347,16 +347,34 @@ export default function FileDetailScreen() {
       {/* Main action — only when no sub-panel open */}
       {!panel && (
         <>
+          {/* Markdown document actions */}
+          {file.mime_type === 'text/markdown' && (
+            <View style={styles.docActions}>
+              <TouchableOpacity
+                style={[styles.docBtn, styles.docBtnPrimary]}
+                onPress={() => router.push(`/(app)/files/edit/${file.id}` as any)}
+              >
+                <Text style={styles.docBtnPrimaryText}>✏️ Редактировать</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.docBtn}
+                onPress={() => router.push(`/(app)/files/view/${file.id}` as any)}
+              >
+                <Text style={styles.docBtnText}>👁 Просмотреть</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {file.content_kind === 'url_file' && file.link_url ? (
             <Button title="Открыть ссылку" onPress={() => Linking.openURL(file.link_url!)} style={styles.btn} />
-          ) : (
+          ) : file.mime_type !== 'text/markdown' ? (
             <Button
               title={downloading ? 'Скачивание...' : 'Скачать'}
               onPress={handleDownload}
               loading={downloading || downloadUrl.isPending}
               style={styles.btn}
             />
-          )}
+          ) : null}
 
           {/* Action buttons grid */}
           <View style={styles.actionGrid}>
@@ -367,6 +385,13 @@ export default function FileDetailScreen() {
             {file.content_kind === 'binary_file' && (file.has_versions || file.is_owner) && (
               <ActionBtn label="🕓 Версии" onPress={() => openPanel('versions')} />
             )}
+            <ActionBtn
+              label="💬 Комментарии"
+              onPress={() => router.push({
+                pathname: '/(app)/files/comments',
+                params: { targetType: 'file', targetId: file.id, targetName: name },
+              } as any)}
+            />
           </View>
 
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteConfirm}>
@@ -721,6 +746,16 @@ const styles = StyleSheet.create({
 
   // Created link
   linkUrl: { fontSize: 13, color: '#2563EB', backgroundColor: '#EFF6FF', borderRadius: 8, padding: 12, lineHeight: 20 },
+
+  // Document actions
+  docActions: { flexDirection: 'row', gap: 10 },
+  docBtn: {
+    flex: 1, paddingVertical: 13, alignItems: 'center', borderRadius: 10,
+    borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
+  },
+  docBtnPrimary: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  docBtnText: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
+  docBtnPrimaryText: { fontSize: 15, color: '#fff', fontWeight: '600' },
 
   // Delete
   deleteBtn: { paddingVertical: 14, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FFF5F5' },

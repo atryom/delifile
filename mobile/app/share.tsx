@@ -84,7 +84,7 @@ export default function ShareScreen() {
 
     let size = 0;
     try {
-      const info = await FileSystem.getInfoAsync(localUri, { size: true });
+      const info = await FileSystem.getInfoAsync(localUri);
       if (info.exists) size = (info as any).size ?? 0;
     } catch { /* size stays 0 */ }
 

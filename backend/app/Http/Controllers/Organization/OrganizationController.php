@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Organization;
 
 use App\Enums\AccessType;
+use App\Enums\FileStatus;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\FileUserAccess;
@@ -29,7 +30,8 @@ class OrganizationController extends Controller
                 'files_count' => FileUserAccess::selectRaw('COUNT(DISTINCT file_user_access.file_id)')
                     ->join('files', function ($join) {
                         $join->on('files.id', '=', 'file_user_access.file_id')
-                             ->whereNull('files.deleted_at');
+                             ->whereNull('files.deleted_at')
+                             ->where('files.status', FileStatus::Available->value);
                     })
                     ->whereColumn('file_user_access.folder_id', 'folders.id')
                     ->where('file_user_access.user_id', $userId)
@@ -58,7 +60,8 @@ class OrganizationController extends Controller
                 'files_count' => FileUserAccess::selectRaw('COUNT(DISTINCT file_user_access.file_id)')
                     ->join('files', function ($join) {
                         $join->on('files.id', '=', 'file_user_access.file_id')
-                             ->whereNull('files.deleted_at');
+                             ->whereNull('files.deleted_at')
+                             ->where('files.status', FileStatus::Available->value);
                     })
                     ->whereColumn('file_user_access.folder_id', 'folders.id')
                     ->where('file_user_access.user_id', $userId)

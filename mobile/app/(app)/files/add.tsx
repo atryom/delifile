@@ -8,10 +8,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '@/api/files';
+import { documentsApi } from '@/api/documents';
 import { useCreateFolder } from '@/hooks/useFolders';
 import { Button } from '@/components/ui/Button';
 
-type Mode = 'menu' | 'link' | 'folder' | 'uploading';
+type Mode = 'menu' | 'link' | 'folder' | 'uploading' | 'document';
 
 export default function AddScreen() {
   const params = useLocalSearchParams<{ folder_id?: string; folder_name?: string }>();
@@ -33,6 +34,26 @@ export default function AddScreen() {
   const pendingFileIdRef = useRef<string | null>(null);
 
   const createFolder = useCreateFolder();
+
+  const [docName, setDocName] = useState('');
+  const [creatingDoc, setCreatingDoc] = useState(false);
+
+  async function handleCreateDocument() {
+    const name = docName.trim() || 'Новый документ';
+    setCreatingDoc(true);
+    try {
+      const res = await documentsApi.create(name);
+      const docId = res.data.data.document.id;
+      qc.invalidateQueries({ queryKey: ['files'] });
+      router.back();
+      // Navigate to editor after modal closes
+      setTimeout(() => router.push(`/(app)/files/edit/${docId}` as any), 300);
+    } catch (e: any) {
+      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось создать документ');
+    } finally {
+      setCreatingDoc(false);
+    }
+  }
 
   async function handleCreateFolder() {
     if (!folderName.trim()) return;
@@ -192,6 +213,14 @@ export default function AddScreen() {
                 <Text style={styles.menuSub}>{params.folder_name ? `Внутри «${params.folder_name}»` : 'В корне'}</Text>
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => setMode('document')}>
+              <Text style={styles.menuIcon}>📝</Text>
+              <View>
+                <Text style={styles.menuTitle}>Создать документ</Text>
+                <Text style={styles.menuSub}>Markdown-документ для записей</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -261,6 +290,29 @@ export default function AddScreen() {
               title="Создать"
               onPress={handleCreateFolder}
               loading={createFolder.isPending}
+            />
+          </View>
+        )}
+
+        {mode === 'document' && (
+          <View style={styles.form}>
+            <TouchableOpacity onPress={() => setMode('menu')} style={styles.back}>
+              <Text style={styles.backText}>← Назад</Text>
+            </TouchableOpacity>
+            <Text style={styles.formTitle}>Создать документ</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Название документа"
+              value={docName}
+              onChangeText={setDocName}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleCreateDocument}
+            />
+            <Button
+              title="Создать и открыть"
+              onPress={handleCreateDocument}
+              loading={creatingDoc}
             />
           </View>
         )}

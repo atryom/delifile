@@ -206,7 +206,8 @@ class CommentController extends Controller
             return $this->forbidden('Только автор может удалить комментарий');
         }
 
-        $comment->update(['deleted_at' => now()]);
+        $comment->deleted_at = now();
+        $comment->save();
 
         $this->commentService->auditComment($comment, $request->user(), 'delete', ['body' => $comment->body], null);
 
