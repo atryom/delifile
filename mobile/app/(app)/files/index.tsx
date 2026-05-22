@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { SectionList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, SectionList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useFileList } from '@/hooks/useFiles';
-import { useFolderList } from '@/hooks/useFolders';
+import { useFolderList, useDeleteFolder, useRenameFolder } from '@/hooks/useFolders';
 import { Spinner } from '@/components/ui/Spinner';
 import type { FileListItem, FileFilter } from '@/types';
 import type { Folder } from '@/types';
@@ -26,7 +26,40 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
-function FolderRow({ folder }: { folder: Folder }) {
+interface FolderRowProps {
+  folder: Folder;
+  onMenu: () => void;
+  isRenaming: boolean;
+  renameText: string;
+  onRenameChange: (v: string) => void;
+  onRenameSave: () => void;
+  onRenameCancel: () => void;
+}
+
+function FolderRow({ folder, onMenu, isRenaming, renameText, onRenameChange, onRenameSave, onRenameCancel }: FolderRowProps) {
+  if (isRenaming) {
+    return (
+      <View style={styles.folderRow}>
+        <Text style={styles.folderIcon}>📁</Text>
+        <TextInput
+          style={styles.renameInput}
+          value={renameText}
+          onChangeText={onRenameChange}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={onRenameSave}
+          selectTextOnFocus
+        />
+        <TouchableOpacity onPress={onRenameSave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
+          <Text style={styles.renameConfirm}>✓</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onRenameCancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
+          <Text style={styles.menuBtnText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <TouchableOpacity
       style={styles.folderRow}
@@ -43,7 +76,9 @@ function FolderRow({ folder }: { folder: Folder }) {
         <Text style={styles.folderName}>{folder.name}</Text>
         <Text style={styles.folderMeta}>{folder.files_count} файлов</Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <TouchableOpacity onPress={onMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
+        <Text style={styles.menuBtnText}>⋯</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -73,12 +108,78 @@ export default function FilesScreen() {
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FileFilter>('all');
+  const deleteFolder = useDeleteFolder();
+  const renameFolder = useRenameFolder();
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState('');
+
+  function handleFolderMenu(folder: Folder) {
+    Alert.alert(folder.name, undefined, [
+      { text: 'Переименовать', onPress: () => { setRenamingId(folder.id); setRenameText(folder.name); } },
+      { text: 'Удалить папку', style: 'destructive', onPress: () => confirmDeleteFolder(folder) },
+      { text: 'Отмена', style: 'cancel' },
+    ]);
+  }
+
+  async function handleSaveRename() {
+    if (!renamingId || !renameText.trim()) { setRenamingId(null); return; }
+    try {
+      await renameFolder.mutateAsync({ id: renamingId, name: renameText.trim() });
+    } catch (e: any) {
+      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось переименовать папку');
+    } finally {
+      setRenamingId(null);
+    }
+  }
+
+  function confirmDeleteFolder(folder: Folder) {
+    Alert.alert(
+      'Удалить папку?',
+      `Папка «${folder.name}» будет удалена.`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: () => doDeleteFolder(folder, false),
+        },
+      ],
+    );
+  }
+
+  async function doDeleteFolder(folder: Folder, force: boolean) {
+    try {
+      await deleteFolder.mutateAsync({ id: folder.id, force });
+    } catch (e: any) {
+      const code = e.response?.data?.error_code ?? e.response?.data?.code;
+      if (code === 'HAS_CHILDREN') {
+        Alert.alert('Нельзя удалить', 'Сначала удалите или переместите вложенные папки.');
+        return;
+      }
+      if (code === 'HAS_FILES') {
+        const count = e.response?.data?.data?.files_count ?? '';
+        Alert.alert(
+          'В папке есть файлы',
+          `${count ? `${count} файлов` : 'Файлы'} будут перемещены в корень. Продолжить?`,
+          [
+            { text: 'Отмена', style: 'cancel' },
+            { text: 'Удалить', style: 'destructive', onPress: () => doDeleteFolder(folder, true) },
+          ],
+        );
+        return;
+      }
+      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось удалить папку');
+    }
+  }
 
   const { data: allFolders, isLoading: foldersLoading } = useFolderList();
+  // folder_id='' → backend treats as NULL → root-only files
+  // folder_id=undefined → Axios omits param → backend returns ALL files (wrong)
+  // filter inside folder must be 'all' (same as web) — backend default is 'mine' which hides received files
   const { data: filesData, isLoading: filesLoading, isError, refetch } = useFileList({
-    folder_id: folderId ?? null,
+    folder_id: folderId !== undefined ? folderId : '',
     search: search || undefined,
-    filter: folderId ? undefined : filter,
+    filter: folderId ? 'all' : filter,
   });
 
   const subFolders = (allFolders ?? []).filter(
@@ -135,6 +236,18 @@ export default function FilesScreen() {
         </View>
       )}
 
+      {!folderId && !search && (
+        <TouchableOpacity
+          style={styles.sharedFoldersEntry}
+          activeOpacity={0.7}
+          onPress={() => router.push('/(app)/files/shared-folders' as any)}
+        >
+          <Text style={styles.sharedFoldersIcon}>🗂</Text>
+          <Text style={styles.sharedFoldersText}>Общие папки</Text>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+      )}
+
       {isLoading ? (
         <Spinner />
       ) : isError ? (
@@ -164,7 +277,15 @@ export default function FilesScreen() {
           }
           renderItem={({ item, section }) =>
             section.title === 'Папки' ? (
-              <FolderRow folder={item as Folder} />
+              <FolderRow
+                folder={item as Folder}
+                onMenu={() => handleFolderMenu(item as Folder)}
+                isRenaming={renamingId === item.id}
+                renameText={renameText}
+                onRenameChange={setRenameText}
+                onRenameSave={handleSaveRename}
+                onRenameCancel={() => setRenamingId(null)}
+              />
             ) : (
               <FileRow item={item as FileListItem} />
             )
@@ -194,6 +315,10 @@ const styles = StyleSheet.create({
   folderName: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
   folderMeta: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
   chevron: { fontSize: 20, color: '#CBD5E1' },
+  menuBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  menuBtnText: { fontSize: 18, color: '#94A3B8' },
+  renameInput: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, color: '#1E293B', borderWidth: 1, borderColor: '#2563EB' },
+  renameConfirm: { fontSize: 18, color: '#2563EB', fontWeight: '700' },
   fileRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   rowMain: { flex: 1 },
   fileName: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
@@ -206,4 +331,11 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 16, fontWeight: '600', color: '#EF4444' },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#2563EB', borderRadius: 8 },
   retryText: { color: '#fff', fontWeight: '600' },
+  sharedFoldersEntry: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#EFF6FF', paddingHorizontal: 16, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: '#DBEAFE',
+  },
+  sharedFoldersIcon: { fontSize: 20 },
+  sharedFoldersText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#2563EB' },
 });

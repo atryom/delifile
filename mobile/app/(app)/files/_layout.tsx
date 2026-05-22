@@ -13,6 +13,9 @@ export default function FilesLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="[id]" />
       <Stack.Screen name="add" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="shared-folders/index" options={{ title: 'Общие папки' }} />
+      <Stack.Screen name="shared-folders/[id]" />
+      <Stack.Screen name="shared-folders/add" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

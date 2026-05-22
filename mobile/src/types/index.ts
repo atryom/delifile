@@ -6,6 +6,7 @@ export * from './inbox';
 export * from './tariff';
 export * from './contact';
 export * from './support';
+export * from './shared-folder';
 
 export interface ApiResponse<T = Record<string, unknown>> {
   result: 'success' | 'error';

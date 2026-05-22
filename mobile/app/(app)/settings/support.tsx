@@ -1,6 +1,6 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Alert, FlatList, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supportApi } from '@/api/support';
 import { Spinner } from '@/components/ui/Spinner';
@@ -33,10 +33,14 @@ export default function SupportScreen() {
     return () => { show.remove(); hide.remove(); };
   }, []);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['support', 'tickets'],
     queryFn: () => supportApi.listTickets().then((r) => r.data.data.items),
+    staleTime: 0,
   });
+
+  // Принудительно обновляем список при каждом возврате на экран
+  useFocusEffect(useCallback(() => { refetch(); }, []));
 
   const createTicket = useMutation({
     mutationFn: (b: string) => supportApi.createTicket(b),
@@ -86,6 +90,8 @@ export default function SupportScreen() {
           data={data ?? []}
           keyExtractor={(t) => t.id}
           contentContainerStyle={creating ? { paddingBottom: 200 } : undefined}
+          onRefresh={refetch}
+          refreshing={isLoading}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyTitle}>Нет обращений</Text>
@@ -93,7 +99,11 @@ export default function SupportScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.ticketRow} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.ticketRow}
+              activeOpacity={0.7}
+              onPress={() => router.push(`/(app)/settings/support/${item.id}` as any)}
+            >
               <View style={styles.ticketMain}>
                 <View style={styles.statusRow}>
                   <View style={[styles.statusDot, { backgroundColor: STATUS_COLOR[item.status] }]} />
@@ -105,6 +115,7 @@ export default function SupportScreen() {
                       <Text style={styles.unreadText}>{item.unread_count}</Text>
                     </View>
                   )}
+                  <Text style={styles.chevron}>›</Text>
                 </View>
                 <Text style={styles.ticketDate}>{formatDate(item.last_event_at ?? item.created_at)}</Text>
               </View>
@@ -157,6 +168,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 14, fontWeight: '600' },
   unreadBadge: { backgroundColor: '#EF4444', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 },
   unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  chevron: { marginLeft: 'auto', fontSize: 20, color: '#CBD5E1' },
   ticketDate: { fontSize: 13, color: '#94A3B8' },
   emptyContainer: { alignItems: 'center', marginTop: 60, gap: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B' },

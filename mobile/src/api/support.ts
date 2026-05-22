@@ -13,4 +13,10 @@ export const supportApi = {
 
   sendMessage: (ticketId: string, body: string) =>
     apiClient.post<ApiResponse<Record<string, unknown>>>(`/support/tickets/${ticketId}/messages`, { body }),
+
+  markRead: (ticketId: string) =>
+    apiClient.post(`/support/tickets/${ticketId}/mark-read`),
+
+  confirmTicket: (ticketId: string) =>
+    apiClient.post(`/support/tickets/${ticketId}/confirm`),
 };

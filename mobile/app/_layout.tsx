@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { AppState, NativeModules, Platform } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import NetInfo from '@react-native-community/netinfo';
 import { useFonts } from 'expo-font';
@@ -36,12 +37,33 @@ function RootLayoutInner() {
     return unsubscribe;
   }, []);
 
+  // Handle Android share intent — opens /share modal on launch and on each foreground resume
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const mod = NativeModules.ShareIntent;
+    if (!mod) return;
+
+    function checkIntent() {
+      mod.getSharedData().then((data: any) => {
+        if (data) router.push('/share' as any);
+      }).catch(() => {});
+    }
+
+    checkIntent();
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkIntent();
+    });
+    return () => sub.remove();
+  }, []);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(app)" />
       <Stack.Screen name="link/[token]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
     </Stack>
   );
 }

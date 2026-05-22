@@ -7,58 +7,47 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useQueryClient } from '@tanstack/react-query';
-import { filesApi } from '@/api/files';
-import { useCreateFolder } from '@/hooks/useFolders';
+import { sharedFoldersApi } from '@/api/shared-folders';
 import { Button } from '@/components/ui/Button';
 
-type Mode = 'menu' | 'link' | 'folder' | 'uploading';
+type Mode = 'menu' | 'link' | 'subfolder' | 'uploading';
 
-export default function AddScreen() {
-  const params = useLocalSearchParams<{ folder_id?: string; folder_name?: string }>();
-  const folderId = params.folder_id || null;
+export default function SharedFolderAddScreen() {
+  const params = useLocalSearchParams<{ shared_folder_id: string; folder_name?: string }>();
+  const folderId = params.shared_folder_id;
   const qc = useQueryClient();
 
   const [mode, setMode] = useState<Mode>('menu');
-  const [folderName, setFolderName] = useState('');
-
-  // Link state
+  const [subfolderName, setSubfolderName] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [savingLink, setSavingLink] = useState(false);
 
-  // Upload state
   const [uploadFileName, setUploadFileName] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const uploadTaskRef = useRef<FileSystem.UploadTask | null>(null);
   const pendingFileIdRef = useRef<string | null>(null);
 
-  const createFolder = useCreateFolder();
-
-  async function handleCreateFolder() {
-    if (!folderName.trim()) return;
+  async function handleCreateSubfolder() {
+    if (!subfolderName.trim()) return;
     try {
-      await createFolder.mutateAsync({ name: folderName.trim(), parent_id: folderId });
+      await sharedFoldersApi.createSubfolder(folderId, subfolderName.trim());
+      qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
       router.back();
     } catch {
-      Alert.alert('Ошибка', 'Не удалось создать папку');
+      Alert.alert('Ошибка', 'Не удалось создать подпапку');
     }
   }
 
   async function handleAddLink() {
     const raw = linkUrl.trim();
     if (!raw) return;
-    // Normalize URL: decode then re-encode to make it RFC-3986 compliant
-    // (pipe `|`, space, etc. fail PHP's FILTER_VALIDATE_URL otherwise)
     let url = raw;
     try { url = encodeURI(decodeURI(raw)); } catch { url = raw; }
     setSavingLink(true);
     try {
-      const res = await filesApi.createUrlFile(url);
-      const fileId = res.data.data.file.id;
-      if (folderId) {
-        await filesApi.moveFolder(fileId, folderId).catch(() => {});
-      }
-      qc.invalidateQueries({ queryKey: ['files'] });
+      await sharedFoldersApi.addUrlFile(folderId, url);
+      qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
       router.back();
     } catch (e: any) {
       Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось добавить ссылку');
@@ -87,7 +76,11 @@ export default function AddScreen() {
       let putUrl: string;
       let putHeaders: Record<string, string>;
       try {
-        const initRes = await filesApi.initUpload({ original_name: name, size, mime_type: mimeType });
+        const initRes = await sharedFoldersApi.initUpload(folderId, {
+          original_name: name,
+          size,
+          mime_type: mimeType,
+        });
         fileId = initRes.data.data.file.id;
         putUrl = initRes.data.data.upload.url;
         putHeaders = initRes.data.data.upload.headers;
@@ -119,7 +112,7 @@ export default function AddScreen() {
         uploadResult = await task.uploadAsync();
       } catch {
         if (pendingFileIdRef.current) {
-          filesApi.cancelUpload(pendingFileIdRef.current).catch(() => {});
+          // no cancel endpoint for shared folder uploads — file will expire
           pendingFileIdRef.current = null;
         }
         setMode('menu');
@@ -129,23 +122,18 @@ export default function AddScreen() {
 
       if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
         setUploadError(`Ошибка загрузки на сервер (${uploadResult?.status ?? '?'})`);
-        filesApi.cancelUpload(fileId).catch(() => {});
         return;
       }
 
       try {
-        await filesApi.completeUpload(fileId);
+        await sharedFoldersApi.completeUpload(folderId, fileId);
       } catch {
         setUploadError('Файл загружен, но не удалось подтвердить. Попробуйте снова.');
         return;
       }
 
-      if (folderId) {
-        await filesApi.moveFolder(fileId, folderId).catch(() => {});
-      }
-
       pendingFileIdRef.current = null;
-      qc.invalidateQueries({ queryKey: ['files'] });
+      qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
       router.back();
     } catch {
       setUploadError('Произошла ошибка. Попробуйте снова.');
@@ -155,12 +143,11 @@ export default function AddScreen() {
   function handleCancelUpload() {
     uploadTaskRef.current?.cancelAsync().catch(() => {});
     uploadTaskRef.current = null;
-    if (pendingFileIdRef.current) {
-      filesApi.cancelUpload(pendingFileIdRef.current).catch(() => {});
-      pendingFileIdRef.current = null;
-    }
+    pendingFileIdRef.current = null;
     setMode('menu');
   }
+
+  const parentName = params.folder_name ?? 'папку';
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
@@ -185,11 +172,11 @@ export default function AddScreen() {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => setMode('folder')}>
-              <Text style={styles.menuIcon}>📁</Text>
+            <TouchableOpacity style={styles.menuItem} onPress={() => setMode('subfolder')}>
+              <Text style={styles.menuIcon}>🗂</Text>
               <View>
-                <Text style={styles.menuTitle}>Создать папку</Text>
-                <Text style={styles.menuSub}>{params.folder_name ? `Внутри «${params.folder_name}»` : 'В корне'}</Text>
+                <Text style={styles.menuTitle}>Создать подпапку</Text>
+                <Text style={styles.menuSub}>Внутри «{parentName}»</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -242,26 +229,22 @@ export default function AddScreen() {
           </View>
         )}
 
-        {mode === 'folder' && (
+        {mode === 'subfolder' && (
           <View style={styles.form}>
             <TouchableOpacity onPress={() => setMode('menu')} style={styles.back}>
               <Text style={styles.backText}>← Назад</Text>
             </TouchableOpacity>
-            <Text style={styles.formTitle}>Создать папку</Text>
+            <Text style={styles.formTitle}>Создать подпапку</Text>
             <TextInput
               style={styles.input}
-              placeholder="Название папки"
-              value={folderName}
-              onChangeText={setFolderName}
+              placeholder="Название подпапки"
+              value={subfolderName}
+              onChangeText={setSubfolderName}
               autoFocus
               returnKeyType="done"
-              onSubmitEditing={handleCreateFolder}
+              onSubmitEditing={handleCreateSubfolder}
             />
-            <Button
-              title="Создать"
-              onPress={handleCreateFolder}
-              loading={createFolder.isPending}
-            />
+            <Button title="Создать" onPress={handleCreateSubfolder} />
           </View>
         )}
 

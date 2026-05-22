@@ -18,6 +18,29 @@ export function useFolderList() {
   });
 }
 
+export function useRenameFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      foldersApi.update(id, { name }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['folders'] });
+    },
+  });
+}
+
+export function useDeleteFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, force }: { id: string; force?: boolean }) =>
+      foldersApi.delete(id, force),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['folders'] });
+      qc.invalidateQueries({ queryKey: ['files'] });
+    },
+  });
+}
+
 export function useCreateFolder() {
   const qc = useQueryClient();
   return useMutation({
