@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useInboxCount } from '@/hooks/useInbox';
 import { useContactRequests } from '@/hooks/useContacts';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { View, Text, StyleSheet } from 'react-native';
 
 function TabBarIcon({ name, color, size }: { name: any; color: string; size: number }) {
@@ -26,6 +27,8 @@ function ConnectionsTabIcon({ color, size }: { color: string; size: number }) {
 }
 
 export default function AppLayout() {
+  usePushNotifications();
+
   return (
     <>
       <OfflineBanner />

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Push;
 
 use App\Http\Controllers\Controller;
+use App\Models\DevicePushToken;
 use App\Models\PushSubscription;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,5 +63,46 @@ class PushController extends Controller
             ->delete();
 
         return $this->success('Подписка удалена');
+    }
+
+    /**
+     * POST /api/v1/push/device-token
+     * Register an Expo / FCM device token for mobile push notifications.
+     */
+    public function registerDeviceToken(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token'     => 'required|string|max:500',
+            'platform'  => 'required|in:android,ios',
+            'device_id' => 'nullable|string|max:255',
+        ]);
+
+        DevicePushToken::updateOrCreate(
+            [
+                'user_id' => $request->user()->id,
+                'token'   => $data['token'],
+            ],
+            [
+                'platform'  => $data['platform'],
+                'device_id' => $data['device_id'] ?? null,
+            ]
+        );
+
+        return $this->success('Токен зарегистрирован');
+    }
+
+    /**
+     * DELETE /api/v1/push/device-token
+     * Remove a device token on logout or permission revoke.
+     */
+    public function unregisterDeviceToken(Request $request): JsonResponse
+    {
+        $request->validate(['token' => 'required|string']);
+
+        $request->user()->devicePushTokens()
+            ->where('token', $request->token)
+            ->delete();
+
+        return $this->success('Токен удалён');
     }
 }

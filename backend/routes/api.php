@@ -74,8 +74,10 @@ Route::prefix('v1')->group(function () {
     // ─── Push Notifications ───────────────────────────────────────────────────
     Route::get('push/vapid-key', [PushController::class, 'vapidKey']);
     Route::middleware('auth:sanctum')->group(function () {
-        Route::post('push/subscribe',   [PushController::class, 'subscribe']);
-        Route::delete('push/unsubscribe', [PushController::class, 'unsubscribe']);
+        Route::post('push/subscribe',        [PushController::class, 'subscribe']);
+        Route::delete('push/unsubscribe',    [PushController::class, 'unsubscribe']);
+        Route::post('push/device-token',     [PushController::class, 'registerDeviceToken']);
+        Route::delete('push/device-token',   [PushController::class, 'unregisterDeviceToken']);
     });
 
     // ─── Public Link Flow ──────────────────────────────────────────────────────

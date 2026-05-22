@@ -3,6 +3,8 @@ import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } fr
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authApi } from '@/api/auth';
+import { pushApi } from '@/api/push';
+import * as Notifications from 'expo-notifications';
 import { tariffsApi } from '@/api/tariffs';
 import { useAuthStore } from '@/store/auth';
 import { Spinner } from '@/components/ui/Spinner';
@@ -49,6 +51,12 @@ export default function ProfileScreen() {
       {
         text: 'Выйти', style: 'destructive',
         onPress: async () => {
+          try {
+            const tokenData = await Notifications.getExpoPushTokenAsync({
+              projectId: '5cb7a68e-9f9c-45e8-ac2f-1c9d58b84b5c',
+            });
+            await pushApi.unregisterToken(tokenData.data);
+          } catch {}
           try { await authApi.logout(); } catch {}
           await clearAuth();
           qc.clear();

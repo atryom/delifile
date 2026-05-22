@@ -116,4 +116,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(PushSubscription::class);
     }
+
+    public function devicePushTokens(): HasMany
+    {
+        return $this->hasMany(DevicePushToken::class);
+    }
 }
