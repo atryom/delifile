@@ -228,7 +228,7 @@ useEffect(() => {
 
 | Функция | Статус | Примечания |
 |---------|--------|-----------|
-| Push-уведомления | ✅ Выполнено | Expo Push Token → бэкенд → `exp.host` relay → FCM/APNs |
+| Push-уведомления | ✅ Выполнено | Raw FCM token (`getDevicePushTokenAsync`) → бэкенд → FCM HTTP v1 API (service account JWT) |
 | Markdown-просмотр (read-only) | ✅ Выполнено | `react-native-markdown-display` |
 | Markdown-редактор | ✅ Выполнено | TipTap в WebView, локальный IIFE-бандл |
 | Комментарии к файлам и папкам | ✅ Выполнено | `/comment-threads/*`, `/comments/*` |

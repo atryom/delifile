@@ -16,7 +16,7 @@ class DevicePushTokenTest extends TestCase
 
         $response = $this->actingAs($user)
             ->postJson('/api/v1/push/device-token', [
-                'token'    => 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxxxx]',
+                'token'    => 'cXXXXXXX:APA91bXXXXXXXXXX-android-token',
                 'platform' => 'android',
             ]);
 
@@ -34,7 +34,7 @@ class DevicePushTokenTest extends TestCase
 
         $response = $this->actingAs($user)
             ->postJson('/api/v1/push/device-token', [
-                'token'     => 'ExponentPushToken[iiiiiiiiiiiiiiiiiiiiii]',
+                'token'     => 'cIIIIIIII:APA91bIIIIIIIIII-ios-token',
                 'platform'  => 'ios',
                 'device_id' => 'test-device-uuid',
             ]);
@@ -51,7 +51,7 @@ class DevicePushTokenTest extends TestCase
     public function test_registering_same_token_twice_does_not_create_duplicate(): void
     {
         $user  = User::factory()->create();
-        $token = 'ExponentPushToken[duplicate]';
+        $token = 'cDUP:APA91b-duplicate-fcm-token';
 
         $this->actingAs($user)->postJson('/api/v1/push/device-token', [
             'token' => $token, 'platform' => 'android',
@@ -79,7 +79,7 @@ class DevicePushTokenTest extends TestCase
 
         $this->actingAs($user)
             ->postJson('/api/v1/push/device-token', [
-                'token'    => 'ExponentPushToken[xxx]',
+                'token'    => 'cXXX:APA91b-test-token',
                 'platform' => 'windows',
             ])
             ->assertStatus(422);
@@ -88,7 +88,7 @@ class DevicePushTokenTest extends TestCase
     public function test_unauthenticated_cannot_register_token(): void
     {
         $this->postJson('/api/v1/push/device-token', [
-            'token'    => 'ExponentPushToken[xxx]',
+            'token'    => 'cXXX:APA91b-test-token',
             'platform' => 'android',
         ])->assertUnauthorized();
     }
@@ -98,7 +98,7 @@ class DevicePushTokenTest extends TestCase
     public function test_authenticated_user_can_unregister_token(): void
     {
         $user  = User::factory()->create();
-        $token = 'ExponentPushToken[toremove]';
+        $token = 'cREM:APA91b-token-to-remove';
 
         DevicePushToken::create([
             'user_id'  => $user->id,
@@ -140,7 +140,7 @@ class DevicePushTokenTest extends TestCase
     {
         $owner = User::factory()->create();
         $other = User::factory()->create();
-        $token = 'ExponentPushToken[foreign]';
+        $token = 'cFOR:APA91b-foreign-user-token';
 
         DevicePushToken::create([
             'user_id'  => $owner->id,
@@ -161,7 +161,7 @@ class DevicePushTokenTest extends TestCase
 
     public function test_unauthenticated_cannot_unregister_token(): void
     {
-        $this->deleteJson('/api/v1/push/device-token', ['token' => 'ExponentPushToken[xxx]'])
+        $this->deleteJson('/api/v1/push/device-token', ['token' => 'cXXX:APA91b-test-token'])
             ->assertUnauthorized();
     }
 
@@ -170,7 +170,7 @@ class DevicePushTokenTest extends TestCase
     public function test_tokens_deleted_when_user_is_deleted(): void
     {
         $user  = User::factory()->create();
-        $token = 'ExponentPushToken[cascade]';
+        $token = 'cCAS:APA91b-cascade-delete-token';
 
         DevicePushToken::create([
             'user_id'  => $user->id,

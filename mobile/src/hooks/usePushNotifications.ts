@@ -1,11 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
-import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { pushApi } from '@/api/push';
 
-// How foreground notifications are displayed
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -16,68 +14,47 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const PROJECT_ID = '5cb7a68e-9f9c-45e8-ac2f-1c9d58b84b5c';
-
 export function usePushNotifications() {
-  const notificationListener = useRef<Notifications.EventSubscription>();
   const responseListener = useRef<Notifications.EventSubscription>();
 
   useEffect(() => {
     registerForPushAsync();
 
-    // Foreground notification received
-    notificationListener.current = Notifications.addNotificationReceivedListener(() => {
-      // Badge update, etc. — no-op for now
-    });
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener(handleNotificationTap);
 
-    // User tapped a notification
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      handleNotificationResponse,
-    );
-
-    return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
-    };
+    return () => responseListener.current?.remove();
   }, []);
 }
 
 async function registerForPushAsync(): Promise<void> {
-  if (!Device.isDevice) return; // simulators / emulators don't support push
-
+  // Create Android notification channel (required for Android 8+)
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
+      name: 'DeliFile',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#2563EB',
     });
   }
 
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let finalStatus = existing;
-
-  if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') return;
+  // Request permission (Android 13+ requires explicit request)
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') return;
 
   try {
-    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
-    const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-    await pushApi.registerToken(tokenData.data, platform);
+    // Raw FCM token — works without Expo Dashboard credentials
+    const tokenData = await Notifications.getDevicePushTokenAsync();
+    const platform: 'android' | 'ios' = Platform.OS === 'ios' ? 'ios' : 'android';
+    await pushApi.registerToken(tokenData.data as string, platform);
   } catch {
-    // Non-critical — app works without push
+    // Non-critical
   }
 }
 
-function handleNotificationResponse(response: Notifications.NotificationResponse): void {
-  const url: string | undefined =
-    response.notification.request.content.data?.url;
+function handleNotificationTap(response: Notifications.NotificationResponse): void {
+  const url: string | undefined = response.notification.request.content.data?.url;
   if (!url) return;
-
-  // Navigate based on URL path from backend deep-link
   try {
     const path = new URL(url).pathname;
     if (path.startsWith('/files/')) {
@@ -89,6 +66,6 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
       router.push('/(app)/settings/support' as any);
     }
   } catch {
-    // Ignore invalid URLs
+    // ignore
   }
 }
