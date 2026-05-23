@@ -209,7 +209,13 @@ export class SharedFoldersComponent implements OnInit {
   }
 
   downloadFile(fileId: string): void {
-    this.filesApi.download(fileId).subscribe((res) => window.open(res.data.url, '_blank'));
+    this.filesApi.download(fileId).subscribe((res) => {
+      const a = document.createElement('a');
+      a.href = res.data.url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
   }
 
   canViewInBrowser(file: SharedFolderFileItem): boolean {

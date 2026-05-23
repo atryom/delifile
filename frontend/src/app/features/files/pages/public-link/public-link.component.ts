@@ -70,7 +70,11 @@ export class PublicLinkComponent implements OnInit {
       next: (res) => {
         const url = res.data.url;
         this.downloadUrl.set(url);
-        window.open(url, '_blank');
+        const a = document.createElement('a');
+        a.href = url;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         this.status.set('downloaded');
         this.downloading.set(false);
       },

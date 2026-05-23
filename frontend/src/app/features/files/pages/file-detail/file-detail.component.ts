@@ -209,23 +209,34 @@ export class FileDetailComponent implements OnInit {
   }
 
   download(): void {
+    const file = this.file();
+    const fileName = file?.original_name;
     const selectedId = this.selectedVersionId();
-    const versions   = this.file()?.versions ?? [];
-    const hasVersions = this.file()?.has_versions;
+    const versions   = file?.versions ?? [];
+    const hasVersions = file?.has_versions;
 
     if (hasVersions && selectedId && versions.length > 0) {
       const latest = versions[versions.length - 1];
       if (selectedId !== latest.id) {
         this.filesApi.downloadVersion(this.id(), selectedId).subscribe((res) => {
-          window.open(res.data.url, '_blank');
+          this.triggerDownload(res.data.url, fileName);
         });
         return;
       }
     }
 
     this.filesApi.download(this.id()).subscribe((res) => {
-      window.open(res.data.url, '_blank');
+      this.triggerDownload(res.data.url, fileName);
     });
+  }
+
+  private triggerDownload(url: string, name?: string): void {
+    const a = document.createElement('a');
+    a.href = url;
+    if (name) a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   openInBrowser(): void {
