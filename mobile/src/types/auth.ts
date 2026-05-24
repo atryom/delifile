@@ -32,6 +32,9 @@ export interface DeviceSession {
 export interface LoginPayload {
   email: string;
   password: string;
+  device_id?: string;
+  device_type?: string;
+  device_name?: string;
 }
 
 export interface RegisterPayload {

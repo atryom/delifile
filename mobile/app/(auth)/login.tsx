@@ -3,6 +3,7 @@ import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, T
 import { router } from 'expo-router';
 import { authApi } from '@/api/auth';
 import { useAuthStore } from '@/store/auth';
+import { getDeviceId, getDeviceType, getDeviceName } from '@/utils/device';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -16,7 +17,18 @@ export default function LoginScreen() {
     if (!email.trim() || !password) return;
     setLoading(true);
     try {
-      const { data } = await authApi.login({ email: email.trim(), password });
+      const [deviceId, deviceType, deviceName] = await Promise.all([
+        getDeviceId(),
+        Promise.resolve(getDeviceType()),
+        Promise.resolve(getDeviceName()),
+      ]);
+      const { data } = await authApi.login({
+        email: email.trim(),
+        password,
+        device_id: deviceId,
+        device_type: deviceType,
+        device_name: deviceName,
+      });
       if (data.result === 'success') {
         await setAuth(data.data.token, data.data.user);
         router.replace('/(app)/files');

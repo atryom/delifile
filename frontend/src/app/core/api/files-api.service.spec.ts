@@ -136,4 +136,21 @@ describe('FilesApiService', () => {
     expect(req.request.method).toBe('POST');
     req.flush({ result: 'success', message: 'OK', data: { file: {}, link: { expires_at: '', allow_save: false } } });
   });
+
+  it('should rename file with display_name', () => {
+    service.rename('file-123', 'My custom name').subscribe();
+
+    const req = httpMock.expectOne('/api/v1/files/file-123/rename');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ display_name: 'My custom name' });
+    req.flush({ result: 'success', message: 'Renamed', data: { display_name: 'My custom name', original_name: 'doc.pdf' } });
+  });
+
+  it('should rename file with null to clear display_name', () => {
+    service.rename('file-123', null).subscribe();
+
+    const req = httpMock.expectOne('/api/v1/files/file-123/rename');
+    expect(req.request.body).toEqual({ display_name: null });
+    req.flush({ result: 'success', message: 'Renamed', data: { display_name: null, original_name: 'doc.pdf' } });
+  });
 });

@@ -18,6 +18,7 @@ use App\Services\ActivityService;
 use App\Services\FileCardBuilder;
 use App\Services\FileService;
 use App\Services\MimeService;
+use App\Services\NotificationService;
 use App\Services\PushNotificationService;
 use App\Services\S3UrlService;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +35,7 @@ class SharingController extends Controller
         private readonly MimeService             $mime,
         private readonly FileCardBuilder         $cardBuilder,
         private readonly PushNotificationService $pushService,
+        private readonly NotificationService     $notificationService,
     ) {}
 
     /**
@@ -147,7 +149,13 @@ class SharingController extends Controller
                     $file->original_name . ' — от ' . $senderName,
                     $autoAdd
                         ? config('app.url') . '/files/' . $file->id
-                        : config('app.url') . '/inbox',
+                        : config('app.url') . '/communication/received',
+                );
+                $this->notificationService->notifyFileShared(
+                    $recipientUser->id,
+                    $senderName,
+                    $file->display_name ?? $file->original_name,
+                    $file->id,
                 );
             }
         });

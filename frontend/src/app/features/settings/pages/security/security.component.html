@@ -113,9 +113,33 @@
           <div class="sessions-list">
             @for (session of sessions(); track session.id) {
               <div class="session-item">
-                <div class="session-icon" aria-hidden="true">💻</div>
+                <div class="session-icon" aria-hidden="true">
+                  @switch (session.device_type) {
+                    @case ('android') {
+                      <!-- Android icon -->
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zm-2.5-1C2.67 17 2 17.67 2 18.5v5C2 24.33 2.67 25 3.5 25S5 24.33 5 23.5v-5C5 17.67 4.33 17 3.5 17zm17 0c-.83 0-1.5.67-1.5 1.5v5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-5c0-.83-.67-1.5-1.5-1.5zm-4.97-15.51l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48A5.84 5.84 0 0 0 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C7.14 3.07 6 4.51 6 6.25v.51h12v-.51c0-1.74-1.14-3.18-2.47-4.26zM10 5c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm4 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg>
+                    }
+                    @case ('ios') {
+                      <!-- Apple icon -->
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                    }
+                    @case ('pwa') {
+                      <!-- PWA/Globe icon -->
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 1 0 20A14.5 14.5 0 0 1 12 2"/><path d="M2 12h20"/></svg>
+                    }
+                    @default {
+                      <!-- Browser/Desktop icon -->
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+                    }
+                  }
+                </div>
                 <div class="session-info">
-                  <p class="session-device">{{ session.device_name }}</p>
+                  <p class="session-device">
+                    {{ session.device_name }}
+                    @if (session.device_type) {
+                      <span class="session-platform-badge">{{ session.device_type }}</span>
+                    }
+                  </p>
                   <p class="session-meta">
                     {{ session.ip_address ?? ('security.sessions.unknown_ip' | translate) }}
                     · {{ 'security.sessions.last_active' | translate:{date: (session.last_active_at | date:'MMM d, y, HH:mm')} }}

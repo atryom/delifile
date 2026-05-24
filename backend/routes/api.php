@@ -27,6 +27,7 @@ use App\Http\Controllers\Comments\CommentSettingsController;
 use App\Http\Controllers\Documents\DocumentController;
 use App\Http\Controllers\Documents\DocumentLockController;
 use App\Http\Controllers\Assets\AssetController;
+use App\Http\Controllers\Notifications\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -122,6 +123,7 @@ Route::prefix('v1')->group(function () {
         Route::post('files/{id}/move-folder',      [FileController::class, 'moveFolder']);
         Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
         Route::patch('files/{id}/description',     [FileController::class, 'updateDescription']);
+        Route::patch('files/{id}/rename',          [FileController::class, 'rename']);
         Route::get('files/{id}/activity',          [FileController::class, 'activity']);
         Route::get('files/{id}/accesses',          [FileController::class, 'accesses']);
 
@@ -201,6 +203,14 @@ Route::prefix('v1')->group(function () {
 
         // User settings
         Route::patch('user/settings', [UserSettingsController::class, 'update']);
+
+        // Notifications
+        Route::prefix('notifications')->group(function () {
+            Route::get('',            [NotificationController::class, 'index']);
+            Route::get('count',       [NotificationController::class, 'count']);
+            Route::post('read-all',   [NotificationController::class, 'markAllRead']);
+            Route::post('{id}/read',  [NotificationController::class, 'markRead']);
+        });
 
         // Inbox (received files & shared folders pending acceptance)
         Route::prefix('inbox')->group(function () {

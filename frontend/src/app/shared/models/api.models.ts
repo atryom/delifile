@@ -610,3 +610,24 @@ export interface SharedFolderCommentSettings {
   private_comments_enabled: boolean;
   mentions_enabled: boolean;
 }
+
+
+export type NotificationGroup = 'administrative' | 'access' | 'contacts' | 'other';
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  group: NotificationGroup;
+  title: string;
+  body: string | null;
+  data: Record<string, unknown> | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationsPage {
+  items: AppNotification[];
+  total: number;
+  page: number;
+  last_page: number;
+}

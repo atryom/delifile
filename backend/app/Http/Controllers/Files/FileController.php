@@ -163,6 +163,45 @@ class FileController extends Controller
     }
 
     /**
+     * PATCH /api/v1/files/{fileId}/rename
+     * Set display_name visible to all with access.
+     * Owner can also clear it (revert to original_name).
+     * Notes (is_editable markdown): only owner can rename (changes original_name).
+     */
+    public function rename(Request $request, string $fileId): JsonResponse
+    {
+        $request->validate([
+            'display_name' => 'nullable|string|max:255',
+        ]);
+
+        $file = File::find($fileId);
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
+            return $this->notFound('File not found');
+        }
+
+        $isOwner = $file->isOwnedBy($request->user());
+
+        // For markdown notes: only the owner can rename (it changes the document title)
+        if ($file->isMarkdownDocument()) {
+            if (!$isOwner) {
+                return $this->forbidden();
+            }
+            $file->update([
+                'original_name' => $request->input('display_name') ?? $file->original_name,
+                'display_name'  => null,
+            ]);
+        } else {
+            // For files and links: any user with access can set the shared display_name
+            $file->update(['display_name' => $request->input('display_name')]);
+        }
+
+        return $this->success('File renamed', [
+            'display_name'  => $file->display_name,
+            'original_name' => $file->original_name,
+        ]);
+    }
+
+    /**
      * PATCH /api/v1/files/{fileId}/description
      * Update per-user description for a file.
      */

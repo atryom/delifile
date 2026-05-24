@@ -18,6 +18,7 @@ class LoginRequest extends FormRequest
             'password'    => ['required', 'string'],
             'device_id'   => ['nullable', 'string', 'max:36'],
             'device_type' => ['nullable', 'string', 'max:50'],
+            'device_name' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

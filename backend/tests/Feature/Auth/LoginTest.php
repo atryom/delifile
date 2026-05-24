@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\DeviceSession;
 use App\Models\User;
 use Tests\TestCase;
 
@@ -78,5 +79,54 @@ class LoginTest extends TestCase
 
         $response->assertOk()
             ->assertJson(['result' => 'success']);
+    }
+
+    public function test_login_with_device_info_creates_device_session(): void
+    {
+        $user = User::factory()->create([
+            'email'    => 'mobile@example.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'email'       => 'mobile@example.com',
+            'password'    => 'password123',
+            'device_id'   => 'test-device-uuid-1234',
+            'device_type' => 'android',
+            'device_name' => 'Samsung Galaxy S23',
+        ])->assertOk();
+
+        $session = DeviceSession::where('user_id', $user->id)
+            ->where('device_id', 'test-device-uuid-1234')
+            ->first();
+
+        $this->assertNotNull($session);
+        $this->assertSame('android', $session->device_type);
+        $this->assertSame('Samsung Galaxy S23', $session->device_name);
+    }
+
+    public function test_repeated_login_with_same_device_id_reuses_session(): void
+    {
+        $user = User::factory()->create([
+            'email'    => 'repeat@example.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $payload = [
+            'email'       => 'repeat@example.com',
+            'password'    => 'password123',
+            'device_id'   => 'stable-device-uuid',
+            'device_type' => 'android',
+            'device_name' => 'Pixel 8',
+        ];
+
+        $this->postJson('/api/v1/auth/login', $payload)->assertOk();
+        $this->postJson('/api/v1/auth/login', $payload)->assertOk();
+
+        $sessionCount = DeviceSession::where('user_id', $user->id)
+            ->where('device_id', 'stable-device-uuid')
+            ->count();
+
+        $this->assertSame(1, $sessionCount);
     }
 }

@@ -6,7 +6,6 @@ import {
   signal,
   OnInit,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { SupportApiService } from '../../../../core/api/support-api.service';
 import {
@@ -24,7 +23,7 @@ type SupportTab = 'tickets' | 'suggestions';
 @Component({
   selector: 'app-support',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ReactiveFormsModule],
+  imports: [ReactiveFormsModule],
   templateUrl: './support.component.html',
   styleUrl: './support.component.scss',
 })

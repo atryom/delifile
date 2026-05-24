@@ -1,0 +1,63 @@
+<div class="page">
+  <div class="page-header">
+    <h1 class="page-title">{{ 'notifications.page_title' | translate }}</h1>
+    @if (items().length > 0) {
+      <button class="btn-mark-all" (click)="markAllRead()" [disabled]="markingAll()">
+        {{ 'notifications.mark_all_read' | translate }}
+      </button>
+    }
+  </div>
+
+  <!-- Filter chips -->
+  <div class="filters" role="group" [attr.aria-label]="'notifications.filter_label' | translate">
+    @for (f of filters; track f.key) {
+      <button
+        class="chip"
+        [class.chip--active]="activeFilter() === f.key"
+        (click)="setFilter(f.key)">
+        {{ f.label | translate }}
+      </button>
+    }
+  </div>
+
+  <!-- List -->
+  @if (loading() && items().length === 0) {
+    <div class="empty-state">{{ 'common.loading' | translate }}</div>
+  } @else if (items().length === 0) {
+    <div class="empty-state">{{ 'notifications.empty' | translate }}</div>
+  } @else {
+    <ul class="notif-list" role="list">
+      @for (item of items(); track item.id) {
+        <li
+          class="notif-item"
+          [class.notif-item--unread]="!item.read_at"
+          (click)="open(item)"
+          role="button"
+          tabindex="0"
+          (keydown.enter)="open(item)">
+          <div class="notif-dot" [attr.aria-label]="item.read_at ? '' : ('notifications.unread' | translate)"></div>
+          <div class="notif-body">
+            <p class="notif-title">{{ item.title }}</p>
+            @if (item.body) {
+              <p class="notif-text">{{ item.body }}</p>
+            }
+            <time class="notif-time" [dateTime]="item.created_at">
+              {{ item.created_at | date:'d MMM, HH:mm' }}
+            </time>
+          </div>
+          <span class="notif-group-badge notif-group-badge--{{ item.group }}">
+            {{ ('notifications.group_' + item.group) | translate }}
+          </span>
+        </li>
+      }
+    </ul>
+
+    @if (hasMore()) {
+      <div class="load-more-wrap">
+        <button class="btn-load-more" (click)="loadMore()" [disabled]="loading()">
+          {{ loading() ? ('common.loading' | translate) : ('notifications.load_more' | translate) }}
+        </button>
+      </div>
+    }
+  }
+</div>

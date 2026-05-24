@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Services\FileCardBuilder;
 use App\Services\FileService;
 use App\Services\LinkPreviewService;
+use App\Services\NotificationService;
 use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,6 +34,7 @@ class SharedFolderController extends Controller
         private readonly FileCardBuilder         $cardBuilder,
         private readonly LinkPreviewService      $previewService,
         private readonly PushNotificationService $pushService,
+        private readonly NotificationService     $notificationService,
     ) {}
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -685,7 +687,13 @@ class SharedFolderController extends Controller
                 $recipientUser,
                 'Приглашение в общую папку',
                 "{$senderName} приглашает вас в папку «{$folder->name}»",
-                config('app.url') . '/inbox',
+                config('app.url') . '/communication/received',
+            );
+            $this->notificationService->notifyFolderShared(
+                $recipientUser->id,
+                $senderName,
+                $folder->name,
+                $folder->id,
             );
 
             return $this->success('Access pending recipient approval', [
@@ -721,6 +729,12 @@ class SharedFolderController extends Controller
                 'Доступ к общей папке',
                 "{$senderName} открыл вам доступ ({$accessLabel}) к папке «{$folder->name}»",
                 config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id,
+            );
+            $this->notificationService->notifyFolderShared(
+                $access->user->id,
+                $senderName,
+                $folder->name,
+                $folder->id,
             );
         }
 

@@ -58,7 +58,7 @@ class AuthService
 
         $deviceId   = $credentials['device_id'] ?? null;
         $deviceType = $credentials['device_type'] ?? null;
-        $deviceName = $deviceType ?? 'Web Browser';
+        $deviceName = $credentials['device_name'] ?? $deviceType ?? 'Web Browser';
 
         $existingSession = $deviceId
             ? DeviceSession::where('user_id', $user->id)->where('device_id', $deviceId)->first()

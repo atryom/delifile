@@ -73,37 +73,82 @@ export const routes: Routes = [
         m => m.FoldersTreeComponent
       ),
   },
+  // ─── Settings (Tags + Security) ─────────────────────────────────────────
   {
     path: 'tags',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/tags/pages/tags-list/tags-list.component').then(m => m.TagsListComponent),
+    redirectTo: '/settings/tags',
+    pathMatch: 'full',
   },
   {
-    path: 'contacts',
+    path: 'settings',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/contacts/pages/contacts/contacts.component').then(m => m.ContactsComponent),
+      import('./features/settings/pages/settings-page/settings-page.component').then(m => m.SettingsPageComponent),
+    children: [
+      { path: '', redirectTo: 'tags', pathMatch: 'full' },
+      {
+        path: 'tags',
+        loadComponent: () =>
+          import('./features/tags/pages/tags-list/tags-list.component').then(m => m.TagsListComponent),
+      },
+      {
+        path: 'security',
+        loadComponent: () =>
+          import('./features/settings/pages/security/security.component').then(m => m.SecurityComponent),
+      },
+      {
+        path: 'support',
+        loadComponent: () =>
+          import('./features/support/pages/support/support.component').then(m => m.SupportComponent),
+      },
+    ],
   },
+
+  // ─── Communication (Contacts + Inbox + Notifications) ───────────────────
+  {
+    path: 'contacts',
+    redirectTo: '/communication/contacts',
+    pathMatch: 'full',
+  },
+  {
+    path: 'inbox',
+    redirectTo: '/communication/received',
+    pathMatch: 'full',
+  },
+  {
+    path: 'communication',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/communication/pages/communication-page/communication-page.component').then(
+        m => m.CommunicationPageComponent
+      ),
+    children: [
+      { path: '', redirectTo: 'contacts', pathMatch: 'full' },
+      {
+        path: 'contacts',
+        loadComponent: () =>
+          import('./features/contacts/pages/contacts/contacts.component').then(m => m.ContactsComponent),
+      },
+      {
+        path: 'received',
+        loadComponent: () =>
+          import('./features/inbox/pages/inbox/inbox.component').then(m => m.InboxComponent),
+      },
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./features/communication/pages/notifications/notifications.component').then(
+            m => m.NotificationsComponent
+          ),
+      },
+    ],
+  },
+
   {
     path: 'activity',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/activity/pages/activity/activity.component').then(m => m.ActivityComponent),
-  },
-  {
-    path: 'settings/security',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/settings/pages/security/security.component').then(m => m.SecurityComponent),
-  },
-
-  // ─── Inbox ───────────────────────────────────────────────────────────────
-  {
-    path: 'inbox',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/inbox/pages/inbox/inbox.component').then(m => m.InboxComponent),
   },
 
   // ─── Invitation flow ─────────────────────────────────────────────────────
@@ -123,12 +168,11 @@ export const routes: Routes = [
       import('./features/tariffs/pages/tariffs/tariffs.component').then(m => m.TariffsComponent),
   },
 
-  // ─── Support ─────────────────────────────────────────────────────────────
+  // ─── Support (redirect to settings tab) ──────────────────────────────────
   {
     path: 'support',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/support/pages/support/support.component').then(m => m.SupportComponent),
+    redirectTo: '/settings/support',
+    pathMatch: 'full',
   },
 
   // ─── Admin ───────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import { AuthApiService } from '../../api/auth-api.service';
 import { UserSettingsApiService } from '../../api/user-settings-api.service';
 import { FilesApiService } from '../../api/files-api.service';
 import { NotificationService } from '../../notifications/notification.service';
+import { NotificationsApiService } from '../../api/notifications-api.service';
 import { PushService } from '../../notifications/push.service';
 import { FooterComponent } from '../../../shared/components/footer/footer.component';
 import { PwaInstallService } from '../../services/pwa-install.service';
@@ -34,6 +35,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   private readonly settingsApi  = inject(UserSettingsApiService);
   private readonly filesApi     = inject(FilesApiService);
   readonly notifService  = inject(NotificationService);
+  private readonly notificationsApi = inject(NotificationsApiService);
   readonly pwaInstall    = inject(PwaInstallService);
   private readonly pushService  = inject(PushService);
   private readonly translate    = inject(TranslateService);
@@ -50,7 +52,8 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   readonly userPlan        = this.authState.plan;
   readonly isSuperUser       = this.authState.isSuperUser;
   readonly showInboxNav      = computed(() => !(this.authState.user()?.auto_add_received_files ?? true));
-  readonly sidebarOpen       = signal(false);
+  readonly sidebarOpen         = signal(false);
+  readonly unreadNotifCount    = signal(0);
   readonly resending       = signal(false);
   readonly resent          = signal(false);
 
@@ -93,9 +96,13 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
       if (url.includes('/files') && url.includes('received')) {
         this.notifService.dismissAll();
       }
-      // If user opens security settings — clear contact request toasts
-      if (url.includes('/settings/security')) {
+      // If user opens security settings or communication — clear contact request toasts
+      if (url.includes('/settings/security') || url.includes('/communication')) {
         this.notifService.dismissAll();
+      }
+      // Refresh unread count when opening notifications page
+      if (url.includes('/communication/notifications')) {
+        this._refreshNotifCount();
       }
     });
   }
@@ -107,7 +114,18 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
 
   private _startPolling(): void {
     this._checkNewEvents();
-    this._pollTimer = setInterval(() => this._checkNewEvents(), POLL_INTERVAL_MS);
+    this._refreshNotifCount();
+    this._pollTimer = setInterval(() => {
+      this._checkNewEvents();
+      this._refreshNotifCount();
+    }, POLL_INTERVAL_MS);
+  }
+
+  private _refreshNotifCount(): void {
+    this.notificationsApi.getCount().subscribe({
+      next: res => this.unreadNotifCount.set(res.data.unread),
+      error: () => { /* ignore */ },
+    });
   }
 
   private _checkNewEvents(): void {

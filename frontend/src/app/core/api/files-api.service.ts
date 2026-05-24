@@ -178,4 +178,8 @@ export class FilesApiService {
   updateDisplayName(fileId: string, displayName: string | null): Observable<ApiResponse<{ display_name: string | null }>> {
     return this.api.patch(`/files/${fileId}/display-name`, { display_name: displayName });
   }
+
+  rename(fileId: string, displayName: string | null): Observable<ApiResponse<{ display_name: string | null; original_name: string }>> {
+    return this.api.patch(`/files/${fileId}/rename`, { display_name: displayName });
+  }
 }

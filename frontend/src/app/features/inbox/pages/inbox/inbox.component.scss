@@ -1,13 +1,13 @@
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   background: var(--bg);
   color: var(--text);
 }
 
 .page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 24px 16px;
+  padding: 28px 32px;
 }
 
 .page-title {

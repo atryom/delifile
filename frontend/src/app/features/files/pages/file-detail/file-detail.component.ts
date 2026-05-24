@@ -118,9 +118,14 @@ export class FileDetailComponent implements OnInit {
   versionCommentDraft = '';
   readonly savingVersion = signal(false);
 
-  // Display name edit
+  // Display name edit (versions-only feature)
   displayNameDraft = '';
   readonly savingDisplayName = signal(false);
+
+  // Inline title rename
+  readonly renamingTitle  = signal(false);
+  renameDraft             = '';
+  readonly savingRename   = signal(false);
 
   ngOnInit(): void {
     const fromParam = this.route.snapshot.queryParamMap.get('from');
@@ -503,6 +508,43 @@ export class FileDetailComponent implements OnInit {
         } : f);
       },
       error: () => {},
+    });
+  }
+
+  startRename(): void {
+    const f = this.file();
+    if (!f) return;
+    this.renameDraft = f.display_name ?? f.original_name;
+    this.renamingTitle.set(true);
+  }
+
+  cancelRename(): void {
+    this.renamingTitle.set(false);
+  }
+
+  commitRename(): void {
+    if (this.savingRename()) return;
+    const f = this.file();
+    if (!f) return;
+    const name = this.renameDraft.trim();
+    const current = f.display_name ?? f.original_name;
+    if (!name || name === current) {
+      this.renamingTitle.set(false);
+      return;
+    }
+    this.savingRename.set(true);
+    this.filesApi.rename(f.id, name).subscribe({
+      next: (res) => {
+        this.file.update(prev => prev ? {
+          ...prev,
+          display_name: res.data.display_name,
+          original_name: res.data.original_name,
+        } : prev);
+        this.savingRename.set(false);
+        this.renamingTitle.set(false);
+        this.showFeedback(this.translate.instant('files.detail.renamed'));
+      },
+      error: () => this.savingRename.set(false),
     });
   }
 

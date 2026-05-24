@@ -116,7 +116,10 @@
     "logout": "Sign out",
     "menu": "Menu",
     "shared_folders": "Shared Folders",
-    "inbox": "Inbox"
+    "inbox": "Inbox",
+    "communication": "Communication",
+    "settings": "Settings",
+    "notifications": "Notifications"
   },
   "tariffs": {
     "title": "Tariff Plans",
@@ -236,7 +239,10 @@
       "add_tag": "Tag",
       "tag_search_placeholder": "Search tags…",
       "create_tag": "Create tag \"{{name}}\"",
-      "no_tags": "No tags found"
+      "no_tags": "No tags found",
+      "renamed": "Renamed",
+      "click_to_rename": "Click to rename",
+      "rename_label": "New file name"
     },
     "versions": {
       "add_version_btn": "Add version",
@@ -530,7 +536,22 @@
     "new_file_title": "New file",
     "new_file_body": "User {{name}} shared file «{{file}}» with you.",
     "contact_request_title": "Contact request",
-    "contact_request_body": "User {{name}} wants to add you as a contact."
+    "contact_request_body": "User {{name}} wants to add you as a contact.",
+    "page_title": "Notifications",
+    "mark_all_read": "Mark all as read",
+    "empty": "No notifications.",
+    "unread": "Unread",
+    "load_more": "Load more",
+    "filter_label": "Filter by type",
+    "filter_all": "All",
+    "filter_administrative": "Administrative",
+    "filter_access": "Access",
+    "filter_contacts": "Contacts",
+    "filter_other": "Other",
+    "group_administrative": "System",
+    "group_access": "Access",
+    "group_contacts": "Contacts",
+    "group_other": "Other"
   },
   "cookie": {
     "text": "Our site uses cookies. By continuing to use it, you agree to the processing of personal data in accordance with our",

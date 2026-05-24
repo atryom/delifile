@@ -133,12 +133,29 @@
                   }
                 </div>
                 <div class="file-header-info">
-                  <h1 class="file-title">
-                    {{ displayTitle() }}
-                    @if (file()!.has_versions) {
-                      <span class="version-badge" title="{{ 'files.versions.versioned' | translate }}">V</span>
-                    }
-                  </h1>
+                  @if (renamingTitle()) {
+                    <div class="file-title-edit">
+                      <input
+                        class="file-title-input"
+                        type="text"
+                        [(ngModel)]="renameDraft"
+                        (keydown.enter)="commitRename()"
+                        (keydown.escape)="cancelRename()"
+                        (blur)="commitRename()"
+                        [disabled]="savingRename()"
+                        [attr.aria-label]="'files.detail.rename_label' | translate"
+                        autofocus
+                      />
+                      <button class="btn-rename-cancel" type="button" (click)="cancelRename()" [attr.aria-label]="'common.cancel' | translate">✕</button>
+                    </div>
+                  } @else {
+                    <h1 class="file-title">
+                      <span class="file-title-text" (click)="startRename()" [title]="'files.detail.click_to_rename' | translate">{{ displayTitle() }}</span>
+                      @if (file()!.has_versions) {
+                        <span class="version-badge" title="{{ 'files.versions.versioned' | translate }}">V</span>
+                      }
+                    </h1>
+                  }
                   <div class="file-meta-row">
                     <span class="badge" [class]="'badge-' + file()!.status">{{ file()!.status }}</span>
                     <span class="meta-item">{{ formatSize(displaySize()) }}</span>

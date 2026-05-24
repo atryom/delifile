@@ -121,7 +121,10 @@
     "logout": "Выйти",
     "menu": "Меню",
     "shared_folders": "Общие папки",
-    "inbox": "Полученные"
+    "inbox": "Полученные",
+    "communication": "Связь",
+    "settings": "Настройки",
+    "notifications": "Оповещения"
   },
   "tariffs": {
     "title": "Использование текущего тарифа",
@@ -246,7 +249,10 @@
       "access_granted": "Доступ успешно предоставлен",
       "link_created": "Публичная ссылка создана",
       "add_description": "Добавить описание",
-      "folders": "Папки"
+      "folders": "Папки",
+      "renamed": "Имя изменено",
+      "click_to_rename": "Нажмите для переименования",
+      "rename_label": "Новое имя файла"
     },
     "versions": {
       "add_version_btn": "Добавить версию",
@@ -540,7 +546,22 @@
     "new_file_title": "Новый файл",
     "new_file_body": "Пользователь {{name}} поделился с вами файлом «{{file}}».",
     "contact_request_title": "Запрос на добавление в контакты",
-    "contact_request_body": "Пользователь {{name}} хочет добавить вас в контакты."
+    "contact_request_body": "Пользователь {{name}} хочет добавить вас в контакты.",
+    "page_title": "Оповещения",
+    "mark_all_read": "Отметить все прочитанными",
+    "empty": "Нет оповещений.",
+    "unread": "Не прочитано",
+    "load_more": "Загрузить ещё",
+    "filter_label": "Фильтр по типу",
+    "filter_all": "Все",
+    "filter_administrative": "Административные",
+    "filter_access": "Доступы",
+    "filter_contacts": "Контакты",
+    "filter_other": "Прочее",
+    "group_administrative": "Системное",
+    "group_access": "Доступ",
+    "group_contacts": "Контакты",
+    "group_other": "Прочее"
   },
   "cookie": {
     "text": "Наш сайт использует куки. Продолжая им пользоваться, вы соглашаетесь на обработку персональных данных в соответствии с",
