@@ -1,6 +1,7 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
+import { NotificationsApiService } from '../../../../core/api/notifications-api.service';
 
 @Component({
   selector: 'app-communication-page',
@@ -29,6 +30,9 @@ import { TranslateModule } from '@ngx-translate/core';
           class="tab-btn"
           role="tab">
           {{ 'nav.notifications' | translate }}
+          @if (notifCount() > 0) {
+            <span class="tab-badge">{{ notifCount() }}</span>
+          }
         </a>
       </div>
       <router-outlet />
@@ -76,10 +80,28 @@ import { TranslateModule } from '@ngx-translate/core';
       }
     }
 
+    .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 9px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-left: 4px;
+    }
+
     @media (max-width: 480px) {
       .tabs { padding: 0 8px; gap: 0; }
       .tab-btn { padding: 10px 10px; font-size: 0.78rem; }
     }
   `],
 })
-export class CommunicationPageComponent {}
+export class CommunicationPageComponent {
+  readonly notifCount = inject(NotificationsApiService).unreadCount;
+}

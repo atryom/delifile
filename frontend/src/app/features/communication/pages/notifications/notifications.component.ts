@@ -56,6 +56,7 @@ export class NotificationsComponent implements OnInit {
   open(item: AppNotification): void {
     if (!item.read_at) {
       this.api.markRead(item.id).subscribe();
+      this.api.decrementCount();
       this.items.update(list =>
         list.map(n => n.id === item.id ? { ...n, read_at: new Date().toISOString() } : n)
       );
@@ -87,6 +88,7 @@ export class NotificationsComponent implements OnInit {
       next: () => {
         const now = new Date().toISOString();
         this.items.update(list => list.map(n => ({ ...n, read_at: n.read_at ?? now })));
+        this.api.unreadCount.set(0);
         this.markingAll.set(false);
       },
       error: () => this.markingAll.set(false),

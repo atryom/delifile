@@ -491,10 +491,12 @@
             <div class="sidebar-section">
               <div class="section-header-row">
                 <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>
-                <button class="btn-section-action" (click)="showShareDialog.set(true)">
-                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
-                  {{ 'files.detail.share' | translate }}
-                </button>
+                @if (file()!.is_owner) {
+                  <button class="btn-section-action" (click)="showShareDialog.set(true)">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+                    {{ 'files.detail.share' | translate }}
+                  </button>
+                }
               </div>
               @if (!accesses().length) {
                 <div class="empty-panel">{{ 'files.detail.only_you' | translate }}</div>

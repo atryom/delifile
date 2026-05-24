@@ -53,7 +53,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   readonly isSuperUser       = this.authState.isSuperUser;
   readonly showInboxNav      = computed(() => !(this.authState.user()?.auto_add_received_files ?? true));
   readonly sidebarOpen         = signal(false);
-  readonly unreadNotifCount    = signal(0);
+  readonly unreadNotifCount    = this.notificationsApi.unreadCount;
   readonly resending       = signal(false);
   readonly resent          = signal(false);
 
@@ -100,9 +100,9 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
       if (url.includes('/settings/security') || url.includes('/communication')) {
         this.notifService.dismissAll();
       }
-      // Refresh unread count when opening notifications page
-      if (url.includes('/communication/notifications')) {
-        this._refreshNotifCount();
+      // Refresh unread count when opening notifications page or navigating away from it
+      if (url.includes('/communication/notifications') || url.includes('/communication')) {
+        this.notificationsApi.refreshCount();
       }
     });
   }
@@ -114,18 +114,11 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
 
   private _startPolling(): void {
     this._checkNewEvents();
-    this._refreshNotifCount();
+    this.notificationsApi.refreshCount();
     this._pollTimer = setInterval(() => {
       this._checkNewEvents();
-      this._refreshNotifCount();
+      this.notificationsApi.refreshCount();
     }, POLL_INTERVAL_MS);
-  }
-
-  private _refreshNotifCount(): void {
-    this.notificationsApi.getCount().subscribe({
-      next: res => this.unreadNotifCount.set(res.data.unread),
-      error: () => { /* ignore */ },
-    });
   }
 
   private _checkNewEvents(): void {
