@@ -1,37 +1,5 @@
 <div class="explorer-app" (click)="closeMenu()">
 
-  <!-- ──────────────────────────────────────────────────────── SIDEBAR -->
-  <aside class="sidebar">
-    <div class="sidebar-section-label">Тип Папки</div>
-
-    <div class="source-list">
-      <div class="source-item" [class.active]="activeTab() === 'local'"
-           (click)="setTab('local'); $event.stopPropagation()" role="button" tabindex="0"
-           (keydown.enter)="setTab('local')" (keydown.space)="setTab('local')">
-        <div class="source-info">
-          <span class="source-name">Локальные</span>
-        </div>
-      </div>
-      <div class="source-item" [class.active]="activeTab() === 'shared'"
-           (click)="setTab('shared'); $event.stopPropagation()" role="button" tabindex="0"
-           (keydown.enter)="setTab('shared')" (keydown.space)="setTab('shared')">
-        <div class="source-info">
-          <span class="source-name">Общие</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="sidebar-footer">
-      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
-        <ellipse cx="12" cy="5" rx="9" ry="3"/>
-        <path d="M3 5v14a9 3 0 0 0 18 0V5"/>
-        <path d="M3 12a9 3 0 0 0 18 0"/>
-      </svg>
-      <span class="footer-label">Использование, Гб</span>
-      <span class="footer-size">{{ storageText() }}</span>
-    </div>
-  </aside>
-
   <!-- ──────────────────────────────────────────────────────── MAIN -->
   <div class="main">
 
@@ -192,35 +160,8 @@
       }
     </nav>
 
-    <!-- ── PRIVATE NOTES TOGGLE (local folder only) ─────────────────────── -->
-    @if (activeTab() === 'local' && currentLocalFolderId()) {
-      <div class="folder-notes-bar">
-        <button
-          class="btn-notes-toggle"
-          (click)="folderNotesOpen.set(!folderNotesOpen())"
-          [attr.aria-expanded]="folderNotesOpen()"
-        >
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-          {{ 'comments.my_notes_btn' | translate }}
-        </button>
-      </div>
-    }
-
-    @if (folderNotesOpen() && activeTab() === 'local' && currentLocalFolderId()) {
-      <div class="folder-notes-panel">
-        <app-thread-comments
-          [targetType]="'local_folder'"
-          [targetId]="currentLocalFolderId()!"
-          [isOwner]="true"
-        />
-      </div>
-    }
-
     <!-- ── SHARED FOLDER DISCUSSION ──────────────────────────────────────── -->
-    @if (activeTab() === 'shared' && currentSharedFolderId()) {
+    @if (currentSharedFolderId()) {
       <div class="folder-notes-bar">
         <button
           class="btn-notes-toggle"
@@ -235,7 +176,7 @@
       </div>
     }
 
-    @if (folderNotesOpen() && activeTab() === 'shared' && currentSharedFolderId()) {
+    @if (folderNotesOpen() && currentSharedFolderId()) {
       <div class="folder-notes-panel">
         <app-thread-comments
           [targetType]="'shared_folder'"
@@ -298,67 +239,8 @@
             </thead>
             <tbody>
 
-              <!-- ── Local sub-folders ──────────────────────────────────── -->
-              @if (activeTab() === 'local') {
-                @for (folder of currentSubFolders(); track folder.id) {
-                  <tr (click)="navigateIntoLocalFolder(folder)">
-                    <td class="col-check"></td>
-                    <td>
-                      <div class="file-cell">
-                        <div class="file-icon icon-folder" aria-hidden="true">
-                          <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
-                          </svg>
-                        </div>
-                        <div class="file-info">
-                          @if (renamingId() === folder.id && renameType() === 'local') {
-                            <input type="text" class="rename-input" [(ngModel)]="renameNameValue"
-                                   maxlength="100" aria-label="Новое название"
-                                   (keydown.enter)="saveRename(folder.id, 'local')"
-                                   (keydown.escape)="cancelRename()"
-                                   (click)="$event.stopPropagation()" />
-                          } @else {
-                            <div class="file-name">{{ folder.name }}</div>
-                          }
-                          <div class="file-meta-mobile">{{ folder.files_count }} файлов</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="col-mod-cell">—</td>
-                    <td class="col-size-cell">{{ folder.files_count }} файлов</td>
-                    <td class="col-open-cell">
-                      <button type="button" class="open-btn"
-                              (click)="navigateIntoLocalFolder(folder); $event.stopPropagation()"
-                              title="Открыть папку" aria-label="Открыть папку {{ folder.name }}">
-                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/>
-                          <path d="M2 13h10"/><path d="m9 16 3-3-3-3"/>
-                        </svg>
-                      </button>
-                    </td>
-                    <td class="actions-cell" (click)="$event.stopPropagation()">
-                      <button type="button" class="action-dots"
-                              (click)="toggleMenu(folder.id, $event)"
-                              [attr.aria-expanded]="openMenuId() === folder.id"
-                              aria-label="Действия с папкой {{ folder.name }}">
-                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                        </svg>
-                      </button>
-                      @if (openMenuId() === folder.id) {
-                        <div class="dropdown-menu" role="menu">
-                          <button type="button" role="menuitem" (click)="navigateIntoLocalFolder(folder); closeMenu()">Открыть</button>
-                          <button type="button" role="menuitem" (click)="startRename(folder.id, 'local', folder.name)">Переименовать</button>
-                          <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteLocalFolder(folder)">Удалить</button>
-                        </div>
-                      }
-                    </td>
-                  </tr>
-                }
-              }
-
               <!-- ── Shared folders at root ──────────────────────────────── -->
-              @if (activeTab() === 'shared' && currentSharedFolderId() === null) {
+              @if (currentSharedFolderId() === null) {
                 @for (folder of filteredSharedFolders(); track folder.id) {
                   <tr (click)="navigateIntoSharedFolder(folder)">
                     <td class="col-check"></td>
@@ -431,7 +313,7 @@
               }
 
               <!-- ── Shared subfolders (when inside a shared folder) ─── -->
-              @if (activeTab() === 'shared' && currentSharedFolderId() !== null) {
+              @if (currentSharedFolderId() !== null) {
                 @for (sub of sfSubfolders(); track sub.id) {
                   <tr (click)="navigateIntoSharedFolder(sub)">
                     <td class="col-check"></td>
@@ -588,7 +470,7 @@
                           <button type="button" role="menuitem" (click)="favoriteFile(file)">В избранное</button>
                           <button type="button" role="menuitem" (click)="openTagDialogForFile(file)">Добавить тег</button>
                           <button type="button" role="menuitem" (click)="openMoveDialogForFile(file)">Переместить в папку</button>
-                          @if (activeTab() === 'shared' && currentSharedFolderId() && isSharedFolderOwner()) {
+                          @if (currentSharedFolderId() && isSharedFolderOwner()) {
                             <button type="button" role="menuitem" (click)="toggleFilePrivacy(file)">
                               {{ $any(file).is_private ? '🔓 Открыть гостям' : '🔒 Сделать личным' }}
                             </button>
@@ -618,24 +500,8 @@
             <p>Нет элементов</p>
           </div>
         } @else {
-          <!-- Local sub-folders -->
-          @if (activeTab() === 'local') {
-            @for (folder of currentSubFolders(); track folder.id) {
-              <div class="grid-card" (click)="navigateIntoLocalFolder(folder)" role="button" tabindex="0"
-                   (keydown.enter)="navigateIntoLocalFolder(folder)" aria-label="Открыть папку {{ folder.name }}">
-                <div class="grid-icon folder-grid-icon" aria-hidden="true">
-                  <svg width="36" height="36" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
-                  </svg>
-                </div>
-                <div class="grid-name">{{ folder.name }}</div>
-                <div class="grid-meta">{{ folder.files_count }} файлов</div>
-              </div>
-            }
-          }
-
           <!-- Shared folders at root -->
-          @if (activeTab() === 'shared' && currentSharedFolderId() === null) {
+          @if (currentSharedFolderId() === null) {
             @for (folder of filteredSharedFolders(); track folder.id) {
               <div class="grid-card" (click)="navigateIntoSharedFolder(folder)" role="button" tabindex="0"
                    (keydown.enter)="navigateIntoSharedFolder(folder)" aria-label="Открыть папку {{ folder.name }}">
@@ -655,7 +521,7 @@
           }
 
           <!-- Shared subfolders (when inside a shared folder) -->
-          @if (activeTab() === 'shared' && currentSharedFolderId() !== null) {
+          @if (currentSharedFolderId() !== null) {
             @for (sub of sfSubfolders(); track sub.id) {
               <div class="grid-card grid-card--folder" (click)="navigateIntoSharedFolder(sub)" role="button" tabindex="0"
                    (keydown.enter)="navigateIntoSharedFolder(sub)" aria-label="Открыть папку {{ sub.name }}">
@@ -890,19 +756,6 @@
   </div>
 }
 
-@if (forceDeleteTarget()) {
-  <div class="modal-backdrop" (click)="forceDeleteTarget.set(null)" role="dialog" aria-modal="true" aria-labelledby="force-del-title">
-    <div class="modal" (click)="$event.stopPropagation()">
-      <h3 id="force-del-title">В папке есть файлы</h3>
-      <p>Папка «{{ forceDeleteTarget()!.name }}» содержит файлы. Удалить вместе со всем содержимым?</p>
-      <div class="modal-actions">
-        <button type="button" class="btn-danger" (click)="forceDeleteLocalFolder()" [disabled]="deleting()">Удалить всё</button>
-        <button type="button" class="btn-secondary" (click)="forceDeleteTarget.set(null)">Отмена</button>
-      </div>
-    </div>
-  </div>
-}
-
 <!-- ══════════════════════════════════════════════════════ LEAVE DIALOG -->
 
 @if (leaveTarget()) {
@@ -1012,39 +865,21 @@
       <p>Выберите папку для {{ moveDialogCountText() }}</p>
       <div class="folder-list" role="listbox" aria-label="Список папок">
 
-        @if (moveDialogIsShared()) {
-          @if (sharedFoldersMoveTree().length === 0) {
-            <div class="folder-list-empty">Нет доступных общих папок</div>
-          }
-          @for (item of sharedFoldersMoveTree(); track item.folder.id) {
-            <button type="button" role="option" class="folder-list-item"
-                    [class.selected]="moveDialogFolderId() === item.folder.id"
-                    [attr.aria-selected]="moveDialogFolderId() === item.folder.id"
-                    [style.padding-left.px]="item.depth * 16 + 12"
-                    (click)="moveDialogFolderId.set(item.folder.id)">
-              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
-              </svg>
-              @if (item.depth > 0) {<span class="move-indent" aria-hidden="true">↳</span>}
-              {{ item.folder.name }}
-            </button>
-          }
-        } @else {
-          @if (flattenedFolders().length === 0) {
-            <div class="folder-list-empty">Нет локальных папок</div>
-          }
-          @for (item of flattenedFolders(); track item.folder.id) {
-            <button type="button" role="option" class="folder-list-item"
-                    [class.selected]="moveDialogFolderId() === item.folder.id"
-                    [attr.aria-selected]="moveDialogFolderId() === item.folder.id"
-                    [style.padding-left.px]="item.depth * 16 + 12"
-                    (click)="moveDialogFolderId.set(item.folder.id)">
-              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
-              </svg>
-              {{ item.folder.name }}
-            </button>
-          }
+        @if (sharedFoldersMoveTree().length === 0) {
+          <div class="folder-list-empty">Нет доступных папок</div>
+        }
+        @for (item of sharedFoldersMoveTree(); track item.folder.id) {
+          <button type="button" role="option" class="folder-list-item"
+                  [class.selected]="moveDialogFolderId() === item.folder.id"
+                  [attr.aria-selected]="moveDialogFolderId() === item.folder.id"
+                  [style.padding-left.px]="item.depth * 16 + 12"
+                  (click)="moveDialogFolderId.set(item.folder.id)">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+            </svg>
+            @if (item.depth > 0) {<span class="move-indent" aria-hidden="true">↳</span>}
+            {{ item.folder.name }}
+          </button>
         }
 
       </div>

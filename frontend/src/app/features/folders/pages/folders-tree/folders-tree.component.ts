@@ -9,18 +9,16 @@ import { TranslateModule } from '@ngx-translate/core';
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { FilesApiService, FileFilter } from '../../../../core/api/files-api.service';
-import { TariffApiService } from '../../../../core/api/tariff-api.service';
 import { FileUploadService } from '../../../files/services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import {
-  FolderTreeNode, SharedFolder, FileListItem, SharedFolderFileItem,
-  Tag, TariffUsage, FileTypeGroup, LinkPreview,
+  SharedFolder, FileListItem, SharedFolderFileItem,
+  Tag, FileTypeGroup, LinkPreview,
 } from '../../../../shared/models/api.models';
 import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialogs/access/shared-folder-access-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 import { formatSize } from '../../../../shared/utils/format';
-import { flattenTree } from '../../../../shared/utils/tree';
 import { classifyMimeType } from '../../../../shared/utils/file';
 
 interface SharedFolderMoveItem { folder: SharedFolder; depth: number; }
@@ -45,7 +43,6 @@ function buildSharedFolderMoveTree(folders: SharedFolder[]): SharedFolderMoveIte
 
 interface Breadcrumb {
   label: string;
-  localFolderId: string | null;
   sharedFolderId: string | null;
 }
 
@@ -63,7 +60,6 @@ export class FoldersTreeComponent implements OnInit {
   private readonly orgApi      = inject(OrganizationApiService);
   private readonly sfApi       = inject(SharedFoldersApiService);
   private readonly filesApi    = inject(FilesApiService);
-  private readonly tariffApi    = inject(TariffApiService);
   private readonly uploadSvc    = inject(FileUploadService);
   private readonly urlFilesApi  = inject(UrlFilesApiService);
   private readonly router       = inject(Router);
@@ -76,24 +72,12 @@ export class FoldersTreeComponent implements OnInit {
   noteCreateValue         = '';
   private readonly noteNameInputEl = viewChild<ElementRef<HTMLInputElement>>('noteNameInput');
 
-  // ── Tab & navigation ─────────────────────────────────────────────────────
-  readonly activeTab             = signal<'local' | 'shared'>('local');
+  // ── Navigation ─────────────────────────────────────────────────────────────
   readonly breadcrumbs           = signal<Breadcrumb[]>([]);
-  readonly currentLocalFolderId  = signal<string | null>(null);
   readonly currentSharedFolderId = signal<string | null>(null);
 
   // ── View mode ─────────────────────────────────────────────────────────────
   readonly viewMode = signal<'table' | 'grid'>('table');
-
-  // ── Local folder tree ─────────────────────────────────────────────────────
-  readonly treeLoading = signal(true);
-  readonly fullTree    = signal<FolderTreeNode[]>([]);
-
-  readonly currentSubFolders = computed<FolderTreeNode[]>(() => {
-    const cid = this.currentLocalFolderId();
-    if (cid === null) return this.fullTree();
-    return this.findNodeById(this.fullTree(), cid)?.children ?? [];
-  });
 
   // ── Shared folders ────────────────────────────────────────────────────────
   readonly sfLoading      = signal(false);
@@ -102,10 +86,20 @@ export class FoldersTreeComponent implements OnInit {
   readonly sfSubsLoading  = signal(false);
 
   // ── Files ─────────────────────────────────────────────────────────────────
-  readonly files        = signal<AnyFile[]>([]);
-  readonly filesLoading = signal(false);
-  readonly page         = signal(1);
-  readonly totalPages   = signal(1);
+  private readonly rawFiles = signal<AnyFile[]>([]);
+  readonly filesLoading     = signal(false);
+  readonly page             = signal(1);
+  readonly totalPages       = signal(1);
+
+  // Client-side filtering for shared folder files (is_owner); personal root files are filtered server-side
+  readonly files = computed<AnyFile[]>(() => {
+    const raw = this.rawFiles();
+    if (this.currentSharedFolderId() === null) return raw;
+    const f = this.activeFilter();
+    if (f === 'mine')     return raw.filter(file => (file as SharedFolderFileItem).is_owner === true);
+    if (f === 'received') return raw.filter(file => (file as SharedFolderFileItem).is_owner !== true);
+    return raw;
+  });
 
   // ── Filters ───────────────────────────────────────────────────────────────
   readonly activeFilter        = signal<FileFilter>('all');
@@ -118,10 +112,7 @@ export class FoldersTreeComponent implements OnInit {
   searchQuery = '';
   private searchTimer?: ReturnType<typeof setTimeout>;
 
-  // ── Storage ───────────────────────────────────────────────────────────────
-  readonly usage = signal<TariffUsage | null>(null);
-
-  // ── Local folder private notes / shared folder discussion ────────────────
+  // ── Shared folder discussion ──────────────────────────────────────────────
   readonly folderNotesOpen = signal(false);
 
   // ── Create folder ─────────────────────────────────────────────────────────
@@ -131,14 +122,13 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── Rename ────────────────────────────────────────────────────────────────
   readonly renamingId   = signal<string | null>(null);
-  readonly renameType   = signal<'local' | 'shared'>('local');
+  readonly renameType   = signal<'local' | 'shared'>('shared');
   renameNameValue = '';
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  readonly deleteTarget      = signal<{ id: string; name: string; kind: 'local-folder' | 'shared-folder' | 'file' } | null>(null);
-  readonly forceDeleteTarget = signal<{ id: string; name: string } | null>(null);
-  readonly deleteError       = signal<string | null>(null);
-  readonly deleting          = signal(false);
+  readonly deleteTarget = signal<{ id: string; name: string; kind: 'shared-folder' | 'file' } | null>(null);
+  readonly deleteError  = signal<string | null>(null);
+  readonly deleting     = signal(false);
 
   // ── Leave shared folder ───────────────────────────────────────────────────
   readonly leaveTarget  = signal<{ id: string; name: string } | null>(null);
@@ -197,18 +187,12 @@ export class FoldersTreeComponent implements OnInit {
     return n === 1 ? '1 файл' : n >= 2 && n <= 4 ? `${n} файла` : `${n} файлов`;
   });
 
-  readonly moveDialogIsShared    = computed(() => this.activeTab() === 'shared' && this.currentSharedFolderId() !== null);
   readonly sharedFoldersMoveList = signal<SharedFolder[]>([]);
   readonly sharedFoldersMoveTree = computed(() => buildSharedFolderMoveTree(this.sharedFoldersMoveList()));
 
   // ── Bulk delete ───────────────────────────────────────────────────────────
   readonly bulkDeleteDialogOpen = signal(false);
   readonly deletingBulk         = signal(false);
-
-  // ── Flattened local folder tree (for move dialog) ─────────────────────────
-  readonly flattenedFolders = computed(() =>
-    flattenTree(this.fullTree()).map(({ node, depth }) => ({ folder: node, depth }))
-  );
 
   // ── Add modal ─────────────────────────────────────────────────────────────
   readonly addModalOpen = signal(false);
@@ -224,22 +208,13 @@ export class FoldersTreeComponent implements OnInit {
   });
 
   // ── Filter definitions ────────────────────────────────────────────────────
-  private readonly localFilters: { key: FileFilter; label: string }[] = [
-    { key: 'all',       label: 'Все' },
-    { key: 'mine',      label: 'Мои Файлы' },
-    { key: 'received',  label: 'Полученные' },
-    { key: 'favorites', label: 'Избранные' },
-  ];
-
   private readonly sharedRootFilters: { key: FileFilter; label: string }[] = [
     { key: 'all',      label: 'Все' },
     { key: 'mine',     label: 'Мои' },
     { key: 'received', label: 'Полученные' },
   ];
 
-  readonly currentFilters = computed(() =>
-    this.activeTab() === 'local' ? this.localFilters : this.sharedRootFilters
-  );
+  readonly currentFilters = computed(() => this.sharedRootFilters);
 
   // ── Type groups ───────────────────────────────────────────────────────────
   readonly typeGroups: { key: FileTypeGroup; label: string }[] = [
@@ -258,73 +233,32 @@ export class FoldersTreeComponent implements OnInit {
   );
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  readonly storageText = computed(() => {
-    const u = this.usage();
-    if (!u) return '—';
-    const used  = (u.storage_used_bytes  / (1024 * 1024 * 1024)).toFixed(2);
-    const limit = (u.storage_limit_bytes / (1024 * 1024 * 1024)).toFixed(1);
-    return `${used} / ${limit}`;
-  });
+  readonly filteredSharedFolders = computed<SharedFolder[]>(() => this.sharedFolders());
 
-  readonly filteredSharedFolders = computed<SharedFolder[]>(() => {
-    const all = this.sharedFolders();
-    const f   = this.activeFilter();
-    if (f === 'mine')     return all.filter(s => s.is_owner);
-    if (f === 'received') return all.filter(s => !s.is_owner);
-    return all;
-  });
-
-  readonly isLoading = computed(() =>
-    this.treeLoading() || this.filesLoading() || this.sfLoading()
-  );
+  readonly isLoading = computed(() => this.filesLoading() || this.sfLoading());
 
   readonly isEmpty = computed(() => {
     if (this.isLoading()) return false;
-    if (this.activeTab() === 'local') {
-      return this.currentSubFolders().length === 0 && this.files().length === 0;
-    }
     if (this.currentSharedFolderId() === null) {
-      return this.filteredSharedFolders().length === 0;
+      return this.filteredSharedFolders().length === 0 && this.files().length === 0;
     }
     return this.sfSubfolders().length === 0 && this.files().length === 0;
   });
 
-  readonly showFilesArea = computed(() =>
-    this.activeTab() === 'local' || this.activeTab() === 'shared'
-  );
+  readonly showFilesArea = computed(() => true);
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
   ngOnInit(): void {
     const qp = this.route.snapshot.queryParamMap;
-    const tab: 'local' | 'shared' = qp.get('tab') === 'shared' ? 'shared' : 'local';
     const deepSharedId = qp.get('shared_folder_id');
-    const deepLocalId  = qp.get('folder_id');
     const tagId = qp.get('tag_id');
 
     if (tagId) this.activeTagId.set(tagId);
 
-    this.activeTab.set(tab);
-    this.breadcrumbs.set([{
-      label: tab === 'local' ? 'Локальные' : 'Общие',
-      localFolderId: null,
-      sharedFolderId: null,
-    }]);
+    this.breadcrumbs.set([{ label: 'Папки', sharedFolderId: null }]);
     this.loadTags();
-    this.loadUsage();
 
-    this.treeLoading.set(true);
-    this.orgApi.getFolderTree().subscribe({
-      next: (res) => {
-        this.fullTree.set(res.data.items);
-        this.treeLoading.set(false);
-        if (tab === 'local' && deepLocalId) {
-          this.restoreLocalFolderPath(deepLocalId);
-        }
-      },
-      error: () => this.treeLoading.set(false),
-    });
-
-    if (tab === 'shared' && deepSharedId) {
+    if (deepSharedId) {
       this.sfLoading.set(true);
       this.sfApi.listAll().subscribe({
         next: (res) => {
@@ -336,34 +270,14 @@ export class FoldersTreeComponent implements OnInit {
       });
     } else {
       this.loadShared();
-      if (!deepLocalId) this.loadFiles();
+      this.loadFiles();
     }
-  }
-
-  // ── Tab switch ────────────────────────────────────────────────────────────
-  setTab(tab: 'local' | 'shared'): void {
-    if (this.activeTab() === tab) return;
-    this.activeTab.set(tab);
-    this.currentLocalFolderId.set(null);
-    this.currentSharedFolderId.set(null);
-    this.sfSubfolders.set([]);
-    this.folderNotesOpen.set(false);
-    this.breadcrumbs.set([{
-      label: tab === 'local' ? 'Локальные' : 'Общие',
-      localFolderId: null,
-      sharedFolderId: null,
-    }]);
-    this.resetFilters();
-    this.files.set([]);
-    this.syncUrl();
-    this.loadFiles();
   }
 
   // ── Breadcrumb navigation ─────────────────────────────────────────────────
   navigateToBreadcrumb(index: number): void {
     const crumb = this.breadcrumbs()[index];
     this.breadcrumbs.set(this.breadcrumbs().slice(0, index + 1));
-    this.currentLocalFolderId.set(crumb.localFolderId);
     this.currentSharedFolderId.set(crumb.sharedFolderId);
     this.folderNotesOpen.set(false);
     this.resetFiltersKeepTag();
@@ -377,28 +291,10 @@ export class FoldersTreeComponent implements OnInit {
   }
 
   // ── Folder navigation ─────────────────────────────────────────────────────
-  navigateIntoLocalFolder(folder: FolderTreeNode): void {
-    this.currentLocalFolderId.set(folder.id);
-    this.folderNotesOpen.set(false);
-    this.breadcrumbs.update(c => [...c, {
-      label: folder.name,
-      localFolderId: folder.id,
-      sharedFolderId: null,
-    }]);
-    this.closeMenu();
-    this.resetFiltersKeepTag();
-    this.syncUrl();
-    this.loadFiles();
-  }
-
   navigateIntoSharedFolder(folder: SharedFolder): void {
     this.currentSharedFolderId.set(folder.id);
     this.folderNotesOpen.set(false);
-    this.breadcrumbs.update(c => [...c, {
-      label: folder.name,
-      localFolderId: null,
-      sharedFolderId: folder.id,
-    }]);
+    this.breadcrumbs.update(c => [...c, { label: folder.name, sharedFolderId: folder.id }]);
     this.closeMenu();
     this.resetFiltersKeepTag();
     this.syncUrl();
@@ -414,24 +310,13 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── URL sync ──────────────────────────────────────────────────────────────
   private syncUrl(): void {
-    const tab     = this.activeTab();
-    const sfId    = this.currentSharedFolderId();
-    const localId = this.currentLocalFolderId();
-    const params: Record<string, string> = { tab };
-    if (sfId)    params['shared_folder_id'] = sfId;
-    if (localId) params['folder_id']        = localId;
+    const sfId = this.currentSharedFolderId();
+    const params: Record<string, string> = {};
+    if (sfId) params['shared_folder_id'] = sfId;
     this.router.navigate([], { relativeTo: this.route, queryParams: params, replaceUrl: true });
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
-  private loadLocal(): void {
-    this.treeLoading.set(true);
-    this.orgApi.getFolderTree().subscribe({
-      next: (res) => { this.fullTree.set(res.data.items); this.treeLoading.set(false); },
-      error: () => this.treeLoading.set(false),
-    });
-  }
-
   private loadShared(): void {
     this.sfLoading.set(true);
     this.sfApi.list().subscribe({
@@ -447,62 +332,29 @@ export class FoldersTreeComponent implements OnInit {
     });
   }
 
-  private loadUsage(): void {
-    this.tariffApi.getUsage().subscribe({
-      next: (res) => this.usage.set(res.data),
-      error: () => {},
-    });
-  }
-
   loadFiles(): void {
     const sfId = this.currentSharedFolderId();
-    if (this.activeTab() === 'shared') {
-      if (sfId !== null) {
-        this.loadSharedFolderFiles(sfId);
-        return;
-      }
-      // At shared root — show personal root files (no folder assigned)
-      this.filesLoading.set(true);
-      this.filesApi.list(
-        this.activeFilter(),
-        this.page(),
-        this.searchQuery || undefined,
-        {
-          tag_id:          this.activeTagId()     || undefined,
-          folder_id:       null,
-          file_type_group: this.activeTypeGroup() || undefined,
-          sort_by:         this.sortBy(),
-          sort_order:      this.sortOrder(),
-          per_page:        20,
-        }
-      ).subscribe({
-        next: (res) => {
-          this.files.set(res.data.items);
-          const p = res.data.pagination;
-          this.totalPages.set(Math.ceil(p.total / p.per_page) || 1);
-          if (p.available_type_groups) this.availableTypeGroups.set(p.available_type_groups);
-          this.filesLoading.set(false);
-        },
-        error: () => this.filesLoading.set(false),
-      });
+    if (sfId !== null) {
+      this.loadSharedFolderFiles(sfId);
       return;
     }
+    // At root — personal files with no folder
     this.filesLoading.set(true);
     this.filesApi.list(
       this.activeFilter(),
       this.page(),
       this.searchQuery || undefined,
       {
-        tag_id:          this.activeTagId()          || undefined,
-        folder_id:       this.currentLocalFolderId(),
-        file_type_group: this.activeTypeGroup()      || undefined,
+        tag_id:          this.activeTagId()     || undefined,
+        folder_id:       null,
+        file_type_group: this.activeTypeGroup() || undefined,
         sort_by:         this.sortBy(),
         sort_order:      this.sortOrder(),
         per_page:        20,
       }
     ).subscribe({
       next: (res) => {
-        this.files.set(res.data.items);
+        this.rawFiles.set(res.data.items);
         const p = res.data.pagination;
         this.totalPages.set(Math.ceil(p.total / p.per_page) || 1);
         if (p.available_type_groups) this.availableTypeGroups.set(p.available_type_groups);
@@ -516,7 +368,7 @@ export class FoldersTreeComponent implements OnInit {
     this.filesLoading.set(true);
     this.sfApi.listFiles(sfId, this.page()).subscribe({
       next: (res) => {
-        this.files.set(res.data.items);
+        this.rawFiles.set(res.data.items);
         const p = res.data.pagination;
         this.totalPages.set(Math.ceil(p.total / p.per_page) || 1);
         this.filesLoading.set(false);
@@ -537,7 +389,10 @@ export class FoldersTreeComponent implements OnInit {
   setFilter(f: FileFilter): void {
     this.activeFilter.set(f);
     this.page.set(1);
-    this.loadFiles();
+    // Inside a shared folder filtering is done client-side via computed; no server reload needed
+    if (this.currentSharedFolderId() === null) {
+      this.loadFiles();
+    }
   }
 
   onTagFilter(event: Event): void {
@@ -567,19 +422,6 @@ export class FoldersTreeComponent implements OnInit {
   onSearchChange(_: string): void {
     clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => { this.page.set(1); this.loadFiles(); }, 350);
-  }
-
-  private resetFilters(): void {
-    this.activeFilter.set('all');
-    this.activeTagId.set('');
-    this.activeTypeGroup.set('');
-    this.sortBy.set('date');
-    this.sortOrder.set('desc');
-    this.searchQuery = '';
-    this.page.set(1);
-    this.totalPages.set(1);
-    this.availableTypeGroups.set([]);
-    this.clearSelection();
   }
 
   private resetFiltersKeepTag(): void {
@@ -618,24 +460,17 @@ export class FoldersTreeComponent implements OnInit {
   saveCreate(): void {
     const name = this.createNameValue.trim();
     if (!name) return;
-    if (this.activeTab() === 'local') {
-      this.orgApi.createFolder({ name, parent_id: this.currentLocalFolderId() }).subscribe({
-        next: () => { this.cancelCreate(); this.loadLocal(); },
+    const parentId = this.currentSharedFolderId();
+    if (parentId) {
+      this.sfApi.createSubfolder(parentId, name).subscribe({
+        next: () => { this.cancelCreate(); this.loadSfSubfolders(parentId); },
         error: (err) => alert(err.message ?? 'Ошибка создания папки'),
       });
     } else {
-      const parentId = this.currentSharedFolderId();
-      if (parentId) {
-        this.sfApi.createSubfolder(parentId, name).subscribe({
-          next: () => { this.cancelCreate(); this.loadSfSubfolders(parentId); },
-          error: (err) => alert(err.message ?? 'Ошибка создания папки'),
-        });
-      } else {
-        this.sfApi.create(name).subscribe({
-          next: () => { this.cancelCreate(); this.loadShared(); },
-          error: (err) => alert(err.message ?? 'Ошибка создания папки'),
-        });
-      }
+      this.sfApi.create(name).subscribe({
+        next: () => { this.cancelCreate(); this.loadShared(); },
+        error: (err) => alert(err.message ?? 'Ошибка создания папки'),
+      });
     }
   }
 
@@ -650,37 +485,24 @@ export class FoldersTreeComponent implements OnInit {
 
   cancelRename(): void { this.renamingId.set(null); }
 
-  saveRename(id: string, type: 'local' | 'shared'): void {
+  saveRename(id: string, _type: 'local' | 'shared'): void {
     const name = this.renameNameValue.trim();
     if (!name) { this.cancelRename(); return; }
-    if (type === 'local') {
-      this.orgApi.updateFolder(id, { name }).subscribe({
-        next: () => { this.cancelRename(); this.loadLocal(); },
-        error: (err) => alert(err.message ?? 'Ошибка'),
-      });
-    } else {
-      this.sfApi.update(id, name).subscribe({
-        next: () => {
-          this.cancelRename();
-          const parentId = this.currentSharedFolderId();
-          if (parentId) {
-            this.loadSfSubfolders(parentId);
-          } else {
-            this.loadShared();
-          }
-        },
-        error: (err) => alert(err.message ?? 'Ошибка'),
-      });
-    }
+    this.sfApi.update(id, name).subscribe({
+      next: () => {
+        this.cancelRename();
+        const parentId = this.currentSharedFolderId();
+        if (parentId) {
+          this.loadSfSubfolders(parentId);
+        } else {
+          this.loadShared();
+        }
+      },
+      error: (err) => alert(err.message ?? 'Ошибка'),
+    });
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  confirmDeleteLocalFolder(folder: FolderTreeNode): void {
-    this.deleteTarget.set({ id: folder.id, name: folder.name, kind: 'local-folder' });
-    this.deleteError.set(null);
-    this.closeMenu();
-  }
-
   confirmDeleteSharedFolder(folder: SharedFolder): void {
     this.deleteTarget.set({ id: folder.id, name: folder.name, kind: 'shared-folder' });
     this.deleteError.set(null);
@@ -704,20 +526,7 @@ export class FoldersTreeComponent implements OnInit {
     this.deleting.set(true);
     this.deleteError.set(null);
 
-    if (target.kind === 'local-folder') {
-      this.orgApi.deleteFolder(target.id, false).subscribe({
-        next: () => { this.deleting.set(false); this.deleteTarget.set(null); this.loadLocal(); },
-        error: (err) => {
-          this.deleting.set(false);
-          if (err.data?.code === 'HAS_FILES') {
-            this.forceDeleteTarget.set({ id: target.id, name: target.name });
-            this.deleteTarget.set(null);
-          } else {
-            this.deleteError.set(err.message ?? 'Ошибка');
-          }
-        },
-      });
-    } else if (target.kind === 'shared-folder') {
+    if (target.kind === 'shared-folder') {
       this.sfApi.delete(target.id).subscribe({
         next: () => {
           this.deleting.set(false);
@@ -767,21 +576,11 @@ export class FoldersTreeComponent implements OnInit {
         this.leaveTarget.set(null);
         this.currentSharedFolderId.set(null);
         this.sfSubfolders.set([]);
-        this.files.set([]);
+        this.rawFiles.set([]);
         this.loadShared();
-        this.breadcrumbs.set([{ label: 'Общие', localFolderId: null, sharedFolderId: null }]);
+        this.breadcrumbs.set([{ label: 'Папки', sharedFolderId: null }]);
       },
       error: (err) => { this.leaving.set(false); this.leaveError.set(err.message ?? 'Ошибка'); },
-    });
-  }
-
-  forceDeleteLocalFolder(): void {
-    const target = this.forceDeleteTarget();
-    if (!target || this.deleting()) return;
-    this.deleting.set(true);
-    this.orgApi.deleteFolder(target.id, true).subscribe({
-      next: () => { this.deleting.set(false); this.forceDeleteTarget.set(null); this.loadLocal(); },
-      error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
     });
   }
 
@@ -796,14 +595,9 @@ export class FoldersTreeComponent implements OnInit {
   // ── File actions ──────────────────────────────────────────────────────────
   openFileDetail(file: AnyFile): void {
     const sfId = this.currentSharedFolderId();
-    const localId = this.currentLocalFolderId();
-    if (this.activeTab() === 'shared' && sfId) {
+    if (sfId) {
       this.router.navigate(['/files', file.id], {
         queryParams: { from: 'shared-folder', folder_id: sfId },
-      });
-    } else if (this.activeTab() === 'local' && localId) {
-      this.router.navigate(['/files', file.id], {
-        queryParams: { from: 'local-folder', folder_id: localId },
       });
     } else {
       this.router.navigate(['/files', file.id]);
@@ -858,18 +652,13 @@ export class FoldersTreeComponent implements OnInit {
     this.creatingDoc.set(true);
     this.docsApi.create(name).subscribe({
       next: res => {
-        const docId   = res.data.document.id;
-        const localId = this.activeTab() === 'local' ? this.currentLocalFolderId() : null;
-        const sfId    = this.activeTab() === 'shared' ? this.currentSharedFolderId() : null;
-
+        const docId = res.data.document.id;
+        const sfId  = this.currentSharedFolderId();
         const navigate = () => {
           this.creatingDoc.set(false);
           this.router.navigate(['/files', docId], { queryParams: { editor: 'expanded' } });
         };
-
-        if (localId) {
-          this.filesApi.moveFolder(docId, localId).subscribe({ next: navigate, error: navigate });
-        } else if (sfId) {
+        if (sfId) {
           this.sfApi.addFile(sfId, docId).subscribe({ next: navigate, error: navigate });
         } else {
           navigate();
@@ -928,29 +717,14 @@ export class FoldersTreeComponent implements OnInit {
 
   private uploadFile(file: File): void {
     const sfId = this.currentSharedFolderId();
-
-    if (this.activeTab() === 'shared' && sfId) {
-      this.doUploadToSharedFolder(file, sfId);
+    if (sfId) {
+      this.uploadSvc.upload(file, { sharedFolderId: sfId }).subscribe({
+        next: () => { this.closeAddModal(); this.loadFiles(); },
+        error: () => {},
+      });
       return;
     }
-
-    // Local tab OR shared root → upload to personal files (no folder)
     this.uploadSvc.upload(file, undefined).subscribe({
-      next: (fileId) => {
-        const folderId = this.activeTab() === 'local' ? this.currentLocalFolderId() : null;
-        const done = () => { this.closeAddModal(); this.loadFiles(); };
-        if (folderId) {
-          this.filesApi.moveFolder(fileId, folderId).subscribe({ next: done, error: done });
-        } else {
-          done();
-        }
-      },
-      error: () => {},
-    });
-  }
-
-  private doUploadToSharedFolder(file: File, folderId: string): void {
-    this.uploadSvc.upload(file, { sharedFolderId: folderId }).subscribe({
       next: () => { this.closeAddModal(); this.loadFiles(); },
       error: () => {},
     });
@@ -977,7 +751,7 @@ export class FoldersTreeComponent implements OnInit {
 
     const sfId = this.currentSharedFolderId();
 
-    if (this.activeTab() === 'shared' && sfId) {
+    if (sfId) {
       const preview = this.linkPreview();
       const previewArg = preview ? {
         title: preview.title ?? null,
@@ -991,19 +765,8 @@ export class FoldersTreeComponent implements OnInit {
       return;
     }
 
-    // Local tab OR shared root → create personal URL file
     this.urlFilesApi.create(url).subscribe({
-      next: (res) => {
-        this.savingLink.set(false);
-        const fileId   = res.data.file.id;
-        const folderId = this.activeTab() === 'local' ? this.currentLocalFolderId() : null;
-        const done = () => { this.closeAddModal(); this.loadFiles(); };
-        if (folderId) {
-          this.filesApi.moveFolder(fileId, folderId).subscribe({ next: done, error: done });
-        } else {
-          done();
-        }
-      },
+      next: () => { this.savingLink.set(false); this.closeAddModal(); this.loadFiles(); },
       error: (err) => { this.savingLink.set(false); this.linkError.set(err.message ?? 'Ошибка'); },
     });
   }
@@ -1052,12 +815,10 @@ export class FoldersTreeComponent implements OnInit {
       this.moveDialogTargetIds.set(ids);
       this.moveDialogFolderId.set(null);
       this.moveDialogOpen.set(true);
-      if (this.moveDialogIsShared()) {
-        this.sfApi.listAll().subscribe({
-          next: (res) => this.sharedFoldersMoveList.set(res.data.items),
-          error: () => {},
-        });
-      }
+      this.sfApi.listAll().subscribe({
+        next: (res) => this.sharedFoldersMoveList.set(res.data.items),
+        error: () => {},
+      });
     } else {
       this.bulkDeleteDialogOpen.set(true);
     }
@@ -1113,45 +874,41 @@ export class FoldersTreeComponent implements OnInit {
     this.moveDialogFolderId.set(null);
     this.moveDialogOpen.set(true);
     this.closeMenu();
-    if (this.moveDialogIsShared()) {
-      this.sfApi.listAll().subscribe({
-        next: (res) => this.sharedFoldersMoveList.set(res.data.items),
-        error: () => {},
-      });
-    }
+    this.sfApi.listAll().subscribe({
+      next: (res) => this.sharedFoldersMoveList.set(res.data.items),
+      error: () => {},
+    });
   }
 
   executeBulkMove(): void {
     const targetFolderId = this.moveDialogFolderId();
     const ids            = this.moveDialogTargetIds();
-    if (ids.length === 0 || this.movingFiles()) return;
+    if (ids.length === 0 || this.movingFiles() || !targetFolderId) return;
     this.movingFiles.set(true);
 
-    if (this.moveDialogIsShared()) {
-      const sourceFolderId = this.currentSharedFolderId()!;
+    const sourceFolderId = this.currentSharedFolderId();
+    if (sourceFolderId) {
       const ops = ids.flatMap(id => [
         this.sfApi.removeFile(sourceFolderId, id),
-        this.sfApi.addFile(targetFolderId!, id),
+        this.sfApi.addFile(targetFolderId, id),
       ]);
       forkJoin(ops).subscribe({
         next: () => {
           this.movingFiles.set(false);
           this.moveDialogOpen.set(false);
           const movedSet = new Set(ids);
-          this.files.update(fs => fs.filter(f => !movedSet.has(f.id)));
+          this.rawFiles.update(fs => fs.filter(f => !movedSet.has(f.id)));
           this.clearSelection();
         },
         error: () => { this.movingFiles.set(false); },
       });
     } else {
-      forkJoin(ids.map(id => this.filesApi.moveFolder(id, targetFolderId))).subscribe({
+      forkJoin(ids.map(id => this.sfApi.addFile(targetFolderId, id))).subscribe({
         next: () => {
           this.movingFiles.set(false);
           this.moveDialogOpen.set(false);
-          const movedSet = new Set(ids);
-          this.files.update(fs => fs.filter(f => !movedSet.has(f.id)));
           this.clearSelection();
-          this.loadLocal();
+          this.loadFiles();
         },
         error: () => { this.movingFiles.set(false); },
       });
@@ -1186,22 +943,13 @@ export class FoldersTreeComponent implements OnInit {
     return (file as { display_name?: string | null }).display_name || file.original_name;
   }
 
-  private findNodeById(nodes: FolderTreeNode[], id: string): FolderTreeNode | null {
-    for (const node of nodes) {
-      if (node.id === id) return node;
-      const found = this.findNodeById(node.children, id);
-      if (found) return found;
-    }
-    return null;
-  }
-
   private restoreSharedFolderPath(allFolders: SharedFolder[], targetId: string): void {
     const path = this.findSharedFolderPath(allFolders, targetId);
     if (!path.length) { this.loadShared(); return; }
 
-    const crumbs: Breadcrumb[] = [{ label: 'Общие', localFolderId: null, sharedFolderId: null }];
+    const crumbs: Breadcrumb[] = [{ label: 'Папки', sharedFolderId: null }];
     for (const folder of path) {
-      crumbs.push({ label: folder.name, localFolderId: null, sharedFolderId: folder.id });
+      crumbs.push({ label: folder.name, sharedFolderId: folder.id });
     }
     this.breadcrumbs.set(crumbs);
 
@@ -1223,31 +971,7 @@ export class FoldersTreeComponent implements OnInit {
     return path;
   }
 
-  private restoreLocalFolderPath(targetId: string): void {
-    const path = this.findLocalFolderPath(this.fullTree(), targetId);
-    if (!path.length) { this.loadFiles(); return; }
-
-    const crumbs: Breadcrumb[] = [{ label: 'Локальные', localFolderId: null, sharedFolderId: null }];
-    for (const node of path) {
-      crumbs.push({ label: node.name, localFolderId: node.id, sharedFolderId: null });
-    }
-    this.breadcrumbs.set(crumbs);
-
-    this.currentLocalFolderId.set(path[path.length - 1].id);
-    this.loadFiles();
-  }
-
-  private findLocalFolderPath(nodes: FolderTreeNode[], targetId: string): FolderTreeNode[] {
-    for (const node of nodes) {
-      if (node.id === targetId) return [node];
-      const childPath = this.findLocalFolderPath(node.children, targetId);
-      if (childPath.length) return [node, ...childPath];
-    }
-    return [];
-  }
-
   // ── Privacy ───────────────────────────────────────────────────────────────
-
   toggleFilePrivacy(file: AnyFile): void {
     const folderId = this.currentSharedFolderId();
     if (!folderId) return;
@@ -1255,7 +979,7 @@ export class FoldersTreeComponent implements OnInit {
     const next = !current;
     this.sfApi.setFilePrivacy(folderId, file.id, next).subscribe({
       next: () => {
-        this.files.update(list =>
+        this.rawFiles.update(list =>
           list.map(f => f.id === file.id ? { ...f, is_private: next } : f)
         );
       },
