@@ -149,6 +149,7 @@ class MigratePersonalFoldersToShared extends Command
         $accesses = FileUserAccess::where('user_id', $user->id)
             ->whereNotNull('folder_id')
             ->whereIn('folder_id', array_keys($folderMap))
+            ->whereHas('file')
             ->get();
 
         foreach ($accesses as $access) {

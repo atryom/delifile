@@ -458,6 +458,7 @@ class SharedFolderController extends Controller
         $isOwner = $folder->owner_id === $user->id;
 
         $baseQuery = SharedFolderFile::where('shared_folder_id', $id)
+            ->whereHas('file')
             ->when(!$isOwner, fn ($q) => $q->where('is_private', false));
 
         $total = $baseQuery->count();
