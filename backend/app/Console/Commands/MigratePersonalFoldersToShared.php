@@ -144,14 +144,28 @@ class MigratePersonalFoldersToShared extends Command
 
     private function migrateUserFiles(User $user, array $folderMap): void
     {
-        // 1. Owned files organized via files.folder_id
+        // Primary source: file_user_access.folder_id — covers all files the user
+        // organized into a local folder (both owned and received).
+        $accesses = FileUserAccess::where('user_id', $user->id)
+            ->whereNotNull('folder_id')
+            ->whereIn('folder_id', array_keys($folderMap))
+            ->get();
+
+        foreach ($accesses as $access) {
+            $sharedFolderId = $folderMap[$access->folder_id] ?? null;
+            if (!$sharedFolderId) continue;
+
+            $this->linkFileToSharedFolder($access->file_id, $sharedFolderId, $user->id);
+        }
+
+        // Fallback: owned files via files.folder_id that may lack a FileUserAccess record.
         $files = File::where('owner_id', $user->id)
             ->whereNotNull('folder_id')
+            ->whereIn('folder_id', array_keys($folderMap))
             ->get();
 
         foreach ($files as $file) {
             $sharedFolderId = $folderMap[$file->folder_id] ?? null;
-
             if (!$sharedFolderId) {
                 $this->warn("  ! Файл {$file->id} ({$file->original_name}): folder_id {$file->folder_id} не в карте — пропуск");
                 $this->filesSkipped++;
@@ -159,25 +173,6 @@ class MigratePersonalFoldersToShared extends Command
             }
 
             $this->linkFileToSharedFolder($file->id, $sharedFolderId, $user->id);
-        }
-
-        // 2. Received/shared files organized via file_user_access.folder_id
-        $accesses = FileUserAccess::where('user_id', $user->id)
-            ->whereNotNull('folder_id')
-            ->whereIn('folder_id', array_keys($folderMap))
-            ->get();
-
-        foreach ($accesses as $access) {
-            // Skip own files — already handled above
-            $file = File::find($access->file_id);
-            if (!$file || $file->owner_id == $user->id) {
-                continue;
-            }
-
-            $sharedFolderId = $folderMap[$access->folder_id] ?? null;
-            if (!$sharedFolderId) continue;
-
-            $this->linkFileToSharedFolder($access->file_id, $sharedFolderId, $user->id);
         }
     }
 
