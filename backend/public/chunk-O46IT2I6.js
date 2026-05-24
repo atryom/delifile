@@ -1,0 +1,1 @@
+function o(r,n="ru"){if(r==null||r===0)return"\u2014";let[_,i,u,$]=n==="en"?["B","KB","MB","GB"]:["\u0411","\u041A\u0411","\u041C\u0411","\u0413\u0411"];return r<1024?`${r} ${_}`:r<1048576?`${(r/1024).toFixed(1)} ${i}`:r<1073741824?`${(r/1048576).toFixed(1)} ${u}`:`${(r/1073741824).toFixed(1)} ${$}`}export{o as a};

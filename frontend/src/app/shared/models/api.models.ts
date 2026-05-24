@@ -81,6 +81,7 @@ export interface FileListItem {
 
 export interface FileCard extends FileListItem {
   is_owner: boolean;
+  can_share: boolean;
   access_type: AccessType | null;
   is_favorite: boolean;
   is_pinned: boolean;
@@ -277,6 +278,10 @@ export interface SharedFolder {
   children_count: number;
   is_owner: boolean;
   my_access_type: SharedFolderAccessType | null;
+  is_private: boolean;
+  is_personal_root: boolean;
+  sort_order: number | null;
+  has_shared_access: boolean;
   created_at: string | null;
 }
 
@@ -319,6 +324,7 @@ export interface SharedFolderFileItem {
   is_owner?: boolean;
   added_by?: number;
   shared_folder_only?: boolean;
+  is_private?: boolean;
 }
 
 // ─── Invitation Models ───────────────────────────────────────────────────────

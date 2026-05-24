@@ -265,6 +265,29 @@ export class SharedFoldersComponent implements OnInit {
     });
   }
 
+  toggleFilePrivacy(file: SharedFolderFileItem): void {
+    const folderId = this.selectedFolder()?.id;
+    if (!folderId) return;
+    const next = !file.is_private;
+    this.sfApi.setFilePrivacy(folderId, file.id, next).subscribe({
+      next: () => {
+        this.files.update(list => list.map(f => f.id === file.id ? { ...f, is_private: next } : f));
+      },
+    });
+  }
+
+  toggleFolderPrivacy(folder: SharedFolder): void {
+    const next = !folder.is_private;
+    this.sfApi.setFolderPrivacy(folder.id, next).subscribe({
+      next: (res) => {
+        const updated = res.data?.folder;
+        if (updated) {
+          this.subfolders.update(list => list.map(f => f.id === folder.id ? updated : f));
+        }
+      },
+    });
+  }
+
   resetUpload(): void {
     this.uploadSvc.reset();
   }

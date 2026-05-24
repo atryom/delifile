@@ -51,15 +51,19 @@
           }
 
           @if (isMarkdown()) {
-            <label class="can-edit-row">
+            <label class="can-edit-row" [class.can-edit-row--disabled]="!isOwner()">
               <input
                 type="checkbox"
                 class="can-edit-checkbox"
                 [checked]="canEdit()"
+                [disabled]="!isOwner()"
                 (change)="canEdit.set($any($event.target).checked)"
               />
               Разрешить редактирование заметки
             </label>
+            @if (!isOwner()) {
+              <p class="can-edit-hint">Только владелец может передать заметку с правом редактирования</p>
+            }
           }
 
           @if (shareStatus() === 'pending') {

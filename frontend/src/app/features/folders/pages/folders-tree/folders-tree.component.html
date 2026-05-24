@@ -378,7 +378,12 @@
                                    (keydown.escape)="cancelRename()"
                                    (click)="$event.stopPropagation()" />
                           } @else {
-                            <div class="file-name">{{ folder.name }}</div>
+                            <div class="file-name">
+                              {{ folder.name }}
+                              @if (folder.has_shared_access) {
+                                <span class="sf-badge sf-badge--shared" title="Поделились с другими">👥</span>
+                              }
+                            </div>
                           }
                           @if (!folder.is_owner) {
                             <div class="role-badge">{{ folder.my_access_type === 'edit' ? 'Редактор' : 'Просматривающий' }}</div>
@@ -445,7 +450,14 @@
                                    (keydown.escape)="cancelRename()"
                                    (click)="$event.stopPropagation()" />
                           } @else {
-                            <div class="file-name">{{ sub.name }}</div>
+                            <div class="file-name">
+                              {{ sub.name }}
+                              @if (sub.is_private) {
+                                <span class="sf-badge sf-badge--private" title="Личная папка — скрыта от гостей">🔒</span>
+                              } @else if (sub.has_shared_access) {
+                                <span class="sf-badge sf-badge--shared" title="Поделились с другими">👥</span>
+                              }
+                            </div>
                           }
                           <div class="file-meta-mobile">{{ sub.files_count }} файлов</div>
                         </div>
@@ -477,6 +489,9 @@
                           @if (sub.is_owner) {
                             <button type="button" role="menuitem" (click)="startRename(sub.id, 'shared', sub.name)">Переименовать</button>
                             <button type="button" role="menuitem" (click)="openAccessDialog(sub)">Управление доступом</button>
+                            <button type="button" role="menuitem" (click)="toggleFolderPrivacy(sub)">
+                              {{ sub.is_private ? '🔓 Открыть гостям' : '🔒 Сделать личной' }}
+                            </button>
                             <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteSharedFolder(sub)">Удалить</button>
                           }
                         </div>
@@ -526,6 +541,9 @@
                             @if (file.has_versions) {
                               <span class="version-badge-v" title="Имеет версии">V</span>
                             }
+                            @if ($any(file).is_private) {
+                              <span class="sf-badge sf-badge--private" title="Личный файл — скрыт от гостей">🔒</span>
+                            }
                           </div>
                           <div class="file-meta-mobile">{{ file.uploaded_at | date:'d MMM y' }} · {{ formatSize(file.size) }}</div>
                         </div>
@@ -570,6 +588,11 @@
                           <button type="button" role="menuitem" (click)="favoriteFile(file)">В избранное</button>
                           <button type="button" role="menuitem" (click)="openTagDialogForFile(file)">Добавить тег</button>
                           <button type="button" role="menuitem" (click)="openMoveDialogForFile(file)">Переместить в папку</button>
+                          @if (activeTab() === 'shared' && currentSharedFolderId() && isSharedFolderOwner()) {
+                            <button type="button" role="menuitem" (click)="toggleFilePrivacy(file)">
+                              {{ $any(file).is_private ? '🔓 Открыть гостям' : '🔒 Сделать личным' }}
+                            </button>
+                          }
                           <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteFile(file)">Удалить</button>
                         </div>
                       }
@@ -622,7 +645,10 @@
                     <path d="M2 13h10"/><path d="m9 16 3-3-3-3"/>
                   </svg>
                 </div>
-                <div class="grid-name">{{ folder.name }}</div>
+                <div class="grid-name">
+                  {{ folder.name }}
+                  @if (folder.has_shared_access) { <span class="sf-badge sf-badge--shared">👥</span> }
+                </div>
                 <div class="grid-meta">{{ folder.files_count }} файлов</div>
               </div>
             }
@@ -638,7 +664,11 @@
                     <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
                   </svg>
                 </div>
-                <div class="grid-name">{{ sub.name }}</div>
+                <div class="grid-name">
+                  {{ sub.name }}
+                  @if (sub.is_private) { <span class="sf-badge sf-badge--private">🔒</span> }
+                  @else if (sub.has_shared_access) { <span class="sf-badge sf-badge--shared">👥</span> }
+                </div>
                 <div class="grid-meta">{{ sub.files_count }} файлов</div>
                 @if (sub.is_owner) {
                   <button type="button" class="grid-card-menu-btn"
@@ -654,6 +684,9 @@
                       <button type="button" role="menuitem" (click)="navigateIntoSharedFolder(sub); closeMenu()">Открыть</button>
                       <button type="button" role="menuitem" (click)="startRename(sub.id, 'shared', sub.name)">Переименовать</button>
                       <button type="button" role="menuitem" (click)="openAccessDialog(sub)">Управление доступом</button>
+                      <button type="button" role="menuitem" (click)="toggleFolderPrivacy(sub)">
+                        {{ sub.is_private ? '🔓 Открыть гостям' : '🔒 Сделать личной' }}
+                      </button>
                       <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteSharedFolder(sub)">Удалить</button>
                     </div>
                   }

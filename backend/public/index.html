@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru" data-beasties-container>
+<head>
+  <meta charset="utf-8">
+  <title>DeliFile</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="DeliFile — личное хранилище файлов с безопасным обменом">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DeliFile">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+  <link rel="icon" type="image/png" href="/assets/icons/logo100.png">
+<style>*,*:before,*:after{box-sizing:border-box}html{height:-webkit-fill-available}html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;font-size:16px;-webkit-font-smoothing:antialiased;overflow-x:hidden;max-width:100vw}:root{--bg:#f5f5f7;--surface:#ffffff;--surface2:#f0f0f0;--surface3:#e8e8e8;--border:#e4e4e7;--border2:#d4d4d8;--text:#18181b;--text-dim:#52525b;--text-muted:#a1a1aa;--accent:#7c6af7;--accent-dim:#ede9fe;--accent-hover:#6355e0;--accent-text:#5b21b6;--folder:#3b82f6;--pdf:#3b82f6;--xlsx:#16a34a;--pptx:#dc2626;--link:#7c3aed;--image:#db2777;--video:#d97706;--danger:#ef4444;--danger-text:#b91c1c;--success-text:#15803d;--shadow:rgba(0, 0, 0, .08);--shadow-lg:rgba(0, 0, 0, .14);--radius:8px;--radius-sm:5px;--radius-lg:12px;--sidebar-bg:#1a1a2e;--sidebar-text:#e0e0e0;--sidebar-border:rgba(255, 255, 255, .08);--sidebar-nav-hover:rgba(255, 255, 255, .07);--sidebar-nav-active:rgba(99, 102, 241, .25);--sidebar-nav-color:#b0b0c0;--sidebar-active-text:#a5b4fc;--shell-bg:#f8f9fa;--upload-bg:#f0f4ff;--upload-border:#c7d2fe}</style><link rel="stylesheet" href="styles-FUQ6KYSF.css" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="styles-FUQ6KYSF.css"></noscript></head>
+<body>
+<app-root></app-root>
+<script>
+  // Capture install prompt before Angular bootstraps
+  window.__pwaInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    window.__pwaInstallPrompt = e;
+  });
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (e) {
+        console.warn('SW registration failed:', e);
+      });
+    });
+  }
+</script>
+<link rel="modulepreload" href="chunk-OZ2ARG6T.js"><link rel="modulepreload" href="chunk-P5YMZ324.js"><link rel="modulepreload" href="chunk-7NTUMCYH.js"><link rel="modulepreload" href="chunk-MDSU65VJ.js"><link rel="modulepreload" href="chunk-EMP3H7G2.js"><link rel="modulepreload" href="chunk-XGSTJURH.js"><link rel="modulepreload" href="chunk-U5TDR7XA.js"><link rel="modulepreload" href="chunk-6V2P45TR.js"><link rel="modulepreload" href="chunk-2F3OQ3SC.js"><script src="polyfills-5CFQRCPP.js" type="module"></script><script src="main-7GZKTNHB.js" type="module"></script></body>
+</html>

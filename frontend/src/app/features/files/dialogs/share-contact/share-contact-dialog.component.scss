@@ -28,5 +28,7 @@
 .btn-secondary { padding: 9px 20px; background: #f9fafb; color: #374151; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; cursor: pointer; }
 .btn-secondary:hover { background: #f3f4f6; }
 
-.can-edit-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.88rem; color: #374151; cursor: pointer; user-select: none; }
-.can-edit-checkbox { width: 15px; height: 15px; accent-color: #6366f1; cursor: pointer; flex-shrink: 0; }
+.can-edit-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.88rem; color: var(--text); cursor: pointer; user-select: none; }
+.can-edit-row--disabled { opacity: 0.5; cursor: not-allowed; }
+.can-edit-checkbox { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.can-edit-hint { margin: 4px 0 0; font-size: 0.78rem; color: var(--text-muted); }

@@ -126,6 +126,18 @@ export class SharedFoldersApiService {
     return this.api.delete(`/shared-folders/${id}/leave`);
   }
 
+  ensureRootFolder(): Observable<ApiResponse<{ folder: SharedFolder }>> {
+    return this.api.post('/shared-folders/ensure-root');
+  }
+
+  setFilePrivacy(folderId: string, fileId: string, isPrivate: boolean): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.patch(`/shared-folders/${folderId}/files/${fileId}/privacy`, { is_private: isPrivate });
+  }
+
+  setFolderPrivacy(folderId: string, isPrivate: boolean): Observable<ApiResponse<{ folder: SharedFolder }>> {
+    return this.api.patch(`/shared-folders/${folderId}/privacy`, { is_private: isPrivate });
+  }
+
   listAll(): Observable<ApiResponse<{ items: SharedFolder[] }>> {
     return this.api.get('/shared-folders/all-flat');
   }

@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, input, output, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, effect, input, output, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
@@ -15,6 +15,7 @@ import { Contact } from '../../../../shared/models/api.models';
 export class ShareContactDialogComponent implements OnInit {
   readonly fileId   = input.required<string>();
   readonly mimeType = input('');
+  readonly isOwner  = input<boolean>(true);
   readonly closed   = output<void>();
   readonly shared   = output<void>();
 
@@ -24,6 +25,14 @@ export class ShareContactDialogComponent implements OnInit {
   private readonly filesApi    = inject(FilesApiService);
   private readonly contactsApi = inject(ContactsApiService);
   private readonly translate   = inject(TranslateService);
+
+  constructor() {
+    effect(() => {
+      if (!this.isOwner() && this.isMarkdown()) {
+        this.canEdit.set(false);
+      }
+    });
+  }
 
   readonly contacts        = signal<Contact[]>([]);
   readonly selectedId      = signal<string | null>(null);

@@ -4,17 +4,22 @@
   <div class="page-header">
     <h1 class="page-title">{{ 'shared_folders.title' | translate }}</h1>
     <div class="header-controls">
-      <select
-        class="folder-select"
-        [value]="selectedFolder()?.id ?? ''"
-        (change)="onFolderSelect($event)"
-        [attr.aria-label]="'shared_folders.select_placeholder' | translate"
-      >
-        <option value="">{{ 'shared_folders.select_placeholder' | translate }}</option>
-        @for (f of folders(); track f.id) {
-          <option [value]="f.id">{{ f.name }}</option>
+      <div class="folder-select-wrap">
+        <select
+          class="folder-select"
+          [value]="selectedFolder()?.id ?? ''"
+          (change)="onFolderSelect($event)"
+          [attr.aria-label]="'shared_folders.select_placeholder' | translate"
+        >
+          <option value="">{{ 'shared_folders.select_placeholder' | translate }}</option>
+          @for (f of folders(); track f.id) {
+            <option [value]="f.id">{{ f.name }}</option>
+          }
+        </select>
+        @if (selectedFolder()?.has_shared_access) {
+          <span class="folder-shared-badge" title="Папка предоставлена другим пользователям">👥 Поделились</span>
         }
-      </select>
+      </div>
       @if (selectedFolder()) {
         @if (selectedFolder()!.is_owner) {
           <button class="btn-add-folder" (click)="openAccessDialog()">
@@ -89,13 +94,36 @@
 
         <div class="subfolders-grid">
           @for (sub of subfolders(); track sub.id) {
-            <button class="subfolder-card" (click)="navigateToSubfolder(sub)">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
-              <span class="subfolder-name">{{ sub.name }}</span>
-              @if (sub.files_count > 0 || sub.children_count > 0) {
-                <span class="subfolder-meta">{{ sub.files_count }} файл. · {{ sub.children_count }} папок</span>
+            <div class="subfolder-card-wrap">
+              <button class="subfolder-card" (click)="navigateToSubfolder(sub)">
+                <div class="subfolder-card-top">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
+                  <span class="subfolder-name">{{ sub.name }}</span>
+                  <div class="subfolder-badges">
+                    @if (sub.is_private) {
+                      <span class="badge badge--private" title="Личная папка — скрыта от гостей">🔒</span>
+                    }
+                    @if (sub.has_shared_access && !sub.is_private) {
+                      <span class="badge badge--shared" title="Доступ предоставлен другим пользователям">👥</span>
+                    }
+                  </div>
+                </div>
+                @if (sub.files_count > 0 || sub.children_count > 0) {
+                  <span class="subfolder-meta">{{ sub.files_count }} файл. · {{ sub.children_count }} папок</span>
+                }
+              </button>
+              @if (selectedFolder()!.is_owner) {
+                <button
+                  class="btn-privacy-toggle"
+                  [class.btn-privacy-toggle--private]="sub.is_private"
+                  (click)="toggleFolderPrivacy(sub)"
+                  [title]="sub.is_private ? 'Сделать доступным гостям' : 'Скрыть от гостей'"
+                  [attr.aria-label]="sub.is_private ? 'Сделать доступным гостям' : 'Скрыть от гостей'"
+                >
+                  {{ sub.is_private ? 'Открыть' : 'Личное' }}
+                </button>
               }
-            </button>
+            </div>
           }
         </div>
       </div>
@@ -205,7 +233,12 @@
                 <div class="file-icon" aria-hidden="true">{{ mimeIcon(file.mime_type ?? '') }}</div>
               }
               <div class="file-info">
-                <span class="file-name">{{ file.original_name }}</span>
+                <span class="file-name">
+                  {{ file.original_name }}
+                  @if (file.is_private) {
+                    <span class="badge badge--private badge--inline" title="Личный файл — скрыт от гостей">🔒</span>
+                  }
+                </span>
                 <span class="file-meta">
                   @if (file.content_kind !== 'url_file') {
                     {{ formatSize(file.size) }} ·
@@ -215,6 +248,15 @@
               </div>
             </a>
             <div class="file-actions">
+              @if (selectedFolder()!.is_owner) {
+                <button
+                  class="btn-file-action btn-privacy-file"
+                  [class.btn-privacy-file--private]="file.is_private"
+                  (click)="$event.stopPropagation(); toggleFilePrivacy(file)"
+                  [title]="file.is_private ? 'Сделать доступным гостям' : 'Скрыть от гостей'"
+                  [attr.aria-label]="file.is_private ? 'Сделать доступным гостям' : 'Скрыть от гостей'"
+                >{{ file.is_private ? '🔓' : '🔒' }}</button>
+              }
               @if (file.content_kind === 'url_file' && file.link_url) {
                 <a class="btn-file-action" [href]="file.link_url" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()" title="Перейти по ссылке" aria-label="Перейти по ссылке">🔗</a>
               }

@@ -51,9 +51,19 @@ class SharingController extends Controller
 
         $canEdit = $request->boolean('can_edit', false);
 
-        $file = File::find($fileId);
-        if (!$file || !$file->isOwnedBy($request->user())) {
+        $file    = File::find($fileId);
+        $access  = $file ? FileUserAccess::where('file_id', $file->id)
+                               ->where('user_id', $request->user()->id)->first() : null;
+        $isOwner = $file?->isOwnedBy($request->user()) ?? false;
+        $canShare = $isOwner || ($access?->access_type === AccessType::Shared);
+
+        if (!$file || !$canShare) {
             return $this->notFound('File not found');
+        }
+
+        // Non-owners cannot grant edit access to markdown notes
+        if (!$isOwner && $file->isMarkdownDocument()) {
+            $canEdit = false;
         }
 
         if (!$file->isAvailable()) {

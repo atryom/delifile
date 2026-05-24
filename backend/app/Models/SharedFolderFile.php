@@ -15,6 +15,11 @@ class SharedFolderFile extends Model
         'shared_folder_id',
         'file_id',
         'added_by',
+        'is_private',
+    ];
+
+    protected $casts = [
+        'is_private' => 'boolean',
     ];
 
     public function folder(): BelongsTo

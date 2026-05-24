@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AccessType;
 use App\Enums\FileStatus;
 use App\Models\File;
 use App\Models\FileUserAccess;
@@ -36,6 +37,7 @@ class FileCardBuilder
             'uploaded_at'        => $file->created_at?->toIso8601String(),
             'expires_at'         => $file->expires_at?->toIso8601String(),
             'is_owner'           => $file->isOwnedBy($user),
+            'can_share'          => $file->isOwnedBy($user) || ($access?->access_type === AccessType::Shared),
             'access_type'        => $access?->access_type?->value,
             'is_favorite'        => $access?->is_favorite ?? false,
             'is_pinned'          => $access?->pinned_at !== null,

@@ -264,8 +264,9 @@
 
 .subfolder-card {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   padding: 8px 12px;
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -279,17 +280,102 @@
   &:hover { border-color: #6366f1; background: #f5f3ff; }
 }
 
+.subfolder-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
 .subfolder-name {
+  flex: 1;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.subfolder-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .subfolder-meta {
   font-size: 0.73rem;
   color: #9ca3af;
   white-space: nowrap;
+  padding-left: 2px;
+}
+
+.subfolder-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+// ─── Badges ───────────────────────────────────────────────────────────────────
+
+.badge {
+  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+
+  &--private { opacity: 0.8; }
+  &--shared { opacity: 0.75; }
+  &--inline { margin-left: 4px; vertical-align: middle; }
+}
+
+.folder-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.folder-shared-badge {
+  font-size: 0.78rem;
+  color: #6366f1;
+  background: #ede9fe;
+  padding: 3px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+// ─── Privacy toggles ──────────────────────────────────────────────────────────
+
+.btn-privacy-toggle {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid #e5e7eb;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  color: #6b7280;
+  cursor: pointer;
+
+  &:hover { border-color: #6366f1; color: #6366f1; background: #f5f3ff; }
+
+  &--private {
+    border-color: #fca5a5;
+    color: #dc2626;
+    background: #fef2f2;
+    &:hover { background: #fee2e2; }
+  }
+}
+
+.btn-privacy-file {
+  font-size: 0.85rem;
+
+  &--private {
+    color: #dc2626;
+    background: #fef2f2;
+    border-radius: 6px;
+  }
 }
 
 .btn-leave-folder {

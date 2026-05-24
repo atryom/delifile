@@ -16,6 +16,14 @@ class SharedFolder extends Model
         'owner_id',
         'parent_id',
         'name',
+        'is_private',
+        'is_personal_root',
+        'sort_order',
+    ];
+
+    protected $casts = [
+        'is_private'       => 'boolean',
+        'is_personal_root' => 'boolean',
     ];
 
     public function owner(): BelongsTo

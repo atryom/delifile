@@ -88,15 +88,19 @@ class SharedFolderController extends Controller
     private function formatFolder(SharedFolder $folder, User $user, ?SharedFolderAccess $myAccess = null): array
     {
         return [
-            'id'             => $folder->id,
-            'name'           => $folder->name,
-            'owner_id'       => $folder->owner_id,
-            'parent_id'      => $folder->parent_id,
-            'files_count'    => $folder->files_count ?? 0,
-            'children_count' => $folder->children_count ?? 0,
-            'is_owner'       => $folder->owner_id === $user->id,
-            'my_access_type' => $myAccess?->access_type?->value,
-            'created_at'     => $folder->created_at?->toIso8601String(),
+            'id'                => $folder->id,
+            'name'              => $folder->name,
+            'owner_id'          => $folder->owner_id,
+            'parent_id'         => $folder->parent_id,
+            'files_count'       => $folder->files_count ?? 0,
+            'children_count'    => $folder->children_count ?? 0,
+            'is_owner'          => $folder->owner_id === $user->id,
+            'my_access_type'    => $myAccess?->access_type?->value,
+            'is_private'        => (bool) $folder->is_private,
+            'is_personal_root'  => (bool) $folder->is_personal_root,
+            'sort_order'        => $folder->sort_order,
+            'has_shared_access' => ($folder->accesses_count ?? 0) > 0,
+            'created_at'        => $folder->created_at?->toIso8601String(),
         ];
     }
 
@@ -178,7 +182,9 @@ class SharedFolderController extends Controller
         $showIds = array_unique($showIds);
 
         $folders = SharedFolder::whereIn('id', $showIds)
-            ->withCount(['sharedFiles as files_count', 'children'])
+            ->withCount(['sharedFiles as files_count', 'children', 'accesses'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
             ->get();
 
         $myAccesses = SharedFolderAccess::where('user_id', $user->id)
@@ -206,11 +212,11 @@ class SharedFolderController extends Controller
         $rootIds       = $ownedRootIds->merge($accessRootIds)->unique();
 
         // BFS to collect all descendants
-        $all       = SharedFolder::whereIn('id', $rootIds)->withCount('children')->get();
+        $all       = SharedFolder::whereIn('id', $rootIds)->withCount(['children', 'accesses'])->get();
         $nextIds   = $all->pluck('id');
 
         while ($nextIds->isNotEmpty()) {
-            $children = SharedFolder::whereIn('parent_id', $nextIds)->withCount('children')->get();
+            $children = SharedFolder::whereIn('parent_id', $nextIds)->withCount(['children', 'accesses'])->get();
             if ($children->isEmpty()) break;
             $all     = $all->merge($children);
             $nextIds = $children->pluck('id');
@@ -292,9 +298,14 @@ class SharedFolderController extends Controller
             return $this->forbidden();
         }
 
-        $user = $request->user();
+        $user    = $request->user();
+        $isOwner = $parent->owner_id === $user->id;
+
         $children = SharedFolder::where('parent_id', $id)
-            ->withCount(['sharedFiles as files_count', 'children'])
+            ->when(!$isOwner, fn ($q) => $q->where('is_private', false))
+            ->withCount(['sharedFiles as files_count', 'children', 'accesses'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
             ->get();
 
         $myAccesses = SharedFolderAccess::where('user_id', $user->id)
@@ -323,10 +334,13 @@ class SharedFolderController extends Controller
             return $this->forbidden('Only the owner can rename this folder');
         }
 
-        $data = $request->validate(['name' => 'required|string|max:100']);
-        $folder->update(['name' => $data['name']]);
+        $data = $request->validate([
+            'name'       => 'required|string|max:100',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+        $folder->update(array_filter($data, fn ($v) => $v !== null) + ['name' => $data['name']]);
 
-        $folder->loadCount(['sharedFiles as files_count', 'children']);
+        $folder->loadCount(['sharedFiles as files_count', 'children', 'accesses']);
 
         return $this->success('Shared folder updated', [
             'folder' => $this->formatFolder($folder, $request->user()),
@@ -441,18 +455,25 @@ class SharedFolderController extends Controller
 
         $page    = (int) $request->get('page', 1);
         $perPage = (int) $request->get('per_page', 20);
+        $isOwner = $folder->owner_id === $user->id;
 
-        $total = SharedFolderFile::where('shared_folder_id', $id)->count();
+        $baseQuery = SharedFolderFile::where('shared_folder_id', $id)
+            ->when(!$isOwner, fn ($q) => $q->where('is_private', false));
 
-        $sharedFiles = SharedFolderFile::where('shared_folder_id', $id)
-            ->with('file')
+        $total = $baseQuery->count();
+
+        $sharedFiles = $baseQuery->with('file')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
 
         $items = $sharedFiles
             ->filter(fn (SharedFolderFile $sf) => $sf->file !== null)
-            ->map(fn (SharedFolderFile $sf) => $this->cardBuilder->buildListItem($sf->file, $user, $sf->added_by))
+            ->map(function (SharedFolderFile $sf) use ($user) {
+                $card = $this->cardBuilder->buildListItem($sf->file, $user, $sf->added_by);
+                $card['is_private'] = (bool) $sf->is_private;
+                return $card;
+            })
             ->values();
 
         return $this->success('Files fetched', [
@@ -914,6 +935,86 @@ class SharedFolderController extends Controller
         return $this->success('Files fetched', [
             'items'      => $items,
             'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => $total],
+        ]);
+    }
+
+    // ─── Personal root ────────────────────────────────────────────────────────
+
+    /**
+     * POST /api/v1/shared-folders/ensure-root
+     * Finds or creates the user's personal root shared folder.
+     */
+    public function ensurePersonalRoot(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $folder = SharedFolder::where('owner_id', $user->id)
+            ->where('is_personal_root', true)
+            ->first();
+
+        if (!$folder) {
+            $folder = SharedFolder::create([
+                'owner_id'          => $user->id,
+                'name'              => 'Мои файлы',
+                'is_personal_root'  => true,
+            ]);
+        }
+
+        $folder->loadCount(['sharedFiles as files_count', 'children', 'accesses']);
+
+        return $this->success('Personal root folder', [
+            'folder' => $this->formatFolder($folder, $user),
+        ]);
+    }
+
+    // ─── Privacy ──────────────────────────────────────────────────────────────
+
+    /**
+     * PATCH /api/v1/shared-folders/{id}/files/{fileId}/privacy
+     * Only the folder owner can mark files as private.
+     */
+    public function setFilePrivacy(Request $request, string $id, string $fileId): JsonResponse
+    {
+        $folder = SharedFolder::find($id);
+        if (!$folder) {
+            return $this->notFound('Shared folder not found');
+        }
+
+        if ($folder->owner_id !== $request->user()->id) {
+            return $this->forbidden('Only the folder owner can mark files as private');
+        }
+
+        $data = $request->validate(['is_private' => 'required|boolean']);
+
+        SharedFolderFile::where('shared_folder_id', $id)
+            ->where('file_id', $fileId)
+            ->update(['is_private' => $data['is_private']]);
+
+        return $this->success('File privacy updated');
+    }
+
+    /**
+     * PATCH /api/v1/shared-folders/{id}/privacy
+     * Owner of this subfolder marks it private (hidden from parent folder guests).
+     */
+    public function setFolderPrivacy(Request $request, string $id): JsonResponse
+    {
+        $folder = SharedFolder::find($id);
+        if (!$folder) {
+            return $this->notFound('Shared folder not found');
+        }
+
+        if ($folder->owner_id !== $request->user()->id) {
+            return $this->forbidden('Only the folder owner can change its privacy');
+        }
+
+        $data = $request->validate(['is_private' => 'required|boolean']);
+        $folder->update(['is_private' => $data['is_private']]);
+
+        $folder->loadCount(['sharedFiles as files_count', 'children', 'accesses']);
+
+        return $this->success('Folder privacy updated', [
+            'folder' => $this->formatFolder($folder, $request->user()),
         ]);
     }
 
