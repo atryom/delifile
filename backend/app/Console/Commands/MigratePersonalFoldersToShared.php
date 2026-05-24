@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\File;
+use App\Models\FileUserAccess;
 use App\Models\Folder;
 use App\Models\SharedFolder;
 use App\Models\SharedFolderFile;
@@ -143,6 +144,7 @@ class MigratePersonalFoldersToShared extends Command
 
     private function migrateUserFiles(User $user, array $folderMap): void
     {
+        // 1. Owned files organized via files.folder_id
         $files = File::where('owner_id', $user->id)
             ->whereNotNull('folder_id')
             ->get();
@@ -156,20 +158,43 @@ class MigratePersonalFoldersToShared extends Command
                 continue;
             }
 
-            // Idempotency: skip if already linked
-            $exists = SharedFolderFile::where('file_id', $file->id)
-                ->where('shared_folder_id', $sharedFolderId)
-                ->exists();
+            $this->linkFileToSharedFolder($file->id, $sharedFolderId, $user->id);
+        }
 
-            if (!$exists) {
-                SharedFolderFile::create([
-                    'shared_folder_id' => $sharedFolderId,
-                    'file_id'          => $file->id,
-                    'added_by'         => $user->id,
-                    'is_private'       => false,
-                ]);
-                $this->filesLinked++;
+        // 2. Received/shared files organized via file_user_access.folder_id
+        $accesses = FileUserAccess::where('user_id', $user->id)
+            ->whereNotNull('folder_id')
+            ->whereIn('folder_id', array_keys($folderMap))
+            ->get();
+
+        foreach ($accesses as $access) {
+            // Skip own files — already handled above
+            $file = File::find($access->file_id);
+            if (!$file || $file->owner_id == $user->id) {
+                continue;
             }
+
+            $sharedFolderId = $folderMap[$access->folder_id] ?? null;
+            if (!$sharedFolderId) continue;
+
+            $this->linkFileToSharedFolder($access->file_id, $sharedFolderId, $user->id);
+        }
+    }
+
+    private function linkFileToSharedFolder(string $fileId, string $sharedFolderId, int $addedBy): void
+    {
+        $exists = SharedFolderFile::where('file_id', $fileId)
+            ->where('shared_folder_id', $sharedFolderId)
+            ->exists();
+
+        if (!$exists) {
+            SharedFolderFile::create([
+                'shared_folder_id' => $sharedFolderId,
+                'file_id'          => $fileId,
+                'added_by'         => $addedBy,
+                'is_private'       => false,
+            ]);
+            $this->filesLinked++;
         }
     }
 
@@ -177,10 +202,15 @@ class MigratePersonalFoldersToShared extends Command
     {
         $this->previewFolderLevel($user, null, 0);
 
-        $files = File::where('owner_id', $user->id)->whereNotNull('folder_id')->count();
-        $this->line("  [DRY] Файлов для привязки: {$files}");
+        $ownedFiles    = File::where('owner_id', $user->id)->whereNotNull('folder_id')->count();
+        $receivedFiles = FileUserAccess::where('user_id', $user->id)
+            ->whereNotNull('folder_id')
+            ->whereHas('file', fn ($q) => $q->where('owner_id', '!=', $user->id))
+            ->count();
+
+        $this->line("  [DRY] Файлов для привязки: {$ownedFiles} своих + {$receivedFiles} полученных");
         $this->foldersCreated += Folder::where('user_id', $user->id)->count();
-        $this->filesLinked    += $files;
+        $this->filesLinked    += $ownedFiles + $receivedFiles;
     }
 
     private function previewFolderLevel(User $user, ?string $localParentId, int $depth): void
