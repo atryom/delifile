@@ -4,7 +4,7 @@
 
 # Базовая версия документации в docs/
 
-Фиксированный commit, от которого отсчитываются изменения в файлах `docs/endpoints.md`, `docs/models.md`, `docs/permission.md`, `docs/pmt.md`, `docs/tests.md`, `docs/userflow.md`, `docs/usermanual.md`:
+Фиксированный commit, от которого отсчитываются изменения в файлах `docs/endpoints.md`, `docs/models.md`, `docs/permission.md`, `docs/pmi.md`, `docs/tests.md`, `docs/userflow.md`, `docs/usermanual.md`:
 
 **`14bb624`** — 16 мая 2026, "+корректировка документации"
 

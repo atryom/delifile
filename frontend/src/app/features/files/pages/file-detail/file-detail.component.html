@@ -150,7 +150,12 @@
                     </div>
                   } @else {
                     <h1 class="file-title">
-                      <span class="file-title-text" (click)="startRename()" [title]="'files.detail.click_to_rename' | translate">{{ displayTitle() }}</span>
+                      <span
+                        class="file-title-text"
+                        [class.file-title-readonly]="!file()!.is_owner"
+                        (click)="startRename()"
+                        [title]="file()!.is_owner ? ('files.detail.click_to_rename' | translate) : ''"
+                      >{{ displayTitle() }}</span>
                       @if (file()!.has_versions) {
                         <span class="version-badge" title="{{ 'files.versions.versioned' | translate }}">V</span>
                       }

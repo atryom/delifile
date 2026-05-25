@@ -104,6 +104,11 @@
   transition: background 0.12s;
 
   &:hover { background: var(--surface2); }
+
+  &.file-title-readonly {
+    cursor: default;
+    &:hover { background: transparent; }
+  }
 }
 
 .file-title-edit {

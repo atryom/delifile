@@ -513,7 +513,7 @@ export class FileDetailComponent implements OnInit {
 
   startRename(): void {
     const f = this.file();
-    if (!f) return;
+    if (!f || !f.is_owner) return;
     this.renameDraft = f.display_name ?? f.original_name;
     this.renamingTitle.set(true);
   }
@@ -544,7 +544,12 @@ export class FileDetailComponent implements OnInit {
         this.renamingTitle.set(false);
         this.showFeedback(this.translate.instant('files.detail.renamed'));
       },
-      error: () => this.savingRename.set(false),
+      error: (err) => {
+        this.savingRename.set(false);
+        this.renamingTitle.set(false);
+        const msg = err?.error?.message ?? 'Нет доступа к переименованию';
+        this.showFeedback(msg);
+      },
     });
   }
 
