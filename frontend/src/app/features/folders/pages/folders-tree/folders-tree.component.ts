@@ -79,6 +79,18 @@ export class FoldersTreeComponent implements OnInit {
   // ── View mode ─────────────────────────────────────────────────────────────
   readonly viewMode = signal<'table' | 'grid'>('table');
 
+  // ── Filters panel ─────────────────────────────────────────────────────────
+  readonly filtersOpen         = signal(false);
+  readonly activeFiltersCount  = computed(() => {
+    let n = 0;
+    if (this.activeFilter()    !== 'all')  n++;
+    if (this.activeTagId())                n++;
+    if (this.sortBy()          !== 'date') n++;
+    if (this.sortOrder()       !== 'desc') n++;
+    if (this.activeTypeGroup())            n++;
+    return n;
+  });
+
   // ── Shared folders ────────────────────────────────────────────────────────
   readonly sfLoading      = signal(false);
   readonly sharedFolders  = signal<SharedFolder[]>([]);
@@ -371,6 +383,7 @@ export class FoldersTreeComponent implements OnInit {
         this.rawFiles.set(res.data.items);
         const p = res.data.pagination;
         this.totalPages.set(Math.ceil(p.total / p.per_page) || 1);
+        if (p.available_type_groups) this.availableTypeGroups.set(p.available_type_groups);
         this.filesLoading.set(false);
       },
       error: () => this.filesLoading.set(false),
@@ -422,6 +435,20 @@ export class FoldersTreeComponent implements OnInit {
   onSearchChange(_: string): void {
     clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => { this.page.set(1); this.loadFiles(); }, 350);
+  }
+
+  resetAllFilters(): void {
+    this.activeFilter.set('all');
+    this.activeTagId.set('');
+    this.activeTypeGroup.set('');
+    this.sortBy.set('date');
+    this.sortOrder.set('desc');
+    this.searchQuery = '';
+    this.page.set(1);
+    this.totalPages.set(1);
+    this.availableTypeGroups.set([]);
+    this.clearSelection();
+    this.loadFiles();
   }
 
   private resetFiltersKeepTag(): void {

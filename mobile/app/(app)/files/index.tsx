@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { Alert, SectionList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { router, useLocalSearchParams, Stack } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, FlatList, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { router, Stack } from 'expo-router';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFileList } from '@/hooks/useFiles';
-import { useFolderList, useDeleteFolder, useRenameFolder } from '@/hooks/useFolders';
+import { useEnsurePersonalRoot } from '@/hooks/useSharedFolders';
+import { sharedFoldersApi } from '@/api/shared-folders';
 import { Spinner } from '@/components/ui/Spinner';
 import type { FileListItem, FileFilter } from '@/types';
-import type { Folder } from '@/types';
+import type { SharedFolder } from '@/types';
 
 const FILTERS: { key: FileFilter; label: string }[] = [
   { key: 'all',       label: 'Все'        },
@@ -27,7 +29,7 @@ function formatDate(iso: string | null) {
 }
 
 interface FolderRowProps {
-  folder: Folder;
+  folder: SharedFolder;
   onMenu: () => void;
   isRenaming: boolean;
   renameText: string;
@@ -37,10 +39,12 @@ interface FolderRowProps {
 }
 
 function FolderRow({ folder, onMenu, isRenaming, renameText, onRenameChange, onRenameSave, onRenameCancel }: FolderRowProps) {
+  const icon = folder.is_personal_root ? '🏠' : folder.is_private ? '🔒' : '🗂';
+
   if (isRenaming) {
     return (
       <View style={styles.folderRow}>
-        <Text style={styles.folderIcon}>📁</Text>
+        <Text style={styles.folderIcon}>{icon}</Text>
         <TextInput
           style={styles.renameInput}
           value={renameText}
@@ -63,24 +67,31 @@ function FolderRow({ folder, onMenu, isRenaming, renameText, onRenameChange, onR
   return (
     <TouchableOpacity
       style={styles.folderRow}
-      onPress={() =>
-        router.push({
-          pathname: '/(app)/files',
-          params: { folder_id: folder.id, folder_name: folder.name },
-        })
-      }
+      onPress={() => router.push(`/(app)/files/shared-folders/${folder.id}` as any)}
       activeOpacity={0.7}
     >
-      <Text style={styles.folderIcon}>📁</Text>
+      <Text style={styles.folderIcon}>{icon}</Text>
       <View style={styles.rowMain}>
-        <Text style={styles.folderName}>{folder.name}</Text>
-        <Text style={styles.folderMeta}>{folder.files_count} файлов</Text>
+        <View style={styles.folderNameRow}>
+          <Text style={styles.folderName} numberOfLines={1}>{folder.name}</Text>
+          {folder.has_shared_access && <Text style={styles.sharedBadge}>👥</Text>}
+        </View>
+        <Text style={styles.folderMeta}>
+          {folder.files_count} файл{pluralFiles(folder.files_count)}
+          {!folder.is_owner ? (folder.my_access_type === 'edit' ? ' · Редактор' : ' · Просмотр') : ''}
+        </Text>
       </View>
       <TouchableOpacity onPress={onMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
         <Text style={styles.menuBtnText}>⋯</Text>
       </TouchableOpacity>
     </TouchableOpacity>
   );
+}
+
+function pluralFiles(n: number) {
+  if (n % 10 === 1 && n % 100 !== 11) return '';
+  if (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) return 'а';
+  return 'ов';
 }
 
 function FileRow({ item }: { item: FileListItem }) {
@@ -102,107 +113,159 @@ function FileRow({ item }: { item: FileListItem }) {
 }
 
 export default function FilesScreen() {
-  const params = useLocalSearchParams<{ folder_id?: string; folder_name?: string }>();
-  const folderId = params.folder_id || undefined;
-  const folderName = params.folder_name || 'Файлы';
-
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FileFilter>('all');
-  const deleteFolder = useDeleteFolder();
-  const renameFolder = useRenameFolder();
+
+  // Rename state
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
 
-  function handleFolderMenu(folder: Folder) {
-    Alert.alert(folder.name, undefined, [
-      { text: 'Переименовать', onPress: () => { setRenamingId(folder.id); setRenameText(folder.name); } },
-      { text: 'Удалить папку', style: 'destructive', onPress: () => confirmDeleteFolder(folder) },
-      { text: 'Отмена', style: 'cancel' },
-    ]);
+  // Create folder state
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const createInputRef = useRef<TextInput>(null);
+  const [kbHeight, setKbHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKbHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
+  const ensureRoot = useEnsurePersonalRoot();
+  useEffect(() => {
+    ensureRoot.mutate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const { data: folders, isLoading: foldersLoading, refetch: refetchFolders } = useQuery({
+    queryKey: ['shared-folders'],
+    queryFn: () => sharedFoldersApi.list().then((r) => r.data.data.items),
+    staleTime: 0,
+  });
+
+  const { data: filesData, isLoading: filesLoading, isError, refetch: refetchFiles } = useFileList({
+    folder_id: '',
+    search: search || undefined,
+    filter,
+  });
+
+  const renameFolder = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => sharedFoldersApi.rename(id, name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
+      setRenamingId(null);
+    },
+    onError: () => Alert.alert('Ошибка', 'Не удалось переименовать папку'),
+  });
+
+  const deleteFolder = useMutation({
+    mutationFn: (id: string) => sharedFoldersApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shared-folders'] }),
+    onError: () => Alert.alert('Ошибка', 'Не удалось удалить папку'),
+  });
+
+  const leaveFolder = useMutation({
+    mutationFn: (id: string) => sharedFoldersApi.leave(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shared-folders'] }),
+    onError: () => Alert.alert('Ошибка', 'Не удалось покинуть папку'),
+  });
+
+  const createFolder = useMutation({
+    mutationFn: (name: string) => sharedFoldersApi.create(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
+      closeCreate();
+    },
+    onError: () => Alert.alert('Ошибка', 'Не удалось создать папку'),
+  });
+
+  function handleFolderMenu(folder: SharedFolder) {
+    if (folder.is_owner) {
+      Alert.alert(folder.name, undefined, [
+        { text: 'Переименовать', onPress: () => { setRenamingId(folder.id); setRenameText(folder.name); } },
+        {
+          text: 'Удалить папку',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert('Удалить папку?', `Папка «${folder.name}» и её содержимое будут удалены.`, [
+              { text: 'Отмена', style: 'cancel' },
+              { text: 'Удалить', style: 'destructive', onPress: () => deleteFolder.mutate(folder.id) },
+            ]),
+        },
+        { text: 'Отмена', style: 'cancel' },
+      ]);
+    } else {
+      Alert.alert(folder.name, undefined, [
+        {
+          text: 'Покинуть папку',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert('Покинуть папку?', `Вы потеряете доступ к «${folder.name}».`, [
+              { text: 'Отмена', style: 'cancel' },
+              { text: 'Покинуть', style: 'destructive', onPress: () => leaveFolder.mutate(folder.id) },
+            ]),
+        },
+        { text: 'Отмена', style: 'cancel' },
+      ]);
+    }
   }
 
   async function handleSaveRename() {
     if (!renamingId || !renameText.trim()) { setRenamingId(null); return; }
-    try {
-      await renameFolder.mutateAsync({ id: renamingId, name: renameText.trim() });
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось переименовать папку');
-    } finally {
-      setRenamingId(null);
-    }
+    renameFolder.mutate({ id: renamingId, name: renameText.trim() });
   }
 
-  function confirmDeleteFolder(folder: Folder) {
-    Alert.alert(
-      'Удалить папку?',
-      `Папка «${folder.name}» будет удалена.`,
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Удалить',
-          style: 'destructive',
-          onPress: () => doDeleteFolder(folder, false),
-        },
-      ],
-    );
+  function openCreate() {
+    setNewName('');
+    setCreating(true);
+    setTimeout(() => createInputRef.current?.focus(), 50);
   }
 
-  async function doDeleteFolder(folder: Folder, force: boolean) {
-    try {
-      await deleteFolder.mutateAsync({ id: folder.id, force });
-    } catch (e: any) {
-      const code = e.response?.data?.error_code ?? e.response?.data?.code;
-      if (code === 'HAS_CHILDREN') {
-        Alert.alert('Нельзя удалить', 'Сначала удалите или переместите вложенные папки.');
-        return;
-      }
-      if (code === 'HAS_FILES') {
-        const count = e.response?.data?.data?.files_count ?? '';
-        Alert.alert(
-          'В папке есть файлы',
-          `${count ? `${count} файлов` : 'Файлы'} будут перемещены в корень. Продолжить?`,
-          [
-            { text: 'Отмена', style: 'cancel' },
-            { text: 'Удалить', style: 'destructive', onPress: () => doDeleteFolder(folder, true) },
-          ],
-        );
-        return;
-      }
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось удалить папку');
-    }
+  function closeCreate() {
+    Keyboard.dismiss();
+    setCreating(false);
+    setNewName('');
   }
 
-  const { data: allFolders, isLoading: foldersLoading } = useFolderList();
-  // folder_id='' → backend treats as NULL → root-only files
-  // folder_id=undefined → Axios omits param → backend returns ALL files (wrong)
-  // filter inside folder must be 'all' (same as web) — backend default is 'mine' which hides received files
-  const { data: filesData, isLoading: filesLoading, isError, refetch } = useFileList({
-    folder_id: folderId !== undefined ? folderId : '',
-    search: search || undefined,
-    filter: folderId ? 'all' : filter,
-  });
+  function handleCreate() {
+    const n = newName.trim();
+    if (!n || createFolder.isPending) return;
+    createFolder.mutate(n);
+  }
 
-  const subFolders = (allFolders ?? []).filter(
-    (f) => (folderId ? f.parent_id === folderId : f.parent_id === null)
-  );
+  function refetch() {
+    refetchFolders();
+    refetchFiles();
+  }
+
+  const rootFolders = (folders ?? []).filter((f) => f.parent_id === null && !f.is_personal_root);
   const files = filesData?.items ?? [];
   const isLoading = foldersLoading || filesLoading;
+
+  type ListItem =
+    | { kind: 'folder'; data: SharedFolder }
+    | { kind: 'file'; data: FileListItem }
+    | { kind: 'header'; text: string };
+
+  const listData: ListItem[] = [];
+  if (rootFolders.length > 0) {
+    if (files.length > 0) listData.push({ kind: 'header', text: 'Папки' });
+    rootFolders.forEach((f) => listData.push({ kind: 'folder', data: f }));
+  }
+  if (files.length > 0) {
+    if (rootFolders.length > 0) listData.push({ kind: 'header', text: 'Файлы' });
+    files.forEach((f) => listData.push({ kind: 'file', data: f }));
+  }
 
   return (
     <View style={styles.flex}>
       <Stack.Screen
         options={{
-          title: folderName,
+          title: 'Файлы',
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/files/add' as any,
-                  params: { folder_id: folderId ?? '', folder_name: folderName },
-                })
-              }
-              style={styles.addBtn}
-            >
+            <TouchableOpacity onPress={openCreate} style={styles.addBtn}>
               <Text style={styles.addBtnText}>＋</Text>
             </TouchableOpacity>
           ),
@@ -220,7 +283,7 @@ export default function FilesScreen() {
         />
       </View>
 
-      {!folderId && (
+      {!search && (
         <View style={styles.filtersBar}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContent}>
             {FILTERS.map((f) => (
@@ -236,63 +299,83 @@ export default function FilesScreen() {
         </View>
       )}
 
-      {!folderId && !search && (
-        <TouchableOpacity
-          style={styles.sharedFoldersEntry}
-          activeOpacity={0.7}
-          onPress={() => router.push('/(app)/files/shared-folders' as any)}
-        >
-          <Text style={styles.sharedFoldersIcon}>🗂</Text>
-          <Text style={styles.sharedFoldersText}>Общие папки</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      )}
-
       {isLoading ? (
         <Spinner />
       ) : isError ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Ошибка загрузки</Text>
-          <TouchableOpacity onPress={() => refetch()} style={styles.retryBtn}>
+          <TouchableOpacity onPress={refetch} style={styles.retryBtn}>
             <Text style={styles.retryText}>Повторить</Text>
           </TouchableOpacity>
         </View>
-      ) : subFolders.length === 0 && files.length === 0 ? (
+      ) : listData.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.empty}>Пусто</Text>
         </View>
       ) : (
-        <SectionList
-          sections={[
-            ...(subFolders.length > 0 ? [{ title: 'Папки', data: subFolders as any[] }] : []),
-            ...(files.length > 0 ? [{ title: 'Файлы', data: files as any[] }] : []),
-          ]}
-          keyExtractor={(item) => item.id}
-          renderSectionHeader={({ section }) =>
-            subFolders.length > 0 && files.length > 0 ? (
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-            ) : null
-          }
-          renderItem={({ item, section }) =>
-            section.title === 'Папки' ? (
-              <FolderRow
-                folder={item as Folder}
-                onMenu={() => handleFolderMenu(item as Folder)}
-                isRenaming={renamingId === item.id}
-                renameText={renameText}
-                onRenameChange={setRenameText}
-                onRenameSave={handleSaveRename}
-                onRenameCancel={() => setRenamingId(null)}
-              />
-            ) : (
-              <FileRow item={item as FileListItem} />
-            )
+        <FlatList
+          data={listData}
+          keyExtractor={(item, i) =>
+            item.kind === 'header' ? `h-${i}` :
+            item.kind === 'folder' ? `sf-${item.data.id}` :
+            `f-${item.data.id}`
           }
           onRefresh={refetch}
           refreshing={isLoading}
+          contentContainerStyle={creating ? { paddingBottom: 200 } : undefined}
+          renderItem={({ item }) => {
+            if (item.kind === 'header') {
+              return (
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>{item.text}</Text>
+                </View>
+              );
+            }
+            if (item.kind === 'folder') {
+              return (
+                <FolderRow
+                  folder={item.data}
+                  onMenu={() => handleFolderMenu(item.data)}
+                  isRenaming={renamingId === item.data.id}
+                  renameText={renameText}
+                  onRenameChange={setRenameText}
+                  onRenameSave={handleSaveRename}
+                  onRenameCancel={() => setRenamingId(null)}
+                />
+              );
+            }
+            return <FileRow item={item.data} />;
+          }}
         />
+      )}
+
+      {creating && (
+        <View style={[styles.inputBar, { bottom: kbHeight }]}>
+          <Text style={styles.barTitle}>Новая папка</Text>
+          <TextInput
+            ref={createInputRef}
+            style={styles.textInput}
+            placeholder="Название папки..."
+            placeholderTextColor="#94A3B8"
+            value={newName}
+            onChangeText={setNewName}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleCreate}
+          />
+          <View style={styles.barButtons}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={closeCreate}>
+              <Text style={styles.cancelText}>Отмена</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.createBtn, (!newName.trim() || createFolder.isPending) && styles.createBtnDisabled]}
+              onPress={handleCreate}
+              disabled={!newName.trim() || createFolder.isPending}
+            >
+              <Text style={styles.createText}>{createFolder.isPending ? '...' : 'Создать'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -312,9 +395,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5 },
   folderRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12 },
   folderIcon: { fontSize: 20 },
-  folderName: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
+  folderNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  folderName: { fontSize: 15, color: '#1E293B', fontWeight: '500', flexShrink: 1 },
+  sharedBadge: { fontSize: 14 },
   folderMeta: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
-  chevron: { fontSize: 20, color: '#CBD5E1' },
   menuBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   menuBtnText: { fontSize: 18, color: '#94A3B8' },
   renameInput: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, color: '#1E293B', borderWidth: 1, borderColor: '#2563EB' },
@@ -331,11 +415,22 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 16, fontWeight: '600', color: '#EF4444' },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#2563EB', borderRadius: 8 },
   retryText: { color: '#fff', fontWeight: '600' },
-  sharedFoldersEntry: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#EFF6FF', paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#DBEAFE',
+  inputBar: {
+    position: 'absolute', left: 0, right: 0,
+    backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
+    borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 8,
   },
-  sharedFoldersIcon: { fontSize: 20 },
-  sharedFoldersText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#2563EB' },
+  barTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
+  textInput: {
+    height: 44, backgroundColor: '#F8FAFC', borderRadius: 10,
+    paddingHorizontal: 14, fontSize: 15, color: '#1E293B',
+    borderWidth: 1, borderColor: '#E2E8F0',
+  },
+  barButtons: { flexDirection: 'row', gap: 10 },
+  cancelBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+  cancelText: { fontSize: 15, color: '#64748B' },
+  createBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
+  createBtnDisabled: { opacity: 0.5 },
+  createText: { fontSize: 15, color: '#fff', fontWeight: '600' },
 });

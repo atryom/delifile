@@ -14,8 +14,8 @@ import {
   useVersionDownload, useActivateVersion,
 } from '@/hooks/useFiles';
 import { useTags } from '@/hooks/useTags';
-import { useFolderTree } from '@/hooks/useFolders';
-import type { FolderTreeNode } from '@/types';
+import { useSharedFolderAllFlat } from '@/hooks/useSharedFolders';
+import type { SharedFolder } from '@/types';
 import { useContacts } from '@/hooks/useContacts';
 import { filesApi } from '@/api/files';
 import { Spinner } from '@/components/ui/Spinner';
@@ -25,14 +25,22 @@ import { formatFileSize, formatDateTime } from '@/utils/format';
 
 type ActionPanel = 'tags' | 'folder' | 'share' | 'link' | 'versions';
 
-function flattenTree(
-  nodes: FolderTreeNode[],
-  depth = 0,
-): Array<{ node: FolderTreeNode; depth: number }> {
-  return nodes.flatMap((node) => [
-    { node, depth },
-    ...flattenTree(node.children, depth + 1),
-  ]);
+function buildSharedFolderMoveTree(folders: SharedFolder[]): Array<{ folder: SharedFolder; depth: number }> {
+  const result: Array<{ folder: SharedFolder; depth: number }> = [];
+  function walk(parentId: string | null, depth: number) {
+    for (const f of folders) {
+      if ((f.parent_id ?? null) === parentId) {
+        result.push({ folder: f, depth });
+        walk(f.id, depth + 1);
+      }
+    }
+  }
+  walk(null, 0);
+  const placed = new Set(result.map((r) => r.folder.id));
+  for (const f of folders) {
+    if (!placed.has(f.id)) result.push({ folder: f, depth: 0 });
+  }
+  return result;
 }
 
 const TTL_OPTIONS = [
@@ -75,7 +83,7 @@ export default function FileDetailScreen() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // Folder panel
-  const { data: folderTree } = useFolderTree();
+  const { data: allFolders } = useSharedFolderAllFlat();
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
   // Share panel
@@ -525,21 +533,16 @@ export default function FileDetailScreen() {
             <Text style={styles.backText}>← Назад</Text>
           </TouchableOpacity>
           <Text style={styles.panelTitle}>Переместить в папку</Text>
-          <TouchableOpacity
-            style={styles.radioRow}
-            onPress={() => setSelectedFolderId(null)}
-          >
-            <View style={[styles.radio, selectedFolderId === null && styles.radioActive]} />
-            <Text style={styles.checkLabel}>Корень (без папки)</Text>
-          </TouchableOpacity>
-          {flattenTree(folderTree ?? []).map(({ node, depth }) => (
+          {buildSharedFolderMoveTree(allFolders ?? []).map(({ folder, depth }) => (
             <TouchableOpacity
-              key={node.id}
+              key={folder.id}
               style={[styles.radioRow, { paddingLeft: depth * 20 }]}
-              onPress={() => setSelectedFolderId(node.id)}
+              onPress={() => setSelectedFolderId(folder.id)}
             >
-              <View style={[styles.radio, selectedFolderId === node.id && styles.radioActive]} />
-              <Text style={styles.checkLabel}>{node.name}</Text>
+              <View style={[styles.radio, selectedFolderId === folder.id && styles.radioActive]} />
+              <Text style={styles.checkLabel}>
+                {folder.is_personal_root ? '🏠 ' : folder.is_private ? '🔒 ' : ''}{folder.name}
+              </Text>
             </TouchableOpacity>
           ))}
           <Button title="Переместить" onPress={handleMoveFolder} loading={moveFolder.isPending} style={styles.btn} />

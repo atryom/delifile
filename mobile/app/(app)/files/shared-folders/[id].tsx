@@ -7,6 +7,10 @@ import { Spinner } from '@/components/ui/Spinner';
 import { formatDateTime } from '@/utils/format';
 import type { FileListItem, SharedFolder } from '@/types';
 
+interface FileListItemWithPrivacy extends FileListItem {
+  is_private?: boolean;
+}
+
 export default function SharedFolderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const qc = useQueryClient();
@@ -53,6 +57,20 @@ export default function SharedFolderScreen() {
     onError: () => Alert.alert('Ошибка', 'Не удалось покинуть папку'),
   });
 
+  const setFolderPrivacy = useMutation({
+    mutationFn: ({ subfolderId, isPrivate }: { subfolderId: string; isPrivate: boolean }) =>
+      sharedFoldersApi.setFolderPrivacy(subfolderId, isPrivate),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shared-folders', id] }),
+    onError: () => Alert.alert('Ошибка', 'Не удалось изменить приватность'),
+  });
+
+  const setFilePrivacy = useMutation({
+    mutationFn: ({ fileId, isPrivate }: { fileId: string; isPrivate: boolean }) =>
+      sharedFoldersApi.setFilePrivacy(id, fileId, isPrivate),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shared-folders', id] }),
+    onError: () => Alert.alert('Ошибка', 'Не удалось изменить приватность'),
+  });
+
   function startRename(subfolder: SharedFolder) {
     setRenamingId(subfolder.id);
     setRenameText(subfolder.name);
@@ -70,10 +88,24 @@ export default function SharedFolderScreen() {
     renameSubfolder.mutate({ subfolderId: renamingId, name: renameText.trim() });
   }
 
+  function handleFileMenu(file: FileListItemWithPrivacy) {
+    Alert.alert(file.display_name ?? file.original_name, undefined, [
+      {
+        text: file.is_private ? 'Открыть доступ' : 'Сделать приватным',
+        onPress: () => setFilePrivacy.mutate({ fileId: file.id, isPrivate: !file.is_private }),
+      },
+      { text: 'Отмена', style: 'cancel' },
+    ]);
+  }
+
   function handleSubfolderMenu(subfolder: SharedFolder) {
     if (subfolder.is_owner) {
       Alert.alert(subfolder.name, undefined, [
         { text: 'Переименовать', onPress: () => startRename(subfolder) },
+        {
+          text: subfolder.is_private ? 'Открыть доступ' : 'Сделать приватной',
+          onPress: () => setFolderPrivacy.mutate({ subfolderId: subfolder.id, isPrivate: !subfolder.is_private }),
+        },
         {
           text: 'Удалить папку',
           style: 'destructive',
@@ -101,13 +133,13 @@ export default function SharedFolderScreen() {
     }
   }
 
-  const files = folderData?.files ?? [];
+  const files = (folderData?.files ?? []) as FileListItemWithPrivacy[];
   const subfolders = folderData?.subfolders ?? [];
 
   type ListItem =
     | { kind: 'header'; text: string }
     | { kind: 'subfolder'; data: SharedFolder }
-    | { kind: 'file'; data: FileListItem };
+    | { kind: 'file'; data: FileListItemWithPrivacy };
 
   const listData: ListItem[] = [];
   if (subfolders.length > 0) {
@@ -209,7 +241,7 @@ export default function SharedFolderScreen() {
                   })
                 }
               >
-                <Text style={styles.fileIcon}>🗂</Text>
+                <Text style={styles.fileIcon}>{item.data.is_private ? '🔒' : '🗂'}</Text>
                 <View style={styles.rowInfo}>
                   <Text style={styles.fileName} numberOfLines={1}>{item.data.name}</Text>
                   <Text style={styles.fileMeta}>{item.data.files_count} файлов</Text>
@@ -225,16 +257,16 @@ export default function SharedFolderScreen() {
             );
           }
 
-          return <FileRow file={item.data} />;
+          return <FileRow file={item.data} onMenu={() => handleFileMenu(item.data)} />;
         }}
       />
     </View>
   );
 }
 
-function FileRow({ file }: { file: FileListItem }) {
+function FileRow({ file, onMenu }: { file: FileListItemWithPrivacy; onMenu: () => void }) {
   const isUrl = file.content_kind === 'url_file';
-  const icon = isUrl ? '🔗' : getFileIcon(file.mime_type);
+  const icon = file.is_private ? '🔒' : isUrl ? '🔗' : getFileIcon(file.mime_type);
   const name = file.display_name || file.original_name;
 
   return (
@@ -254,7 +286,9 @@ function FileRow({ file }: { file: FileListItem }) {
           <Text style={styles.fileDate}>{formatDateTime(file.uploaded_at)}</Text>
         )}
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <TouchableOpacity onPress={onMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
+        <Text style={styles.menuBtnText}>⋯</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }

@@ -3,22 +3,54 @@
   <!-- ──────────────────────────────────────────────────────── MAIN -->
   <div class="main">
 
-    <!-- ── TOPBAR ─────────────────────────────────────────────────────── -->
+    <!-- ── TOPBAR: кнопки добавления + переключатель вида ───────────── -->
     <header class="topbar">
+      <button type="button" class="btn-action" (click)="openAddModal($event)" title="Добавить файл или ссылку">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Добавить файл</span>
+      </button>
 
-      <!-- Filter tabs -->
-      <div class="filter-tabs" role="tablist">
-        @for (f of currentFilters(); track f.key) {
-          <button type="button" role="tab" class="filter-tab"
-                  [class.active]="activeFilter() === f.key"
-                  [attr.aria-selected]="activeFilter() === f.key"
-                  (click)="setFilter(f.key); $event.stopPropagation()">
-            {{ f.label }}
-          </button>
-        }
+      <button type="button" class="btn-action" (click)="startNoteCreate($event)"
+              [disabled]="creatingDoc() || showNoteInput()" title="Создать заметку">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <span>{{ creatingDoc() ? 'Создаём...' : 'Заметка' }}</span>
+      </button>
+
+      <!-- Переключатель вида — всегда справа -->
+      <div class="view-toggle" role="group" aria-label="Режим отображения">
+        <button type="button" class="view-btn" [class.active]="viewMode() === 'table'"
+                (click)="viewMode.set('table')" title="Список" aria-label="Список"
+                [attr.aria-pressed]="viewMode() === 'table'">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+            <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+          </svg>
+          <span class="view-btn-label">Список</span>
+        </button>
+        <button type="button" class="view-btn" [class.active]="viewMode() === 'grid'"
+                (click)="viewMode.set('grid')" title="Сетка" aria-label="Сетка"
+                [attr.aria-pressed]="viewMode() === 'grid'">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          <span class="view-btn-label">Сетка</span>
+        </button>
       </div>
+    </header>
 
-      <!-- Search -->
+    <!-- ── ПОИСК + КНОПКА ФИЛЬТРОВ ───────────────────────────────────── -->
+    <div class="search-bar">
       <div class="search-wrap">
         <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -27,109 +59,88 @@
                [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange($event)"
                aria-label="Поиск файлов и папок" />
       </div>
-
-      <!-- Action buttons -->
-      <div class="topbar-actions">
-        <button type="button" class="btn-action" (click)="startCreate($event)" title="Новая папка">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
-          </svg>
-          <span>Новая папка</span>
-        </button>
-
-        <button type="button" class="btn-action" (click)="openAddModal($event)" title="Добавить файл или ссылку">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          <span>Добавить</span>
-        </button>
-
-        <button type="button" class="btn-action" (click)="startNoteCreate($event)"
-                [disabled]="creatingDoc() || showNoteInput()" title="Создать заметку">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="12" y1="18" x2="12" y2="12"/>
-            <line x1="9" y1="15" x2="15" y2="15"/>
-          </svg>
-          <span>{{ creatingDoc() ? 'Создаём...' : 'Заметка' }}</span>
-        </button>
-
-        <div class="topbar-divider" aria-hidden="true"></div>
-
-        <button type="button" class="topbar-btn" [class.active]="viewMode() === 'table'"
-                (click)="viewMode.set('table')" title="Табличный вид" aria-label="Табличный вид"
-                [attr.aria-pressed]="viewMode() === 'table'">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-            <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
-            <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
-            <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-          </svg>
-        </button>
-        <button type="button" class="topbar-btn" [class.active]="viewMode() === 'grid'"
-                (click)="viewMode.set('grid')" title="Сетка" aria-label="Сетка"
-                [attr.aria-pressed]="viewMode() === 'grid'">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-            <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-          </svg>
-        </button>
-        <!-- Settings and More Options: reserved for future use -->
-        <button type="button" class="topbar-btn visually-hidden" title="Настройки" aria-label="Настройки">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-        </button>
-        <button type="button" class="topbar-btn visually-hidden" title="Дополнительные параметры" aria-label="Дополнительные параметры">
-          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
-          </svg>
-        </button>
-      </div>
-    </header>
-
-    <!-- ── SECONDARY FILTERS ───────────────────────────────────────────── -->
-    <div class="secondary-filters">
-      @if (tags().length > 0) {
-        <div class="custom-select">
-          <select (change)="onTagFilter($event)" aria-label="Фильтр по тегам">
-            <option value="">Все теги</option>
-            @for (tag of tags(); track tag.id) {
-              <option [value]="tag.id" [selected]="activeTagId() === tag.id">{{ tag.name }}</option>
-            }
-          </select>
-        </div>
-      }
-      @if (showFilesArea()) {
-        <div class="custom-select">
-          <select (change)="onSortByChange($event)" aria-label="Сортировка">
-            <option value="date"      [selected]="sortBy() === 'date'">По дате</option>
-            <option value="extension" [selected]="sortBy() === 'extension'">По типу</option>
-            <option value="size"      [selected]="sortBy() === 'size'">По размеру</option>
-          </select>
-        </div>
-        <div class="custom-select">
-          <select (change)="onSortOrderChange($event)" aria-label="Порядок сортировки">
-            <option value="desc" [selected]="sortOrder() === 'desc'">↓ По убыванию</option>
-            <option value="asc"  [selected]="sortOrder() === 'asc'">↑ По возрастанию</option>
-          </select>
-        </div>
-      }
+      <button type="button" class="btn-filter-toggle"
+              [class.active]="filtersOpen()"
+              [class.has-filters]="activeFiltersCount() > 0"
+              (click)="filtersOpen.set(!filtersOpen()); $event.stopPropagation()"
+              [attr.aria-expanded]="filtersOpen()"
+              aria-label="Фильтры">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+        </svg>
+        @if (activeFiltersCount() > 0) {
+          <span class="filter-badge" [attr.aria-label]="activeFiltersCount() + ' активных фильтра'">{{ activeFiltersCount() }}</span>
+        }
+      </button>
     </div>
 
-    <!-- ── TYPE GROUP FILTERS ──────────────────────────────────────────── -->
-    @if (visibleTypeGroups().length > 0 && showFilesArea()) {
-      <div class="type-group" role="group" aria-label="Фильтр по типу файлов">
-        @for (g of visibleTypeGroups(); track g.key) {
-          <button type="button" class="type-group-btn"
-                  [class.active]="activeTypeGroup() === g.key"
-                  (click)="setTypeGroup(g.key); $event.stopPropagation()">
-            {{ g.label }}
+    <!-- ── СЕКЦИЯ ФИЛЬТРОВ (раскрывающаяся) ──────────────────────────── -->
+    @if (filtersOpen()) {
+      <div class="filters-panel" (click)="$event.stopPropagation()">
+
+        <!-- Табы владельца: Все / Мои / Полученные + кнопка сброса -->
+        <div class="filter-tabs-row">
+          <div class="filter-tabs" role="tablist" aria-label="Фильтр по владельцу">
+            @for (f of currentFilters(); track f.key) {
+              <button type="button" role="tab" class="filter-tab"
+                      [class.active]="activeFilter() === f.key"
+                      [attr.aria-selected]="activeFilter() === f.key"
+                      (click)="setFilter(f.key); $event.stopPropagation()">
+                {{ f.label }}
+              </button>
+            }
+          </div>
+          <button type="button" class="btn-clear-filters"
+                  [disabled]="activeFiltersCount() === 0"
+                  (click)="resetAllFilters(); $event.stopPropagation()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            Очистить
           </button>
+        </div>
+
+        <!-- Теги + сортировка -->
+        <div class="filter-selects-row">
+          @if (tags().length > 0) {
+            <div class="custom-select">
+              <select (change)="onTagFilter($event)" aria-label="Фильтр по тегам">
+                <option value="">Все теги</option>
+                @for (tag of tags(); track tag.id) {
+                  <option [value]="tag.id" [selected]="activeTagId() === tag.id">{{ tag.name }}</option>
+                }
+              </select>
+            </div>
+          }
+          <div class="custom-select">
+            <select (change)="onSortByChange($event)" aria-label="Сортировка">
+              <option value="date"      [selected]="sortBy() === 'date'">По дате</option>
+              <option value="extension" [selected]="sortBy() === 'extension'">По типу</option>
+              <option value="size"      [selected]="sortBy() === 'size'">По размеру</option>
+            </select>
+          </div>
+          <div class="custom-select">
+            <select (change)="onSortOrderChange($event)" aria-label="Порядок сортировки">
+              <option value="desc" [selected]="sortOrder() === 'desc'">↓ По убыванию</option>
+              <option value="asc"  [selected]="sortOrder() === 'asc'">↑ По возрастанию</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Типы файлов (пилюли) -->
+        @if (visibleTypeGroups().length > 0 && showFilesArea()) {
+          <div class="type-group" role="group" aria-label="Фильтр по типу файлов">
+            @for (g of visibleTypeGroups(); track g.key) {
+              <button type="button" class="type-group-btn"
+                      [class.active]="activeTypeGroup() === g.key"
+                      (click)="setTypeGroup(g.key); $event.stopPropagation()">
+                {{ g.label }}
+              </button>
+            }
+          </div>
         }
+
       </div>
     }
 
@@ -146,19 +157,28 @@
       <div class="upload-error" role="alert">{{ uploadState().error }}</div>
     }
 
-    <!-- ── BREADCRUMB ──────────────────────────────────────────────────── -->
-    <nav class="breadcrumb" aria-label="Навигация по папкам">
-      @for (crumb of breadcrumbs(); track crumb.label; let i = $index) {
-        @if (i < breadcrumbs().length - 1) {
-          <button type="button" class="breadcrumb-root" (click)="navigateToBreadcrumb(i); $event.stopPropagation()">
-            {{ crumb.label }}
-          </button>
-          <span class="breadcrumb-sep" aria-hidden="true">/</span>
-        } @else {
-          <span class="breadcrumb-current" aria-current="page">{{ crumb.label }}</span>
+    <!-- ── ХЛЕБНЫЕ КРОШКИ + КНОПКА ДОБАВИТЬ ПАПКУ ──────────────────── -->
+    <div class="breadcrumb-row">
+      <nav class="breadcrumb" aria-label="Навигация по папкам">
+        @for (crumb of breadcrumbs(); track crumb.label; let i = $index) {
+          @if (i < breadcrumbs().length - 1) {
+            <button type="button" class="breadcrumb-root" (click)="navigateToBreadcrumb(i); $event.stopPropagation()">
+              {{ crumb.label }}
+            </button>
+            <span class="breadcrumb-sep" aria-hidden="true">/</span>
+          } @else {
+            <span class="breadcrumb-current" aria-current="page">{{ crumb.label }}</span>
+          }
         }
-      }
-    </nav>
+      </nav>
+      <button type="button" class="btn-add-folder" (click)="startCreate($event)" title="Новая папка">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+        </svg>
+        <span class="add-folder-label">Новая папка</span>
+      </button>
+    </div>
 
     <!-- ── SHARED FOLDER DISCUSSION ──────────────────────────────────────── -->
     @if (currentSharedFolderId()) {

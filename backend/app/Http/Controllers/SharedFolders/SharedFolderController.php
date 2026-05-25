@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Services\FileCardBuilder;
 use App\Services\FileService;
 use App\Services\LinkPreviewService;
+use App\Services\MimeService;
 use App\Services\NotificationService;
 use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
@@ -33,6 +34,7 @@ class SharedFolderController extends Controller
         private readonly FileService             $fileService,
         private readonly FileCardBuilder         $cardBuilder,
         private readonly LinkPreviewService      $previewService,
+        private readonly MimeService             $mime,
         private readonly PushNotificationService $pushService,
         private readonly NotificationService     $notificationService,
     ) {}
@@ -477,12 +479,27 @@ class SharedFolderController extends Controller
             })
             ->values();
 
+        $typeRows = DB::table('shared_folder_files')
+            ->join('files', 'shared_folder_files.file_id', '=', 'files.id')
+            ->where('shared_folder_files.shared_folder_id', $id)
+            ->when(!$isOwner, fn ($q) => $q->where('shared_folder_files.is_private', false))
+            ->select('files.mime_type', 'files.content_kind')
+            ->distinct()
+            ->get();
+
+        $availableTypeGroups = [];
+        foreach ($typeRows as $row) {
+            $g = $this->mime->classify($row->content_kind ?? 'binary_file', $row->mime_type ?? '');
+            $availableTypeGroups[$g] = true;
+        }
+
         return $this->success('Files fetched', [
             'items'      => $items,
             'pagination' => [
-                'page'     => $page,
-                'per_page' => $perPage,
-                'total'    => $total,
+                'page'                  => $page,
+                'per_page'              => $perPage,
+                'total'                 => $total,
+                'available_type_groups' => array_keys($availableTypeGroups),
             ],
         ]);
     }
