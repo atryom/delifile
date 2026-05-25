@@ -13,6 +13,7 @@ use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\PendingReceivedFile;
 use App\Models\ShareLink;
+use App\Models\SharedFolderLink;
 use App\Models\User;
 use App\Services\ActivityService;
 use App\Services\FileCardBuilder;
@@ -158,7 +159,7 @@ class SharingController extends Controller
                         : config('app.url') . '/communication/received',
                 );
                 $this->notificationService->notifyFileShared(
-                    $recipientUser->id,
+                    $recipientUser,
                     $senderName,
                     $file->display_name ?? $file->original_name,
                     $file->id,
@@ -477,6 +478,36 @@ class SharingController extends Controller
                 e($title),
                 e($description),
                 e($image),
+                e($url),
+            );
+        }
+
+        $indexPath = base_path('../public/index.html');
+        $html = file_exists($indexPath)
+            ? file_get_contents($indexPath)
+            : '<!doctype html><html><head></head><body><app-root></app-root></body></html>';
+
+        $html = str_replace('</head>', $ogTags . '</head>', $html);
+
+        return response($html, 200, ['Content-Type' => 'text/html; charset=utf-8']);
+    }
+
+    /**
+     * GET /shared-link/{token}
+     * Public SPA page with injected OG meta tags for shared folder links.
+     */
+    public function publicSharedFolderLinkPage(string $token): Response
+    {
+        $link = SharedFolderLink::where('token', $token)->with('folder')->first();
+
+        $ogTags = '';
+
+        if ($link && $link->isValid() && $link->folder) {
+            $url    = config('app.url') . '/shared-link/' . $token;
+            $ogTags = $this->renderOgTags(
+                e($link->folder->name),
+                e('Папка в DeliFile'),
+                '',
                 e($url),
             );
         }

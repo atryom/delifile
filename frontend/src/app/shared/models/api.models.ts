@@ -191,6 +191,10 @@ export interface CurrentUser {
   is_superuser: boolean;
   notifications_enabled: boolean;
   notify_new_files: boolean;
+  notify_folder_shared: boolean;
+  notify_comments: boolean;
+  notify_mentions: boolean;
+  notify_support_reply: boolean;
   notify_contacts_added: boolean;
   allow_contacts_without_confirmation: boolean;
   auto_add_received_files: boolean;
@@ -387,6 +391,10 @@ export interface ContactRequestItem {
 export interface UserSettings {
   notifications_enabled?: boolean;
   notify_new_files?: boolean;
+  notify_folder_shared?: boolean;
+  notify_comments?: boolean;
+  notify_mentions?: boolean;
+  notify_support_reply?: boolean;
   notify_contacts_added?: boolean;
   allow_contacts_without_confirmation?: boolean;
   auto_add_received_files?: boolean;

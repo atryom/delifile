@@ -487,7 +487,15 @@
       "new_files_label": "Notify about new files",
       "new_files_desc": "Notification when a new file is shared with you.",
       "contacts_label": "Notify about contact requests",
-      "contacts_desc": "Notification when another user wants to add you as a contact."
+      "contacts_desc": "Notification when another user wants to add you as a contact.",
+      "folder_shared_label": "Notify about folder access",
+      "folder_shared_desc": "Notification when a shared folder is made accessible to you.",
+      "comments_label": "Notify about new comments",
+      "comments_desc": "Notification when a new comment appears in a thread you participated in.",
+      "mentions_label": "Notify about mentions",
+      "mentions_desc": "Notification when you are mentioned via @ in a comment.",
+      "support_reply_label": "Notify about support replies",
+      "support_reply_desc": "Notification when the support team replies to your ticket."
     },
     "contacts_privacy": {
       "title": "Contact privacy",

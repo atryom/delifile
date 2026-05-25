@@ -46,6 +46,10 @@ export class SecurityComponent implements OnInit {
   // Notification toggles (mirrored from user state for local editing)
   readonly notificationsEnabled   = signal(true);
   readonly notifyNewFiles         = signal(true);
+  readonly notifyFolderShared     = signal(true);
+  readonly notifyComments         = signal(true);
+  readonly notifyMentions         = signal(true);
+  readonly notifySupportReply     = signal(true);
   readonly notifyContactsAdded    = signal(true);
 
   // Contact settings
@@ -92,6 +96,10 @@ export class SecurityComponent implements OnInit {
 
     // Sub-settings keep their backend-stored state regardless of browser permission
     this.notifyNewFiles.set(user.notify_new_files ?? true);
+    this.notifyFolderShared.set(user.notify_folder_shared ?? true);
+    this.notifyComments.set(user.notify_comments ?? true);
+    this.notifyMentions.set(user.notify_mentions ?? true);
+    this.notifySupportReply.set(user.notify_support_reply ?? true);
     this.notifyContactsAdded.set(user.notify_contacts_added ?? true);
     this.allowContactsWithout.set(user.allow_contacts_without_confirmation ?? true);
     this.autoAddReceivedFiles.set(user.auto_add_received_files ?? true);
@@ -223,6 +231,26 @@ export class SecurityComponent implements OnInit {
     this._saveSettings();
   }
 
+  toggleNotifyFolderShared(value: boolean): void {
+    this.notifyFolderShared.set(value);
+    this._saveSettings();
+  }
+
+  toggleNotifyComments(value: boolean): void {
+    this.notifyComments.set(value);
+    this._saveSettings();
+  }
+
+  toggleNotifyMentions(value: boolean): void {
+    this.notifyMentions.set(value);
+    this._saveSettings();
+  }
+
+  toggleNotifySupportReply(value: boolean): void {
+    this.notifySupportReply.set(value);
+    this._saveSettings();
+  }
+
   toggleNotifyContacts(value: boolean): void {
     this.notifyContactsAdded.set(value);
     this._saveSettings();
@@ -244,6 +272,10 @@ export class SecurityComponent implements OnInit {
     this.settingsApi.updateSettings({
       notifications_enabled:               this.notificationsEnabled(),
       notify_new_files:                    this.notifyNewFiles(),
+      notify_folder_shared:                this.notifyFolderShared(),
+      notify_comments:                     this.notifyComments(),
+      notify_mentions:                     this.notifyMentions(),
+      notify_support_reply:                this.notifySupportReply(),
       notify_contacts_added:               this.notifyContactsAdded(),
       allow_contacts_without_confirmation: this.allowContactsWithout(),
       auto_add_received_files:             this.autoAddReceivedFiles(),

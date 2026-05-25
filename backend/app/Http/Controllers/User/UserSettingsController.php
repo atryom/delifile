@@ -19,6 +19,10 @@ class UserSettingsController extends Controller
         $data = $request->validate([
             'notifications_enabled'               => ['sometimes', 'boolean'],
             'notify_new_files'                    => ['sometimes', 'boolean'],
+            'notify_folder_shared'                => ['sometimes', 'boolean'],
+            'notify_comments'                     => ['sometimes', 'boolean'],
+            'notify_mentions'                     => ['sometimes', 'boolean'],
+            'notify_support_reply'                => ['sometimes', 'boolean'],
             'notify_contacts_added'               => ['sometimes', 'boolean'],
             'allow_contacts_without_confirmation' => ['sometimes', 'boolean'],
             'auto_add_received_files'             => ['sometimes', 'boolean'],

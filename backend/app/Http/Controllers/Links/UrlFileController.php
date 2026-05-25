@@ -43,29 +43,4 @@ class UrlFileController extends Controller
         return $this->success('Link saved successfully', $result, 201);
     }
 
-    /**
-     * POST /api/v1/files/{fileId}/download  — for url_file returns .url content
-     * This extends FileController::download for url_file types.
-     * Handled inline in FileController — see download().
-     */
-    public function downloadUrlFile(string $fileId, Request $request): Response
-    {
-        $file = \App\Models\File::find($fileId);
-
-        if (!$file || !$file->isUrlFile()) {
-            abort(404);
-        }
-
-        if (!$this->fileService->canAccess($request->user(), $file)) {
-            abort(403);
-        }
-
-        $content  = $this->fileService->buildUrlFileContent($file);
-        $filename = $file->original_name ?: 'link.url';
-
-        return response($content, 200, [
-            'Content-Type'        => 'application/internet-shortcut',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ]);
-    }
 }

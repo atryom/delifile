@@ -128,9 +128,10 @@ class SharedFolderController extends Controller
         // Set of all folder IDs the user can reach directly (owned or granted)
         $accessibleSet = array_flip(array_unique(array_merge($ownedIds, $directAccessIds)));
 
-        // 1. User's own root folders
+        // 1. User's own root folders (exclude personal-root helper folder)
         $showIds = SharedFolder::whereIn('id', $ownedIds)
             ->whereNull('parent_id')
+            ->where(fn ($q) => $q->whereNull('is_personal_root')->orWhere('is_personal_root', false))
             ->pluck('id')
             ->toArray();
 
@@ -729,7 +730,7 @@ class SharedFolderController extends Controller
                 config('app.url') . '/communication/received',
             );
             $this->notificationService->notifyFolderShared(
-                $recipientUser->id,
+                $recipientUser,
                 $senderName,
                 $folder->name,
                 $folder->id,
@@ -770,7 +771,7 @@ class SharedFolderController extends Controller
                 config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id,
             );
             $this->notificationService->notifyFolderShared(
-                $access->user->id,
+                $access->user,
                 $senderName,
                 $folder->name,
                 $folder->id,

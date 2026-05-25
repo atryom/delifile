@@ -333,6 +333,7 @@ class CommentService
         foreach ($mentionedUserIds as $uid) {
             $mentioned = $users[$uid] ?? null;
             if (!$mentioned) continue;
+            if (!($mentioned->notify_mentions ?? true)) continue;
 
             $this->pushService->sendToUser(
                 $mentioned,
@@ -370,7 +371,7 @@ class CommentService
         $users = User::whereIn('id', $participantIds)->get()->keyBy('id');
         foreach ($participantIds as $uid) {
             $user = $users[$uid] ?? null;
-            if ($user) {
+            if ($user && ($user->notify_comments ?? true)) {
                 $this->pushService->sendToUser($user, $title, $body, $targetUrl);
             }
         }

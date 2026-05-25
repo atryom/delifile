@@ -40,7 +40,7 @@ import { classifyMimeType } from '../../../../shared/utils/file';
           </p>
 
           @if (isAuthenticated()) {
-            <a [routerLink]="['/shared-folders']" [queryParams]="{folder_id: folder()!.id}" class="btn-open">
+            <a [routerLink]="['/folders']" [queryParams]="{shared_folder_id: folder()!.id}" class="btn-open">
               Открыть папку
             </a>
           }

@@ -8,18 +8,14 @@ enum NotificationType: string
     case FileShared      = 'file_shared';
     case FolderShared    = 'folder_shared';
     case ContactRequest  = 'contact_request';
-    case AccessChanged   = 'access_changed';
-    case FileExpired     = 'file_expired';
 
     public function group(): string
     {
         return match($this) {
             self::AdminMessage   => 'administrative',
             self::FileShared,
-            self::FolderShared,
-            self::AccessChanged  => 'access',
+            self::FolderShared   => 'access',
             self::ContactRequest => 'contacts',
-            self::FileExpired    => 'other',
         };
     }
 
@@ -30,8 +26,6 @@ enum NotificationType: string
             self::FileShared     => 'File shared',
             self::FolderShared   => 'Folder shared',
             self::ContactRequest => 'Contact request',
-            self::AccessChanged  => 'Access changed',
-            self::FileExpired    => 'File expired',
         };
     }
 }

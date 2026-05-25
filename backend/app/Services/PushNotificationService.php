@@ -11,6 +11,10 @@ class PushNotificationService
 {
     public function sendToUser(User $user, string $title, string $body, ?string $url = null): void
     {
+        if (!($user->notifications_enabled ?? true)) {
+            return;
+        }
+
         $subscriptions = $user->pushSubscriptions;
 
         if (!$subscriptions->isEmpty()) {

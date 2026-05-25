@@ -22,9 +22,13 @@
 | account_status | string(40) | `active`, `pending_email_verification`, `blocked_unverified_email` |
 | plan | enum(TariffPlan) | Тариф: `free`, `silver`, `gold` |
 | is_superuser | bool | Флаг администратора |
-| notifications_enabled | bool | Вкл/выкл уведомления |
+| notifications_enabled | bool | Вкл/выкл уведомления (глобальный) |
 | notify_new_files | bool | Уведомлять о новых файлах |
-| notify_contacts_added | bool | Уведомлять о добавлении контактов |
+| notify_folder_shared | bool | Уведомлять о доступе к папке |
+| notify_comments | bool | Уведомлять о новых комментариях |
+| notify_mentions | bool | Уведомлять об @упоминаниях |
+| notify_support_reply | bool | Уведомлять об ответе поддержки |
+| notify_contacts_added | bool | Уведомлять о запросах в контакты |
 | allow_contacts_without_confirmation | bool | Авто-добавление контактов |
 | auto_add_received_files | bool | Авто-принятие полученных файлов |
 
@@ -322,7 +326,7 @@ PHP-сессии (для web-роутов).
 |------|-----|------------|
 | id | ulid | Первичный ключ |
 | user_id | FK→users | Получатель |
-| type | string(50), enum(NotificationType) | Тип: `admin_message`, `file_shared`, `folder_shared`, `contact_request`, `access_changed`, `file_expired` |
+| type | string(50), enum(NotificationType) | Тип: `admin_message`, `file_shared`, `folder_shared`, `contact_request` |
 | title | string | Заголовок |
 | body | text, nullable | Текст |
 | data | json, nullable | Дополнительные данные |
@@ -507,4 +511,4 @@ PHP-сессии (для web-роутов).
 | `SharedCommentMode` | `enabled`, `disabled`, `inherit_for_items` | shared_folder_comment_settings.shared_comments_mode |
 | `SharedCommentOverride` | `inherit`, `enabled`, `disabled` | file_comment_settings.shared_comments_override |
 | `EditorType` | `markdown` | files.editor_type |
-| `NotificationType` | `admin_message`, `file_shared`, `folder_shared`, `contact_request`, `access_changed`, `file_expired` | user_notifications.type |
+| `NotificationType` | `admin_message`, `file_shared`, `folder_shared`, `contact_request` | user_notifications.type |

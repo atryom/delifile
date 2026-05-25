@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\NotificationType;
+use App\Models\User;
 use App\Models\UserNotification;
 
 class NotificationService
@@ -23,10 +24,13 @@ class NotificationService
         ]);
     }
 
-    public function notifyFileShared(string $recipientUserId, string $senderName, string $fileName, string $fileId): void
+    public function notifyFileShared(User $recipient, string $senderName, string $fileName, string $fileId): void
     {
+        if (!($recipient->notify_new_files ?? true)) {
+            return;
+        }
         $this->create(
-            $recipientUserId,
+            $recipient->id,
             NotificationType::FileShared,
             "Вам передан файл",
             "{$senderName} поделился файлом «{$fileName}»",
@@ -34,10 +38,13 @@ class NotificationService
         );
     }
 
-    public function notifyFolderShared(string $recipientUserId, string $senderName, string $folderName, string $folderId): void
+    public function notifyFolderShared(User $recipient, string $senderName, string $folderName, string $folderId): void
     {
+        if (!($recipient->notify_folder_shared ?? true)) {
+            return;
+        }
         $this->create(
-            $recipientUserId,
+            $recipient->id,
             NotificationType::FolderShared,
             "Вам открыт доступ к папке",
             "{$senderName} открыл доступ к папке «{$folderName}»",
@@ -45,10 +52,13 @@ class NotificationService
         );
     }
 
-    public function notifyContactRequest(string $recipientUserId, string $requesterName, string $requesterId): void
+    public function notifyContactRequest(User $recipient, string $requesterName, string $requesterId): void
     {
+        if (!($recipient->notify_contacts_added ?? true)) {
+            return;
+        }
         $this->create(
-            $recipientUserId,
+            $recipient->id,
             NotificationType::ContactRequest,
             "Запрос на добавление в контакты",
             "{$requesterName} хочет добавить вас в контакты",

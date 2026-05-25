@@ -7,6 +7,7 @@ use App\Models\Contact;
 use App\Models\ContactRequest;
 use App\Models\User;
 use App\Services\InvitationService;
+use App\Services\NotificationService;
 use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class ContactController extends Controller
 {
     public function __construct(
         private readonly InvitationService       $invitationService,
+        private readonly NotificationService     $notificationService,
         private readonly PushNotificationService $pushService,
     ) {}
 
@@ -118,6 +120,11 @@ class ContactController extends Controller
                     'Запрос на добавление в контакты',
                     $senderName . ' хочет добавить вас в контакты',
                     config('app.url') . '/settings/security',
+                );
+                $this->notificationService->notifyContactRequest(
+                    $resolved,
+                    $senderName,
+                    (string) $request->user()->id,
                 );
             }
 

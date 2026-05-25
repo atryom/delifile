@@ -146,8 +146,10 @@
 | Метод | Путь | Auth | Описание |
 |-------|------|------|----------|
 | GET | `/push/vapid-key` | public | Получить VAPID public key |
-| POST | `/push/subscribe` | auth | Сохранить подписку на push-уведомления |
-| DELETE | `/push/unsubscribe` | auth | Удалить подписку на push-уведомления |
+| POST | `/push/subscribe` | auth | Сохранить Web Push подписку браузера |
+| DELETE | `/push/unsubscribe` | auth | Удалить Web Push подписку |
+| POST | `/push/device-token` | auth | Зарегистрировать FCM токен мобильного устройства |
+| DELETE | `/push/device-token` | auth | Удалить FCM токен мобильного устройства |
 
 ## 📊 Активность
 
@@ -176,7 +178,7 @@
 
 | Метод | Путь | Auth | Описание |
 |-------|------|------|----------|
-| PATCH | `/user/settings` | auth | Обновить настройки уведомлений и контактов |
+| PATCH | `/user/settings` | auth | Обновить настройки уведомлений и контактов (`notifications_enabled`, `notify_new_files`, `notify_folder_shared`, `notify_comments`, `notify_mentions`, `notify_support_reply`, `notify_contacts_added`, `allow_contacts_without_confirmation`, `auto_add_received_files`) |
 
 ## 🤝 Запросы контактов
 

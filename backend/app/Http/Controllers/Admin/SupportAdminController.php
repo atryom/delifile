@@ -109,12 +109,14 @@ class SupportAdminController extends Controller
         $now = now();
         $ticket->update(['status' => 'awaiting_confirmation', 'awaiting_at' => $now]);
 
-        $this->pushService->sendToUser(
-            $ticket->user,
-            'Ваше обращение #' . $ticket->id . ' ожидает подтверждения',
-            'Поддержка считает вопрос решённым. Подтвердите закрытие или напишите, если проблема осталась.',
-            config('app.url') . '/support/' . $ticket->id,
-        );
+        if ($ticket->user && ($ticket->user->notify_support_reply ?? true)) {
+            $this->pushService->sendToUser(
+                $ticket->user,
+                'Ваше обращение #' . $ticket->id . ' ожидает подтверждения',
+                'Поддержка считает вопрос решённым. Подтвердите закрытие или напишите, если проблема осталась.',
+                config('app.url') . '/support/' . $ticket->id,
+            );
+        }
 
         return $this->success('Ожидает подтверждения пользователя', ['status' => 'awaiting_confirmation']);
     }
@@ -164,12 +166,14 @@ class SupportAdminController extends Controller
         $message->load('attachments');
 
         $ticket->loadMissing('user');
-        $this->pushService->sendToUser(
-            $ticket->user,
-            'Ответ поддержки по обращению #' . $ticket->id,
-            mb_substr($request->input('body'), 0, 80),
-            config('app.url') . '/support/' . $ticket->id,
-        );
+        if ($ticket->user && ($ticket->user->notify_support_reply ?? true)) {
+            $this->pushService->sendToUser(
+                $ticket->user,
+                'Ответ поддержки по обращению #' . $ticket->id,
+                mb_substr($request->input('body'), 0, 80),
+                config('app.url') . '/support/' . $ticket->id,
+            );
+        }
 
         return $this->success('Сообщение отправлено', ['message' => $this->formatMessage($message)]);
     }
