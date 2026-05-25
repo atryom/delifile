@@ -242,17 +242,32 @@
 
 ## 3. Организация файлов
 
-### 3.1 Папки (Folders)
+### 3.1 Папки (единая модель — SharedFolder)
+
+Папки больше не разделяются на «локальные» и «общие». Все папки — `SharedFolder`. Личная корневая папка пользователя («Мои файлы») помечена `is_personal_root=true`.
 
 ```
-/folders → GET /api/v1/folders (плоский список)
-/folders → GET /api/v1/folders/tree
-  ← Иерархическое дерево папок
-  → Создать: POST /api/v1/folders {name, parent_id}
-  → Переименовать: PATCH /api/v1/folders/{id}
-  → Удалить: DELETE /api/v1/folders/{id}
-  → Переместить файл: POST /api/v1/files/{id}/move-folder {folder_id}
-  → Очистить папку: POST /api/v1/files/{id}/clear-folder
+/folders → единая страница папок
+  → На корневом уровне: shared-папки + файлы без папки
+  → Внутри папки: подпапки и файлы (с учётом приватности и sort_order)
+  → Фильтры: Все / Мои / Полученные
+  → Навигация вглубь через хлебные крошки
+
+  → GET /api/v1/shared-folders (список корневых папок)
+  → POST /api/v1/shared-folders {name} (создать папку)
+  → PATCH /api/v1/shared-folders/{id} {name, sort_order?} (обновить)
+  → DELETE /api/v1/shared-folders/{id} (удалить, только владелец)
+  → GET /api/v1/shared-folders/{id}/subfolders (подпапки)
+  → POST /api/v1/shared-folders/{id}/subfolders {name} (создать подпапку)
+  → POST /api/v1/shared-folders/ensure-root (найти/создать личную корневую)
+```
+
+**Приватность (только владелец):**
+```
+  → PATCH /api/v1/shared-folders/{id}/privacy {is_private: bool}
+    ← Подпапка скрыта от гостей
+  → PATCH /api/v1/shared-folders/{id}/files/{fileId}/privacy {is_private: bool}
+    ← Файл скрыт от гостей
 ```
 
 ### 3.2 Теги (Tags)
@@ -320,49 +335,51 @@
 
 ---
 
-## 5. Общие папки (Shared Folders)
+## 5. Папки (Shared Folders — единая модель)
 
-### 5.1 Создание и просмотр общих папок
+Старое разделение на «локальные» и «общие» папки устранено. Единая точка входа — `/folders`. Отдельной страницы `/shared-folders` больше нет.
+
+### 5.1 Создание и просмотр папок
 
 ```
-/shared-folders → "Создать папку"
+/folders → "Создать папку"
   → POST /api/v1/shared-folders {name}
     ← Создаётся SharedFolder, владелец получает доступ
-/shared-folders → GET /api/v1/shared-folders (список папок пользователя)
-/shared-folders → GET /api/v1/shared-folders/all-flat (плоский список)
+/folders → GET /api/v1/shared-folders (список корневых папок)
+/folders → GET /api/v1/shared-folders/all-flat (плоский список)
 ```
 
 ### 5.2 Управление доступом
 
 ```
-/shared-folders/:id → "Доступ"
+Внутри папки → "Доступ"
   → GET /api/v1/shared-folders/{id}/accesses
   → POST /api/v1/shared-folders/{id}/accesses {contact_id, access_type: view|edit}
   → DELETE /api/v1/shared-folders/{id}/accesses/{accessId}
 ```
 
-### 5.3 Загрузка в общую папку
+### 5.3 Загрузка в папку
 
 ```
-/shared-folders/:id → "Загрузить"
+Внутри папки → "Загрузить"
   → POST /api/v1/shared-folders/{id}/init-upload
     ← shared_folder_only=true
   → POST /api/v1/shared-folders/{id}/complete-upload
 ```
 
-### 5.4 Добавление URL в общую папку
+### 5.4 Добавление URL в папку
 
 ```
-/shared-folders/:id → "Добавить ссылку"
+Внутри папки → "Добавить ссылку"
   → POST /api/v1/shared-folders/{id}/url-file {url}
     ← Fetch Open Graph метаданных
     ← Создаётся url_file, добавляется в папку
 ```
 
-### 5.5 Публичная ссылка на общую папку
+### 5.5 Публичная ссылка на папку
 
 ```
-/shared-folders/:id → "Создать ссылку"
+Внутри папки → "Создать ссылку"
   → POST /api/v1/shared-folders/{id}/links {access_type, ttl_hours}
     ← URL: /shared-link/{token}
   → /shared-link/:token → POST /api/v1/shared-links/{token}/resolve
@@ -373,32 +390,32 @@
 ### 5.6 Управление подпапками
 
 ```
-/shared-folders/:id → "Добавить подпапку"
+Внутри папки → "Добавить подпапку"
   → POST /api/v1/shared-folders/{id}/subfolders {name}
     ← Создаётся вложенная SharedFolder
   → GET /api/v1/shared-folders/{id}/subfolders
-    ← Список подпапок
+    ← Список подпапок (приватные скрыты от гостей)
 ```
 
 ### 5.7 Добавление/удаление существующего файла
 
 ```
-Из файла → "Добавить в общую папку" (диалог)
+Из файла → "Добавить в папку" (диалог)
   → POST /api/v1/shared-folders/{folder_id}/files/{file_id}
     ← Файл привязан к папке
-/shared-folders/:id → удалить файл из папки
+Внутри папки → удалить файл
   → DELETE /api/v1/shared-folders/{id}/files/{file_id}
     ← Файл отвязан от папки
   → GET /api/v1/files/{id}/shared-folders
-    ← Список общих папок файла
+    ← Список папок, в которых состоит файл
   → POST /api/v1/files/{id}/shared-folders {folder_ids}
-    ← Обновить привязку к общим папкам
+    ← Обновить привязку к папкам
 ```
 
-### 5.8 Выход из общей папки
+### 5.8 Выход из папки
 
 ```
-/shared-folders/:id → "Покинуть папку"
+Внутри папки → "Покинуть папку"
   → DELETE /api/v1/shared-folders/{id}/leave
     ← Пользователь удалён из участников папки
 ```
@@ -406,9 +423,26 @@
 ### 5.9 Добавление в "Мои файлы"
 
 ```
-Из общей папки → "Добавить в мои файлы"
+Из папки → "Добавить в мои файлы"
   → POST /api/v1/files/{id}/add-to-my-files
     ← shared_folder_only=false, создаётся FileUserAccess
+```
+
+### 5.10 Управление приватностью (только владелец)
+
+```
+Скрыть подпапку от гостей:
+  → PATCH /api/v1/shared-folders/{id}/privacy {is_private: true}
+Скрыть файл от гостей:
+  → PATCH /api/v1/shared-folders/{id}/files/{fileId}/privacy {is_private: true}
+```
+
+### 5.11 Корневая личная папка
+
+При первом входе или при необходимости фронтенд вызывает:
+```
+  → POST /api/v1/shared-folders/ensure-root
+    ← Находит или создаёт папку с is_personal_root=true и именем «Мои файлы»
 ```
 
 ---
@@ -468,21 +502,23 @@
 
 ### 6.5 Входящие (Inbox)
 
+Входящие доступны через меню **Связь → Полученные** (`/communication/received`).
+
 ```
-/inbox → GET /api/v1/inbox/count
-  ← Количество новых непринятых файлов и общих папок
-/inbox → "Файлы"
+/communication/received → GET /api/v1/inbox/count
+  ← Количество новых непринятых файлов и папок
+/communication/received → "Файлы"
   → GET /api/v1/inbox/files
     ← Список файлов, которыми поделились (ожидают принятия)
   → POST /api/v1/inbox/files/accept {file_ids}
     ← FileUserAccess создаются, файлы появляются в /files
   → POST /api/v1/inbox/files/reject {file_ids}
     ← Файлы отклонены
-/inbox → "Общие папки"
+/communication/received → "Папки"
   → GET /api/v1/inbox/shared-folders
-    ← Список приглашений в общие папки
+    ← Список приглашений в папки
   → POST /api/v1/inbox/shared-folders/accept {folder_ids}
-    ← Доступ к общей папке активирован
+    ← Доступ к папке активирован
   → POST /api/v1/inbox/shared-folders/reject {folder_ids}
     ← Приглашение отклонено
 ```
@@ -560,10 +596,12 @@
 
 ## 10. Поддержка и предложения
 
+Поддержка доступна через меню **Настройки → Техподдержка** (`/settings/support`).
+
 ### 10.1 Тикеты поддержки
 
 ```
-/support → "Создать тикет"
+/settings/support → "Создать тикет"
   → POST /api/v1/support/tickets {subject, body, attachments?}
     ← Создаётся SupportTicket (status=new)
   → GET /api/v1/support/tickets (список)
@@ -577,7 +615,7 @@
 ### 10.2 Предложения (Suggestion)
 
 ```
-/support → вкладка "Предложения"
+/settings/support → вкладка "Предложения"
   → POST /api/v1/support/suggestions {body, attachments?}
     ← Создаётся SuggestionTicket (status=new)
   → GET /api/v1/support/suggestions (список предложений)
@@ -661,11 +699,41 @@
   → DELETE /api/v1/push/unsubscribe
 ```
 
+### 12.4 Внутренние уведомления
+
+Внутрисистемные уведомления (не Push API) доступны через меню **Связь → Оповещения** (`/communication/notifications`).
+
+```
+/communication/notifications → GET /api/v1/notifications
+  ← Список уведомлений (пагинация, фильтр по типам)
+  → GET /api/v1/notifications/count
+    ← Количество непрочитанных (бейдж на меню)
+  → POST /api/v1/notifications/read-all
+    ← Все отмечены прочитанными
+  → POST /api/v1/notifications/{id}/read
+    ← Конкретное уведомление прочитано
+
+Типы уведомлений: admin_message, file_shared, folder_shared,
+                  contact_request, access_changed, file_expired
+```
+
 ---
 
 ## 13. Настройки пользователя
 
-### 13.1 Безопасность
+Настройки сгруппированы по вкладкам: **Настройки → Теги / Безопасность / Техподдержка**.
+
+### 13.1 Теги
+
+```
+/settings/tags → GET /api/v1/tags
+  ← Список тегов с file_counts
+  → Создать: POST /api/v1/tags {name}
+  → Переименовать: PATCH /api/v1/tags/{id}
+  → Удалить: DELETE /api/v1/tags/{id}
+```
+
+### 13.2 Безопасность
 
 ```
 /settings/security
@@ -674,7 +742,7 @@
   → PATCH /api/v1/user/settings {notifications_enabled, ...}
 ```
 
-### 13.2 PIN-код (локальный, только устройство)
+### 13.3 PIN-код (локальный, только устройство)
 
 ```
 После логина → PIN-экран (локальный, не серверный)
@@ -763,24 +831,23 @@
     /account-blocked           Аутентифицирован
     (email не верифицирован)        │
                                    │
-               ┌──────────────┼──────────────────────────────────┐
-               ▼              ▼                  ▼                ▼
-         ┌──────────┐  ┌────────────┐  ┌──────────────┐  ┌─────────────────────┐
-         │ /files    │  │  /inbox    │  │ /contacts    │  │ /shared-folders      │
-         │ (главная) │  │ (входящие) │  │              │  │                     │
-         └────┬─────┘  └─────┬──────┘  └──────┬───────┘  └──────────┬──────────┘
-              │              │                │                     │
-    ┌─────────┼────────┐    │     ┌───────────┼──────────┐  ┌───────┼──────┐
-    ▼         ▼        ▼    ▼     ▼           ▼          ▼  ▼       ▼      ▼
-   /files/:id  /folders  /tags  │  Создать/   Принять/   │  Соз-   Загру-  Ссылка
-   (детали)    (дерево)  (теги) │  удалить    отклонить  │  дать   зить    на
-        │                      │  контакт    инвайт     │  папку  файлы   папку
-        │                      │                       │
-   ┌────┼────┬─────┐          ▼                       ▼
-   │    │    │     │    Контакты → приглашения     Подпапки
-   ▼    ▼    ▼     ▼    Запросы в контакты         Добавить файл
-  Шеринг Шеринг Pin /                               Выйти из папки
-  → контакт → ссылка Favorite
+               ┌──────────────┬────┴──────────┐
+               ▼              ▼                ▼
+         ┌──────────┐  ┌────────────┐  ┌──────────────┐
+         │ /files    │  │  /folders  │  │ /communication│
+         │ (главная) │  │ (папки)    │  │ (связь)       │
+         └────┬─────┘  └─────┬──────┘  └──────┬───────┘
+              │              │                │
+    ┌─────────┼────────┐    │        ┌───────┼────────┐
+    ▼         ▼        ▼    ▼        ▼       ▼        ▼
+   /files/:id /folders  │  Внутри  │Контакты│Получен-│Опове-
+   (детали)   (папка)   │  папки:  │        │ные     │щения
+        │               │  файлы,  │        │(inbox) │
+   ┌────┼────┬─────┐    │  подпапки│        │        │
+   │    │    │     │    │  приват- │        │        │
+   ▼    ▼    ▼     ▼    │  ность   │        │        │
+  Шеринг Шеринг Pin /   │  доступ  │        │        │
+  → контакт → ссылка FAV│          │        │        │
                          Скачать / Удалить
                          Описание / Теги / Версии
                          Комментарии
@@ -790,8 +857,9 @@
              ├──────────────────────────┤
              │ /activity    — лента     │
              │ /tariffs     — тарифы    │
-             │ /support     — тикеты    │
              │ /settings    — настройки │
+             │   (теги/безопасность/    │
+             │    техподдержка)         │
              │ /invite/:token — инвайт  │
              │ /admin       — админка  │
              │ /privacy     — политика │

@@ -2,15 +2,19 @@
 
 ## Архитектура системы прав
 
-**4 модели доступа:**
+**5 моделей доступа:**
 
 | Модель | Сущность | Типы доступа | Наследование |
 |---|---|---|---|---|
 | `file_user_access` | Файл | `owner` / `shared` / `saved` | Нет (per-user per-file) |
-| `shared_folder_accesses` | Общая папка | `view` / `edit` | Да (по цепочке parent_id до root) |
+| `shared_folder_accesses` | Папка (SharedFolder) | `view` / `edit` | Да (по цепочке parent_id до root) |
 | `share_links` | Публичная ссылка на файл | `allow_save: bool` | Нет |
 | `shared_folder_links` | Публичная ссылка на папку | `view` / `edit` + `allow_save` | Нет |
 | `file_user_access.can_edit` | Markdown-документ | `can_edit: bool` на shared-доступе | Нет |
+
+**Производные права:**
+- **`can_share`** (файл): пользователь с `access_type=owner` или `shared` может расшарить файл. Shared-пользователь **не может** выдать `can_edit=true` для Markdown-документа.
+- **`is_private`** (папка/файл): владелец может скрыть подпапку или файл от гостей. Гости не видят приватные объекты в списках.
 
 ---
 
@@ -26,7 +30,7 @@
 | **Теги** (set-tags) | ✅ | ✅ | ✅ |
 | **Переместить в лок. папку** (move-folder) | ✅ | ✅ | ✅ |
 | **Удалить** (destroy) | ✅ логическое удаление | ✅ только detach своего доступа | ✅ только detach |
-| **Поделиться с контактом** | ✅ **Owner Only** | ❌ | ❌ |
+| **Поделиться с контактом** | ✅ | ✅ (без права выдавать `can_edit` для markdown) | ❌ |
 | **Создать публичную ссылку** | ✅ **Owner Only** | ❌ | ❌ |
 | **Отозвать доступ** | ✅ **Owner Only** | ❌ | ❌ |
 | **Список доступов** (accesses) | ✅ **Owner Only** | ❌ | ❌ |
@@ -262,6 +266,32 @@ U1 создаёт Markdown-документ (`is_editable=true`, `editor_type='m
 2. `FileUserAccess` с `access_type=shared` AND `can_edit=true` → true
 3. Иначе → false
 
+### Сценарий M — Приватность в папке (is_private)
+
+U1 создаёт папку `Root` и добавляет U2 с правом `view`. Внутри `Root` U1 создаёт `Sub1` с `is_private=true`.
+
+```
+Root     ← U1: owner, U2: view
+└── Sub1 ← U1: owner, is_private=true
+    └── FileA
+Root/Files:
+  FileB (is_private=false)
+  FileC (is_private=true)
+```
+
+| Операция | U1 (owner) | U2 (view) |
+|---|---|---|
+| Видит `Root` в списке | ✅ | ✅ |
+| Видит `Sub1` в списке | ✅ | ❌ (скрыта — `is_private=true`) |
+| Видит `FileB` в Root | ✅ | ✅ |
+| Видит `FileC` в Root | ✅ | ❌ (скрыт — `is_private=true`) |
+| Установить `is_private` на подпапке/файле | ✅ **Owner Only** | ❌ |
+
+**Правила приватности:**
+- Владелец может устанавливать `is_private=true` на любой подпапке или файле внутри своей папки
+- Гости (не-владельцы) не видят приватные объекты в `index()`, `subfolders()`, `files()`
+- Приватность применяется только на уровне конкретной папки/файла, не наследуется вниз
+
 ---
 
 ## Исправления
@@ -285,13 +315,15 @@ U1 создаёт Markdown-документ (`is_editable=true`, `editor_type='m
 
 | Концепция | Особенность |
 |---|---|
-| **Local folders** | Только для owner, не шарится |
+| **Local folders** | **Устаревшая модель.** Все папки теперь `SharedFolder`. Личная корневая помечена `is_personal_root=true`. Миграция: `php artisan folders:migrate-to-shared`. |
 | **File share (direct)** | Только view/скачивание/комментирование/tags/fav/pin. Без права пересылать. |
-| **Shared folder (view)** | R/O, наследуется на все подпапки |
-| **Shared folder (edit)** | Добавление/удаление файлов, создание подпапок |
+| **Shared folder (view)** | R/O, наследуется на все подпапки. Приватные (`is_private=true`) скрыты от гостей. |
+| **Shared folder (edit)** | Добавление/удаление файлов, создание подпапок. Приватные файлы скрыты от гостей. |
 | **Наследование прав** | Только вверх (additive), нет механизма restrict для подпапок |
 | **Public file link** | Можно разрешить save себе в аккаунт |
 | **Public folder link** | Auth-юзеру авто-выдаётся постоянный доступ |
 | **Owner** | Абсолютный контроль (share, link, delete, rename, manage accesses) |
 | **Saved** | Файл навсегда сохранён пользователем — owner не может удалить пока есть Saved (см. `File::canBeDeleted()`) |
 | **Markdown document** | Owner может редактировать и управлять блокировками. Shared-пользователь редактирует только с `can_edit=true`. Блокировка — pessimistic lock с heartbeat/takeover. |
+| **Shared folder privacy** | Владелец может скрыть подпапку или файл (`is_private=true`). Гости их не видят. |
+| **can_share** | Shared-пользователь может расшарить файл, но не может выдать `can_edit` для Markdown. |

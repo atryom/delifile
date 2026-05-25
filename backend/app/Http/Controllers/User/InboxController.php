@@ -11,6 +11,7 @@ use App\Models\SharedFolderAccess;
 use App\Services\S3UrlService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class InboxController extends Controller
@@ -82,7 +83,9 @@ class InboxController extends Controller
                 ])->values()->toArray();
 
             if (!empty($toInsert)) {
-                DB::table('file_user_access')->insert($toInsert);
+                $allowed = array_merge((new FileUserAccess)->getFillable(), ['id', 'created_at', 'updated_at']);
+                $safeRows = array_map(fn($row) => Arr::only($row, $allowed), $toInsert);
+                DB::table('file_user_access')->insert($safeRows);
             }
 
             PendingReceivedFile::whereIn('id', $pending->pluck('id'))->delete();
@@ -170,7 +173,9 @@ class InboxController extends Controller
                 ])->values()->toArray();
 
             if (!empty($toInsert)) {
-                DB::table('shared_folder_accesses')->insert($toInsert);
+                $allowed = array_merge((new SharedFolderAccess)->getFillable(), ['id', 'created_at', 'updated_at']);
+                $safeRows = array_map(fn($row) => Arr::only($row, $allowed), $toInsert);
+                DB::table('shared_folder_accesses')->insert($safeRows);
             }
 
             PendingReceivedSharedFolder::whereIn('id', $pending->pluck('id'))->delete();

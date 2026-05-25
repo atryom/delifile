@@ -1,7 +1,7 @@
 # Сводный отчёт по тестированию проекта Delifile
 
-> **Всего проанализировано тестов: 1005**  
-> **Дата составления:** 16 мая 2026 г.  
+> **Всего проанализировано тестов: 1018**  
+> **Дата составления:** 24 мая 2026 г.  
 > **Назначение:** детальное описание всех тестов проекта (Frontend Angular 21 + Backend Laravel 11)  
 > для формирования методики тестирования, контрольных примеров и тестовой документации.
 
@@ -44,6 +44,7 @@
 - [Feature/Links](#backend-feature-links) — 8 тестов
 - [Feature/Organization](#backend-feature-organization) — 22 тестов
 - [Feature/Push](#backend-feature-push) — 8 тестов
+- [Feature/Notifications](#backend-feature-notifications) — 8 тестов
 - [Feature/Documents](#backend-feature-documents) — 47 тестов
 - [Feature/SharedFolders](#backend-feature-sharedfolders) — 58 тестов
 - [Feature/Sharing](#backend-feature-sharing) — 20 тестов
@@ -58,7 +59,7 @@
 ## Frontend (Angular)
 
 ### `core/api`
-*Всего тестов: 96*
+*Всего тестов: 101*
 
 #### `admin-api.service.spec`
 *Компонент/Сервис: `AdminApiService` | Тестов: 8*
@@ -239,6 +240,17 @@
 | 2 | `should get contact requests` | Проверяет получение запросов на добавление в контакты через GET /api/v1/contact-requests. | Вызов service.getContactRequests() без параметров | GET запрос на /api/v1/contact-requests | req.request.method === 'GET' |
 | 3 | `should accept contact request` | Проверяет принятие запроса на добавление в контакты через POST /api/v1/contact-requests/cr1/accept. | ID 'cr1' передаётся в service.acceptContactRequest('cr1') | POST запрос на /api/v1/contact-requests/cr1/accept | req.request.method === 'POST' |
 | 4 | `should reject contact request` | Проверяет отклонение запроса на добавление в контакты через POST /api/v1/contact-requests/cr1/reject. | ID 'cr1' передаётся в service.rejectContactRequest('cr1') | POST запрос на /api/v1/contact-requests/cr1/reject | req.request.method === 'POST' |
+
+#### `notifications-api.service.spec`
+*Компонент/Сервис: `NotificationsApiService` | Тестов: 5*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `should get notifications` | Проверяет получение списка уведомлений через GET /api/v1/notifications. | Вызов service.getNotifications() | GET запрос на /api/v1/notifications | req.request.method === 'GET' |
+| 2 | `should get unread count` | Проверяет получение количества непрочитанных уведомлений через GET /api/v1/notifications/count. | Вызов service.getUnreadCount() | GET запрос на /api/v1/notifications/count | req.request.method === 'GET' |
+| 3 | `should mark all as read` | Проверяет отметку всех уведомлений прочитанными через POST /api/v1/notifications/read-all. | Вызов service.markAllRead() | POST запрос на /api/v1/notifications/read-all | req.request.method === 'POST' |
+| 4 | `should mark one as read` | Проверяет отметку одного уведомления прочитанным через POST /api/v1/notifications/{id}/read. | Вызов service.markRead('notif-1') | POST запрос на /api/v1/notifications/notif-1/read | req.request.method === 'POST' |
+| 5 | `should handle unauthorized` | Проверяет, что без токена запросы возвращают 401. | HttpClient без токена | GET /api/v1/notifications | req.flush('', { status: 401, statusText: 'Unauthorized' }) |
 
 ### `core/auth`
 *Всего тестов: 13*
@@ -1393,6 +1405,23 @@
 | 8 | `test_user_can_delete_contact` | Проверяет удаление контакта | Пользователь, контакт | DELETE-запрос /api/v1/contacts/{contactId} | assertOk() (200), assertDatabaseMissing('contacts', ['id' => $contact->id]) |
 | 9 | `test_user_can_import_contacts` | Проверяет массовый импорт контактов | Пользователь | POST-запрос /api/v1/contacts/import с JSON: contacts = [['name'=>'Alice', 'email'=>'alice@example.com'], ['name'=>'Bob', 'email'=>'bob@example.com']] | assertOk() (200), assertJsonPath('data.imported', 2) |
 | 10 | `test_unauthenticated_user_cannot_access_contacts` | Проверяет, что неаутентифицированный пользователь не может получить список контактов | Нет пользователя | GET-запрос /api/v1/contacts | assertUnauthorized() (401) |
+
+### `Feature/Notifications`
+*Всего тестов: 8*
+
+#### `NotificationTest`
+*Класс: `Tests\Feature\Notifications\NotificationTest` | Тестов: 8*
+
+| № | Тест | Описание | Входные данные | Выходные данные | Ожидаемый результат |
+|---|------|----------|---------------|-----------------|--------------------|
+| 1 | `test_user_can_list_notifications` | Проверяет получение списка уведомлений | User, 3 уведомления | GET /api/v1/notifications (actingAs user) | assertOk(), assertCount(3, items) |
+| 2 | `test_user_can_get_unread_count` | Проверяет получение количества непрочитанных | User, 2 прочитанных + 1 непрочитанное | GET /api/v1/notifications/count | assertOk(), assertJsonPath('data.count', 1) |
+| 3 | `test_user_can_mark_notification_as_read` | Проверяет отметку одного уведомления прочитанным | User, 1 непрочитанное | POST /api/v1/notifications/{id}/read | assertOk(), assertDatabaseHas('user_notifications', ['id' => $n->id, 'read_at' => не null]) |
+| 4 | `test_user_can_mark_all_as_read` | Проверяет отметку всех уведомлений прочитанными | User, 3 непрочитанных | POST /api/v1/notifications/read-all | assertOk(), assertDatabaseMissing с read_at = null |
+| 5 | `test_user_cannot_view_others_notifications` | Проверяет изоляцию — чужое уведомление не видно | user, other, уведомление other | GET /api/v1/notifications (actingAs user) | Список не содержит уведомление other |
+| 6 | `test_user_cannot_mark_others_as_read` | Проверяет, что нельзя отметить чужое уведомление как прочитанное | user, other, уведомление other | POST /api/v1/notifications/{id}/read (actingAs user) | assertStatus(404) |
+| 7 | `test_notifications_are_paginated` | Проверяет пагинацию уведомлений | User, 25 уведомлений | GET /api/v1/notifications?per_page=10 | assertCount(10, items), data содержит nextCursor |
+| 8 | `test_unauthenticated_cannot_access_notifications` | Проверяет, что без auth — 401 | Нет пользователя | GET /api/v1/notifications | assertUnauthorized() |
 
 ### `Feature/Documents`
 *Всего тестов: 47*

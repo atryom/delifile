@@ -109,26 +109,19 @@ class MigratePersonalFoldersToShared extends Command
             ->get();
 
         foreach ($children as $folder) {
-            // Idempotency: find existing SharedFolder with same owner/parent/name
-            $query = SharedFolder::where('owner_id', $user->id)
-                ->where('name', $folder->name);
-
-            if ($sharedParentId === null) {
-                $query->whereNull('parent_id');
-            } else {
-                $query->where('parent_id', $sharedParentId);
-            }
-
-            $shared = $query->first();
-
-            if (!$shared) {
-                $shared = SharedFolder::create([
-                    'owner_id'   => $user->id,
-                    'parent_id'  => $sharedParentId,
-                    'name'       => $folder->name,
+            $shared = SharedFolder::firstOrCreate(
+                [
+                    'owner_id'  => $user->id,
+                    'name'      => $folder->name,
+                    'parent_id' => $sharedParentId,
+                ],
+                [
                     'sort_order' => $folder->sort_order,
                     'is_private' => false,
-                ]);
+                ]
+            );
+
+            if ($shared->wasRecentlyCreated) {
                 $this->foldersCreated++;
                 $this->line("  + SharedFolder «{$folder->name}»");
             } else {

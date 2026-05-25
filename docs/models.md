@@ -1,6 +1,6 @@
 # Модели и таблицы БД проекта DeliFile
 
-Всего **42 таблицы**. Модели используют ULID в качестве первичных ключей (кроме `users`, `push_subscriptions`, `password_reset_codes` и системных таблиц Laravel).
+Всего **44 таблицы**. Модели используют ULID в качестве первичных ключей (кроме `users`, `push_subscriptions`, `password_reset_codes` и системных таблиц Laravel).
 
 ---
 
@@ -198,12 +198,15 @@ PHP-сессии (для web-роутов).
 **Связи:** `file` → File, `creator` → User
 
 ### `shared_folders` — `App\Models\SharedFolder` (HasUlids)
-Общие папки для совместной работы.
+Общие папки для совместной работы. Единая модель для всех папок пользователя (личные корневые помечаются флагом `is_personal_root`).
 | Поле | Тип | Назначение |
 |------|-----|------------|
 | owner_id | FK→users | Владелец |
 | parent_id | FK→shared_folders, nullable | Родительская папка (подпапки) |
 | name | string(100) | Название |
+| is_private | bool, default false | Приватная — скрыта от гостей родительской папки |
+| is_personal_root | bool, default false | Корневая личная папка пользователя («Мои файлы») |
+| sort_order | unsigned int, nullable | Порядок сортировки |
 
 **Связи:** `owner` → User, `parent` → SharedFolder (self), `children` → SharedFolder (self), `accesses` → SharedFolderAccess, `links` → SharedFolderLink, `sharedFiles` → SharedFolderFile, `commentSettings` → SharedFolderCommentSettings
 
@@ -235,6 +238,12 @@ PHP-сессии (для web-роутов).
 
 ### `shared_folder_files` — `App\Models\SharedFolderFile` (HasUlids)
 Файлы, добавленные в общую папку.
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| shared_folder_id | FK→shared_folders | Папка |
+| file_id | FK→files | Файл |
+| added_by | FK→users, nullable | Кто добавил |
+| is_private | bool, default false | Приватный — скрыт от гостей папки |
 | unique | (shared_folder_id, file_id) |
 
 **Связи:** `folder` → SharedFolder, `file` → File
@@ -306,6 +315,36 @@ PHP-сессии (для web-роутов).
 ---
 
 ## 7. Notifications
+
+### `user_notifications` — `App\Models\UserNotification` (HasUlids)
+Уведомления пользователя (внутренние, не Push API).
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| id | ulid | Первичный ключ |
+| user_id | FK→users | Получатель |
+| type | string(50), enum(NotificationType) | Тип: `admin_message`, `file_shared`, `folder_shared`, `contact_request`, `access_changed`, `file_expired` |
+| title | string | Заголовок |
+| body | text, nullable | Текст |
+| data | json, nullable | Дополнительные данные |
+| read_at | timestamp, nullable | Когда прочитано |
+| timestamps | created_at, updated_at | |
+
+**Индексы:** (user_id, created_at), (user_id, read_at)
+
+**Связи:** `user` → User
+
+### `device_push_tokens` — `App\Models\DevicePushToken`
+Токены устройств для мобильных Push-уведомлений.
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| id | bigint auto-increment | Первичный ключ |
+| user_id | FK→users | Владелец устройства |
+| token | string(500) | Push-токен |
+| platform | string(10) | `android` или `ios` |
+| device_id | string(255), nullable | ID устройства |
+| unique | (user_id, token) |
+
+**Связи:** `user` → User
 
 ### `push_subscriptions` — `App\Models\PushSubscription`
 Подписки браузеров на Push-уведомления (WebPush).
@@ -468,3 +507,4 @@ PHP-сессии (для web-роутов).
 | `SharedCommentMode` | `enabled`, `disabled`, `inherit_for_items` | shared_folder_comment_settings.shared_comments_mode |
 | `SharedCommentOverride` | `inherit`, `enabled`, `disabled` | file_comment_settings.shared_comments_override |
 | `EditorType` | `markdown` | files.editor_type |
+| `NotificationType` | `admin_message`, `file_shared`, `folder_shared`, `contact_request`, `access_changed`, `file_expired` | user_notifications.type |

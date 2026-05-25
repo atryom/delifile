@@ -89,12 +89,13 @@ class SharingController extends Controller
 
         if (!$contact->isRegistered()) {
             // Contact hasn't accepted invitation yet — queue the file as pending
-            DB::transaction(function () use ($file, $contact, $request) {
+            DB::transaction(function () use ($file, $contact, $request, $canEdit) {
                 ContactPendingShare::firstOrCreate([
                     'contact_id' => $contact->id,
                     'file_id'    => $file->id,
                 ], [
                     'sender_user_id' => $request->user()->id,
+                    'can_edit'       => $canEdit,
                 ]);
 
                 $this->activityService->log($file, $request->user(), ActivityType::SharedToContact, [
@@ -118,18 +119,13 @@ class SharingController extends Controller
             $autoAdd = $recipientUser ? ($recipientUser->auto_add_received_files ?? true) : true;
 
             if ($autoAdd) {
-                $sharerAccess = FileUserAccess::where('file_id', $file->id)
-                    ->where('user_id', $request->user()->id)
-                    ->first();
-
                 FileUserAccess::firstOrCreate([
                     'file_id'     => $file->id,
                     'user_id'     => $contact->resolved_user_id,
                     'access_type' => AccessType::Shared,
                 ], [
-                    'contact_id'  => $contact->id,
-                    'description' => $sharerAccess?->description,
-                    'can_edit'    => $canEdit,
+                    'contact_id' => $contact->id,
+                    'can_edit'   => $canEdit,
                 ]);
             } else {
                 PendingReceivedFile::firstOrCreate([

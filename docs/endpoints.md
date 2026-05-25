@@ -155,6 +155,15 @@
 |-------|------|------|----------|
 | GET | `/activity` | auth | Глобальная лента активности пользователя |
 
+## 🔔 Уведомления
+
+| Метод | Путь | Auth | Описание |
+|-------|------|------|----------|
+| GET | `/notifications` | auth | Список уведомлений (фильтры по типам, пагинация) |
+| GET | `/notifications/count` | auth | Количество непрочитанных |
+| POST | `/notifications/read-all` | auth | Отметить все прочитанными |
+| POST | `/notifications/{id}/read` | auth | Отметить одно уведомление прочитанным |
+
 ## 💰 Тарифы / Планы
 
 | Метод | Путь | Auth | Описание |
@@ -198,13 +207,15 @@
 | GET | `/support/suggestions/{id}` | auth | Детали предложения |
 | GET | `/support/suggestions/{id}/attachments/{attachmentId}` | auth | Скачать вложение предложения |
 
-## 📂 Общие папки (Shared Folders)
+## 📂 Папки (Shared Folders — единая модель)
+
+Единая система папок: личные корневые (`is_personal_root=true`) и общие. Файлы без папки отображаются на корневом уровне.
 
 | Метод | Путь | Auth | Описание |
 |-------|------|------|----------|
-| GET | `/shared-folders` | auth | Список общих папок (свои + доступные) |
-| POST | `/shared-folders` | auth | Создать новую общую папку |
-| PATCH | `/shared-folders/{id}` | auth | Переименовать (только владелец) |
+| GET | `/shared-folders` | auth | Список папок (свои + доступные, с учётом приватности и `sort_order`) |
+| POST | `/shared-folders` | auth | Создать новую папку |
+| PATCH | `/shared-folders/{id}` | auth | Переименовать или изменить `sort_order` (только владелец) |
 | DELETE | `/shared-folders/{id}` | auth | Удалить (только владелец) |
 | GET | `/shared-folders/{id}/files` | auth | Файлы в общей папке (пагинация) |
 | POST | `/shared-folders/{id}/init-upload` | auth | Начать загрузку в общую папку (нужно право edit) |
@@ -221,7 +232,10 @@
 | POST | `/shared-folders/{id}/subfolders` | auth | Создать подпапку в общей папке |
 | POST | `/shared-folders/{id}/files/{fileId}` | auth | Добавить существующий файл в общую папку |
 | DELETE | `/shared-folders/{id}/files/{fileId}` | auth | Удалить файл из общей папки |
-| DELETE | `/shared-folders/{id}/leave` | auth | Покинуть общую папку (не владелец) |
+| DELETE | `/shared-folders/{id}/leave` | auth | Покинуть папку (не владелец) |
+| POST | `/shared-folders/ensure-root` | auth | Найти или создать личную корневую папку («Мои файлы», `is_personal_root=true`) |
+| PATCH | `/shared-folders/{id}/privacy` | auth | Установить приватность подпапки (`is_private`, только владелец) |
+| PATCH | `/shared-folders/{id}/files/{fileId}/privacy` | auth | Установить приватность файла в папке (`is_private`, только владелец) |
 
 ## 🔄 Операции файл ↔ общая папка
 
@@ -327,5 +341,9 @@
 
 ---
 
-**Итого:** ~166 API-endpoint'ов, разделённых на 33 логические группы.
+**Итого:** ~173 API-endpoint'ов, разделённых на 34 логические группы.
 Авторизация: Laravel Sanctum (токены). Формат ответа: `{ result, message, data }`.
+
+> **Поля ответов, добавленные после рефакторинга:**
+> - `formatFolder()`: `is_private`, `is_personal_root`, `sort_order`, `has_shared_access`
+> - `buildCard()`: `can_share` — может ли текущий пользователь расшарить файл (владелец или shared-доступ)

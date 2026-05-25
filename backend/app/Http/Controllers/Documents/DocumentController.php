@@ -144,7 +144,7 @@ class DocumentController extends Controller
 
         $access = FileUserAccess::where('id', $accessId)
             ->where('file_id', $fileId)
-            ->whereIn('access_type', [AccessType::Shared->value])
+            ->where('access_type', AccessType::Shared->value)
             ->first();
 
         if (!$access) {

@@ -16,6 +16,7 @@ class ContactPendingShare extends Model
         'contact_id',
         'file_id',
         'sender_user_id',
+        'can_edit',
     ];
 
     public function contact(): BelongsTo

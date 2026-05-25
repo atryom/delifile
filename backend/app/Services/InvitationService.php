@@ -65,6 +65,7 @@ class InvitationService
                         'access_type' => AccessType::Shared,
                     ], [
                         'contact_id' => $contact->id,
+                        'can_edit'   => (bool) $pending->can_edit,
                     ]);
                 }
 
