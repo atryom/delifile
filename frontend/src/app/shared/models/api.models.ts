@@ -72,6 +72,8 @@ export interface FileListItem {
   folder_id?: string | null;
   description?: string | null;
   preview_url?: string | null;
+  is_owner?: boolean | null;
+  access_type?: AccessType | null;
   // url_file preview fields
   link_url?: string | null;
   link_title?: string | null;

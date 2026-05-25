@@ -447,6 +447,9 @@
                               <span class="sf-badge sf-badge--private" title="Личный файл — скрыт от гостей">🔒</span>
                             }
                           </div>
+                          @if (currentSharedFolderId() === null && file.is_owner === false) {
+                            <div class="role-badge">Получен</div>
+                          }
                           <div class="file-meta-mobile">{{ file.uploaded_at | date:'d MMM y' }} · {{ formatSize(file.size) }}</div>
                         </div>
                       </div>
@@ -597,7 +600,12 @@
                   </div>
                 }
                 <div class="grid-name">{{ fileDisplayName(file) }}</div>
-                <div class="grid-meta">{{ formatSize(file.size) }}</div>
+                <div class="grid-meta">
+                  {{ formatSize(file.size) }}
+                  @if (currentSharedFolderId() === null && file.is_owner === false) {
+                    <span class="grid-received-badge">Получен</span>
+                  }
+                </div>
               </div>
             }
           }

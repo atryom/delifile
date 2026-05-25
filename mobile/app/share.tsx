@@ -32,9 +32,15 @@ export default function ShareScreen() {
         const text: string = data.text ?? '';
         const isUrl = text.startsWith('http://') || text.startsWith('https://');
         if (isUrl) {
-          await handleUrl(text);
+          await handleUrl(text.trim());
         } else {
-          setPhase({ kind: 'error', message: `Получен текст:\n"${text.slice(0, 120)}"\n\nДеliFile поддерживает только ссылки и файлы.` });
+          // Chrome shares as "Page title https://url" — extract URL from anywhere in text
+          const urlMatch = text.match(/https?:\/\/[^\s]+/);
+          if (urlMatch) {
+            await handleUrl(urlMatch[0]);
+          } else {
+            setPhase({ kind: 'error', message: `Получен текст:\n"${text.slice(0, 120)}"\n\nДеliFile поддерживает только ссылки и файлы.` });
+          }
         }
       } else if (data.type === 'file') {
         await handleFile(data.uri, data.fileName ?? 'file', data.mimeType ?? 'application/octet-stream');

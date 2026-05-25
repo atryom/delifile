@@ -741,6 +741,13 @@ td { padding: 12px 20px; font-size: 13px; }
   text-align: center;
 }
 .grid-meta { font-size: 11px; color: var(--text-dim); }
+.grid-received-badge {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 500;
+}
 
 .grid-card--folder { position: relative; }
 .grid-card-menu-btn {
