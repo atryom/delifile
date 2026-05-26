@@ -19,6 +19,7 @@ import { AddToSharedFolderDialogComponent } from '../../dialogs/add-to-shared-fo
 import { AddVersionDialogComponent } from '../../dialogs/add-version/add-version-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 import { MarkdownEditorPanelComponent } from './markdown-editor-panel.component';
+import { FileUpdatesService } from '../../../../core/services/file-updates.service';
 
 interface FolderMoveItem { folder: SharedFolder; depth: number; }
 
@@ -58,6 +59,7 @@ export class FileDetailComponent implements OnInit {
   private readonly route     = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
   readonly authState         = inject(AuthStateService);
+  private readonly fileUpdates = inject(FileUpdatesService);
 
   private backFolderId: string | null = null;
   readonly backLink = signal<{ commands: string[]; queryParams?: Record<string,string> }>({ commands: ['/folders'] });
@@ -664,6 +666,7 @@ export class FileDetailComponent implements OnInit {
           display_name: res.data.display_name,
           original_name: res.data.original_name,
         } : prev);
+        this.fileUpdates.notifyRenamed({ id: f.id, display_name: res.data.display_name, original_name: res.data.original_name });
         this.savingRename.set(false);
         this.renamingTitle.set(false);
         this.showFeedback(this.translate.instant('files.detail.renamed'));

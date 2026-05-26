@@ -222,8 +222,8 @@
                 }
               </div>
               <div class="recent-info">
-                <span class="recent-name" [title]="file.content_kind === 'url_file' ? (file.link_title ?? file.original_name) : file.original_name">
-                  {{ file.content_kind === 'url_file' ? (file.link_title ?? file.original_name) : file.original_name }}
+                <span class="recent-name" [title]="file.content_kind === 'url_file' ? (file.display_name ?? file.link_title ?? file.original_name) : (file.display_name ?? file.original_name)">
+                  {{ file.content_kind === 'url_file' ? (file.display_name ?? file.link_title ?? file.original_name) : (file.display_name ?? file.original_name) }}
                 </span>
                 <span class="recent-meta">
                   @if (file.content_kind !== 'url_file') {

@@ -1,5 +1,5 @@
 import {
-  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy, viewChild, ElementRef,
+  Component, inject, signal, computed, OnInit, effect, ChangeDetectionStrategy, viewChild, ElementRef,
 } from '@angular/core';
 import { RouterLink, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -12,6 +12,7 @@ import { FileUploadService } from '../../services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { FileTypeIconComponent } from '../../../../shared/components/file-type-icon/file-type-icon.component';
 import { FileListItem, FileCard, LinkPreview } from '../../../../shared/models/api.models';
+import { FileUpdatesService } from '../../../../core/services/file-updates.service';
 
 @Component({
   selector: 'app-file-list',
@@ -28,6 +29,17 @@ export class FileListComponent implements OnInit {
   private readonly translate     = inject(TranslateService);
   private readonly router        = inject(Router);
   private readonly fb            = inject(FormBuilder);
+  private readonly fileUpdates   = inject(FileUpdatesService);
+
+  constructor() {
+    effect(() => {
+      const update = this.fileUpdates.lastRename();
+      if (!update) return;
+      this.recentFiles.update(list =>
+        list.map(f => f.id === update.id ? { ...f, display_name: update.display_name, original_name: update.original_name } : f)
+      );
+    });
+  }
 
   readonly creatingDoc   = signal(false);
   readonly showNoteInput = signal(false);

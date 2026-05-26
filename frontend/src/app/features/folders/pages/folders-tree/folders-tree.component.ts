@@ -1,5 +1,5 @@
 import {
-  Component, inject, signal, computed, OnInit, ChangeDetectionStrategy, viewChild, ElementRef,
+  Component, inject, signal, computed, OnInit, effect, ChangeDetectionStrategy, viewChild, ElementRef,
 } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { DatePipe } from '@angular/common';
@@ -20,6 +20,7 @@ import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialo
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 import { formatSize } from '../../../../shared/utils/format';
 import { classifyMimeType } from '../../../../shared/utils/file';
+import { FileUpdatesService } from '../../../../core/services/file-updates.service';
 
 interface SharedFolderMoveItem { folder: SharedFolder; depth: number; }
 
@@ -66,6 +67,17 @@ export class FoldersTreeComponent implements OnInit {
   private readonly route        = inject(ActivatedRoute);
   private readonly fb           = inject(FormBuilder);
   private readonly docsApi      = inject(DocumentsApiService);
+  private readonly fileUpdates = inject(FileUpdatesService);
+
+  constructor() {
+    effect(() => {
+      const update = this.fileUpdates.lastRename();
+      if (!update) return;
+      this.rawFiles.update(list =>
+        list.map(f => f.id === update.id ? { ...f, display_name: update.display_name, original_name: update.original_name } : f)
+      );
+    });
+  }
 
   readonly creatingDoc    = signal(false);
   readonly showNoteInput  = signal(false);
@@ -1014,7 +1026,7 @@ export class FoldersTreeComponent implements OnInit {
   }
 
   fileDisplayName(file: AnyFile): string {
-    if (file.content_kind === 'url_file') return file.link_title || file.original_name;
+    if (file.content_kind === 'url_file') return file.display_name || file.link_title || file.original_name;
     return (file as { display_name?: string | null }).display_name || file.original_name;
   }
 
