@@ -90,9 +90,18 @@
   flex-wrap: wrap;
   gap: 2px;
   padding: 8px 20px;
-  background: var(--surface);
+  background: var(--surface, #fff);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+
+  @media (max-width: 700px) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 6px 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
 
   button {
     background: none;

@@ -66,7 +66,7 @@ import { ImagePickerComponent } from './image-picker.component';
               type="button"
               class="md-btn"
               (click)="revert()"
-            >Отменить изменения</button>
+            >Сбросить</button>
           }
           <button type="button" class="md-btn" (click)="goBack()">Назад</button>
         </div>
@@ -215,7 +215,9 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
 
   ngOnDestroy(): void {
     window.removeEventListener('beforeunload', this.onBeforeUnload);
-    if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
+    const wasUnsaved = this.saveStatus() === 'unsaved' && !this.conflictError();
+    const wasEditable = this.canEdit() || this.lockState() === 'held';
+    if (wasUnsaved && wasEditable) {
       this.save();
     }
     if (this.lockState() === 'held') {

@@ -78,7 +78,7 @@ import { ImagePickerComponent } from '../markdown-editor/image-picker.component'
             type="button"
             class="ep-btn"
             (click)="revert()"
-          >Отменить изменения</button>
+          >Сбросить</button>
         }
 
         <!-- Expand / minimize -->
@@ -358,7 +358,9 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
 
   ngOnDestroy(): void {
     window.removeEventListener('beforeunload', this.onBeforeUnload);
-    if (this.saveStatus() === 'unsaved' && this.canEdit() && !this.conflictError()) {
+    const wasUnsaved = this.saveStatus() === 'unsaved' && !this.conflictError();
+    const wasEditable = this.canEdit() || this.lockState() === 'held';
+    if (wasUnsaved && wasEditable) {
       this.save();
     }
     if (this.lockState() === 'held') {

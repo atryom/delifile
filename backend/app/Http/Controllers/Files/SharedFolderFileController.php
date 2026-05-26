@@ -181,6 +181,11 @@ class SharedFolderFileController extends Controller
             'file_id'          => $fileId,
         ], ['added_by' => $user->id]);
 
+        // When moving (not just adding), hide the file from the owner's root view
+        if ($request->boolean('move') && $file->owner_id === $user->id && !$file->shared_folder_only) {
+            $file->update(['shared_folder_only' => true]);
+        }
+
         return $this->success('File added to folder');
     }
 

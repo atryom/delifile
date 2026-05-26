@@ -402,6 +402,11 @@ export class FileDetailComponent implements OnInit {
         );
         this.savingFolder.set(false);
         this.showFeedback(this.translate.instant('files.detail.folder_saved'));
+        if (folderId) {
+          this.backLink.set({ commands: ['/folders'], queryParams: { folder_id: folderId } });
+        } else {
+          this.backLink.set({ commands: ['/folders'] });
+        }
       },
       error: () => this.savingFolder.set(false),
     });

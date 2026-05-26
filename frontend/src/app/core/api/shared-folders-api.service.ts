@@ -142,7 +142,7 @@ export class SharedFoldersApiService {
     return this.api.get('/shared-folders/all-flat');
   }
 
-  addFile(folderId: string, fileId: string): Observable<ApiResponse<Record<string, never>>> {
-    return this.api.post(`/shared-folders/${folderId}/files/${fileId}`, {});
+  addFile(folderId: string, fileId: string, move = false): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.post(`/shared-folders/${folderId}/files/${fileId}`, move ? { move: true } : {});
   }
 }

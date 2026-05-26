@@ -208,7 +208,7 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── Add modal ─────────────────────────────────────────────────────────────
   readonly addModalOpen = signal(false);
-  readonly addModalTab  = signal<'file' | 'link'>('file');
+  readonly addModalTab  = signal<'file' | 'link' | 'note'>('file');
   readonly isDragOver   = signal(false);
   readonly linkPreview  = signal<LinkPreview | null>(null);
   readonly linkError    = signal<string | null>(null);
@@ -930,12 +930,13 @@ export class FoldersTreeComponent implements OnInit {
         error: () => { this.movingFiles.set(false); },
       });
     } else {
-      forkJoin(ids.map(id => this.sfApi.addFile(targetFolderId, id))).subscribe({
+      forkJoin(ids.map(id => this.sfApi.addFile(targetFolderId, id, true))).subscribe({
         next: () => {
           this.movingFiles.set(false);
           this.moveDialogOpen.set(false);
+          const movedSet = new Set(ids);
+          this.rawFiles.update(fs => fs.filter(f => !movedSet.has(f.id)));
           this.clearSelection();
-          this.loadFiles();
         },
         error: () => { this.movingFiles.set(false); },
       });
