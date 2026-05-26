@@ -190,10 +190,11 @@ export class FoldersTreeComponent implements OnInit {
   });
 
   // ── Move dialog ───────────────────────────────────────────────────────────
-  readonly moveDialogOpen      = signal(false);
-  readonly moveDialogTargetIds = signal<string[]>([]);
-  readonly moveDialogFolderId  = signal<string | null>(null);
-  readonly movingFiles         = signal(false);
+  readonly moveDialogOpen         = signal(false);
+  readonly moveDialogTargetIds    = signal<string[]>([]);
+  readonly moveDialogFolderId     = signal<string | null>(null);
+  readonly moveDialogHasSelection = signal(false);
+  readonly movingFiles            = signal(false);
   readonly moveDialogCountText = computed(() => {
     const n = this.moveDialogTargetIds().length;
     return n === 1 ? '1 файл' : n >= 2 && n <= 4 ? `${n} файла` : `${n} файлов`;
@@ -841,9 +842,10 @@ export class FoldersTreeComponent implements OnInit {
     } else if (action === 'move') {
       this.moveDialogTargetIds.set(ids);
       this.moveDialogFolderId.set(null);
+      this.moveDialogHasSelection.set(false);
       this.moveDialogOpen.set(true);
       this.sfApi.listAll().subscribe({
-        next: (res) => this.sharedFoldersMoveList.set(res.data.items),
+        next: (res) => this.sharedFoldersMoveList.set(res.data.items.filter(f => !f.is_personal_root)),
         error: () => {},
       });
     } else {
@@ -899,21 +901,42 @@ export class FoldersTreeComponent implements OnInit {
   openMoveDialogForFile(file: AnyFile): void {
     this.moveDialogTargetIds.set([file.id]);
     this.moveDialogFolderId.set(null);
+    this.moveDialogHasSelection.set(false);
     this.moveDialogOpen.set(true);
     this.closeMenu();
     this.sfApi.listAll().subscribe({
-      next: (res) => this.sharedFoldersMoveList.set(res.data.items),
+      next: (res) => this.sharedFoldersMoveList.set(res.data.items.filter(f => !f.is_personal_root)),
       error: () => {},
     });
   }
 
   executeBulkMove(): void {
-    const targetFolderId = this.moveDialogFolderId();
-    const ids            = this.moveDialogTargetIds();
-    if (ids.length === 0 || this.movingFiles() || !targetFolderId) return;
-    this.movingFiles.set(true);
+    const ids = this.moveDialogTargetIds();
+    if (ids.length === 0 || this.movingFiles() || !this.moveDialogHasSelection()) return;
 
+    const targetFolderId = this.moveDialogFolderId();
     const sourceFolderId = this.currentSharedFolderId();
+
+    if (targetFolderId === null) {
+      if (!sourceFolderId) {
+        this.moveDialogOpen.set(false);
+        return;
+      }
+      this.movingFiles.set(true);
+      forkJoin(ids.map(id => this.sfApi.removeFile(sourceFolderId, id))).subscribe({
+        next: () => {
+          this.movingFiles.set(false);
+          this.moveDialogOpen.set(false);
+          const movedSet = new Set(ids);
+          this.rawFiles.update(fs => fs.filter(f => !movedSet.has(f.id)));
+          this.clearSelection();
+        },
+        error: () => { this.movingFiles.set(false); },
+      });
+      return;
+    }
+
+    this.movingFiles.set(true);
     if (sourceFolderId) {
       const ops = ids.flatMap(id => [
         this.sfApi.removeFile(sourceFolderId, id),

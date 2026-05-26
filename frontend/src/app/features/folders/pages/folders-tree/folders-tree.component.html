@@ -925,15 +925,23 @@
       <p>Выберите папку для {{ moveDialogCountText() }}</p>
       <div class="folder-list" role="listbox" aria-label="Список папок">
 
-        @if (sharedFoldersMoveTree().length === 0) {
-          <div class="folder-list-empty">Нет доступных папок</div>
-        }
+        <button type="button" role="option" class="folder-list-item"
+                [class.selected]="moveDialogHasSelection() && moveDialogFolderId() === null"
+                [attr.aria-selected]="moveDialogHasSelection() && moveDialogFolderId() === null"
+                style="padding-left: 12px"
+                (click)="moveDialogFolderId.set(null); moveDialogHasSelection.set(true)">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          Без папки (корень)
+        </button>
         @for (item of sharedFoldersMoveTree(); track item.folder.id) {
           <button type="button" role="option" class="folder-list-item"
                   [class.selected]="moveDialogFolderId() === item.folder.id"
                   [attr.aria-selected]="moveDialogFolderId() === item.folder.id"
                   [style.padding-left.px]="item.depth * 16 + 12"
-                  (click)="moveDialogFolderId.set(item.folder.id)">
+                  (click)="moveDialogFolderId.set(item.folder.id); moveDialogHasSelection.set(true)">
             <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
             </svg>
@@ -945,7 +953,7 @@
       </div>
       <div class="modal-actions">
         <button type="button" class="btn-primary"
-                [disabled]="!moveDialogFolderId() || movingFiles()"
+                [disabled]="!moveDialogHasSelection() || movingFiles()"
                 (click)="executeBulkMove()">
           {{ movingFiles() ? 'Перемещается…' : 'Переместить' }}
         </button>

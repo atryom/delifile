@@ -101,13 +101,14 @@ export class FileDetailComponent implements OnInit {
   readonly contextSharedFolderId  = signal<string | null>(null);
 
   // ─── Folder picker (tree move dialog) ────────────────────────────────────────
-  readonly showFolderPickerDialog = signal(false);
-  readonly folderPickerList       = signal<SharedFolder[]>([]);
-  readonly folderPickerTree       = computed(() => buildFolderMoveTree(this.folderPickerList()));
-  readonly folderPickerLoading    = signal(false);
-  readonly folderPickerSelectedId = signal<string | null>(null);
-  readonly folderPickerMoving     = signal(false);
-  readonly resolvedFolderName     = signal<string | null>(null);
+  readonly showFolderPickerDialog   = signal(false);
+  readonly folderPickerList         = signal<SharedFolder[]>([]);
+  readonly folderPickerTree         = computed(() => buildFolderMoveTree(this.folderPickerList()));
+  readonly folderPickerLoading      = signal(false);
+  readonly folderPickerSelectedId   = signal<string | null>(null);
+  readonly folderPickerHasSelection = signal(false);
+  readonly folderPickerMoving       = signal(false);
+  readonly resolvedFolderName       = signal<string | null>(null);
 
   readonly descriptionEditorOpen  = signal(false);
   readonly editorPanelOpen        = signal(false);
@@ -444,12 +445,13 @@ export class FileDetailComponent implements OnInit {
   }
 
   openFolderPicker(): void {
-    this.folderPickerSelectedId.set(this.contextSharedFolderId());
+    this.folderPickerSelectedId.set(null);
+    this.folderPickerHasSelection.set(false);
     this.showFolderPickerDialog.set(true);
     this.folderPickerLoading.set(true);
     this.sfApi.listAll().subscribe({
       next: res => {
-        this.folderPickerList.set(res.data.items);
+        this.folderPickerList.set(res.data.items.filter(f => !f.is_personal_root));
         this.folderPickerLoading.set(false);
         const currentId = this.contextSharedFolderId();
         if (currentId) {
@@ -462,10 +464,11 @@ export class FileDetailComponent implements OnInit {
   }
 
   confirmFolderMove(): void {
-    const newFolderId = this.folderPickerSelectedId();
-    if (!newFolderId || this.folderPickerMoving()) return;
+    if (!this.folderPickerHasSelection() || this.folderPickerMoving()) return;
 
+    const newFolderId = this.folderPickerSelectedId();
     const oldFolderId = this.contextSharedFolderId();
+
     if (oldFolderId === newFolderId) {
       this.showFolderPickerDialog.set(false);
       return;
@@ -473,6 +476,27 @@ export class FileDetailComponent implements OnInit {
 
     this.folderPickerMoving.set(true);
     const fileId = this.id();
+
+    if (newFolderId === null) {
+      if (!oldFolderId) {
+        this.folderPickerMoving.set(false);
+        this.showFolderPickerDialog.set(false);
+        return;
+      }
+      this.sfApi.removeFile(oldFolderId, fileId).subscribe({
+        next: () => {
+          this.contextSharedFolderId.set(null);
+          this.resolvedFolderName.set(null);
+          this.folderPickerMoving.set(false);
+          this.showFolderPickerDialog.set(false);
+          this.backLink.set({ commands: ['/folders'] });
+          this.showFeedback('Файл перемещён');
+        },
+        error: () => this.folderPickerMoving.set(false),
+      });
+      return;
+    }
+
     const newFolderName = this.folderPickerList().find(f => f.id === newFolderId)?.name ?? null;
 
     const finish = () => {

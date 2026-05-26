@@ -615,15 +615,23 @@
               <p>Загрузка папок…</p>
             } @else {
               <div class="fp-folder-list" role="listbox" aria-label="Список папок">
-                @if (folderPickerTree().length === 0) {
-                  <div class="fp-empty">Нет доступных папок</div>
-                }
+                <button type="button" role="option" class="fp-folder-item"
+                        [class.fp-folder-item--selected]="folderPickerHasSelection() && folderPickerSelectedId() === null"
+                        [attr.aria-selected]="folderPickerHasSelection() && folderPickerSelectedId() === null"
+                        style="padding-left: 12px"
+                        (click)="folderPickerSelectedId.set(null); folderPickerHasSelection.set(true)">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                  Без папки (корень)
+                </button>
                 @for (item of folderPickerTree(); track item.folder.id) {
                   <button type="button" role="option" class="fp-folder-item"
                           [class.fp-folder-item--selected]="folderPickerSelectedId() === item.folder.id"
                           [attr.aria-selected]="folderPickerSelectedId() === item.folder.id"
                           [style.padding-left.px]="item.depth * 16 + 12"
-                          (click)="folderPickerSelectedId.set(item.folder.id)">
+                          (click)="folderPickerSelectedId.set(item.folder.id); folderPickerHasSelection.set(true)">
                     <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
                     </svg>
@@ -635,7 +643,7 @@
             }
             <div class="modal-actions" style="margin-top: 16px">
               <button type="button" class="btn-primary"
-                      [disabled]="!folderPickerSelectedId() || folderPickerMoving()"
+                      [disabled]="!folderPickerHasSelection() || folderPickerMoving()"
                       (click)="confirmFolderMove()">
                 {{ folderPickerMoving() ? 'Перемещение…' : 'Переместить' }}
               </button>
