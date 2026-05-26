@@ -356,6 +356,15 @@ export interface LinkPreview {
   hostname: string;
 }
 
+// ─── API Token Models ─────────────────────────────────────────────────────────
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  created_at: string | null;
+  last_used_at: string | null;
+}
+
 // ─── Session Models ──────────────────────────────────────────────────────────
 
 export interface DeviceSession {

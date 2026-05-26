@@ -19,6 +19,7 @@ use App\Http\Controllers\Support\SuggestionController;
 use App\Http\Controllers\Tariff\TariffController;
 use App\Http\Controllers\Push\PushController;
 use App\Http\Controllers\User\UserSettingsController;
+use App\Http\Controllers\User\ApiTokenController;
 use App\Http\Controllers\User\InboxController;
 use App\Http\Controllers\SharedFolders\SharedFolderController;
 use App\Http\Controllers\Comments\CommentThreadController;
@@ -203,6 +204,11 @@ Route::prefix('v1')->group(function () {
 
         // User settings
         Route::patch('user/settings', [UserSettingsController::class, 'update']);
+
+        // API tokens
+        Route::get('api-tokens',         [ApiTokenController::class, 'index']);
+        Route::post('api-tokens',        [ApiTokenController::class, 'store']);
+        Route::delete('api-tokens/{id}', [ApiTokenController::class, 'destroy']);
 
         // Notifications
         Route::prefix('notifications')->group(function () {
