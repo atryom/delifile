@@ -431,6 +431,10 @@ class CommentService
         $sharedFolderIds = SharedFolderFile::where('file_id', $fileId)->pluck('shared_folder_id');
         if ($sharedFolderIds->isEmpty()) return false;
 
+        if (SharedFolder::whereIn('id', $sharedFolderIds)->where('owner_id', $user->id)->exists()) {
+            return true;
+        }
+
         return SharedFolderAccess::whereIn('shared_folder_id', $sharedFolderIds)
             ->where('user_id', $user->id)
             ->exists();
