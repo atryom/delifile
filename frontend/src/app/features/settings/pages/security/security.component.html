@@ -377,23 +377,25 @@
             Создать токен
           </button>
         } @else {
-          <form (ngSubmit)="createToken()" class="settings-form" style="margin-bottom:16px">
+          <div class="settings-form" style="margin-bottom:16px">
             <div class="field">
               <label for="token-name">Название токена</label>
-              <input id="token-name" type="text" [value]="newTokenName()"
-                     (input)="newTokenName.set($any($event.target).value)"
-                     placeholder="Например: Claude Code" maxlength="100" />
+              <input id="token-name" type="text" [formControl]="tokenNameCtrl"
+                     placeholder="Например: Claude Code" maxlength="100"
+                     (keydown.enter)="createToken()" />
             </div>
             @if (tokenCreateError()) {
               <div class="error-msg" role="alert">{{ tokenCreateError() }}</div>
             }
             <div class="form-row-actions">
-              <button type="submit" class="btn-primary" [disabled]="!newTokenName().trim() || creatingToken()">
+              <button type="button" class="btn-primary"
+                      [disabled]="!tokenNameCtrl.value?.trim() || creatingToken()"
+                      (click)="createToken()">
                 {{ creatingToken() ? 'Создание...' : 'Создать' }}
               </button>
               <button type="button" class="btn-outline" (click)="cancelCreateToken()">Отмена</button>
             </div>
-          </form>
+          </div>
         }
 
         @if (createdTokenValue()) {

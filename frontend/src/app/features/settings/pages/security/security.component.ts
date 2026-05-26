@@ -1,6 +1,6 @@
 import { Component, inject, signal, OnInit, ChangeDetectionStrategy, computed } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
@@ -68,7 +68,7 @@ export class SecurityComponent implements OnInit {
   readonly apiTokens          = signal<ApiToken[]>([]);
   readonly loadingTokens      = signal(false);
   readonly showCreateToken    = signal(false);
-  readonly newTokenName       = signal('');
+  readonly tokenNameCtrl      = new FormControl('');
   readonly creatingToken      = signal(false);
   readonly tokenCreateError   = signal<string | null>(null);
   readonly createdTokenValue  = signal<string | null>(null);
@@ -327,7 +327,7 @@ export class SecurityComponent implements OnInit {
   }
 
   createToken(): void {
-    const name = this.newTokenName().trim();
+    const name = this.tokenNameCtrl.value?.trim();
     if (!name || this.creatingToken()) return;
 
     this.creatingToken.set(true);
@@ -348,7 +348,7 @@ export class SecurityComponent implements OnInit {
 
   cancelCreateToken(): void {
     this.showCreateToken.set(false);
-    this.newTokenName.set('');
+    this.tokenNameCtrl.reset();
     this.tokenCreateError.set(null);
   }
 
