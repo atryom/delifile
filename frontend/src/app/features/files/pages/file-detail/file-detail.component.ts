@@ -1,4 +1,5 @@
 import { Component, inject, signal, computed, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
+import { forkJoin } from 'rxjs';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -8,7 +9,7 @@ import { DocumentsApiService } from '../../../../core/api/documents-api.service'
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
-import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode } from '../../../../shared/models/api.models';
+import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode, SharedFolder } from '../../../../shared/models/api.models';
 import { formatSize } from '../../../../shared/utils/format';
 import { canViewInBrowser } from '../../../../shared/utils/file';
 import { flattenTree } from '../../../../shared/utils/tree';
@@ -18,6 +19,26 @@ import { AddToSharedFolderDialogComponent } from '../../dialogs/add-to-shared-fo
 import { AddVersionDialogComponent } from '../../dialogs/add-version/add-version-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
 import { MarkdownEditorPanelComponent } from './markdown-editor-panel.component';
+
+interface FolderMoveItem { folder: SharedFolder; depth: number; }
+
+function buildFolderMoveTree(folders: SharedFolder[]): FolderMoveItem[] {
+  const result: FolderMoveItem[] = [];
+  function walk(parentId: string | null, depth: number): void {
+    for (const f of folders) {
+      if ((f.parent_id ?? null) === parentId) {
+        result.push({ folder: f, depth });
+        walk(f.id, depth + 1);
+      }
+    }
+  }
+  walk(null, 0);
+  const placed = new Set(result.map(r => r.folder.id));
+  for (const f of folders) {
+    if (!placed.has(f.id)) result.push({ folder: f, depth: 0 });
+  }
+  return result;
+}
 
 @Component({
   selector: 'app-file-detail',
@@ -78,6 +99,16 @@ export class FileDetailComponent implements OnInit {
   readonly showActivity           = signal(false);
   readonly showVersions           = signal(false);
   readonly contextSharedFolderId  = signal<string | null>(null);
+
+  // ─── Folder picker (tree move dialog) ────────────────────────────────────────
+  readonly showFolderPickerDialog = signal(false);
+  readonly folderPickerList       = signal<SharedFolder[]>([]);
+  readonly folderPickerTree       = computed(() => buildFolderMoveTree(this.folderPickerList()));
+  readonly folderPickerLoading    = signal(false);
+  readonly folderPickerSelectedId = signal<string | null>(null);
+  readonly folderPickerMoving     = signal(false);
+  readonly resolvedFolderName     = signal<string | null>(null);
+
   readonly descriptionEditorOpen  = signal(false);
   readonly editorPanelOpen        = signal(false);
   readonly editorExpanded         = signal(false);
@@ -410,6 +441,63 @@ export class FileDetailComponent implements OnInit {
       },
       error: () => this.savingFolder.set(false),
     });
+  }
+
+  openFolderPicker(): void {
+    this.folderPickerSelectedId.set(this.contextSharedFolderId());
+    this.showFolderPickerDialog.set(true);
+    this.folderPickerLoading.set(true);
+    this.sfApi.listAll().subscribe({
+      next: res => {
+        this.folderPickerList.set(res.data.items);
+        this.folderPickerLoading.set(false);
+        const currentId = this.contextSharedFolderId();
+        if (currentId) {
+          const found = res.data.items.find(f => f.id === currentId);
+          if (found) this.resolvedFolderName.set(found.name);
+        }
+      },
+      error: () => this.folderPickerLoading.set(false),
+    });
+  }
+
+  confirmFolderMove(): void {
+    const newFolderId = this.folderPickerSelectedId();
+    if (!newFolderId || this.folderPickerMoving()) return;
+
+    const oldFolderId = this.contextSharedFolderId();
+    if (oldFolderId === newFolderId) {
+      this.showFolderPickerDialog.set(false);
+      return;
+    }
+
+    this.folderPickerMoving.set(true);
+    const fileId = this.id();
+    const newFolderName = this.folderPickerList().find(f => f.id === newFolderId)?.name ?? null;
+
+    const finish = () => {
+      this.contextSharedFolderId.set(newFolderId);
+      this.resolvedFolderName.set(newFolderName);
+      this.folderPickerMoving.set(false);
+      this.showFolderPickerDialog.set(false);
+      this.backLink.set({ commands: ['/folders'], queryParams: { tab: 'shared', shared_folder_id: newFolderId } });
+      this.showFeedback('Файл перемещён');
+    };
+
+    if (oldFolderId) {
+      forkJoin([
+        this.sfApi.removeFile(oldFolderId, fileId),
+        this.sfApi.addFile(newFolderId, fileId),
+      ]).subscribe({
+        next: () => finish(),
+        error: () => this.folderPickerMoving.set(false),
+      });
+    } else {
+      this.sfApi.addFile(newFolderId, fileId, true).subscribe({
+        next: () => finish(),
+        error: () => this.folderPickerMoving.set(false),
+      });
+    }
   }
 
   copyLink(url: string): void {

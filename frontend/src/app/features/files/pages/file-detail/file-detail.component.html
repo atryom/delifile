@@ -440,16 +440,22 @@
             <div class="sidebar-section">
               <h3 class="section-title">{{ 'files.detail.folders' | translate }}</h3>
               <div class="folder-block">
-                <select class="folder-select" (change)="onFolderSelect($event)" [disabled]="savingFolder()">
-                  <option value="">{{ 'files.detail.no_folder' | translate }}</option>
-                  @for (node of flatFolders(); track node.id) {
-                    <option [value]="node.id" [selected]="node.id === pendingFolderId()">
-                      {{ node.indent }}{{ node.name }}
-                    </option>
-                  }
-                </select>
-                @if (savingFolder()) {
-                  <span class="folder-saving-hint">{{ 'common.saving' | translate }}</span>
+                <button type="button" class="folder-picker-btn"
+                        (click)="openFolderPicker()"
+                        [disabled]="folderPickerMoving()"
+                        [attr.aria-label]="'Выбрать папку'">
+                  <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+                  </svg>
+                  <span class="folder-picker-name">
+                    {{ resolvedFolderName() || currentFolderName() || ('files.detail.no_folder' | translate) }}
+                  </span>
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6"/>
+                  </svg>
+                </button>
+                @if (folderPickerMoving()) {
+                  <span class="folder-saving-hint">Перемещение…</span>
                 }
               </div>
             </div>
@@ -598,5 +604,44 @@
           (closed)="showAddVersionDialog.set(false)"
           (uploaded)="onVersionUploaded()"
         />
+      }
+
+      <!-- Folder picker dialog -->
+      @if (showFolderPickerDialog()) {
+        <div class="modal-backdrop" (click)="showFolderPickerDialog.set(false)" role="dialog" aria-modal="true" aria-labelledby="fp-title">
+          <div class="modal modal-lg" (click)="$event.stopPropagation()">
+            <h3 id="fp-title">Переместить в папку</h3>
+            @if (folderPickerLoading()) {
+              <p>Загрузка папок…</p>
+            } @else {
+              <div class="fp-folder-list" role="listbox" aria-label="Список папок">
+                @if (folderPickerTree().length === 0) {
+                  <div class="fp-empty">Нет доступных папок</div>
+                }
+                @for (item of folderPickerTree(); track item.folder.id) {
+                  <button type="button" role="option" class="fp-folder-item"
+                          [class.fp-folder-item--selected]="folderPickerSelectedId() === item.folder.id"
+                          [attr.aria-selected]="folderPickerSelectedId() === item.folder.id"
+                          [style.padding-left.px]="item.depth * 16 + 12"
+                          (click)="folderPickerSelectedId.set(item.folder.id)">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/>
+                    </svg>
+                    @if (item.depth > 0) {<span class="fp-indent" aria-hidden="true">↳</span>}
+                    {{ item.folder.name }}
+                  </button>
+                }
+              </div>
+            }
+            <div class="modal-actions" style="margin-top: 16px">
+              <button type="button" class="btn-primary"
+                      [disabled]="!folderPickerSelectedId() || folderPickerMoving()"
+                      (click)="confirmFolderMove()">
+                {{ folderPickerMoving() ? 'Перемещение…' : 'Переместить' }}
+              </button>
+              <button type="button" class="btn-secondary" (click)="showFolderPickerDialog.set(false)">Отмена</button>
+            </div>
+          </div>
+        </div>
       }
     </div>

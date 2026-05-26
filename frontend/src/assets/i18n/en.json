@@ -624,7 +624,7 @@
     "create_link_allow_save_hint": "Authenticated users will be able to add this folder to their account",
     "add_to_my_files_btn": "Add to my files",
     "add_to_my_files_done": "File added to your files",
-    "add_to_shared_folder_btn": "Add to shared folder",
+    "add_to_shared_folder_btn": "Copy to folder",
     "add_to_shared_folder_title": "Select shared folders",
     "add_to_shared_folder_hint": "Check folders where you want to add this file. Uncheck to remove.",
     "add_to_shared_folder_save": "Save",

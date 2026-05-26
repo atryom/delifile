@@ -655,7 +655,7 @@
     "create_link_allow_save_hint": "Авторизованные пользователи смогут добавить эту папку к себе",
     "add_to_my_files_btn": "Добавить в свои файлы",
     "add_to_my_files_done": "Файл добавлен в ваши файлы",
-    "add_to_shared_folder_btn": "Добавить в общую папку",
+    "add_to_shared_folder_btn": "Копировать в папку",
     "add_to_shared_folder_title": "Выбор общих папок",
     "add_to_shared_folder_hint": "Отметьте папки, в которые хотите добавить этот файл. Снимите отметку — и файл будет убран из папки.",
     "add_to_shared_folder_save": "Сохранить",
