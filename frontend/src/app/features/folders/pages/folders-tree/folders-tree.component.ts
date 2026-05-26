@@ -208,9 +208,10 @@ export class FoldersTreeComponent implements OnInit {
   readonly deletingBulk         = signal(false);
 
   // ── Add modal ─────────────────────────────────────────────────────────────
-  readonly addModalOpen = signal(false);
-  readonly addModalTab  = signal<'file' | 'link' | 'note'>('file');
-  readonly isDragOver   = signal(false);
+  readonly addModalOpen  = signal(false);
+  readonly addModalTab   = signal<'file' | 'link' | 'note'>('file');
+  readonly isDragOver    = signal(false);
+  readonly uploadQueue   = signal<{ total: number; done: number } | null>(null);
   readonly linkPreview  = signal<LinkPreview | null>(null);
   readonly linkError    = signal<string | null>(null);
   readonly previewing   = signal(false);
@@ -687,7 +688,7 @@ export class FoldersTreeComponent implements OnInit {
           this.router.navigate(['/files', docId], { queryParams: { editor: 'expanded' } });
         };
         if (sfId) {
-          this.sfApi.addFile(sfId, docId).subscribe({ next: navigate, error: navigate });
+          this.sfApi.addFile(sfId, docId, true).subscribe({ next: navigate, error: navigate });
         } else {
           navigate();
         }
@@ -718,10 +719,14 @@ export class FoldersTreeComponent implements OnInit {
   // ── Upload ────────────────────────────────────────────────────────────────
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const file  = input.files?.[0];
-    if (!file) return;
+    const files = Array.from(input.files ?? []);
     input.value = '';
-    this.uploadFile(file);
+    if (files.length === 0) return;
+    if (files.length === 1) {
+      this.uploadFile(files[0]);
+    } else {
+      this.uploadMultiple(files);
+    }
   }
 
   onDragOver(event: DragEvent): void {
@@ -739,23 +744,42 @@ export class FoldersTreeComponent implements OnInit {
     event.preventDefault();
     event.stopPropagation();
     this.isDragOver.set(false);
-    const file = event.dataTransfer?.files?.[0];
-    if (file) this.uploadFile(file);
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (files.length === 0) return;
+    if (files.length === 1) {
+      this.uploadFile(files[0]);
+    } else {
+      this.uploadMultiple(files);
+    }
   }
 
   private uploadFile(file: File): void {
     const sfId = this.currentSharedFolderId();
-    if (sfId) {
-      this.uploadSvc.upload(file, { sharedFolderId: sfId }).subscribe({
-        next: () => { this.closeAddModal(); this.loadFiles(); },
-        error: () => {},
-      });
-      return;
-    }
-    this.uploadSvc.upload(file, undefined).subscribe({
+    this.uploadSvc.upload(file, sfId ? { sharedFolderId: sfId } : undefined).subscribe({
       next: () => { this.closeAddModal(); this.loadFiles(); },
       error: () => {},
     });
+  }
+
+  private uploadMultiple(files: File[]): void {
+    const sfId = this.currentSharedFolderId();
+    this.uploadQueue.set({ total: files.length, done: 0 });
+
+    const uploadNext = (index: number): void => {
+      if (index >= files.length) {
+        this.uploadQueue.set(null);
+        this.uploadSvc.reset();
+        this.closeAddModal();
+        this.loadFiles();
+        return;
+      }
+      this.uploadSvc.upload(files[index], sfId ? { sharedFolderId: sfId } : undefined).subscribe({
+        next:  () => { this.uploadQueue.update(q => q ? { ...q, done: q.done + 1 } : null); uploadNext(index + 1); },
+        error: () => { this.uploadQueue.update(q => q ? { ...q, done: q.done + 1 } : null); uploadNext(index + 1); },
+      });
+    };
+
+    uploadNext(0);
   }
 
   // ── Link save ─────────────────────────────────────────────────────────────

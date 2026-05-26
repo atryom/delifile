@@ -681,10 +681,14 @@
       @if (addModalTab() === 'file') {
         <div class="add-modal-body" role="tabpanel">
 
-          @if (uploadState().phase === 'uploading' || uploadState().phase === 'init' || uploadState().phase === 'completing') {
+          @if (uploadQueue() || uploadState().phase === 'uploading' || uploadState().phase === 'init' || uploadState().phase === 'completing') {
             <div class="modal-upload-progress">
               <div class="modal-upload-info">
-                <span>Загрузка файла…</span>
+                @if (uploadQueue()) {
+                  <span>Загрузка файлов… {{ uploadQueue()!.done + 1 }} из {{ uploadQueue()!.total }}</span>
+                } @else {
+                  <span>Загрузка файла…</span>
+                }
                 <span class="modal-upload-pct">{{ uploadState().progress }}%</span>
               </div>
               <div class="progress-track">
@@ -694,7 +698,7 @@
           } @else {
             <label class="drop-zone" [class.drag-over]="isDragOver()"
                    (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)">
-              <input type="file" (change)="onFileSelected($event)" style="display:none" aria-label="Выбрать файл" />
+              <input type="file" multiple (change)="onFileSelected($event)" style="display:none" aria-label="Выбрать файлы" />
               <div class="drop-zone-icon" aria-hidden="true">
                 <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                   <polyline points="16 16 12 12 8 16"/>
@@ -702,9 +706,9 @@
                   <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
                 </svg>
               </div>
-              <p class="drop-zone-hint">Перетащите файл сюда</p>
+              <p class="drop-zone-hint">Перетащите файлы сюда</p>
               <span class="drop-zone-or">или</span>
-              <span class="drop-zone-btn">Выбрать файл</span>
+              <span class="drop-zone-btn">Выбрать файлы</span>
             </label>
           }
 
