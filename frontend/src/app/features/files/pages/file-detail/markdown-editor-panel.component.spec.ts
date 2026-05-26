@@ -172,7 +172,7 @@ describe('MarkdownEditorPanelComponent', () => {
     lockStateSig.set('held');
     fixture.detectChanges();
     const buttons = fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.ep-btn');
-    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Отменить изменения'));
+    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Сбросить'));
     expect(revertBtn).toBeTruthy();
   });
 
@@ -180,7 +180,7 @@ describe('MarkdownEditorPanelComponent', () => {
     lockStateSig.set('readonly');
     fixture.detectChanges();
     const buttons = fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.ep-btn');
-    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Отменить изменения'));
+    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Сбросить'));
     expect(revertBtn).toBeUndefined();
   });
 

@@ -157,7 +157,7 @@ describe('MarkdownEditorComponent', () => {
     lockStateSig.set('readonly');
     fixture.detectChanges();
     const buttons = fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.md-btn');
-    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Отменить изменения'));
+    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Сбросить'));
     expect(revertBtn).toBeUndefined();
     expect(fixture.nativeElement.querySelector('.md-toolbar')).toBeNull();
   });
@@ -166,7 +166,7 @@ describe('MarkdownEditorComponent', () => {
     lockStateSig.set('held');
     fixture.detectChanges();
     const buttons = fixture.nativeElement.querySelectorAll<HTMLButtonElement>('.md-btn');
-    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Отменить изменения'));
+    const revertBtn = Array.from(buttons).find(b => b.textContent?.includes('Сбросить'));
     expect(revertBtn).toBeTruthy();
   });
 

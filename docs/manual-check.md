@@ -17,7 +17,7 @@
 **Данные для тестов:**
 - Тестовый файл: image.png (200×200, <1 МБ), document.pdf (1 МБ), video.mp4 (5 МБ)
 - Комментарий: для ответов/упоминаний
-- Ссылка для URL-файла: `https://example.com`
+- Ссылка для URL-файла: `https://delifile.ru`
 
 ---
 
@@ -1325,7 +1325,7 @@
 ## 9. URL-файлы
 
 - [ ] **9.1 Предпросмотр ссылки**
-  - **Д:** Вставить URL `https://example.com`, нажать «Предпросмотр».
+  - **Д:** Вставить URL `https://delifile.ru`, нажать «Предпросмотр».
   - **О:** POST `/links-preview` → 200, Open Graph метаданные (title, description, image, site_name).
   - **Ф:** ___________
 

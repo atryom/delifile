@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFileList } from '@/hooks/useFiles';
@@ -121,18 +121,6 @@ export default function FilesScreen() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
 
-  // Create folder state
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-  const createInputRef = useRef<TextInput>(null);
-  const [kbHeight, setKbHeight] = useState(0);
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', (e) => setKbHeight(e.endCoordinates.height));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
-    return () => { show.remove(); hide.remove(); };
-  }, []);
-
   const ensureRoot = useEnsurePersonalRoot();
   useEffect(() => {
     ensureRoot.mutate();
@@ -172,15 +160,6 @@ export default function FilesScreen() {
     onError: () => Alert.alert('Ошибка', 'Не удалось покинуть папку'),
   });
 
-  const createFolder = useMutation({
-    mutationFn: (name: string) => sharedFoldersApi.create(name),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['shared-folders'] });
-      closeCreate();
-    },
-    onError: () => Alert.alert('Ошибка', 'Не удалось создать папку'),
-  });
-
   function handleFolderMenu(folder: SharedFolder) {
     if (folder.is_owner) {
       Alert.alert(folder.name, undefined, [
@@ -217,24 +196,6 @@ export default function FilesScreen() {
     renameFolder.mutate({ id: renamingId, name: renameText.trim() });
   }
 
-  function openCreate() {
-    setNewName('');
-    setCreating(true);
-    setTimeout(() => createInputRef.current?.focus(), 50);
-  }
-
-  function closeCreate() {
-    Keyboard.dismiss();
-    setCreating(false);
-    setNewName('');
-  }
-
-  function handleCreate() {
-    const n = newName.trim();
-    if (!n || createFolder.isPending) return;
-    createFolder.mutate(n);
-  }
-
   function refetch() {
     refetchFolders();
     refetchFiles();
@@ -265,7 +226,7 @@ export default function FilesScreen() {
         options={{
           title: 'Файлы',
           headerRight: () => (
-            <TouchableOpacity onPress={openCreate} style={styles.addBtn}>
+            <TouchableOpacity onPress={() => router.push('/(app)/files/add' as any)} style={styles.addBtn}>
               <Text style={styles.addBtnText}>＋</Text>
             </TouchableOpacity>
           ),
@@ -322,7 +283,6 @@ export default function FilesScreen() {
           }
           onRefresh={refetch}
           refreshing={isLoading}
-          contentContainerStyle={creating ? { paddingBottom: 200 } : undefined}
           renderItem={({ item }) => {
             if (item.kind === 'header') {
               return (
@@ -349,34 +309,6 @@ export default function FilesScreen() {
         />
       )}
 
-      {creating && (
-        <View style={[styles.inputBar, { bottom: kbHeight }]}>
-          <Text style={styles.barTitle}>Новая папка</Text>
-          <TextInput
-            ref={createInputRef}
-            style={styles.textInput}
-            placeholder="Название папки..."
-            placeholderTextColor="#94A3B8"
-            value={newName}
-            onChangeText={setNewName}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={handleCreate}
-          />
-          <View style={styles.barButtons}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={closeCreate}>
-              <Text style={styles.cancelText}>Отмена</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.createBtn, (!newName.trim() || createFolder.isPending) && styles.createBtnDisabled]}
-              onPress={handleCreate}
-              disabled={!newName.trim() || createFolder.isPending}
-            >
-              <Text style={styles.createText}>{createFolder.isPending ? '...' : 'Создать'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
@@ -415,22 +347,4 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 16, fontWeight: '600', color: '#EF4444' },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#2563EB', borderRadius: 8 },
   retryText: { color: '#fff', fontWeight: '600' },
-  inputBar: {
-    position: 'absolute', left: 0, right: 0,
-    backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
-    borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 8,
-  },
-  barTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
-  textInput: {
-    height: 44, backgroundColor: '#F8FAFC', borderRadius: 10,
-    paddingHorizontal: 14, fontSize: 15, color: '#1E293B',
-    borderWidth: 1, borderColor: '#E2E8F0',
-  },
-  barButtons: { flexDirection: 'row', gap: 10 },
-  cancelBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontSize: 15, color: '#64748B' },
-  createBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
-  createBtnDisabled: { opacity: 0.5 },
-  createText: { fontSize: 15, color: '#fff', fontWeight: '600' },
 });

@@ -4,24 +4,18 @@ import { OrganizationApiService } from '../../../../core/api/organization-api.se
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { FilesApiService } from '../../../../core/api/files-api.service';
 import { CommentsApiService } from '../../../../core/api/comments-api.service';
-import { TariffApiService } from '../../../../core/api/tariff-api.service';
 import { FileUploadService } from '../../../files/services/file-upload.service';
-import { VideoThumbnailService } from '../../../files/services/video-thumbnail.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { ActivatedRoute, Router } from '@angular/router';
-import { HttpClientTestingModule, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { signal } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 
 describe('FoldersTreeComponent', () => {
   const mockOrgApi = {
-    getFolderTree: vi.fn(() => of({ result: 'success', data: { items: [] } })),
     getTags: vi.fn(() => of({ result: 'success', data: { items: [] } })),
-    createFolder: vi.fn(() => of({ result: 'success' })),
-    updateFolder: vi.fn(() => of({ result: 'success' })),
-    deleteFolder: vi.fn(() => of({ result: 'success' })),
     attachTags: vi.fn(() => of({ result: 'success' })),
     createTag: vi.fn(() => of({ result: 'success', data: { tag: { id: 't-1', name: 'newtag' } } })),
   };
@@ -40,24 +34,19 @@ describe('FoldersTreeComponent', () => {
     initUpload: vi.fn(),
     completeUpload: vi.fn(() => of({ result: 'success' })),
     addUrlFile: vi.fn(() => of({ result: 'success' })),
+    setFilePrivacy: vi.fn(() => of({ result: 'success' })),
+    setFolderPrivacy: vi.fn(() => of({ result: 'success' })),
   };
   const mockFilesApi = {
     list: vi.fn(() => of({ result: 'success', data: { items: [], pagination: { page: 1, per_page: 20, total: 0 } } })),
     download: vi.fn(() => of({ result: 'success', data: { url: 'https://example.com/dl' } })),
     favorite: vi.fn(() => of({ result: 'success' })),
     delete: vi.fn(() => of({ result: 'success' })),
-    moveFolder: vi.fn(() => of({ result: 'success' })),
-  };
-  const mockTariffApi = {
-    getUsage: vi.fn(() => of({ result: 'success', data: { storage_used_bytes: 100, storage_limit_bytes: 1000000000 } })),
   };
   const mockUploadSvc = {
     state: signal({ phase: 'idle', progress: 0, fileId: null, error: null }),
     upload: vi.fn(() => of('file-1')),
     reset: vi.fn(),
-  };
-  const mockThumbnailSvc = {
-    generateFromFile: vi.fn(() => Promise.resolve(null)),
   };
   const mockUrlFilesApi = {
     preview: vi.fn(() => of({ result: 'success', data: { preview: { title: 'Test', image_url: null, site_name: 'test.com' } } })),
@@ -69,14 +58,8 @@ describe('FoldersTreeComponent', () => {
   };
   const mockCommentsApi = {
     getThreads: vi.fn(() => of({ result: 'success', data: { policy: {}, threads: {} } })),
-    getThread: vi.fn(),
-    markRead: vi.fn(() => of({})),
-    createComment: vi.fn(),
-    updateComment: vi.fn(),
-    deleteComment: vi.fn(),
-    updateFileCommentSettings: vi.fn(),
-    updateSharedFolderCommentSettings: vi.fn(),
   };
+  const mockRouter = { navigate: vi.fn() };
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -88,13 +71,11 @@ describe('FoldersTreeComponent', () => {
         { provide: OrganizationApiService, useValue: mockOrgApi },
         { provide: SharedFoldersApiService, useValue: mockSfApi },
         { provide: FilesApiService, useValue: mockFilesApi },
-        { provide: TariffApiService, useValue: mockTariffApi },
         { provide: FileUploadService, useValue: mockUploadSvc },
-        { provide: VideoThumbnailService, useValue: mockThumbnailSvc },
         { provide: UrlFilesApiService, useValue: mockUrlFilesApi },
         { provide: AuthStateService, useValue: mockAuthState },
         { provide: CommentsApiService, useValue: mockCommentsApi },
-        { provide: Router, useValue: { navigate: vi.fn() } },
+        { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
       ],
     }).compileComponents();
@@ -105,41 +86,25 @@ describe('FoldersTreeComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should initialize with local tab', () => {
-    const fixture = TestBed.createComponent(FoldersTreeComponent);
-    expect(fixture.componentInstance.activeTab()).toBe('local');
-  });
-
-  it('should load folder tree on init', () => {
+  it('should initialize with root breadcrumb', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
     fixture.detectChanges();
-    expect(mockOrgApi.getFolderTree).toHaveBeenCalled();
+    expect(fixture.componentInstance.breadcrumbs()).toEqual([{ label: 'Папки', sharedFolderId: null }]);
+    expect(fixture.componentInstance.currentSharedFolderId()).toBeNull();
+  });
+
+  it('should load shared folders, files and tags on init', () => {
+    const fixture = TestBed.createComponent(FoldersTreeComponent);
+    fixture.detectChanges();
+    expect(mockSfApi.list).toHaveBeenCalled();
+    expect(mockFilesApi.list).toHaveBeenCalled();
+    expect(mockOrgApi.getTags).toHaveBeenCalled();
   });
 
   it('should load tags on init', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
     fixture.detectChanges();
     expect(mockOrgApi.getTags).toHaveBeenCalled();
-  });
-
-  it('should load usage on init', () => {
-    const fixture = TestBed.createComponent(FoldersTreeComponent);
-    fixture.detectChanges();
-    expect(mockTariffApi.getUsage).toHaveBeenCalled();
-  });
-
-  it('should switch tab', () => {
-    const fixture = TestBed.createComponent(FoldersTreeComponent);
-    fixture.componentInstance.setTab('shared');
-    expect(fixture.componentInstance.activeTab()).toBe('shared');
-  });
-
-  it('should navigate into local folder', () => {
-    const fixture = TestBed.createComponent(FoldersTreeComponent);
-    fixture.detectChanges();
-    fixture.componentInstance.navigateIntoLocalFolder({ id: 'folder-1', name: 'Test', children: [] });
-    expect(fixture.componentInstance.currentLocalFolderId()).toBe('folder-1');
-    expect(fixture.componentInstance.breadcrumbs().length).toBe(2);
   });
 
   it('should navigate into shared folder', () => {
@@ -159,7 +124,7 @@ describe('FoldersTreeComponent', () => {
 
   it('should toggle all files', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
-    fixture.componentInstance.files.set([{ id: 'f-1' } as any, { id: 'f-2' } as any]);
+    fixture.componentInstance.rawFiles.set([{ id: 'f-1' } as any, { id: 'f-2' } as any]);
     fixture.componentInstance.toggleAllFiles();
     expect(fixture.componentInstance.selectedFileIds().size).toBe(2);
     fixture.componentInstance.toggleAllFiles();
@@ -195,7 +160,7 @@ describe('FoldersTreeComponent', () => {
 
   it('should confirm and cancel delete', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
-    fixture.componentInstance.confirmDeleteLocalFolder({ id: 'f-1', name: 'Folder', children: [] });
+    fixture.componentInstance.confirmDeleteSharedFolder({ id: 'sf-1', name: 'Folder' } as any);
     expect(fixture.componentInstance.deleteTarget()).toBeTruthy();
     fixture.componentInstance.cancelDelete();
     expect(fixture.componentInstance.deleteTarget()).toBeNull();
@@ -223,12 +188,11 @@ describe('FoldersTreeComponent', () => {
     expect(fixture.componentInstance.page()).toBe(2);
   });
 
-  it('should create local folder', () => {
+  it('should create shared folder', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
-    fixture.componentInstance.activeTab.set('local');
     fixture.componentInstance.createNameValue = 'New Folder';
     fixture.componentInstance.saveCreate();
-    expect(mockOrgApi.createFolder).toHaveBeenCalled();
+    expect(mockSfApi.create).toHaveBeenCalled();
   });
 
   it('should open access dialog', () => {
@@ -303,16 +267,15 @@ describe('FoldersTreeComponent', () => {
     expect(mockUrlFilesApi.preview).toHaveBeenCalledWith('https://example.com');
   });
 
-  it('should save link for local tab', () => {
+  it('should save link at root level', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
     fixture.componentInstance.linkForm.setValue({ url: 'https://example.com' });
     fixture.componentInstance.saveLink();
     expect(mockUrlFilesApi.create).toHaveBeenCalledWith('https://example.com');
   });
 
-  it('should save link for shared tab', () => {
+  it('should save link inside shared folder', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
-    fixture.componentInstance.activeTab.set('shared');
     fixture.componentInstance.currentSharedFolderId.set('sf-1');
     fixture.componentInstance.linkForm.setValue({ url: 'https://example.com' });
     fixture.componentInstance.saveLink();
@@ -327,7 +290,7 @@ describe('FoldersTreeComponent', () => {
 
   it('should toggle all files when all selected', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
-    fixture.componentInstance.files.set([{ id: 'f-1' } as any, { id: 'f-2' } as any]);
+    fixture.componentInstance.rawFiles.set([{ id: 'f-1' } as any, { id: 'f-2' } as any]);
     fixture.componentInstance.selectedFileIds.set(new Set(['f-1', 'f-2']));
     expect(fixture.componentInstance.allFilesSelected()).toBe(true);
     fixture.componentInstance.toggleAllFiles();
