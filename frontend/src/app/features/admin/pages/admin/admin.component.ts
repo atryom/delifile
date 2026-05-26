@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormControl, Validators } from '@angular/forms';
 import { AdminApiService } from '../../../../core/api/admin-api.service';
 import { SupportApiService } from '../../../../core/api/support-api.service';
+import { ApiTokenApiService } from '../../../../core/api/api-token-api.service';
 import {
   AdminStats,
   AdminUser,
@@ -13,10 +14,11 @@ import {
   SuggestionItem,
   SuggestionDetail,
   PaginatedData,
+  ApiToken,
 } from '../../../../shared/models/api.models';
 import { formatSize } from '../../../../shared/utils/format';
 
-type AdminTab = 'stats' | 'users' | 'support' | 'suggestions';
+type AdminTab = 'stats' | 'users' | 'support' | 'suggestions' | 'tokens';
 
 @Component({
   selector: 'app-admin',
@@ -28,6 +30,7 @@ type AdminTab = 'stats' | 'users' | 'support' | 'suggestions';
 export class AdminComponent {
   private readonly adminApi   = inject(AdminApiService);
   private readonly supportApi = inject(SupportApiService);
+  private readonly tokenApi   = inject(ApiTokenApiService);
   private readonly fb         = inject(FormBuilder);
 
   readonly activeTab  = signal<AdminTab>('stats');
@@ -80,6 +83,16 @@ export class AdminComponent {
     return p ? Math.ceil(p.total / p.per_page) : 1;
   });
 
+  // ─── API Tokens ───────────────────────────────────────────────────────────
+  readonly apiTokens         = signal<ApiToken[]>([]);
+  readonly loadingTokens     = signal(false);
+  readonly showCreateToken   = signal(false);
+  readonly tokenNameCtrl     = new FormControl('');
+  readonly creatingToken     = signal(false);
+  readonly tokenCreateError  = signal<string | null>(null);
+  readonly createdTokenValue = signal<string | null>(null);
+  readonly tokenCopied       = signal(false);
+
   // ─── Admin Suggestions ────────────────────────────────────────────────────
   readonly adminSuggestions        = signal<SuggestionItem[]>([]);
   readonly suggestionsPagination   = signal<PaginatedData<SuggestionItem>['pagination'] | null>(null);
@@ -119,6 +132,9 @@ export class AdminComponent {
     }
     if (tab === 'suggestions' && this.adminSuggestions().length === 0) {
       this.loadSuggestions();
+    }
+    if (tab === 'tokens' && this.apiTokens().length === 0) {
+      this._loadApiTokens();
     }
   }
 
@@ -497,6 +513,62 @@ export class AdminComponent {
         this.notifyError.set(err?.message ?? 'Ошибка отправки');
         this.notifySending.set(false);
       },
+    });
+  }
+
+  // ─── API Token management ─────────────────────────────────────────────────
+
+  private _loadApiTokens(): void {
+    this.loadingTokens.set(true);
+    this.tokenApi.list().subscribe({
+      next: res => {
+        this.apiTokens.set(res.data.items);
+        this.loadingTokens.set(false);
+      },
+      error: () => this.loadingTokens.set(false),
+    });
+  }
+
+  createToken(): void {
+    const name = this.tokenNameCtrl.value?.trim();
+    if (!name || this.creatingToken()) return;
+
+    this.creatingToken.set(true);
+    this.tokenCreateError.set(null);
+    this.tokenApi.create(name).subscribe({
+      next: res => {
+        this.creatingToken.set(false);
+        this.apiTokens.update(ts => [res.data.item, ...ts]);
+        this.createdTokenValue.set(res.data.token);
+        this.cancelCreateToken();
+      },
+      error: (err) => {
+        this.creatingToken.set(false);
+        this.tokenCreateError.set(err?.message ?? 'Не удалось создать токен');
+      },
+    });
+  }
+
+  cancelCreateToken(): void {
+    this.showCreateToken.set(false);
+    this.tokenNameCtrl.reset();
+    this.tokenCreateError.set(null);
+  }
+
+  revokeToken(token: ApiToken): void {
+    if (!confirm(`Отозвать токен «${token.name}»?`)) return;
+    this.tokenApi.revoke(token.id).subscribe(() => {
+      this.apiTokens.update(ts => ts.filter(t => t.id !== token.id));
+      if (this.createdTokenValue()) this.createdTokenValue.set(null);
+    });
+  }
+
+  copyToken(): void {
+    const val = this.createdTokenValue();
+    if (!val) return;
+    navigator.clipboard.writeText(val).then(() => {
+      this.tokenCopied.set(true);
+      setTimeout(() => this.tokenCopied.set(false), 2000);
     });
   }
 

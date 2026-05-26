@@ -17,6 +17,9 @@
     <button class="tab-btn" [class.tab-btn--active]="activeTab() === 'suggestions'" (click)="setTab('suggestions')">
       Предложения
     </button>
+    <button class="tab-btn" [class.tab-btn--active]="activeTab() === 'tokens'" (click)="setTab('tokens')">
+      API-токены
+    </button>
   </div>
 
   <!-- ─── STATS ─────────────────────────────────────────────────────────────── -->
@@ -575,5 +578,73 @@
         }
       </div>
     </div>
+  }
+
+  <!-- ─── API TOKENS ──────────────────────────────────────────────────────── -->
+  @if (activeTab() === 'tokens') {
+    <section class="tokens-section">
+      <div class="section-toolbar">
+        <p class="tokens-desc">Долгоживущие ключи для доступа к API без браузерной сессии.</p>
+        @if (!showCreateToken()) {
+          <button class="btn-refresh" (click)="showCreateToken.set(true)">+ Создать токен</button>
+        }
+      </div>
+
+      @if (showCreateToken()) {
+        <div class="token-create-form">
+          <input class="token-name-input" type="text" [formControl]="tokenNameCtrl"
+                 placeholder="Название токена (например: Claude Code)" maxlength="100"
+                 (keydown.enter)="createToken()" />
+          @if (tokenCreateError()) {
+            <p class="error-text">{{ tokenCreateError() }}</p>
+          }
+          <div class="token-create-actions">
+            <button class="btn-save" [disabled]="!tokenNameCtrl.value?.trim() || creatingToken()" (click)="createToken()">
+              {{ creatingToken() ? 'Создание...' : 'Создать' }}
+            </button>
+            <button class="btn-neutral-sm" (click)="cancelCreateToken()">Отмена</button>
+          </div>
+        </div>
+      }
+
+      @if (createdTokenValue()) {
+        <div class="token-reveal" role="alert">
+          <p class="token-reveal__label">Скопируйте токен — он показывается один раз:</p>
+          <div class="token-reveal__row">
+            <code class="token-reveal__value">{{ createdTokenValue() }}</code>
+            <button class="btn-copy" (click)="copyToken()" [attr.aria-label]="'Скопировать токен'">
+              {{ tokenCopied() ? '✓ Скопировано' : 'Копировать' }}
+            </button>
+            <button class="btn-neutral-sm" (click)="createdTokenValue.set(null)">Скрыть</button>
+          </div>
+        </div>
+      }
+
+      @if (loadingTokens()) {
+        <p class="info-text">Загрузка...</p>
+      } @else {
+        <div class="token-list">
+          @for (token of apiTokens(); track token.id) {
+            <div class="token-item">
+              <div class="token-item-info">
+                <span class="token-item-name">{{ token.name }}</span>
+                <span class="token-item-meta">
+                  Создан: {{ formatDate(token.created_at) }}
+                  @if (token.last_used_at) {
+                    · Использовался: {{ formatDate(token.last_used_at) }}
+                  } @else {
+                    · Не использовался
+                  }
+                </span>
+              </div>
+              <button class="btn-danger-sm btn-action" (click)="revokeToken(token)">Отозвать</button>
+            </div>
+          }
+          @if (apiTokens().length === 0) {
+            <p class="info-text" style="padding: 24px 0">Токены не созданы</p>
+          }
+        </div>
+      }
+    </section>
   }
 </div>

@@ -769,3 +769,112 @@
   font-weight: 600;
   color: #16a34a;
 }
+
+/* ── API Tokens section ── */
+.tokens-section { padding: 0; }
+
+.tokens-desc {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.token-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.token-name-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 7px 10px;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  background: var(--surface2);
+  color: var(--text);
+  box-sizing: border-box;
+  &:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+}
+
+.token-create-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.token-reveal {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.token-reveal__label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.token-reveal__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.token-reveal__value {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 5px 10px;
+}
+
+.token-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.token-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  &:last-child { border-bottom: none; }
+}
+
+.token-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.token-item-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.token-item-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}

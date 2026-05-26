@@ -1,14 +1,13 @@
-import { Component, inject, signal, OnInit, ChangeDetectionStrategy, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { FormBuilder, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { UserSettingsApiService } from '../../../../core/api/user-settings-api.service';
-import { ApiTokenApiService } from '../../../../core/api/api-token-api.service';
 import { NotificationService } from '../../../../core/notifications/notification.service';
-import { DeviceSession, ContactRequestItem, ApiToken } from '../../../../shared/models/api.models';
+import { DeviceSession, ContactRequestItem } from '../../../../shared/models/api.models';
 
 @Component({
   selector: 'app-security',
@@ -25,7 +24,6 @@ export class SecurityComponent implements OnInit {
   private readonly router         = inject(Router);
   private readonly translate      = inject(TranslateService);
   private readonly settingsApi    = inject(UserSettingsApiService);
-  private readonly tokenApi       = inject(ApiTokenApiService);
   readonly notifService           = inject(NotificationService);
 
   readonly sessions        = signal<DeviceSession[]>([]);
@@ -64,16 +62,6 @@ export class SecurityComponent implements OnInit {
   readonly contactRequests        = signal<ContactRequestItem[]>([]);
   readonly loadingRequests        = signal(false);
 
-  // API tokens
-  readonly apiTokens          = signal<ApiToken[]>([]);
-  readonly loadingTokens      = signal(false);
-  readonly showCreateToken    = signal(false);
-  readonly tokenNameCtrl      = new FormControl('');
-  readonly creatingToken      = signal(false);
-  readonly tokenCreateError   = signal<string | null>(null);
-  readonly createdTokenValue  = signal<string | null>(null);
-  readonly tokenCopied        = signal(false);
-
   readonly pwdForm = this.fb.group({
     current_password:      ['', [Validators.required]],
     password:              ['', [Validators.required, Validators.minLength(8)]],
@@ -94,7 +82,6 @@ export class SecurityComponent implements OnInit {
     this.loadSessions();
     this._syncSettingsFromUser();
     this._loadContactRequests();
-    this._loadApiTokens();
   }
 
   private _syncSettingsFromUser(): void {
@@ -315,57 +302,4 @@ export class SecurityComponent implements OnInit {
     });
   }
 
-  private _loadApiTokens(): void {
-    this.loadingTokens.set(true);
-    this.tokenApi.list().subscribe({
-      next: res => {
-        this.apiTokens.set(res.data.items);
-        this.loadingTokens.set(false);
-      },
-      error: () => this.loadingTokens.set(false),
-    });
-  }
-
-  createToken(): void {
-    const name = this.tokenNameCtrl.value?.trim();
-    if (!name || this.creatingToken()) return;
-
-    this.creatingToken.set(true);
-    this.tokenCreateError.set(null);
-    this.tokenApi.create(name).subscribe({
-      next: res => {
-        this.creatingToken.set(false);
-        this.apiTokens.update(ts => [res.data.item, ...ts]);
-        this.createdTokenValue.set(res.data.token);
-        this.cancelCreateToken();
-      },
-      error: (err) => {
-        this.creatingToken.set(false);
-        this.tokenCreateError.set(err?.message ?? 'Не удалось создать токен');
-      },
-    });
-  }
-
-  cancelCreateToken(): void {
-    this.showCreateToken.set(false);
-    this.tokenNameCtrl.reset();
-    this.tokenCreateError.set(null);
-  }
-
-  revokeToken(token: ApiToken): void {
-    if (!confirm(`Отозвать токен «${token.name}»?`)) return;
-    this.tokenApi.revoke(token.id).subscribe(() => {
-      this.apiTokens.update(ts => ts.filter(t => t.id !== token.id));
-      if (this.createdTokenValue()) this.createdTokenValue.set(null);
-    });
-  }
-
-  copyToken(): void {
-    const val = this.createdTokenValue();
-    if (!val) return;
-    navigator.clipboard.writeText(val).then(() => {
-      this.tokenCopied.set(true);
-      setTimeout(() => this.tokenCopied.set(false), 2000);
-    });
-  }
 }
