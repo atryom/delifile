@@ -490,6 +490,8 @@
       "contacts_desc": "Notification when another user wants to add you as a contact.",
       "folder_shared_label": "Notify about folder access",
       "folder_shared_desc": "Notification when a shared folder is made accessible to you.",
+      "shared_folder_updates_label": "Notify about new content in shared folders",
+      "shared_folder_updates_desc": "Notification when a member adds a file, link, or note to your shared folder.",
       "comments_label": "Notify about new comments",
       "comments_desc": "Notification when a new comment appears in a thread you participated in.",
       "mentions_label": "Notify about mentions",

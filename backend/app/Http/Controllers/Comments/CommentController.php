@@ -146,7 +146,11 @@ class CommentController extends Controller
             if ($mentionsJson) {
                 $this->commentService->processMentions($comment, $mentionsJson, $targetUrl);
             }
-            $this->commentService->notifyNewComment($comment, $thread, $targetUrl);
+            if ($thread->target_type === CommentTargetType::SharedFolder && $thread->scope === CommentScope::Shared) {
+                $this->commentService->notifySharedFolderNote($comment, $thread, $targetUrl);
+            } else {
+                $this->commentService->notifyNewComment($comment, $thread, $targetUrl);
+            }
 
             return $this->success('Comment created', [
                 'comment' => $this->commentService->formatComment($comment, $user->id),

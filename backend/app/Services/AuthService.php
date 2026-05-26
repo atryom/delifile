@@ -183,6 +183,7 @@ class AuthService
             'notifications_enabled'                 => (bool) ($user->notifications_enabled ?? true),
             'notify_new_files'                      => (bool) ($user->notify_new_files ?? true),
             'notify_folder_shared'                  => (bool) ($user->notify_folder_shared ?? true),
+            'notify_shared_folder_updates'          => (bool) ($user->notify_shared_folder_updates ?? true),
             'notify_comments'                       => (bool) ($user->notify_comments ?? true),
             'notify_mentions'                       => (bool) ($user->notify_mentions ?? true),
             'notify_support_reply'                  => (bool) ($user->notify_support_reply ?? true),

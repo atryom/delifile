@@ -192,6 +192,7 @@ export interface CurrentUser {
   notifications_enabled: boolean;
   notify_new_files: boolean;
   notify_folder_shared: boolean;
+  notify_shared_folder_updates: boolean;
   notify_comments: boolean;
   notify_mentions: boolean;
   notify_support_reply: boolean;
@@ -401,6 +402,7 @@ export interface UserSettings {
   notifications_enabled?: boolean;
   notify_new_files?: boolean;
   notify_folder_shared?: boolean;
+  notify_shared_folder_updates?: boolean;
   notify_comments?: boolean;
   notify_mentions?: boolean;
   notify_support_reply?: boolean;

@@ -70,7 +70,13 @@ export class NotificationsComponent implements OnInit {
       case 'access_changed':
         return item.data?.['file_id'] ? `/files/${item.data['file_id']}` : '/files';
       case 'folder_shared':
-        return '/folders';
+        return item.data?.['folder_id']
+          ? `/folders?tab=shared&shared_folder_id=${item.data['folder_id']}`
+          : '/folders';
+      case 'shared_folder_content_added':
+        return item.data?.['folder_id']
+          ? `/folders?tab=shared&shared_folder_id=${item.data['folder_id']}`
+          : '/folders';
       case 'contact_request':
         return '/communication/contacts';
       case 'admin_message':

@@ -20,6 +20,7 @@ class UserSettingsController extends Controller
             'notifications_enabled'               => ['sometimes', 'boolean'],
             'notify_new_files'                    => ['sometimes', 'boolean'],
             'notify_folder_shared'                => ['sometimes', 'boolean'],
+            'notify_shared_folder_updates'        => ['sometimes', 'boolean'],
             'notify_comments'                     => ['sometimes', 'boolean'],
             'notify_mentions'                     => ['sometimes', 'boolean'],
             'notify_support_reply'                => ['sometimes', 'boolean'],

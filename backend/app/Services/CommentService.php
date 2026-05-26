@@ -26,6 +26,7 @@ class CommentService
 {
     public function __construct(
         private readonly PushNotificationService $pushService,
+        private readonly NotificationService     $notificationService,
     ) {}
 
     // ─── Access checks ────────────────────────────────────────────────────────
@@ -348,6 +349,47 @@ class CommentService
             CommentMention::where('comment_id', $comment->id)
                 ->whereIn('mentioned_user_id', $delivered)
                 ->update(['delivered_at' => $now]);
+        }
+    }
+
+    /**
+     * Notify all members of a shared folder when a new shared note is posted.
+     * Called instead of notifyNewComment for SharedFolder+Shared scope threads.
+     */
+    public function notifySharedFolderNote(Comment $comment, CommentThread $thread, string $targetUrl): void
+    {
+        $folder = SharedFolder::find($thread->target_id);
+        if (!$folder) {
+            return;
+        }
+
+        $memberIds = array_unique(array_merge(
+            [$folder->owner_id],
+            SharedFolderAccess::where('shared_folder_id', $folder->id)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')
+                ->toArray()
+        ));
+
+        $author    = $comment->author;
+        $adderName = $author?->name ?? $author?->email ?? 'Пользователь';
+
+        foreach ($memberIds as $memberId) {
+            if ($memberId === $comment->author_user_id) continue;
+            $member = User::find($memberId);
+            if (!$member) continue;
+
+            $this->notificationService->notifySharedFolderContentAdded(
+                $member, $adderName, $folder->name, $folder->id, 'note',
+            );
+            if ($member->notifications_enabled ?? true) {
+                $this->pushService->sendToUser(
+                    $member,
+                    'Новая заметка в общей папке',
+                    "{$adderName} добавил заметку в папку «{$folder->name}»",
+                    $targetUrl,
+                );
+            }
         }
     }
 

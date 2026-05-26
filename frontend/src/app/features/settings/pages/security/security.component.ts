@@ -45,9 +45,10 @@ export class SecurityComponent implements OnInit {
 
   // Notification toggles (mirrored from user state for local editing)
   readonly notificationsEnabled   = signal(true);
-  readonly notifyNewFiles         = signal(true);
-  readonly notifyFolderShared     = signal(true);
-  readonly notifyComments         = signal(true);
+  readonly notifyNewFiles               = signal(true);
+  readonly notifyFolderShared           = signal(true);
+  readonly notifySharedFolderUpdates    = signal(true);
+  readonly notifyComments               = signal(true);
   readonly notifyMentions         = signal(true);
   readonly notifySupportReply     = signal(true);
   readonly notifyContactsAdded    = signal(true);
@@ -97,6 +98,7 @@ export class SecurityComponent implements OnInit {
     // Sub-settings keep their backend-stored state regardless of browser permission
     this.notifyNewFiles.set(user.notify_new_files ?? true);
     this.notifyFolderShared.set(user.notify_folder_shared ?? true);
+    this.notifySharedFolderUpdates.set(user.notify_shared_folder_updates ?? true);
     this.notifyComments.set(user.notify_comments ?? true);
     this.notifyMentions.set(user.notify_mentions ?? true);
     this.notifySupportReply.set(user.notify_support_reply ?? true);
@@ -236,6 +238,11 @@ export class SecurityComponent implements OnInit {
     this._saveSettings();
   }
 
+  toggleNotifySharedFolderUpdates(value: boolean): void {
+    this.notifySharedFolderUpdates.set(value);
+    this._saveSettings();
+  }
+
   toggleNotifyComments(value: boolean): void {
     this.notifyComments.set(value);
     this._saveSettings();
@@ -273,6 +280,7 @@ export class SecurityComponent implements OnInit {
       notifications_enabled:               this.notificationsEnabled(),
       notify_new_files:                    this.notifyNewFiles(),
       notify_folder_shared:                this.notifyFolderShared(),
+      notify_shared_folder_updates:        this.notifySharedFolderUpdates(),
       notify_comments:                     this.notifyComments(),
       notify_mentions:                     this.notifyMentions(),
       notify_support_reply:                this.notifySupportReply(),

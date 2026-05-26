@@ -66,6 +66,27 @@ class NotificationService
         );
     }
 
+    public function notifySharedFolderContentAdded(User $recipient, string $adderName, string $folderName, string $folderId, string $contentType): void
+    {
+        if (!($recipient->notify_shared_folder_updates ?? true)) {
+            return;
+        }
+
+        $contentLabel = match($contentType) {
+            'link' => 'ссылку',
+            'note' => 'заметку',
+            default => 'файл',
+        };
+
+        $this->create(
+            $recipient->id,
+            NotificationType::SharedFolderContentAdded,
+            'Новое в общей папке',
+            "{$adderName} добавил {$contentLabel} в папку «{$folderName}»",
+            ['folder_id' => $folderId],
+        );
+    }
+
     public function notifyAdmin(string $recipientUserId, string $title, ?string $body = null): void
     {
         $this->create($recipientUserId, NotificationType::AdminMessage, $title, $body);

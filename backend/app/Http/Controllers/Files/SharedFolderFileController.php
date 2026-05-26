@@ -11,13 +11,55 @@ use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
 use App\Models\User;
 use App\Services\FileService;
+use App\Services\NotificationService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class SharedFolderFileController extends Controller
 {
-    public function __construct(private readonly FileService $fileService) {}
+    public function __construct(
+        private readonly FileService             $fileService,
+        private readonly NotificationService     $notificationService,
+        private readonly PushNotificationService $pushService,
+    ) {}
+
+    private function notifyFolderMembers(SharedFolder $folder, User $adder, string $contentType): void
+    {
+        $memberIds = array_unique(array_merge(
+            [$folder->owner_id],
+            SharedFolderAccess::where('shared_folder_id', $folder->id)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')
+                ->toArray()
+        ));
+        $adderName    = $adder->name ?? $adder->email;
+        $contentLabel = match($contentType) {
+            'link' => 'ссылку',
+            'note' => 'заметку',
+            default => 'файл',
+        };
+        $notifUrl = config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id;
+
+        foreach ($memberIds as $memberId) {
+            if ($memberId === $adder->id) continue;
+            $member = User::find($memberId);
+            if (!$member) continue;
+
+            $this->notificationService->notifySharedFolderContentAdded(
+                $member, $adderName, $folder->name, $folder->id, $contentType,
+            );
+            if ($member->notifications_enabled ?? true) {
+                $this->pushService->sendToUser(
+                    $member,
+                    'Новое в общей папке',
+                    "{$adderName} добавил {$contentLabel} в «{$folder->name}»",
+                    $notifUrl,
+                );
+            }
+        }
+    }
     /**
      * Check folder access with ancestor inheritance — mirrors SharedFolderController::canAccess().
      */
@@ -141,6 +183,13 @@ class SharedFolderFileController extends Controller
             }
         });
 
+        foreach ($toAdd as $folderId) {
+            $folder = $allFolders->get($folderId);
+            if ($folder) {
+                $this->notifyFolderMembers($folder, $user, 'file');
+            }
+        }
+
         $updatedFolderIds = SharedFolderFile::where('file_id', $file->id)
             ->pluck('shared_folder_id')->values()->toArray();
 
@@ -176,7 +225,7 @@ class SharedFolderFileController extends Controller
             return $this->forbidden('Edit access required to add files');
         }
 
-        SharedFolderFile::firstOrCreate([
+        $sff = SharedFolderFile::firstOrCreate([
             'shared_folder_id' => $folderId,
             'file_id'          => $fileId,
         ], ['added_by' => $user->id]);
@@ -184,6 +233,10 @@ class SharedFolderFileController extends Controller
         // When moving (not just adding), hide the file from the owner's root view
         if ($request->boolean('move') && $file->owner_id === $user->id && !$file->shared_folder_only) {
             $file->update(['shared_folder_only' => true]);
+        }
+
+        if ($sff->wasRecentlyCreated) {
+            $this->notifyFolderMembers($folder, $user, 'file');
         }
 
         return $this->success('File added to folder');

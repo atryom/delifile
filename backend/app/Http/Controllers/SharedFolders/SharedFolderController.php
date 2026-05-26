@@ -39,6 +39,48 @@ class SharedFolderController extends Controller
         private readonly NotificationService     $notificationService,
     ) {}
 
+    // ─── Notification helpers ─────────────────────────────────────────────────
+
+    private function getFolderMemberUserIds(SharedFolder $folder): array
+    {
+        $memberIds = [$folder->owner_id];
+        $directIds = SharedFolderAccess::where('shared_folder_id', $folder->id)
+            ->whereNotNull('user_id')
+            ->pluck('user_id')
+            ->toArray();
+        return array_unique(array_merge($memberIds, $directIds));
+    }
+
+    private function notifyFolderMembers(SharedFolder $folder, User $adder, string $contentType): void
+    {
+        $memberIds = $this->getFolderMemberUserIds($folder);
+        $adderName = $adder->name ?? $adder->email;
+        $contentLabel = match($contentType) {
+            'link' => 'ссылку',
+            'note' => 'заметку',
+            default => 'файл',
+        };
+        $notifUrl = config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id;
+
+        foreach ($memberIds as $memberId) {
+            if ($memberId === $adder->id) continue;
+            $member = User::find($memberId);
+            if (!$member) continue;
+
+            $this->notificationService->notifySharedFolderContentAdded(
+                $member, $adderName, $folder->name, $folder->id, $contentType,
+            );
+            if ($member->notifications_enabled ?? true) {
+                $this->pushService->sendToUser(
+                    $member,
+                    'Новое в общей папке',
+                    "{$adderName} добавил {$contentLabel} в «{$folder->name}»",
+                    $notifUrl,
+                );
+            }
+        }
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     /**
@@ -587,6 +629,8 @@ class SharedFolderController extends Controller
 
         $result = $this->fileService->completeUpload($file, $user, $request->input('thumbnail_key'));
 
+        $this->notifyFolderMembers($folder, $user, 'file');
+
         return $this->success('Upload completed', $result);
     }
 
@@ -632,6 +676,8 @@ class SharedFolderController extends Controller
             ], [
                 'added_by' => $user->id,
             ]);
+
+            $this->notifyFolderMembers($folder, $user, 'link');
 
             return $this->success('URL file added', $result, 201);
         });
