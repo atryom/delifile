@@ -131,6 +131,9 @@ export class FileDetailComponent implements OnInit {
     if (!f) return '';
     const v = this.selectedVersion();
     if (v) return v.original_name;
+    if (f.content_kind === 'url_file') {
+      return f.display_name ?? f.link_title ?? f.original_name;
+    }
     return f.display_name ?? f.original_name;
   });
 
@@ -631,7 +634,9 @@ export class FileDetailComponent implements OnInit {
   startRename(): void {
     const f = this.file();
     if (!f || !f.is_owner) return;
-    this.renameDraft = f.display_name ?? f.original_name;
+    this.renameDraft = f.content_kind === 'url_file'
+      ? (f.display_name ?? f.link_title ?? f.original_name)
+      : (f.display_name ?? f.original_name);
     this.renamingTitle.set(true);
   }
 
@@ -644,7 +649,9 @@ export class FileDetailComponent implements OnInit {
     const f = this.file();
     if (!f) return;
     const name = this.renameDraft.trim();
-    const current = f.display_name ?? f.original_name;
+    const current = f.content_kind === 'url_file'
+      ? (f.display_name ?? f.link_title ?? f.original_name)
+      : (f.display_name ?? f.original_name);
     if (!name || name === current) {
       this.renamingTitle.set(false);
       return;

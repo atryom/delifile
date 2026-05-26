@@ -64,7 +64,29 @@
                 <div class="url-card-body">
                   <div class="url-card-content">
                     <p class="url-site">{{ file()!.link_site_name ?? file()!.link_url }}</p>
-                    <h2 class="url-card-title">{{ file()!.original_name }}</h2>
+                    @if (renamingTitle()) {
+                      <div class="file-title-edit">
+                        <input
+                          class="file-title-input"
+                          type="text"
+                          [(ngModel)]="renameDraft"
+                          (keydown.enter)="commitRename()"
+                          (keydown.escape)="cancelRename()"
+                          (blur)="commitRename()"
+                          [disabled]="savingRename()"
+                          [attr.aria-label]="'files.detail.rename_label' | translate"
+                          autofocus
+                        />
+                        <button class="btn-rename-cancel" type="button" (click)="cancelRename()" [attr.aria-label]="'common.cancel' | translate">✕</button>
+                      </div>
+                    } @else {
+                      <h2 class="url-card-title"
+                          [class.file-title-readonly]="!file()!.is_owner"
+                          (click)="startRename()"
+                          [title]="file()!.is_owner ? ('files.detail.click_to_rename' | translate) : ''">
+                        {{ displayTitle() }}
+                      </h2>
+                    }
                     @if (file()!.link_description) {
                       <p class="url-card-desc">{{ file()!.link_description }}</p>
                     }
