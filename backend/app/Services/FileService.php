@@ -504,6 +504,26 @@ class FileService
             $query->where('content_kind', $options['content_kind']);
         }
 
+        if (isset($options['is_task'])) {
+            $query->where('is_task', (bool) $options['is_task']);
+        }
+
+        if (!empty($options['task_status'])) {
+            $query->where('task_status', $options['task_status']);
+        }
+
+        if (!empty($options['task_assigned_user_id'])) {
+            $query->where('task_assigned_user_id', $options['task_assigned_user_id']);
+        }
+
+        if (!empty($options['task_date_from'])) {
+            $query->where('task_start_date', '>=', $options['task_date_from']);
+        }
+
+        if (!empty($options['task_date_to'])) {
+            $query->where('task_due_date', '<=', $options['task_date_to']);
+        }
+
         $availableTypeGroups = $this->computeAvailableTypeGroups(clone $query);
 
         if (!empty($options['file_type_group'])) {

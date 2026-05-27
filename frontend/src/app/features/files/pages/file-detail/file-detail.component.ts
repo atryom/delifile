@@ -9,7 +9,7 @@ import { DocumentsApiService } from '../../../../core/api/documents-api.service'
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
-import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode, SharedFolder } from '../../../../shared/models/api.models';
+import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode, SharedFolder, TaskStatus } from '../../../../shared/models/api.models';
 import { formatSize } from '../../../../shared/utils/format';
 import { canViewInBrowser } from '../../../../shared/utils/file';
 import { flattenTree } from '../../../../shared/utils/tree';
@@ -164,6 +164,22 @@ export class FileDetailComponent implements OnInit {
   renameDraft             = '';
   readonly savingRename   = signal(false);
 
+  // ─── Task state ──────────────────────────────────────────────────────────────
+
+  readonly isTask        = computed(() => this.file()?.is_task ?? false);
+  readonly taskStatus    = computed(() => this.file()?.task_status ?? null);
+  readonly taskAssignee  = computed(() => this.file()?.task_assigned_user ?? null);
+  readonly savingTask    = signal(false);
+  taskStartDraft         = '';
+  taskDueDraft           = '';
+
+  readonly taskStatuses: { value: TaskStatus; labelKey: string }[] = [
+    { value: 'template',     labelKey: 'tasks.status.template' },
+    { value: 'in_progress',  labelKey: 'tasks.status.in_progress' },
+    { value: 'under_review', labelKey: 'tasks.status.under_review' },
+    { value: 'completed',    labelKey: 'tasks.status.completed' },
+  ];
+
   ngOnInit(): void {
     const fromParam = this.route.snapshot.queryParamMap.get('from');
     const folderIdParam = this.route.snapshot.queryParamMap.get('folder_id');
@@ -204,6 +220,8 @@ export class FileDetailComponent implements OnInit {
         this.file.set(res.data.file);
         this.descriptionDraft = res.data.file.description ?? '';
         this.descriptionEditorOpen.set(!!(res.data.file.description));
+        this.taskStartDraft = res.data.file.task_start_date ? this.toDatetimeLocal(res.data.file.task_start_date) : '';
+        this.taskDueDraft   = res.data.file.task_due_date   ? this.toDatetimeLocal(res.data.file.task_due_date)   : '';
         this.pendingFolderId.set(res.data.file.folder_id ?? null);
         this.displayNameDraft = res.data.file.display_name ?? '';
         this.loading.set(false);
@@ -767,6 +785,58 @@ export class FileDetailComponent implements OnInit {
       },
       error: () => {},
     });
+  }
+
+  // ─── Task management ─────────────────────────────────────────────────────────
+
+  toggleTaskMode(): void {
+    if (this.savingTask()) return;
+    const current = this.isTask();
+    this.savingTask.set(true);
+    this.filesApi.updateTask(this.id(), { is_task: !current }).subscribe({
+      next: (res) => {
+        this.file.set(res.data.file);
+        if (res.data.file.task_start_date) this.taskStartDraft = this.toDatetimeLocal(res.data.file.task_start_date);
+        if (res.data.file.task_due_date)   this.taskDueDraft   = this.toDatetimeLocal(res.data.file.task_due_date);
+        this.savingTask.set(false);
+      },
+      error: () => this.savingTask.set(false),
+    });
+  }
+
+  updateTaskStatus(status: TaskStatus): void {
+    if (this.savingTask()) return;
+    this.savingTask.set(true);
+    this.filesApi.updateTask(this.id(), { task_status: status }).subscribe({
+      next: (res) => { this.file.set(res.data.file); this.savingTask.set(false); },
+      error: () => this.savingTask.set(false),
+    });
+  }
+
+  updateTaskDates(): void {
+    if (this.savingTask()) return;
+    this.savingTask.set(true);
+    const start = this.taskStartDraft ? new Date(this.taskStartDraft).toISOString() : null;
+    const due   = this.taskDueDraft   ? new Date(this.taskDueDraft).toISOString()   : null;
+    this.filesApi.updateTask(this.id(), { task_start_date: start, task_due_date: due }).subscribe({
+      next: (res) => { this.file.set(res.data.file); this.savingTask.set(false); },
+      error: () => this.savingTask.set(false),
+    });
+  }
+
+  updateTaskAssignee(userId: number | null): void {
+    if (this.savingTask()) return;
+    this.savingTask.set(true);
+    this.filesApi.updateTask(this.id(), { task_assigned_user_id: userId }).subscribe({
+      next: (res) => { this.file.set(res.data.file); this.savingTask.set(false); },
+      error: () => this.savingTask.set(false),
+    });
+  }
+
+  private toDatetimeLocal(iso: string): string {
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   addToMyFiles(): void {

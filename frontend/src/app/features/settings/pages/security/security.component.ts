@@ -52,6 +52,7 @@ export class SecurityComponent implements OnInit {
   readonly notifyMentions         = signal(true);
   readonly notifySupportReply     = signal(true);
   readonly notifyContactsAdded    = signal(true);
+  readonly notifyTaskAssigned     = signal(true);
 
   // Contact settings
   readonly allowContactsWithout   = signal(true);
@@ -103,6 +104,7 @@ export class SecurityComponent implements OnInit {
     this.notifyMentions.set(user.notify_mentions ?? true);
     this.notifySupportReply.set(user.notify_support_reply ?? true);
     this.notifyContactsAdded.set(user.notify_contacts_added ?? true);
+    this.notifyTaskAssigned.set(user.notify_task_assigned ?? true);
     this.allowContactsWithout.set(user.allow_contacts_without_confirmation ?? true);
     this.autoAddReceivedFiles.set(user.auto_add_received_files ?? true);
   }
@@ -263,6 +265,11 @@ export class SecurityComponent implements OnInit {
     this._saveSettings();
   }
 
+  toggleNotifyTaskAssigned(value: boolean): void {
+    this.notifyTaskAssigned.set(value);
+    this._saveSettings();
+  }
+
   toggleAllowContacts(value: boolean): void {
     this.allowContactsWithout.set(value);
     this._saveSettings();
@@ -285,6 +292,7 @@ export class SecurityComponent implements OnInit {
       notify_mentions:                     this.notifyMentions(),
       notify_support_reply:                this.notifySupportReply(),
       notify_contacts_added:               this.notifyContactsAdded(),
+      notify_task_assigned:                this.notifyTaskAssigned(),
       allow_contacts_without_confirmation: this.allowContactsWithout(),
       auto_add_received_files:             this.autoAddReceivedFiles(),
     }).subscribe({

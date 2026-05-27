@@ -212,6 +212,19 @@
                         </svg>
                         {{ editorPanelOpen() ? 'Закрыть редактор' : 'Редактировать' }}
                       </button>
+                      @if (file()!.is_owner) {
+                        <button
+                          type="button"
+                          class="card-link-btn"
+                          [class.card-link-btn-primary]="isTask()"
+                          (click)="toggleTaskMode()"
+                          [disabled]="savingTask()"
+                          [attr.aria-label]="(isTask() ? ('tasks.toggle_to_note' | translate) : ('tasks.toggle_to_task' | translate))"
+                        >
+                          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                          {{ isTask() ? ('tasks.toggle_to_note' | translate) : ('tasks.toggle_to_task' | translate) }}
+                        </button>
+                      }
                     } @else {
                       <button class="card-link-btn card-link-btn-primary" (click)="download()" [disabled]="actionPending()">
                         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
@@ -266,6 +279,51 @@
                       }
                     </span>
                   </button>
+                </div>
+              </div>
+            }
+
+            <!-- Task management section -->
+            @if (isTask()) {
+              <div class="section task-section">
+                <h3 class="section-title">{{ 'tasks.section_title' | translate }}</h3>
+
+                <div class="task-status-row" role="group" [attr.aria-label]="'tasks.status_label' | translate">
+                  @for (s of taskStatuses; track s.value) {
+                    <button
+                      type="button"
+                      class="task-status-btn"
+                      [class.task-status-btn--active]="taskStatus() === s.value"
+                      (click)="updateTaskStatus(s.value)"
+                      [disabled]="savingTask()"
+                      [attr.aria-pressed]="taskStatus() === s.value"
+                    >{{ s.labelKey | translate }}</button>
+                  }
+                </div>
+
+                <div class="task-dates-row">
+                  <div class="task-date-field">
+                    <label class="field-label" for="taskStartDate">{{ 'tasks.start_date' | translate }}</label>
+                    <input
+                      id="taskStartDate"
+                      class="field-input"
+                      type="datetime-local"
+                      [(ngModel)]="taskStartDraft"
+                      (change)="updateTaskDates()"
+                      [attr.aria-label]="'tasks.start_date' | translate"
+                    />
+                  </div>
+                  <div class="task-date-field">
+                    <label class="field-label" for="taskDueDate">{{ 'tasks.due_date' | translate }}</label>
+                    <input
+                      id="taskDueDate"
+                      class="field-input"
+                      type="datetime-local"
+                      [(ngModel)]="taskDueDraft"
+                      (change)="updateTaskDates()"
+                      [attr.aria-label]="'tasks.due_date' | translate"
+                    />
+                  </div>
                 </div>
               </div>
             }
@@ -559,6 +617,28 @@
                     >
                       <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
+                  }
+                  @if (isTask() && file()!.is_owner && !a.is_pending) {
+                    @if (a.user?.id === taskAssignee()?.id) {
+                      <span class="assignee-badge" [title]="'tasks.assignee' | translate" [attr.aria-label]="'tasks.assignee' | translate">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                      </span>
+                      <button
+                        type="button"
+                        class="btn-assign btn-assign--revoke"
+                        (click)="updateTaskAssignee(null)"
+                        [disabled]="savingTask()"
+                        [attr.aria-label]="'tasks.unassign_btn' | translate"
+                      >{{ 'tasks.unassign_btn' | translate }}</button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="btn-assign"
+                        (click)="updateTaskAssignee(a.user!.id)"
+                        [disabled]="savingTask()"
+                        [attr.aria-label]="'tasks.assign_btn' | translate"
+                      >{{ 'tasks.assign_btn' | translate }}</button>
+                    }
                   }
                 </div>
               }

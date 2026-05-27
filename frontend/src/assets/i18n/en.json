@@ -497,7 +497,9 @@
       "mentions_label": "Notify about mentions",
       "mentions_desc": "Notification when you are mentioned via @ in a comment.",
       "support_reply_label": "Notify about support replies",
-      "support_reply_desc": "Notification when the support team replies to your ticket."
+      "support_reply_desc": "Notification when the support team replies to your ticket.",
+      "task_assigned_label": "Task assignee notifications",
+      "task_assigned_desc": "Notify when you are assigned as a task executor."
     },
     "contacts_privacy": {
       "title": "Contact privacy",
@@ -686,5 +688,25 @@
     "discussion_panel_aria": "Folder discussion panel",
     "discussion_title": "Folder Discussion",
     "my_notes_btn": "My Notes"
+  },
+  "tasks": {
+    "section_title": "Task",
+    "status_label": "Task status",
+    "status_all": "All statuses",
+    "status": {
+      "template": "Template",
+      "in_progress": "In Progress",
+      "under_review": "Under Review",
+      "completed": "Completed"
+    },
+    "toggle_to_task": "Task",
+    "toggle_to_note": "Note",
+    "create_as_task": "Create as task",
+    "start_date": "Start date",
+    "due_date": "Due date",
+    "assignee": "Assignee",
+    "assign_btn": "Assign",
+    "unassign_btn": "Unassign",
+    "task_view": "Tasks"
   }
 }

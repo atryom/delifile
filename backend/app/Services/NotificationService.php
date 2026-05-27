@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\NotificationType;
+use App\Models\File;
 use App\Models\User;
 use App\Models\UserNotification;
 
@@ -84,6 +85,18 @@ class NotificationService
             'Новое в общей папке',
             "{$adderName} добавил {$contentLabel} в папку «{$folderName}»",
             ['folder_id' => $folderId],
+        );
+    }
+
+    public function notifyTaskAssigned(User $assignee, File $file, User $assigner): void
+    {
+        $fileName = $file->display_name ?? $file->original_name;
+        $this->create(
+            $assignee->id,
+            NotificationType::TaskAssigned,
+            'Вы назначены исполнителем',
+            "{$assigner->name} назначил вас исполнителем задачи «{$fileName}»",
+            ['file_id' => $file->id],
         );
     }
 

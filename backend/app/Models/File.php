@@ -43,6 +43,11 @@ class File extends Model
         'link_image_url',
         'link_site_name',
         'link_fetched_at',
+        'is_task',
+        'task_status',
+        'task_assigned_user_id',
+        'task_start_date',
+        'task_due_date',
     ];
 
     protected function casts(): array
@@ -57,6 +62,9 @@ class File extends Model
             'is_editable'        => 'boolean',
             'width'              => 'integer',
             'height'             => 'integer',
+            'is_task'            => 'boolean',
+            'task_start_date'    => 'datetime',
+            'task_due_date'      => 'datetime',
         ];
     }
 
@@ -68,6 +76,16 @@ class File extends Model
     public function isMarkdownDocument(): bool
     {
         return $this->is_editable && $this->editor_type === 'markdown';
+    }
+
+    public function taskAssignee(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'task_assigned_user_id');
+    }
+
+    public function isTask(): bool
+    {
+        return (bool) $this->is_task;
     }
 
     public function updatedByUser(): \Illuminate\Database\Eloquent\Relations\BelongsTo

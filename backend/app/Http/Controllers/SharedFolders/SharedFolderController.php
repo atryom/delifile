@@ -137,6 +137,7 @@ class SharedFolderController extends Controller
             'owner_id'          => $folder->owner_id,
             'parent_id'         => $folder->parent_id,
             'files_count'       => $folder->files_count ?? 0,
+            'tasks_count'       => $folder->tasks_count ?? 0,
             'children_count'    => $folder->children_count ?? 0,
             'is_owner'          => $folder->owner_id === $user->id,
             'my_access_type'    => $myAccess?->access_type?->value,
@@ -227,7 +228,12 @@ class SharedFolderController extends Controller
         $showIds = array_unique($showIds);
 
         $folders = SharedFolder::whereIn('id', $showIds)
-            ->withCount(['sharedFiles as files_count', 'children', 'accesses'])
+            ->withCount([
+                    'sharedFiles as files_count',
+                    'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
+                    'children',
+                    'accesses',
+                ])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -348,7 +354,12 @@ class SharedFolderController extends Controller
 
         $children = SharedFolder::where('parent_id', $id)
             ->when(!$isOwner, fn ($q) => $q->where('is_private', false))
-            ->withCount(['sharedFiles as files_count', 'children', 'accesses'])
+            ->withCount([
+                    'sharedFiles as files_count',
+                    'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
+                    'children',
+                    'accesses',
+                ])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -385,7 +396,12 @@ class SharedFolderController extends Controller
         ]);
         $folder->update(array_filter($data, fn ($v) => $v !== null) + ['name' => $data['name']]);
 
-        $folder->loadCount(['sharedFiles as files_count', 'children', 'accesses']);
+        $folder->loadCount([
+            'sharedFiles as files_count',
+            'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
+            'children',
+            'accesses',
+        ]);
 
         return $this->success('Shared folder updated', [
             'folder' => $this->formatFolder($folder, $request->user()),
@@ -502,9 +518,30 @@ class SharedFolderController extends Controller
         $perPage = (int) $request->get('per_page', 20);
         $isOwner = $folder->owner_id === $user->id;
 
+        $isTaskFilter = $request->has('is_task')
+            ? filter_var($request->get('is_task'), FILTER_VALIDATE_BOOLEAN)
+            : null;
+
         $baseQuery = SharedFolderFile::where('shared_folder_id', $id)
-            ->whereHas('file')
+            ->whereHas('file', function ($q) use ($isTaskFilter) {
+                if ($isTaskFilter !== null) {
+                    $q->where('is_task', $isTaskFilter);
+                }
+            })
             ->when(!$isOwner, fn ($q) => $q->where('is_private', false));
+
+        if ($request->get('task_status')) {
+            $baseQuery->whereHas('file', fn ($q) => $q->where('task_status', $request->get('task_status')));
+        }
+        if ($request->get('task_assigned_user_id')) {
+            $baseQuery->whereHas('file', fn ($q) => $q->where('task_assigned_user_id', $request->get('task_assigned_user_id')));
+        }
+        if ($request->get('task_date_from')) {
+            $baseQuery->whereHas('file', fn ($q) => $q->where('task_start_date', '>=', $request->get('task_date_from')));
+        }
+        if ($request->get('task_date_to')) {
+            $baseQuery->whereHas('file', fn ($q) => $q->where('task_due_date', '<=', $request->get('task_date_to')));
+        }
 
         $total = $baseQuery->count();
 
@@ -1025,7 +1062,12 @@ class SharedFolderController extends Controller
             ]);
         }
 
-        $folder->loadCount(['sharedFiles as files_count', 'children', 'accesses']);
+        $folder->loadCount([
+            'sharedFiles as files_count',
+            'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
+            'children',
+            'accesses',
+        ]);
 
         return $this->success('Personal root folder', [
             'folder' => $this->formatFolder($folder, $user),
@@ -1076,7 +1118,12 @@ class SharedFolderController extends Controller
         $data = $request->validate(['is_private' => 'required|boolean']);
         $folder->update(['is_private' => $data['is_private']]);
 
-        $folder->loadCount(['sharedFiles as files_count', 'children', 'accesses']);
+        $folder->loadCount([
+            'sharedFiles as files_count',
+            'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
+            'children',
+            'accesses',
+        ]);
 
         return $this->success('Folder privacy updated', [
             'folder' => $this->formatFolder($folder, $request->user()),

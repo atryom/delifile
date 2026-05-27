@@ -17,6 +17,8 @@ export interface ApiError {
 }
 
 export type FileTypeGroup = 'image' | 'video' | 'audio' | 'document' | 'archive' | 'link' | 'note' | 'other';
+
+export type TaskStatus = 'template' | 'in_progress' | 'under_review' | 'completed';
 export type SortBy = 'date' | 'extension' | 'size';
 export type SortOrder = 'asc' | 'desc';
 
@@ -79,6 +81,9 @@ export interface FileListItem {
   link_title?: string | null;
   link_image_url?: string | null;
   link_site_name?: string | null;
+  // task fields
+  is_task?: boolean;
+  task_status?: TaskStatus | null;
 }
 
 export interface FileCard extends FileListItem {
@@ -95,6 +100,12 @@ export interface FileCard extends FileListItem {
   versions: FileVersion[];
   // url_file extended fields
   link_description?: string | null;
+  // task extended fields
+  is_task: boolean;
+  task_status: TaskStatus | null;
+  task_start_date: string | null;
+  task_due_date: string | null;
+  task_assigned_user: UserRef | null;
 }
 
 export interface FileAccess {
@@ -199,6 +210,7 @@ export interface CurrentUser {
   notify_contacts_added: boolean;
   allow_contacts_without_confirmation: boolean;
   auto_add_received_files: boolean;
+  notify_task_assigned: boolean;
 }
 
 // ─── Admin Models ─────────────────────────────────────────────────────────────
@@ -282,6 +294,7 @@ export interface SharedFolder {
   owner_id: number;
   parent_id: string | null;
   files_count: number;
+  tasks_count: number;
   children_count: number;
   is_owner: boolean;
   my_access_type: SharedFolderAccessType | null;
@@ -332,6 +345,8 @@ export interface SharedFolderFileItem {
   added_by?: number;
   shared_folder_only?: boolean;
   is_private?: boolean;
+  is_task?: boolean;
+  task_status?: TaskStatus | null;
 }
 
 // ─── Invitation Models ───────────────────────────────────────────────────────
@@ -409,6 +424,7 @@ export interface UserSettings {
   notify_contacts_added?: boolean;
   allow_contacts_without_confirmation?: boolean;
   auto_add_received_files?: boolean;
+  notify_task_assigned?: boolean;
 }
 
 // ─── Inbox Models ────────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ class UserSettingsController extends Controller
             'notify_contacts_added'               => ['sometimes', 'boolean'],
             'allow_contacts_without_confirmation' => ['sometimes', 'boolean'],
             'auto_add_received_files'             => ['sometimes', 'boolean'],
+            'notify_task_assigned'                => ['sometimes', 'boolean'],
         ]);
 
         $user = $request->user();

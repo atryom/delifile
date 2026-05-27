@@ -38,12 +38,20 @@ class FileController extends Controller
         $search  = $request->get('search');
 
         $options = array_filter([
-            'tag_id'          => $request->get('tag_id'),
-            'content_kind'    => $request->get('content_kind'),
-            'file_type_group' => $request->get('file_type_group'),
-            'sort_by'         => $request->get('sort_by'),
-            'sort_order'      => $request->get('sort_order'),
+            'tag_id'                 => $request->get('tag_id'),
+            'content_kind'           => $request->get('content_kind'),
+            'file_type_group'        => $request->get('file_type_group'),
+            'sort_by'                => $request->get('sort_by'),
+            'sort_order'             => $request->get('sort_order'),
+            'task_status'            => $request->get('task_status'),
+            'task_assigned_user_id'  => $request->get('task_assigned_user_id'),
+            'task_date_from'         => $request->get('task_date_from'),
+            'task_date_to'           => $request->get('task_date_to'),
         ]);
+
+        if ($request->has('is_task')) {
+            $options['is_task'] = filter_var($request->get('is_task'), FILTER_VALIDATE_BOOLEAN);
+        }
 
         // folder_id can be explicitly null (no-folder filter)
         // empty string sent from client means "root only" → treat as null
@@ -71,7 +79,7 @@ class FileController extends Controller
     public function show(Request $request, string $fileId): JsonResponse
     {
         $user = $request->user();
-        $file = File::with(['owner'])->find($fileId);
+        $file = File::with(['owner', 'taskAssignee'])->find($fileId);
 
         if (!$file || !$this->fileService->canAccess($user, $file)) {
             return $this->notFound('File not found');
@@ -494,6 +502,88 @@ class FileController extends Controller
 
         return $this->success(__('messages.files.accesses_fetched'), [
             'items' => $accesses->merge($pending)->values(),
+        ]);
+    }
+
+    /**
+     * PATCH /api/v1/files/{fileId}/task
+     * Update task fields. Only owner can toggle is_task or change assignee.
+     * Owner and current assignee can update status and dates.
+     */
+    public function updateTask(Request $request, string $fileId): JsonResponse
+    {
+        $validated = $request->validate([
+            'is_task'               => 'sometimes|boolean',
+            'task_status'           => 'sometimes|nullable|in:template,in_progress,under_review,completed',
+            'task_start_date'       => 'sometimes|nullable|date',
+            'task_due_date'         => 'sometimes|nullable|date',
+            'task_assigned_user_id' => 'sometimes|nullable|integer|exists:users,id',
+        ]);
+
+        $user = $request->user();
+        $file = File::with(['owner', 'taskAssignee'])->find($fileId);
+
+        if (!$file || !$this->fileService->canAccess($user, $file)) {
+            return $this->notFound('File not found');
+        }
+
+        $isOwner    = $file->isOwnedBy($user);
+        $isAssignee = $file->task_assigned_user_id && $file->task_assigned_user_id === $user->id;
+
+        // is_task toggle and assignee change: owner only
+        if ((array_key_exists('is_task', $validated) || array_key_exists('task_assigned_user_id', $validated)) && !$isOwner) {
+            return $this->forbidden('Only the owner can change task mode or assignee');
+        }
+
+        // Status and dates: owner or current assignee
+        if ((array_key_exists('task_status', $validated) || array_key_exists('task_start_date', $validated) || array_key_exists('task_due_date', $validated))
+            && !$isOwner && !$isAssignee) {
+            return $this->forbidden('Only the owner or assignee can update task status and dates');
+        }
+
+        if (array_key_exists('is_task', $validated)) {
+            $newIsTask = (bool) $validated['is_task'];
+
+            if ($newIsTask && !$file->isMarkdownDocument()) {
+                return $this->error('Только заметки можно конвертировать в задачи', 'not_a_note', [], 422);
+            }
+
+            if ($newIsTask && !$file->is_task) {
+                // Converting to task: set default status if not provided
+                $validated['task_status'] = $validated['task_status'] ?? 'template';
+                // Default assignee to owner if not set
+                if (!array_key_exists('task_assigned_user_id', $validated) && !$file->task_assigned_user_id) {
+                    $validated['task_assigned_user_id'] = $user->id;
+                }
+            } elseif (!$newIsTask) {
+                // Clearing task mode: reset all task fields
+                $validated['task_status']           = null;
+                $validated['task_start_date']        = null;
+                $validated['task_due_date']          = null;
+                $validated['task_assigned_user_id']  = null;
+            }
+        }
+
+        $oldAssigneeId = $file->task_assigned_user_id;
+
+        $file->update($validated);
+        $file->load('taskAssignee');
+
+        // Schedule assignee notification if changed (not self-assign, after 30s)
+        if (array_key_exists('task_assigned_user_id', $validated)) {
+            $newAssigneeId = $validated['task_assigned_user_id'];
+            if ($newAssigneeId && $newAssigneeId !== $oldAssigneeId && $newAssigneeId !== $user->id) {
+                \App\Jobs\SendTaskAssignedNotification::dispatch(
+                    $newAssigneeId,
+                    $file->id,
+                    $user->id,
+                    $newAssigneeId,
+                )->delay(now()->addSeconds(30));
+            }
+        }
+
+        return $this->success('Задача обновлена', [
+            'file' => $this->fileService->buildFileCard($file, $user),
         ]);
     }
 }

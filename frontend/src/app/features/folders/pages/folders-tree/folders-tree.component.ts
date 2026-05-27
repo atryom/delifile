@@ -14,7 +14,7 @@ import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import {
   SharedFolder, FileListItem, SharedFolderFileItem,
-  Tag, FileTypeGroup, LinkPreview,
+  Tag, FileTypeGroup, LinkPreview, TaskStatus,
 } from '../../../../shared/models/api.models';
 import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialogs/access/shared-folder-access-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
@@ -89,7 +89,15 @@ export class FoldersTreeComponent implements OnInit {
   readonly currentSharedFolderId = signal<string | null>(null);
 
   // ── View mode ─────────────────────────────────────────────────────────────
-  readonly viewMode = signal<'table' | 'grid'>('table');
+  readonly viewMode = signal<'table' | 'grid' | 'tasks'>('table');
+
+  // ── Task filters (active only in 'tasks' view) ─────────────────────────
+  readonly taskFilterStatus     = signal<TaskStatus | ''>('');
+  readonly taskFilterDateFrom   = signal<string>('');
+  readonly taskFilterDateTo     = signal<string>('');
+
+  // ── Note creation task toggle ──────────────────────────────────────────
+  newNoteIsTask = false;
 
   // ── Filters panel ─────────────────────────────────────────────────────────
   readonly filtersOpen         = signal(false);
@@ -100,6 +108,9 @@ export class FoldersTreeComponent implements OnInit {
     if (this.sortBy()          !== 'date') n++;
     if (this.sortOrder()       !== 'desc') n++;
     if (this.activeTypeGroup())            n++;
+    if (this.taskFilterStatus())           n++;
+    if (this.taskFilterDateFrom())         n++;
+    if (this.taskFilterDateTo())           n++;
     return n;
   });
 
@@ -261,6 +272,11 @@ export class FoldersTreeComponent implements OnInit {
   // ── Derived state ─────────────────────────────────────────────────────────
   readonly filteredSharedFolders = computed<SharedFolder[]>(() => this.sharedFolders());
 
+  readonly visibleSubfolders = computed<SharedFolder[]>(() => {
+    if (this.viewMode() !== 'tasks') return this.sfSubfolders();
+    return this.sfSubfolders().filter(f => (f.tasks_count ?? 0) > 0);
+  });
+
   readonly isLoading = computed(() => this.filesLoading() || this.sfLoading());
 
   readonly isEmpty = computed(() => {
@@ -278,8 +294,10 @@ export class FoldersTreeComponent implements OnInit {
     const qp = this.route.snapshot.queryParamMap;
     const deepSharedId = qp.get('shared_folder_id');
     const tagId = qp.get('tag_id');
+    const view = qp.get('view');
 
     if (tagId) this.activeTagId.set(tagId);
+    if (view === 'table' || view === 'grid' || view === 'tasks') this.viewMode.set(view);
 
     this.breadcrumbs.set([{ label: 'Папки', sharedFolderId: null }]);
     this.loadTags();
@@ -337,9 +355,19 @@ export class FoldersTreeComponent implements OnInit {
   // ── URL sync ──────────────────────────────────────────────────────────────
   private syncUrl(): void {
     const sfId = this.currentSharedFolderId();
+    const mode = this.viewMode();
     const params: Record<string, string> = {};
     if (sfId) params['shared_folder_id'] = sfId;
+    if (mode !== 'table') params['view'] = mode;
     this.router.navigate([], { relativeTo: this.route, queryParams: params, replaceUrl: true });
+  }
+
+  setViewMode(mode: 'table' | 'grid' | 'tasks'): void {
+    this.viewMode.set(mode);
+    this.page.set(1);
+    this.clearSelection();
+    this.syncUrl();
+    this.loadFiles();
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -364,6 +392,7 @@ export class FoldersTreeComponent implements OnInit {
       this.loadSharedFolderFiles(sfId);
       return;
     }
+    const isTasksMode = this.viewMode() === 'tasks';
     // At root — personal files with no folder
     this.filesLoading.set(true);
     this.filesApi.list(
@@ -371,12 +400,18 @@ export class FoldersTreeComponent implements OnInit {
       this.page(),
       this.searchQuery || undefined,
       {
-        tag_id:          this.activeTagId()     || undefined,
-        folder_id:       null,
-        file_type_group: this.activeTypeGroup() || undefined,
-        sort_by:         this.sortBy(),
-        sort_order:      this.sortOrder(),
-        per_page:        20,
+        tag_id:                  this.activeTagId()      || undefined,
+        folder_id:               null,
+        file_type_group:         this.activeTypeGroup()  || undefined,
+        sort_by:                 this.sortBy(),
+        sort_order:              this.sortOrder(),
+        per_page:                20,
+        ...(isTasksMode ? {
+          is_task:                true,
+          task_status:            this.taskFilterStatus()   || undefined,
+          task_date_from:         this.taskFilterDateFrom() || undefined,
+          task_date_to:           this.taskFilterDateTo()   || undefined,
+        } : {}),
       }
     ).subscribe({
       next: (res) => {
@@ -391,8 +426,14 @@ export class FoldersTreeComponent implements OnInit {
   }
 
   private loadSharedFolderFiles(sfId: string): void {
+    const isTasksMode = this.viewMode() === 'tasks';
     this.filesLoading.set(true);
-    this.sfApi.listFiles(sfId, this.page()).subscribe({
+    this.sfApi.listFiles(sfId, this.page(), 20, isTasksMode ? {
+      is_task:              true,
+      task_status:          this.taskFilterStatus()   || undefined,
+      task_date_from:       this.taskFilterDateFrom() || undefined,
+      task_date_to:         this.taskFilterDateTo()   || undefined,
+    } : undefined).subscribe({
       next: (res) => {
         this.rawFiles.set(res.data.items);
         const p = res.data.pagination;
@@ -461,6 +502,9 @@ export class FoldersTreeComponent implements OnInit {
     this.page.set(1);
     this.totalPages.set(1);
     this.availableTypeGroups.set([]);
+    this.taskFilterStatus.set('');
+    this.taskFilterDateFrom.set('');
+    this.taskFilterDateTo.set('');
     this.clearSelection();
     this.loadFiles();
   }
@@ -474,7 +518,16 @@ export class FoldersTreeComponent implements OnInit {
     this.page.set(1);
     this.totalPages.set(1);
     this.availableTypeGroups.set([]);
+    this.taskFilterStatus.set('');
+    this.taskFilterDateFrom.set('');
+    this.taskFilterDateTo.set('');
     this.clearSelection();
+  }
+
+  onTaskFilterChange(): void {
+    this.page.set(1);
+    this.clearSelection();
+    this.loadFiles();
   }
 
   goToPage(p: number): void {
@@ -689,7 +742,9 @@ export class FoldersTreeComponent implements OnInit {
   saveNoteCreate(): void {
     const name = this.noteCreateValue.trim();
     if (!name) return;
+    const isTask = this.newNoteIsTask;
     this.showNoteInput.set(false);
+    this.newNoteIsTask = false;
     this.creatingDoc.set(true);
     this.docsApi.create(name).subscribe({
       next: res => {
@@ -699,10 +754,17 @@ export class FoldersTreeComponent implements OnInit {
           this.creatingDoc.set(false);
           this.router.navigate(['/files', docId], { queryParams: { editor: 'expanded' } });
         };
-        if (sfId) {
-          this.sfApi.addFile(sfId, docId, true).subscribe({ next: navigate, error: navigate });
+        const doNavigate = () => {
+          if (sfId) {
+            this.sfApi.addFile(sfId, docId, true).subscribe({ next: navigate, error: navigate });
+          } else {
+            navigate();
+          }
+        };
+        if (isTask) {
+          this.filesApi.updateTask(docId, { is_task: true }).subscribe({ next: doNavigate, error: doNavigate });
         } else {
-          navigate();
+          doNavigate();
         }
       },
       error: () => this.creatingDoc.set(false),
