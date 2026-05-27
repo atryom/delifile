@@ -125,6 +125,7 @@ Route::prefix('v1')->group(function () {
         Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
         Route::patch('files/{id}/description',     [FileController::class, 'updateDescription']);
         Route::patch('files/{id}/rename',          [FileController::class, 'rename']);
+        Route::patch('files/{id}/task',            [FileController::class, 'updateTask']);
         Route::get('files/{id}/activity',          [FileController::class, 'activity']);
         Route::get('files/{id}/accesses',          [FileController::class, 'accesses']);
 

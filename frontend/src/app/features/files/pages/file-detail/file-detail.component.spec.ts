@@ -445,4 +445,85 @@ describe('FileDetailComponent', () => {
 
     expect(mockDocsApi.takeover).not.toHaveBeenCalled();
   });
+
+  // ── accessPopupId ─────────────────────────────────────────────────────────
+
+  it('toggleAccessPopup opens popup for the given id', () => {
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    const event = new MouseEvent('click');
+    vi.spyOn(event, 'stopPropagation');
+
+    fixture.componentInstance.toggleAccessPopup('a-1', event);
+
+    expect(fixture.componentInstance.accessPopupId()).toBe('a-1');
+    expect(event.stopPropagation).toHaveBeenCalled();
+  });
+
+  it('toggleAccessPopup closes popup when the same id is toggled again', () => {
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    const event = new MouseEvent('click');
+    vi.spyOn(event, 'stopPropagation');
+
+    fixture.componentInstance.toggleAccessPopup('a-1', event);
+    expect(fixture.componentInstance.accessPopupId()).toBe('a-1');
+
+    fixture.componentInstance.toggleAccessPopup('a-1', event);
+    expect(fixture.componentInstance.accessPopupId()).toBeNull();
+  });
+
+  it('closeAccessPopup resets accessPopupId to null', () => {
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    const event = new MouseEvent('click');
+    vi.spyOn(event, 'stopPropagation');
+    fixture.componentInstance.toggleAccessPopup('a-2', event);
+    expect(fixture.componentInstance.accessPopupId()).toBe('a-2');
+
+    fixture.componentInstance.closeAccessPopup();
+
+    expect(fixture.componentInstance.accessPopupId()).toBeNull();
+  });
+
+  // ── canEditTask ───────────────────────────────────────────────────────────
+
+  it('canEditTask returns true for the file owner', () => {
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    // mockAuthState.user().id = 'u-1', file is_owner = true
+    fixture.componentInstance.file.set(makeFile({ is_owner: true, task_assigned_user: null }));
+
+    expect(fixture.componentInstance.canEditTask()).toBe(true);
+  });
+
+  it('canEditTask returns true for the assigned user even when not owner', () => {
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    // authState.user().id = 'u-1'; task_assigned_user.id must match Number('u-1') = NaN
+    // So we use numeric id 1 in authState and match it
+    mockAuthState.user.set({ id: '42', email: 'test@test.com' } as any);
+    fixture.componentInstance.file.set(makeFile({
+      is_owner: false,
+      task_assigned_user: { id: 42, email: 'assignee@test.com', name: 'Assignee' },
+    }));
+
+    expect(fixture.componentInstance.canEditTask()).toBe(true);
+    // Restore
+    mockAuthState.user.set({ id: 'u-1', email: 'test@test.com' } as any);
+  });
+
+  it('canEditTask returns false when user is neither owner nor assignee', () => {
+    const fixture = TestBed.createComponent(FileDetailComponent);
+    fixture.componentRef.setInput('id', 'f-1');
+    mockAuthState.user.set({ id: '99', email: 'other@test.com' } as any);
+    fixture.componentInstance.file.set(makeFile({
+      is_owner: false,
+      task_assigned_user: { id: 42, email: 'assignee@test.com', name: 'Assignee' },
+    }));
+
+    expect(fixture.componentInstance.canEditTask()).toBe(false);
+    // Restore
+    mockAuthState.user.set({ id: 'u-1', email: 'test@test.com' } as any);
+  });
 });

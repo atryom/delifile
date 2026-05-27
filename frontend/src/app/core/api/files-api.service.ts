@@ -13,6 +13,7 @@ import {
   InitUploadResponse,
   CompleteUploadResponse,
   PaginatedData,
+  TaskStatus,
 } from '../../shared/models/api.models';
 
 export interface VersionInitResponse {
@@ -39,17 +40,25 @@ export class FilesApiService {
       sort_by?: string;
       sort_order?: string;
       per_page?: number;
+      is_task?: boolean;
+      task_status?: string;
+      task_date_from?: string;
+      task_date_to?: string;
     }
   ): Observable<ApiResponse<PaginatedData<FileListItem>>> {
     const params: Record<string, string | number> = { filter, page };
-    if (search)                         params['search']    = search;
-    if (options?.tag_id)                params['tag_id']    = options.tag_id;
-    if (options?.folder_id !== undefined) params['folder_id'] = options.folder_id ?? '';
-    if (options?.content_kind)    params['content_kind']    = options.content_kind;
-    if (options?.file_type_group) params['file_type_group'] = options.file_type_group;
-    if (options?.sort_by)         params['sort_by']         = options.sort_by;
-    if (options?.sort_order)      params['sort_order']      = options.sort_order;
-    if (options?.per_page)        params['per_page']        = options.per_page;
+    if (search)                           params['search']         = search;
+    if (options?.tag_id)                  params['tag_id']         = options.tag_id;
+    if (options?.folder_id !== undefined) params['folder_id']      = options.folder_id ?? '';
+    if (options?.content_kind)            params['content_kind']   = options.content_kind;
+    if (options?.file_type_group)         params['file_type_group'] = options.file_type_group;
+    if (options?.sort_by)                 params['sort_by']        = options.sort_by;
+    if (options?.sort_order)              params['sort_order']     = options.sort_order;
+    if (options?.per_page)                params['per_page']       = options.per_page;
+    if (options?.is_task !== undefined)   params['is_task']        = options.is_task ? 1 : 0;
+    if (options?.task_status)             params['task_status']    = options.task_status;
+    if (options?.task_date_from)          params['task_date_from'] = options.task_date_from;
+    if (options?.task_date_to)            params['task_date_to']   = options.task_date_to;
     return this.api.get('/files', params);
   }
 
@@ -181,5 +190,17 @@ export class FilesApiService {
 
   rename(fileId: string, displayName: string | null): Observable<ApiResponse<{ display_name: string | null; original_name: string }>> {
     return this.api.patch(`/files/${fileId}/rename`, { display_name: displayName });
+  }
+
+  // ─── Task management ─────────────────────────────────────────────────────────
+
+  updateTask(fileId: string, data: {
+    is_task?: boolean;
+    task_status?: TaskStatus | null;
+    task_start_date?: string | null;
+    task_due_date?: string | null;
+    task_assigned_user_id?: number | null;
+  }): Observable<ApiResponse<{ file: FileCard }>> {
+    return this.api.patch(`/files/${fileId}/task`, data);
   }
 }

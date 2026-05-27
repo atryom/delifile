@@ -55,6 +55,11 @@ class FileCardBuilder
                 'name'  => $file->owner->name,
             ],
             'versions'           => $file->has_versions ? $this->buildVersionsList($file) : [],
+            'is_task'            => (bool) $file->is_task,
+            'task_status'        => $file->task_status,
+            'task_start_date'    => $file->task_start_date?->toIso8601String(),
+            'task_due_date'      => $file->task_due_date?->toIso8601String(),
+            'task_assigned_user' => $this->formatTaskAssignee($file),
         ];
 
         if ($file->isUrlFile()) {
@@ -108,6 +113,8 @@ class FileCardBuilder
             'is_favorite'   => $access?->is_favorite ?? false,
             'description'   => $access?->description,
             'preview_url'   => null,
+            'is_task'        => (bool) $file->is_task,
+            'task_status'    => $file->task_status,
         ];
 
         if ($inSharedFolderContext) {
@@ -165,6 +172,27 @@ class FileCardBuilder
         }
 
         return $item;
+    }
+
+    private function formatTaskAssignee(File $file): ?array
+    {
+        if (!$file->task_assigned_user_id) {
+            return null;
+        }
+
+        $assignee = $file->relationLoaded('taskAssignee')
+            ? $file->taskAssignee
+            : $file->taskAssignee()->first();
+
+        if (!$assignee) {
+            return null;
+        }
+
+        return [
+            'id'    => $assignee->id,
+            'name'  => $assignee->name,
+            'email' => $assignee->email,
+        ];
     }
 
     /**

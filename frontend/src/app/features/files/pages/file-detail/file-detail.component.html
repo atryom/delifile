@@ -21,8 +21,8 @@
                   [fileId]="id()"
                   [expanded]="editorExpanded()"
                   [refreshTrigger]="editorRefreshTrigger()"
-                  (closed)="editorPanelOpen.set(false); editorExpanded.set(false)"
-                  (expandToggle)="editorExpanded.set(!editorExpanded())"
+                  (closed)="closeEditor()"
+                  (expandToggle)="toggleEditorExpanded()"
                 />
               </div>
             }
@@ -204,7 +204,7 @@
                         type="button"
                         class="card-link-btn"
                         [class.card-link-btn-primary]="!editorPanelOpen()"
-                        (click)="editorPanelOpen.set(!editorPanelOpen())"
+                        (click)="toggleEditorPanel()"
                       >
                         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -212,6 +212,19 @@
                         </svg>
                         {{ editorPanelOpen() ? 'Закрыть редактор' : 'Редактировать' }}
                       </button>
+                      @if (file()!.is_owner) {
+                        <button
+                          type="button"
+                          class="card-link-btn"
+                          [class.card-link-btn-primary]="isTask()"
+                          (click)="toggleTaskMode()"
+                          [disabled]="savingTask()"
+                          [attr.aria-label]="(isTask() ? ('tasks.toggle_to_note' | translate) : ('tasks.toggle_to_task' | translate))"
+                        >
+                          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                          {{ isTask() ? ('tasks.toggle_to_note' | translate) : ('tasks.toggle_to_task' | translate) }}
+                        </button>
+                      }
                     } @else {
                       <button class="card-link-btn card-link-btn-primary" (click)="download()" [disabled]="actionPending()">
                         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
@@ -267,6 +280,55 @@
                     </span>
                   </button>
                 </div>
+              </div>
+            }
+
+            <!-- Task management section -->
+            @if (isTask()) {
+              <div class="section task-section">
+                <h3 class="section-title">{{ 'tasks.section_title' | translate }}</h3>
+
+                @if (canEditTask()) {
+                  <div class="task-status-row" role="group" [attr.aria-label]="'tasks.status_label' | translate">
+                    @for (s of taskStatuses; track s.value) {
+                      <button
+                        type="button"
+                        class="task-status-btn"
+                        [class.task-status-btn--active]="taskStatus() === s.value"
+                        (click)="updateTaskStatus(s.value)"
+                        [disabled]="savingTask()"
+                        [attr.aria-pressed]="taskStatus() === s.value"
+                      >{{ s.labelKey | translate }}</button>
+                    }
+                  </div>
+
+                  <div class="task-dates-row">
+                    <div class="task-date-field">
+                      <label class="field-label" for="taskStartDate">{{ 'tasks.start_date' | translate }}</label>
+                      <input
+                        id="taskStartDate"
+                        class="field-input"
+                        type="datetime-local"
+                        [(ngModel)]="taskStartDraft"
+                        (change)="updateTaskDates()"
+                        [attr.aria-label]="'tasks.start_date' | translate"
+                      />
+                    </div>
+                    <div class="task-date-field">
+                      <label class="field-label" for="taskDueDate">{{ 'tasks.due_date' | translate }}</label>
+                      <input
+                        id="taskDueDate"
+                        class="field-input"
+                        type="datetime-local"
+                        [(ngModel)]="taskDueDraft"
+                        (change)="updateTaskDates()"
+                        [attr.aria-label]="'tasks.due_date' | translate"
+                      />
+                    </div>
+                  </div>
+                } @else {
+                  <p class="task-status-readonly">{{ taskStatus() ? (('tasks.status.' + taskStatus()) | translate) : '—' }}</p>
+                }
               </div>
             }
 
@@ -524,12 +586,19 @@
             <div class="sidebar-section">
               <div class="section-header-row">
                 <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>
-                @if (file()!.can_share) {
-                  <button class="btn-section-action" (click)="showShareDialog.set(true)">
-                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
-                    {{ 'files.detail.share' | translate }}
-                  </button>
-                }
+                <div class="section-header-actions">
+                  @if (accesses().some(a => a.is_pending)) {
+                    <button class="btn-section-action btn-section-refresh" (click)="refreshAccesses()" [attr.aria-label]="'Обновить список доступов'">
+                      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </button>
+                  }
+                  @if (file()!.can_share) {
+                    <button class="btn-section-action" (click)="showShareDialog.set(true)">
+                      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+                      {{ 'files.detail.share' | translate }}
+                    </button>
+                  }
+                </div>
               </div>
               @if (!accesses().length) {
                 <div class="empty-panel">{{ 'files.detail.only_you' | translate }}</div>
@@ -540,26 +609,54 @@
                   @if (a.is_pending) {
                     <span class="access-pending-badge">Ожидает принятия</span>
                   }
-                  @if (!a.is_pending && file()!.mime_type === 'text/markdown' && a.access_type === 'shared') {
-                    <button
-                      type="button"
-                      class="access-edit-toggle"
-                      [class.access-edit-toggle--on]="a.can_edit"
-                      [title]="a.can_edit ? 'Запретить редактирование' : 'Разрешить редактирование'"
-                      (click)="toggleAccessEdit(a)"
-                    >{{ a.can_edit ? 'Редактирование' : 'Просмотр' }}</button>
-                  }
-                  @if (a.access_type === 'shared' && file()!.is_owner) {
-                    <button
-                      type="button"
-                      class="access-revoke-btn"
-                      title="Забрать доступ"
-                      (click)="revokeAccess(a)"
-                      aria-label="Забрать доступ"
-                    >
-                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                  }
+                  <div class="access-actions">
+                    @if (isTask() && file()!.is_owner && !a.is_pending) {
+                      @if (a.user?.id === taskAssignee()?.id) {
+                        <span class="assignee-badge" [title]="'tasks.assignee' | translate" [attr.aria-label]="'tasks.assignee' | translate">
+                          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        </span>
+                      } @else {
+                        <button
+                          type="button"
+                          class="btn-assign"
+                          (click)="updateTaskAssignee(a.user!.id)"
+                          [disabled]="savingTask()"
+                          [attr.aria-label]="'tasks.assign_btn' | translate"
+                        >{{ 'tasks.assign_btn' | translate }}</button>
+                      }
+                    }
+                    @if (!a.is_pending && a.access_type === 'shared' && file()!.is_owner) {
+                      <div class="access-popup-wrap">
+                        <button
+                          type="button"
+                          class="access-mode-btn"
+                          [class.access-mode-btn--edit]="a.can_edit"
+                          [title]="a.can_edit ? 'Редактирование' : 'Просмотр'"
+                          [attr.aria-label]="a.can_edit ? 'Редактирование' : 'Просмотр'"
+                          (click)="toggleAccessPopup(a.id, $event)"
+                        >
+                          @if (a.can_edit) {
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          } @else {
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          }
+                        </button>
+                        @if (accessPopupId() === a.id) {
+                          <div class="access-popup" role="dialog" (click)="$event.stopPropagation()">
+                            <p class="access-popup-current">Текущий доступ: <strong>{{ a.can_edit ? 'Редактирование' : 'Просмотр' }}</strong></p>
+                            @if (file()!.mime_type === 'text/markdown') {
+                              <button type="button" class="access-popup-item" (click)="toggleAccessEdit(a); closeAccessPopup()">
+                                Сменить на {{ a.can_edit ? 'просмотр' : 'редактирование' }}
+                              </button>
+                            }
+                            <button type="button" class="access-popup-item access-popup-item--danger" (click)="revokeAccess(a); closeAccessPopup()">
+                              Забрать доступ
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
                 </div>
               }
             </div>

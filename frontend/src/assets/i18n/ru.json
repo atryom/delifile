@@ -507,7 +507,9 @@
       "mentions_label": "Оповещать об упоминаниях",
       "mentions_desc": "Уведомление, когда вас упомянули через @ в комментарии.",
       "support_reply_label": "Оповещать об ответах поддержки",
-      "support_reply_desc": "Уведомление при ответе службы поддержки на ваше обращение."
+      "support_reply_desc": "Уведомление при ответе службы поддержки на ваше обращение.",
+      "task_assigned_label": "Назначение исполнителем",
+      "task_assigned_desc": "Уведомлять, когда вас назначают исполнителем задачи."
     },
     "contacts_privacy": {
       "title": "Конфиденциальность контактов",
@@ -717,5 +719,24 @@
     "discussion_panel_aria": "Панель обсуждения папки",
     "discussion_title": "Обсуждение папки",
     "my_notes_btn": "Мои заметки"
+  },
+  "tasks": {
+    "section_title": "Задача",
+    "status_label": "Статус задачи",
+    "status_all": "Все статусы",
+    "status": {
+      "template": "Шаблон",
+      "in_progress": "В работе",
+      "under_review": "На проверке",
+      "completed": "Завершена"
+    },
+    "toggle_to_task": "Задача",
+    "toggle_to_note": "Заметка",
+    "create_as_task": "Создать как задачу",
+    "start_date": "Дата начала",
+    "due_date": "Дата завершения",
+    "assignee": "Исполнитель",
+    "assign_btn": "Делегировать",
+    "task_view": "Задачи"
   }
 }

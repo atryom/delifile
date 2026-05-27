@@ -12,6 +12,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
+import { TranslateService } from '@ngx-translate/core';
 
 describe('FoldersTreeComponent', () => {
   const mockOrgApi = {
@@ -60,6 +61,14 @@ describe('FoldersTreeComponent', () => {
     getThreads: vi.fn(() => of({ result: 'success', data: { policy: {}, threads: {} } })),
   };
   const mockRouter = { navigate: vi.fn() };
+  const translateMock = {
+    instant: (k: string) => k,
+    get: () => of(''),
+    getCurrentLang: () => 'ru',
+    onTranslationChange: { subscribe: () => ({ unsubscribe: () => {} }) },
+    onLangChange: { subscribe: () => ({ unsubscribe: () => {} }) },
+    onFallbackLangChange: { subscribe: () => ({ unsubscribe: () => {} }) },
+  };
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -76,6 +85,7 @@ describe('FoldersTreeComponent', () => {
         { provide: AuthStateService, useValue: mockAuthState },
         { provide: CommentsApiService, useValue: mockCommentsApi },
         { provide: Router, useValue: mockRouter },
+        { provide: TranslateService, useValue: translateMock },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
       ],
     }).compileComponents();
@@ -111,7 +121,7 @@ describe('FoldersTreeComponent', () => {
     const fixture = TestBed.createComponent(FoldersTreeComponent);
     fixture.componentInstance.navigateIntoSharedFolder({ id: 'sf-1', name: 'Shared', is_owner: true, parent_id: null } as any);
     expect(fixture.componentInstance.currentSharedFolderId()).toBe('sf-1');
-    expect(mockSfApi.getSubfolders).toHaveBeenCalledWith('sf-1');
+    expect(mockSfApi.getSubfolders).toHaveBeenCalledWith('sf-1', undefined);
   });
 
   it('should toggle file selection', () => {
@@ -295,5 +305,80 @@ describe('FoldersTreeComponent', () => {
     expect(fixture.componentInstance.allFilesSelected()).toBe(true);
     fixture.componentInstance.toggleAllFiles();
     expect(fixture.componentInstance.selectedFileIds().size).toBe(0);
+  });
+
+  // ── filteredSharedFolders in tasks mode ───────────────────────────────────
+
+  it('filteredSharedFolders shows only folders with tasks_count > 0 in tasks mode', () => {
+    const fixture = TestBed.createComponent(FoldersTreeComponent);
+    fixture.componentInstance.viewMode.set('tasks');
+    fixture.componentInstance.sharedFolders.set([
+      { id: 'sf-1', name: 'HasTasks', tasks_count: 3 } as any,
+      { id: 'sf-2', name: 'NoTasks', tasks_count: 0 } as any,
+      { id: 'sf-3', name: 'NullTasks' } as any,
+    ]);
+    const result = fixture.componentInstance.filteredSharedFolders();
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe('sf-1');
+  });
+
+  it('filteredSharedFolders shows all folders in table mode', () => {
+    const fixture = TestBed.createComponent(FoldersTreeComponent);
+    fixture.componentInstance.viewMode.set('table');
+    fixture.componentInstance.sharedFolders.set([
+      { id: 'sf-1', name: 'HasTasks', tasks_count: 3 } as any,
+      { id: 'sf-2', name: 'NoTasks', tasks_count: 0 } as any,
+    ]);
+    const result = fixture.componentInstance.filteredSharedFolders();
+    expect(result.length).toBe(2);
+  });
+
+  // ── loadSfSubfolders passes task filters ──────────────────────────────────
+
+  it('navigateIntoSharedFolder in tasks mode passes taskFilters object to getSubfolders', () => {
+    const fixture = TestBed.createComponent(FoldersTreeComponent);
+    // navigateIntoSharedFolder resets filters before calling loadSfSubfolders,
+    // so the filters object will have undefined values (empty signals -> || undefined)
+    fixture.componentInstance.viewMode.set('tasks');
+
+    fixture.componentInstance.navigateIntoSharedFolder({ id: 'sf-2', name: 'Folder', is_owner: true, parent_id: null } as any);
+
+    // In tasks mode, loadSfSubfolders passes a filters object (not undefined)
+    const call = (mockSfApi.getSubfolders as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toBe('sf-2');
+    expect(call[1]).toBeTypeOf('object');
+    expect(call[1]).not.toBeNull();
+  });
+
+  it('navigateIntoSharedFolder in table mode passes undefined to getSubfolders', () => {
+    const fixture = TestBed.createComponent(FoldersTreeComponent);
+    fixture.componentInstance.viewMode.set('table');
+
+    fixture.componentInstance.navigateIntoSharedFolder({ id: 'sf-3', name: 'Folder', is_owner: true, parent_id: null } as any);
+
+    expect(mockSfApi.getSubfolders).toHaveBeenCalledWith('sf-3', undefined);
+  });
+
+  // ── onTaskFilterChange reloads subfolders when inside a folder ────────────
+
+  it('onTaskFilterChange inside a shared folder in tasks mode calls getSubfolders', () => {
+    const fixture = TestBed.createComponent(FoldersTreeComponent);
+    fixture.componentInstance.viewMode.set('tasks');
+    fixture.componentInstance.currentSharedFolderId.set('sf-4');
+    vi.clearAllMocks();
+
+    fixture.componentInstance.onTaskFilterChange();
+
+    expect(mockSfApi.getSubfolders).toHaveBeenCalledWith('sf-4', expect.objectContaining({}));
+  });
+
+  it('onTaskFilterChange at root does NOT call getSubfolders', () => {
+    const fixture = TestBed.createComponent(FoldersTreeComponent);
+    fixture.componentInstance.currentSharedFolderId.set(null);
+    vi.clearAllMocks();
+
+    fixture.componentInstance.onTaskFilterChange();
+
+    expect(mockSfApi.getSubfolders).not.toHaveBeenCalled();
   });
 });

@@ -504,6 +504,36 @@ class FileService
             $query->where('content_kind', $options['content_kind']);
         }
 
+        if (isset($options['is_task'])) {
+            $query->where('is_task', (bool) $options['is_task']);
+        }
+
+        if (!empty($options['task_status'])) {
+            $query->where('task_status', $options['task_status']);
+        }
+
+        if (!empty($options['task_assigned_user_id'])) {
+            $query->where('task_assigned_user_id', $options['task_assigned_user_id']);
+        }
+
+        $dateFrom = !empty($options['task_date_from']) ? $options['task_date_from'] : null;
+        $dateTo   = !empty($options['task_date_to'])   ? $options['task_date_to']   : null;
+
+        if ($dateFrom !== null || $dateTo !== null) {
+            // Task must have at least one date to participate in range filtering
+            $query->where(fn ($q) => $q->whereNotNull('task_start_date')->orWhereNotNull('task_due_date'));
+
+            // task range [start, due] overlaps filter range [from, to]:
+            //   start <= to  (task starts before filter ends)
+            if ($dateTo !== null) {
+                $query->where(fn ($q) => $q->whereNull('task_start_date')->orWhere('task_start_date', '<=', $dateTo));
+            }
+            //   due >= from  (task ends after filter starts)
+            if ($dateFrom !== null) {
+                $query->where(fn ($q) => $q->whereNull('task_due_date')->orWhere('task_due_date', '>=', $dateFrom));
+            }
+        }
+
         $availableTypeGroups = $this->computeAvailableTypeGroups(clone $query);
 
         if (!empty($options['file_type_group'])) {

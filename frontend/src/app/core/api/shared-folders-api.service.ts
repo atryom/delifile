@@ -37,8 +37,20 @@ export class SharedFoldersApiService {
 
   // ── Files ─────────────────────────────────────────────────────────────────
 
-  listFiles(id: string, page = 1, perPage = 20): Observable<ApiResponse<PaginatedData<SharedFolderFileItem>>> {
-    return this.api.get(`/shared-folders/${id}/files`, { page, per_page: perPage });
+  listFiles(id: string, page = 1, perPage = 20, options?: {
+    is_task?: boolean;
+    task_status?: string;
+    task_assigned_user_id?: number;
+    task_date_from?: string;
+    task_date_to?: string;
+  }): Observable<ApiResponse<PaginatedData<SharedFolderFileItem>>> {
+    const params: Record<string, string | number> = { page, per_page: perPage };
+    if (options?.is_task !== undefined)   params['is_task']               = options.is_task ? 1 : 0;
+    if (options?.task_status)             params['task_status']           = options.task_status;
+    if (options?.task_assigned_user_id)   params['task_assigned_user_id'] = options.task_assigned_user_id;
+    if (options?.task_date_from)          params['task_date_from']        = options.task_date_from;
+    if (options?.task_date_to)            params['task_date_to']          = options.task_date_to;
+    return this.api.get(`/shared-folders/${id}/files`, params);
   }
 
   initUpload(id: string, data: InitUploadRequest): Observable<ApiResponse<InitUploadResponse>> {
@@ -110,8 +122,15 @@ export class SharedFoldersApiService {
 
   // ── Subfolders ────────────────────────────────────────────────────────────
 
-  getSubfolders(parentId: string): Observable<ApiResponse<{ items: SharedFolder[] }>> {
-    return this.api.get(`/shared-folders/${parentId}/subfolders`);
+  getSubfolders(parentId: string, taskFilters?: { task_status?: string; task_date_from?: string; task_date_to?: string }): Observable<ApiResponse<{ items: SharedFolder[] }>> {
+    const params: Record<string, string> = {};
+    if (taskFilters?.task_status)    params['task_status']    = taskFilters.task_status;
+    if (taskFilters?.task_date_from) params['task_date_from'] = taskFilters.task_date_from;
+    if (taskFilters?.task_date_to)   params['task_date_to']   = taskFilters.task_date_to;
+    const query = Object.keys(params).length
+      ? '?' + new URLSearchParams(params).toString()
+      : '';
+    return this.api.get(`/shared-folders/${parentId}/subfolders${query}`);
   }
 
   createSubfolder(parentId: string, name: string): Observable<ApiResponse<{ folder: SharedFolder }>> {

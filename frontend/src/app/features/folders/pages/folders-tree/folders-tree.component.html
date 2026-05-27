@@ -28,7 +28,7 @@
       <!-- Переключатель вида — всегда справа -->
       <div class="view-toggle" role="group" aria-label="Режим отображения">
         <button type="button" class="view-btn" [class.active]="viewMode() === 'table'"
-                (click)="viewMode.set('table')" title="Список" aria-label="Список"
+                (click)="setViewMode('table')" title="Список" aria-label="Список"
                 [attr.aria-pressed]="viewMode() === 'table'">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
             <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
@@ -38,13 +38,21 @@
           <span class="view-btn-label">Список</span>
         </button>
         <button type="button" class="view-btn" [class.active]="viewMode() === 'grid'"
-                (click)="viewMode.set('grid')" title="Сетка" aria-label="Сетка"
+                (click)="setViewMode('grid')" title="Сетка" aria-label="Сетка"
                 [attr.aria-pressed]="viewMode() === 'grid'">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
             <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
           </svg>
           <span class="view-btn-label">Сетка</span>
+        </button>
+        <button type="button" class="view-btn" [class.active]="viewMode() === 'tasks'"
+                (click)="setViewMode('tasks')" [title]="'tasks.task_view' | translate" [attr.aria-label]="'tasks.task_view' | translate"
+                [attr.aria-pressed]="viewMode() === 'tasks'">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          </svg>
+          <span class="view-btn-label">{{ 'tasks.task_view' | translate }}</span>
         </button>
       </div>
     </header>
@@ -141,6 +149,38 @@
           </div>
         }
 
+        <!-- Фильтры задач (только в режиме задач) -->
+        @if (viewMode() === 'tasks') {
+          <div class="task-filters-row">
+            <div class="custom-select">
+              <select
+                [ngModel]="taskFilterStatus()"
+                (ngModelChange)="taskFilterStatus.set($event); onTaskFilterChange()"
+                [attr.aria-label]="'tasks.status_label' | translate">
+                <option value="">{{ 'tasks.status_all' | translate }}</option>
+                <option value="template">{{ 'tasks.status.template' | translate }}</option>
+                <option value="in_progress">{{ 'tasks.status.in_progress' | translate }}</option>
+                <option value="under_review">{{ 'tasks.status.under_review' | translate }}</option>
+                <option value="completed">{{ 'tasks.status.completed' | translate }}</option>
+              </select>
+            </div>
+            <div class="task-date-filter">
+              <label class="task-date-filter-label" for="taskDateFrom">{{ 'tasks.start_date' | translate }}</label>
+              <input id="taskDateFrom" type="date" class="task-date-input"
+                     [ngModel]="taskFilterDateFrom()"
+                     (ngModelChange)="taskFilterDateFrom.set($event); onTaskFilterChange()"
+                     [attr.aria-label]="'tasks.start_date' | translate" />
+            </div>
+            <div class="task-date-filter">
+              <label class="task-date-filter-label" for="taskDateTo">{{ 'tasks.due_date' | translate }}</label>
+              <input id="taskDateTo" type="date" class="task-date-input"
+                     [ngModel]="taskFilterDateTo()"
+                     (ngModelChange)="taskFilterDateTo.set($event); onTaskFilterChange()"
+                     [attr.aria-label]="'tasks.due_date' | translate" />
+            </div>
+          </div>
+        }
+
       </div>
     }
 
@@ -228,7 +268,7 @@
     }
 
     <!-- ── TABLE VIEW ─────────────────────────────────────────────────── -->
-    @if (!isLoading() && viewMode() === 'table') {
+    @if (!isLoading() && (viewMode() === 'table' || viewMode() === 'tasks')) {
       <div class="table-container">
         @if (isEmpty()) {
           <div class="empty-state">
@@ -290,12 +330,12 @@
                           @if (!folder.is_owner) {
                             <div class="role-badge">{{ folder.my_access_type === 'edit' ? 'Редактор' : 'Просматривающий' }}</div>
                           }
-                          <div class="file-meta-mobile">{{ folder.files_count }} файлов</div>
+                          <div class="file-meta-mobile">{{ viewMode() === 'tasks' ? (folder.tasks_count + ' задач') : (folder.files_count + ' файлов') }}</div>
                         </div>
                       </div>
                     </td>
                     <td class="col-mod-cell">{{ folder.created_at | date:'d MMM y' }}</td>
-                    <td class="col-size-cell">{{ folder.files_count }} файлов</td>
+                    <td class="col-size-cell">{{ viewMode() === 'tasks' ? (folder.tasks_count + ' задач') : (folder.files_count + ' файлов') }}</td>
                     <td class="col-open-cell">
                       <button type="button" class="open-btn"
                               (click)="navigateIntoSharedFolder(folder); $event.stopPropagation()"
@@ -334,7 +374,7 @@
 
               <!-- ── Shared subfolders (when inside a shared folder) ─── -->
               @if (currentSharedFolderId() !== null) {
-                @for (sub of sfSubfolders(); track sub.id) {
+                @for (sub of visibleSubfolders(); track sub.id) {
                   <tr (click)="navigateIntoSharedFolder(sub)">
                     <td class="col-check"></td>
                     <td>
@@ -361,12 +401,12 @@
                               }
                             </div>
                           }
-                          <div class="file-meta-mobile">{{ sub.files_count }} файлов</div>
+                          <div class="file-meta-mobile">{{ viewMode() === 'tasks' ? (sub.tasks_count + ' задач') : (sub.files_count + ' файлов') }}</div>
                         </div>
                       </div>
                     </td>
                     <td class="col-mod-cell">{{ sub.created_at | date:'d MMM y' }}</td>
-                    <td class="col-size-cell">{{ sub.files_count }} файлов</td>
+                    <td class="col-size-cell">{{ viewMode() === 'tasks' ? (sub.tasks_count + ' задач') : (sub.files_count + ' файлов') }}</td>
                     <td class="col-open-cell">
                       <button type="button" class="open-btn"
                               (click)="navigateIntoSharedFolder(sub); $event.stopPropagation()"
@@ -445,6 +485,11 @@
                             }
                             @if ($any(file).is_private) {
                               <span class="sf-badge sf-badge--private" title="Личный файл — скрыт от гостей">🔒</span>
+                            }
+                            @if ($any(file).is_task && $any(file).task_status) {
+                              <span class="task-status-badge task-status-badge--{{ $any(file).task_status }}">
+                                {{ 'tasks.status.' + $any(file).task_status | translate }}
+                              </span>
                             }
                           </div>
                           @if (currentSharedFolderId() === null && file.is_owner === false) {
@@ -538,14 +583,14 @@
                   {{ folder.name }}
                   @if (folder.has_shared_access) { <span class="sf-badge sf-badge--shared">👥</span> }
                 </div>
-                <div class="grid-meta">{{ folder.files_count }} файлов</div>
+                <div class="grid-meta">{{ viewMode() === 'tasks' ? (folder.tasks_count + ' задач') : (folder.files_count + ' файлов') }}</div>
               </div>
             }
           }
 
           <!-- Shared subfolders (when inside a shared folder) -->
           @if (currentSharedFolderId() !== null) {
-            @for (sub of sfSubfolders(); track sub.id) {
+            @for (sub of visibleSubfolders(); track sub.id) {
               <div class="grid-card grid-card--folder" (click)="navigateIntoSharedFolder(sub)" role="button" tabindex="0"
                    (keydown.enter)="navigateIntoSharedFolder(sub)" aria-label="Открыть папку {{ sub.name }}">
                 <div class="grid-icon folder-grid-icon" aria-hidden="true">
@@ -558,7 +603,7 @@
                   @if (sub.is_private) { <span class="sf-badge sf-badge--private">🔒</span> }
                   @else if (sub.has_shared_access) { <span class="sf-badge sf-badge--shared">👥</span> }
                 </div>
-                <div class="grid-meta">{{ sub.files_count }} файлов</div>
+                <div class="grid-meta">{{ viewMode() === 'tasks' ? (sub.tasks_count + ' задач') : (sub.files_count + ' файлов') }}</div>
                 @if (sub.is_owner) {
                   <button type="button" class="grid-card-menu-btn"
                           (click)="toggleMenu(sub.id, $event); $event.stopPropagation()"
@@ -599,7 +644,14 @@
                     </svg>
                   </div>
                 }
-                <div class="grid-name">{{ fileDisplayName(file) }}</div>
+                <div class="grid-name">
+                  {{ fileDisplayName(file) }}
+                  @if ($any(file).is_task && $any(file).task_status) {
+                    <span class="task-status-badge task-status-badge--{{ $any(file).task_status }}">
+                      {{ 'tasks.status.' + $any(file).task_status | translate }}
+                    </span>
+                  }
+                </div>
                 <div class="grid-meta">
                   {{ formatSize(file.size) }}
                   @if (currentSharedFolderId() === null && file.is_owner === false) {
@@ -729,6 +781,19 @@
             <input id="modal-note-name" type="text" [(ngModel)]="noteCreateValue"
                    placeholder="Название заметки" maxlength="200"
                    (keydown.enter)="saveNoteCreate(); closeAddModal()" />
+          </div>
+          <div class="task-toggle-row">
+            <span class="task-toggle-label">{{ 'tasks.create_as_task' | translate }}</span>
+            <button
+              type="button"
+              role="switch"
+              class="toggle-switch"
+              [class.toggle-switch--on]="newNoteIsTask"
+              [attr.aria-checked]="newNoteIsTask"
+              (click)="newNoteIsTask = !newNoteIsTask"
+            >
+              <span class="toggle-thumb"></span>
+            </button>
           </div>
           <div class="modal-actions">
             <button type="button" class="btn-primary"
@@ -977,6 +1042,19 @@
              class="modal-name-input" maxlength="100"
              (keydown.enter)="saveNoteCreate()" (keydown.escape)="cancelNoteCreate()"
              aria-label="Название заметки" />
+      <div class="task-toggle-row">
+        <span class="task-toggle-label">{{ 'tasks.create_as_task' | translate }}</span>
+        <button
+          type="button"
+          role="switch"
+          class="toggle-switch"
+          [class.toggle-switch--on]="newNoteIsTask"
+          [attr.aria-checked]="newNoteIsTask"
+          (click)="newNoteIsTask = !newNoteIsTask"
+        >
+          <span class="toggle-thumb"></span>
+        </button>
+      </div>
       <div class="modal-actions">
         <button type="button" class="btn-primary"
                 [disabled]="creatingDoc() || !noteCreateValue.trim()"
