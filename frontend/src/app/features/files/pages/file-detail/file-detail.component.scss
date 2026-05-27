@@ -376,6 +376,17 @@
   .section-title { margin: 0; }
 }
 
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-section-refresh {
+  padding: 4px 6px;
+  color: var(--text-muted);
+}
+
 .btn-section-action {
   display: inline-flex;
   align-items: center;

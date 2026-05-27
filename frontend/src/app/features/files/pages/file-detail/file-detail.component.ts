@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, input, ChangeDetectionStrategy } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
@@ -48,7 +48,7 @@ function buildFolderMoveTree(folders: SharedFolder[]): FolderMoveItem[] {
   templateUrl: './file-detail.component.html',
   styleUrl: './file-detail.component.scss',
 })
-export class FileDetailComponent implements OnInit {
+export class FileDetailComponent implements OnInit, OnDestroy {
   readonly id = input.required<string>();
 
   private readonly filesApi  = inject(FilesApiService);
@@ -206,6 +206,7 @@ export class FileDetailComponent implements OnInit {
     }
 
     this.loadFile();
+    this._startAccessPolling();
     this.orgApi.getTags().subscribe((r) => this.allTags.set(r.data.items));
     this.orgApi.getFolderTree().subscribe((r) => {
       this.allFolders.set(r.data.items);
@@ -831,6 +832,55 @@ export class FileDetailComponent implements OnInit {
       next: (res) => { this.file.set(res.data.file); this.savingTask.set(false); },
       error: () => this.savingTask.set(false),
     });
+  }
+
+  // ─── Editor URL sync ─────────────────────────────────────────────────────────
+
+  toggleEditorPanel(): void {
+    const open = !this.editorPanelOpen();
+    this.editorPanelOpen.set(open);
+    if (!open) this.editorExpanded.set(false);
+    this.syncEditorUrl();
+  }
+
+  closeEditor(): void {
+    this.editorPanelOpen.set(false);
+    this.editorExpanded.set(false);
+    this.syncEditorUrl();
+  }
+
+  toggleEditorExpanded(): void {
+    this.editorExpanded.set(!this.editorExpanded());
+    this.syncEditorUrl();
+  }
+
+  private syncEditorUrl(): void {
+    const params: Record<string, string> = {};
+    const qp = this.route.snapshot.queryParamMap;
+    const keep = ['from', 'folder_id', 'shared_folder_id'];
+    for (const k of keep) { const v = qp.get(k); if (v) params[k] = v; }
+    if (this.editorExpanded()) params['editor'] = 'expanded';
+    this.router.navigate([], { relativeTo: this.route, queryParams: params, replaceUrl: true });
+  }
+
+  // ─── Access polling (refreshes pending accesses) ─────────────────────────────
+
+  private _accessPollTimer?: ReturnType<typeof setInterval>;
+
+  private _startAccessPolling(): void {
+    this._accessPollTimer = setInterval(() => {
+      if (this.accesses().some(a => a.is_pending)) {
+        this.filesApi.accesses(this.id()).subscribe(r => this.accesses.set(r.data.items));
+      }
+    }, 15_000);
+  }
+
+  refreshAccesses(): void {
+    this.filesApi.accesses(this.id()).subscribe(r => this.accesses.set(r.data.items));
+  }
+
+  ngOnDestroy(): void {
+    clearInterval(this._accessPollTimer);
   }
 
   private toDatetimeLocal(iso: string): string {
