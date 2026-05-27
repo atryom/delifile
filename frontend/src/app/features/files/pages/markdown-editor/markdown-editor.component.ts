@@ -217,12 +217,24 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
     window.removeEventListener('beforeunload', this.onBeforeUnload);
     const wasUnsaved = this.saveStatus() === 'unsaved' && !this.conflictError();
     const wasEditable = this.canEdit() || this.lockState() === 'held';
-    if (wasUnsaved && wasEditable) {
-      this.save();
+    const lockWasHeld = this.lockState() === 'held';
+    const fileId = this.id();
+
+    if (wasUnsaved && wasEditable && lockWasHeld) {
+      // Flush save first, release lock in callback to prevent server rejecting
+      // save with LOCK_REQUIRED if release reaches server before save does.
+      this.editorSvc.flushOnDestroy(fileId).subscribe({
+        complete: () => this.lockService.release(fileId),
+      });
+    } else {
+      if (wasUnsaved && wasEditable) {
+        this.save();
+      }
+      if (lockWasHeld) {
+        this.lockService.release(fileId);
+      }
     }
-    if (this.lockState() === 'held') {
-      this.lockService.release(this.id());
-    }
+
     this.editorSvc.teardown();
     this.lockService.reset();
   }

@@ -1,4 +1,6 @@
 import { Injectable, inject, signal, computed, NgZone } from '@angular/core';
+import { Observable, of } from 'rxjs';
+import { tap, map, catchError } from 'rxjs/operators';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { ResizableImage } from '../pages/markdown-editor/resizable-image.extension';
@@ -212,7 +214,22 @@ export class MarkdownEditorService {
     await this.lockService.reacquire(fileId);
     if (this.lockState() === 'held') {
       this.editor?.setEditable(true);
+      // Mark unsaved so periodic timer will flush any content written during the lock gap
+      this.saveStatus.set('unsaved');
     }
+  }
+
+  flushOnDestroy(fileId: string): Observable<void> {
+    if (!this.editor || !this.doc()) return of(undefined);
+    const etag = this.doc()!.etag;
+    if (!etag) return of(undefined);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw: string = (this.editor.storage as any)['markdown']?.getMarkdown?.() ?? '';
+    return this.docsApi.save(fileId, raw, etag).pipe(
+      tap(res => this.doc.update(d => d ? { ...d, etag: res.data.etag, updatedAt: res.data.updatedAt } : d)),
+      map(() => undefined),
+      catchError(() => of(undefined)),
+    );
   }
 
   setImgWidth(width: number | null): void {

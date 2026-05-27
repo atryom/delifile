@@ -171,6 +171,13 @@ export class FileDetailComponent implements OnInit {
       this.backFolderId = folderIdParam;
       this.backLink.set({ commands: ['/folders'], queryParams: { tab: 'shared', shared_folder_id: folderIdParam } });
       this.contextSharedFolderId.set(folderIdParam);
+      this.sfApi.listAll().subscribe({
+        next: res => {
+          const found = res.data.items.find(f => f.id === folderIdParam);
+          if (found) this.resolvedFolderName.set(found.name);
+        },
+        error: () => {},
+      });
     } else if (fromParam === 'local-folder' && folderIdParam) {
       this.backFolderId = folderIdParam;
       this.backLink.set({ commands: ['/folders'], queryParams: { folder_id: folderIdParam } });
