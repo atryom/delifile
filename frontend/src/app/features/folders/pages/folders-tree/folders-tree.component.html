@@ -1042,6 +1042,19 @@
              class="modal-name-input" maxlength="100"
              (keydown.enter)="saveNoteCreate()" (keydown.escape)="cancelNoteCreate()"
              aria-label="Название заметки" />
+      <div class="task-toggle-row">
+        <span class="task-toggle-label">{{ 'tasks.create_as_task' | translate }}</span>
+        <button
+          type="button"
+          role="switch"
+          class="toggle-switch"
+          [class.toggle-switch--on]="newNoteIsTask"
+          [attr.aria-checked]="newNoteIsTask"
+          (click)="newNoteIsTask = !newNoteIsTask"
+        >
+          <span class="toggle-thumb"></span>
+        </button>
+      </div>
       <div class="modal-actions">
         <button type="button" class="btn-primary"
                 [disabled]="creatingDoc() || !noteCreateValue.trim()"

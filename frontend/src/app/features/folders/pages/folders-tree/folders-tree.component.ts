@@ -737,6 +737,7 @@ export class FoldersTreeComponent implements OnInit {
   cancelNoteCreate(): void {
     this.showNoteInput.set(false);
     this.noteCreateValue = '';
+    this.newNoteIsTask = false;
   }
 
   saveNoteCreate(): void {
