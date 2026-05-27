@@ -736,8 +736,7 @@
     "start_date": "Дата начала",
     "due_date": "Дата завершения",
     "assignee": "Исполнитель",
-    "assign_btn": "Назначить",
-    "unassign_btn": "Снять",
+    "assign_btn": "Делегировать",
     "task_view": "Задачи"
   }
 }

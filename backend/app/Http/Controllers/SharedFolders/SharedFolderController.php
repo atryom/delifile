@@ -352,11 +352,29 @@ class SharedFolderController extends Controller
         $user    = $request->user();
         $isOwner = $parent->owner_id === $user->id;
 
+        $taskStatus = $request->get('task_status') ?: null;
+        $dateFrom   = $request->get('task_date_from') ?: null;
+        $dateTo     = $request->get('task_date_to')   ?: null;
+
         $children = SharedFolder::where('parent_id', $id)
             ->when(!$isOwner, fn ($q) => $q->where('is_private', false))
             ->withCount([
                     'sharedFiles as files_count',
-                    'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
+                    'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', function ($fq) use ($taskStatus, $dateFrom, $dateTo) {
+                        $fq->where('is_task', true);
+                        if ($taskStatus) {
+                            $fq->where('task_status', $taskStatus);
+                        }
+                        if ($dateFrom !== null || $dateTo !== null) {
+                            $fq->where(fn ($q2) => $q2->whereNotNull('task_start_date')->orWhereNotNull('task_due_date'));
+                            if ($dateTo !== null) {
+                                $fq->where(fn ($q2) => $q2->whereNull('task_start_date')->orWhere('task_start_date', '<=', $dateTo));
+                            }
+                            if ($dateFrom !== null) {
+                                $fq->where(fn ($q2) => $q2->whereNull('task_due_date')->orWhere('task_due_date', '>=', $dateFrom));
+                            }
+                        }
+                    }),
                     'children',
                     'accesses',
                 ])
@@ -536,11 +554,18 @@ class SharedFolderController extends Controller
         if ($request->get('task_assigned_user_id')) {
             $baseQuery->whereHas('file', fn ($q) => $q->where('task_assigned_user_id', $request->get('task_assigned_user_id')));
         }
-        if ($request->get('task_date_from')) {
-            $baseQuery->whereHas('file', fn ($q) => $q->where('task_start_date', '>=', $request->get('task_date_from')));
-        }
-        if ($request->get('task_date_to')) {
-            $baseQuery->whereHas('file', fn ($q) => $q->where('task_due_date', '<=', $request->get('task_date_to')));
+        $dateFrom = $request->get('task_date_from') ?: null;
+        $dateTo   = $request->get('task_date_to')   ?: null;
+        if ($dateFrom !== null || $dateTo !== null) {
+            $baseQuery->whereHas('file', function ($q) use ($dateFrom, $dateTo) {
+                $q->where(fn ($q2) => $q2->whereNotNull('task_start_date')->orWhereNotNull('task_due_date'));
+                if ($dateTo !== null) {
+                    $q->where(fn ($q2) => $q2->whereNull('task_start_date')->orWhere('task_start_date', '<=', $dateTo));
+                }
+                if ($dateFrom !== null) {
+                    $q->where(fn ($q2) => $q2->whereNull('task_due_date')->orWhere('task_due_date', '>=', $dateFrom));
+                }
+            });
         }
 
         $total = $baseQuery->count();

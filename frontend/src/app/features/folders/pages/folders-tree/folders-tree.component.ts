@@ -270,7 +270,10 @@ export class FoldersTreeComponent implements OnInit {
   );
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  readonly filteredSharedFolders = computed<SharedFolder[]>(() => this.sharedFolders());
+  readonly filteredSharedFolders = computed<SharedFolder[]>(() => {
+    if (this.viewMode() !== 'tasks') return this.sharedFolders();
+    return this.sharedFolders().filter(f => (f.tasks_count ?? 0) > 0);
+  });
 
   readonly visibleSubfolders = computed<SharedFolder[]>(() => {
     if (this.viewMode() !== 'tasks') return this.sfSubfolders();
@@ -447,7 +450,13 @@ export class FoldersTreeComponent implements OnInit {
 
   private loadSfSubfolders(sfId: string): void {
     this.sfSubsLoading.set(true);
-    this.sfApi.getSubfolders(sfId).subscribe({
+    const isTasksMode = this.viewMode() === 'tasks';
+    const filters = isTasksMode ? {
+      task_status:    this.taskFilterStatus()   || undefined,
+      task_date_from: this.taskFilterDateFrom() || undefined,
+      task_date_to:   this.taskFilterDateTo()   || undefined,
+    } : undefined;
+    this.sfApi.getSubfolders(sfId, filters).subscribe({
       next: (res) => { this.sfSubfolders.set(res.data.items); this.sfSubsLoading.set(false); },
       error: () => { this.sfSubfolders.set([]); this.sfSubsLoading.set(false); },
     });
@@ -528,6 +537,8 @@ export class FoldersTreeComponent implements OnInit {
     this.page.set(1);
     this.clearSelection();
     this.loadFiles();
+    const sfId = this.currentSharedFolderId();
+    if (sfId) this.loadSfSubfolders(sfId);
   }
 
   goToPage(p: number): void {

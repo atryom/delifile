@@ -8,6 +8,7 @@ use App\Models\Contact;
 use App\Models\ContactPendingShare;
 use App\Models\FileUserAccess;
 use App\Models\Invitation;
+use App\Models\PendingReceivedFile;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -58,19 +59,37 @@ class InvitationService
                 // Apply pending file shares queued for this contact
                 $pendingShares = ContactPendingShare::where('contact_id', $contact->id)->get();
 
+                $grantedFileIds = [];
                 foreach ($pendingShares as $pending) {
-                    FileUserAccess::firstOrCreate([
-                        'file_id'     => $pending->file_id,
-                        'user_id'     => $user->id,
-                        'access_type' => AccessType::Shared,
-                    ], [
-                        'contact_id' => $contact->id,
-                        'can_edit'   => (bool) $pending->can_edit,
-                    ]);
+                    $existing = FileUserAccess::where('file_id', $pending->file_id)
+                        ->where('user_id', $user->id)
+                        ->first();
+                    if ($existing) {
+                        if (!$existing->contact_id) {
+                            $existing->contact_id = $contact->id;
+                            $existing->save();
+                        }
+                    } else {
+                        FileUserAccess::create([
+                            'file_id'     => $pending->file_id,
+                            'user_id'     => $user->id,
+                            'access_type' => AccessType::Shared,
+                            'contact_id'  => $contact->id,
+                            'can_edit'    => (bool) $pending->can_edit,
+                        ]);
+                    }
+                    $grantedFileIds[] = $pending->file_id;
                 }
 
                 // Remove processed pending shares
                 ContactPendingShare::where('contact_id', $contact->id)->delete();
+
+                // Clean up any stale PendingReceivedFile for the same user+files
+                if (!empty($grantedFileIds)) {
+                    PendingReceivedFile::whereIn('file_id', $grantedFileIds)
+                        ->where('recipient_user_id', $user->id)
+                        ->delete();
+                }
             }
         });
 

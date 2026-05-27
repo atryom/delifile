@@ -149,38 +149,38 @@
           </div>
         }
 
-      </div>
-    }
+        <!-- Фильтры задач (только в режиме задач) -->
+        @if (viewMode() === 'tasks') {
+          <div class="task-filters-row">
+            <div class="custom-select">
+              <select
+                [ngModel]="taskFilterStatus()"
+                (ngModelChange)="taskFilterStatus.set($event); onTaskFilterChange()"
+                [attr.aria-label]="'tasks.status_label' | translate">
+                <option value="">{{ 'tasks.status_all' | translate }}</option>
+                <option value="template">{{ 'tasks.status.template' | translate }}</option>
+                <option value="in_progress">{{ 'tasks.status.in_progress' | translate }}</option>
+                <option value="under_review">{{ 'tasks.status.under_review' | translate }}</option>
+                <option value="completed">{{ 'tasks.status.completed' | translate }}</option>
+              </select>
+            </div>
+            <div class="task-date-filter">
+              <label class="task-date-filter-label" for="taskDateFrom">{{ 'tasks.start_date' | translate }}</label>
+              <input id="taskDateFrom" type="date" class="task-date-input"
+                     [ngModel]="taskFilterDateFrom()"
+                     (ngModelChange)="taskFilterDateFrom.set($event); onTaskFilterChange()"
+                     [attr.aria-label]="'tasks.start_date' | translate" />
+            </div>
+            <div class="task-date-filter">
+              <label class="task-date-filter-label" for="taskDateTo">{{ 'tasks.due_date' | translate }}</label>
+              <input id="taskDateTo" type="date" class="task-date-input"
+                     [ngModel]="taskFilterDateTo()"
+                     (ngModelChange)="taskFilterDateTo.set($event); onTaskFilterChange()"
+                     [attr.aria-label]="'tasks.due_date' | translate" />
+            </div>
+          </div>
+        }
 
-    <!-- ── TASK FILTERS (visible only in tasks view) ─────────────────── -->
-    @if (viewMode() === 'tasks') {
-      <div class="task-filters-bar" (click)="$event.stopPropagation()">
-        <div class="custom-select">
-          <select
-            [ngModel]="taskFilterStatus()"
-            (ngModelChange)="taskFilterStatus.set($event); onTaskFilterChange()"
-            [attr.aria-label]="'tasks.status_label' | translate">
-            <option value="">{{ 'tasks.status_all' | translate }}</option>
-            <option value="template">{{ 'tasks.status.template' | translate }}</option>
-            <option value="in_progress">{{ 'tasks.status.in_progress' | translate }}</option>
-            <option value="under_review">{{ 'tasks.status.under_review' | translate }}</option>
-            <option value="completed">{{ 'tasks.status.completed' | translate }}</option>
-          </select>
-        </div>
-        <div class="task-date-filter">
-          <label class="task-date-filter-label" for="taskDateFrom">{{ 'tasks.start_date' | translate }}</label>
-          <input id="taskDateFrom" type="date" class="task-date-input"
-                 [ngModel]="taskFilterDateFrom()"
-                 (ngModelChange)="taskFilterDateFrom.set($event); onTaskFilterChange()"
-                 [attr.aria-label]="'tasks.start_date' | translate" />
-        </div>
-        <div class="task-date-filter">
-          <label class="task-date-filter-label" for="taskDateTo">{{ 'tasks.due_date' | translate }}</label>
-          <input id="taskDateTo" type="date" class="task-date-input"
-                 [ngModel]="taskFilterDateTo()"
-                 (ngModelChange)="taskFilterDateTo.set($event); onTaskFilterChange()"
-                 [attr.aria-label]="'tasks.due_date' | translate" />
-        </div>
       </div>
     }
 
@@ -330,12 +330,12 @@
                           @if (!folder.is_owner) {
                             <div class="role-badge">{{ folder.my_access_type === 'edit' ? 'Редактор' : 'Просматривающий' }}</div>
                           }
-                          <div class="file-meta-mobile">{{ folder.files_count }} файлов</div>
+                          <div class="file-meta-mobile">{{ viewMode() === 'tasks' ? (folder.tasks_count + ' задач') : (folder.files_count + ' файлов') }}</div>
                         </div>
                       </div>
                     </td>
                     <td class="col-mod-cell">{{ folder.created_at | date:'d MMM y' }}</td>
-                    <td class="col-size-cell">{{ folder.files_count }} файлов</td>
+                    <td class="col-size-cell">{{ viewMode() === 'tasks' ? (folder.tasks_count + ' задач') : (folder.files_count + ' файлов') }}</td>
                     <td class="col-open-cell">
                       <button type="button" class="open-btn"
                               (click)="navigateIntoSharedFolder(folder); $event.stopPropagation()"
@@ -401,12 +401,12 @@
                               }
                             </div>
                           }
-                          <div class="file-meta-mobile">{{ sub.files_count }} файлов</div>
+                          <div class="file-meta-mobile">{{ viewMode() === 'tasks' ? (sub.tasks_count + ' задач') : (sub.files_count + ' файлов') }}</div>
                         </div>
                       </div>
                     </td>
                     <td class="col-mod-cell">{{ sub.created_at | date:'d MMM y' }}</td>
-                    <td class="col-size-cell">{{ sub.files_count }} файлов</td>
+                    <td class="col-size-cell">{{ viewMode() === 'tasks' ? (sub.tasks_count + ' задач') : (sub.files_count + ' файлов') }}</td>
                     <td class="col-open-cell">
                       <button type="button" class="open-btn"
                               (click)="navigateIntoSharedFolder(sub); $event.stopPropagation()"
@@ -583,7 +583,7 @@
                   {{ folder.name }}
                   @if (folder.has_shared_access) { <span class="sf-badge sf-badge--shared">👥</span> }
                 </div>
-                <div class="grid-meta">{{ folder.files_count }} файлов</div>
+                <div class="grid-meta">{{ viewMode() === 'tasks' ? (folder.tasks_count + ' задач') : (folder.files_count + ' файлов') }}</div>
               </div>
             }
           }
@@ -603,7 +603,7 @@
                   @if (sub.is_private) { <span class="sf-badge sf-badge--private">🔒</span> }
                   @else if (sub.has_shared_access) { <span class="sf-badge sf-badge--shared">👥</span> }
                 </div>
-                <div class="grid-meta">{{ sub.files_count }} файлов</div>
+                <div class="grid-meta">{{ viewMode() === 'tasks' ? (sub.tasks_count + ' задач') : (sub.files_count + ' файлов') }}</div>
                 @if (sub.is_owner) {
                   <button type="button" class="grid-card-menu-btn"
                           (click)="toggleMenu(sub.id, $event); $event.stopPropagation()"

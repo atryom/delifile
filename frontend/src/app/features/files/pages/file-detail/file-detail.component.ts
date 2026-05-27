@@ -47,6 +47,7 @@ function buildFolderMoveTree(folders: SharedFolder[]): FolderMoveItem[] {
   imports: [DatePipe, RouterLink, FormsModule, ShareContactDialogComponent, CreateLinkDialogComponent, AddToSharedFolderDialogComponent, AddVersionDialogComponent, TranslateModule, ThreadCommentsComponent, MarkdownEditorPanelComponent],
   templateUrl: './file-detail.component.html',
   styleUrl: './file-detail.component.scss',
+  host: { '(document:click)': 'closeAccessPopup()' },
 })
 export class FileDetailComponent implements OnInit, OnDestroy {
   readonly id = input.required<string>();
@@ -70,6 +71,7 @@ export class FileDetailComponent implements OnInit, OnDestroy {
   readonly feedback      = signal<string | null>(null);
   readonly links         = signal<ShareLink[]>([]);
   readonly accesses      = signal<FileAccess[]>([]);
+  readonly accessPopupId = signal<string | null>(null);
   readonly activity      = signal<ActivityLog[]>([]);
 
   descriptionDraft = '';
@@ -169,6 +171,12 @@ export class FileDetailComponent implements OnInit, OnDestroy {
   readonly isTask        = computed(() => this.file()?.is_task ?? false);
   readonly taskStatus    = computed(() => this.file()?.task_status ?? null);
   readonly taskAssignee  = computed(() => this.file()?.task_assigned_user ?? null);
+  readonly canEditTask   = computed(() => {
+    const f = this.file();
+    const u = this.authState.user();
+    if (!f || !u) return false;
+    return f.is_owner || (f.task_assigned_user?.id === Number(u.id));
+  });
   readonly savingTask    = signal(false);
   taskStartDraft         = '';
   taskDueDraft           = '';
@@ -746,6 +754,15 @@ export class FileDetailComponent implements OnInit, OnDestroy {
 
   versionDisplayLabel(v: FileVersion): string {
     return v.version_label ? `v${v.version_label}` : `v${v.version_number}`;
+  }
+
+  toggleAccessPopup(id: string, event: Event): void {
+    event.stopPropagation();
+    this.accessPopupId.set(this.accessPopupId() === id ? null : id);
+  }
+
+  closeAccessPopup(): void {
+    this.accessPopupId.set(null);
   }
 
   revokeAccess(access: FileAccess): void {

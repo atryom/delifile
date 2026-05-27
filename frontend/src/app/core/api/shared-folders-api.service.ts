@@ -122,8 +122,15 @@ export class SharedFoldersApiService {
 
   // ── Subfolders ────────────────────────────────────────────────────────────
 
-  getSubfolders(parentId: string): Observable<ApiResponse<{ items: SharedFolder[] }>> {
-    return this.api.get(`/shared-folders/${parentId}/subfolders`);
+  getSubfolders(parentId: string, taskFilters?: { task_status?: string; task_date_from?: string; task_date_to?: string }): Observable<ApiResponse<{ items: SharedFolder[] }>> {
+    const params: Record<string, string> = {};
+    if (taskFilters?.task_status)    params['task_status']    = taskFilters.task_status;
+    if (taskFilters?.task_date_from) params['task_date_from'] = taskFilters.task_date_from;
+    if (taskFilters?.task_date_to)   params['task_date_to']   = taskFilters.task_date_to;
+    const query = Object.keys(params).length
+      ? '?' + new URLSearchParams(params).toString()
+      : '';
+    return this.api.get(`/shared-folders/${parentId}/subfolders${query}`);
   }
 
   createSubfolder(parentId: string, name: string): Observable<ApiResponse<{ folder: SharedFolder }>> {

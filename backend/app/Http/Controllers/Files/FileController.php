@@ -482,23 +482,39 @@ class FileController extends Controller
                 'is_pending'  => false,
             ]);
 
-        $pending = PendingReceivedFile::where('file_id', $file->id)
+        $pendingRaw = PendingReceivedFile::where('file_id', $file->id)
             ->with('recipient:id,email,name')
-            ->get()
-            ->map(fn ($p) => [
-                'id'          => $p->id,
-                'access_type' => AccessType::Shared->value,
-                'user'        => $p->recipient ? [
-                    'id'    => $p->recipient->id,
-                    'email' => $p->recipient->email,
-                    'name'  => $p->recipient->name,
-                ] : null,
-                'is_favorite' => false,
-                'saved_at'    => null,
-                'contact_id'  => null,
-                'can_edit'    => (bool) $p->can_edit,
-                'is_pending'  => true,
-            ]);
+            ->get();
+
+        // Clean up stale pending entries where the user already has FileUserAccess
+        if ($pendingRaw->isNotEmpty()) {
+            $recipientIds = $pendingRaw->pluck('recipient_user_id')->filter()->unique()->values();
+            $alreadyAccessUserIds = FileUserAccess::where('file_id', $file->id)
+                ->whereIn('user_id', $recipientIds)
+                ->pluck('user_id')
+                ->toArray();
+
+            $stale = $pendingRaw->filter(fn ($p) => in_array($p->recipient_user_id, $alreadyAccessUserIds));
+            if ($stale->isNotEmpty()) {
+                PendingReceivedFile::whereIn('id', $stale->pluck('id'))->delete();
+            }
+            $pendingRaw = $pendingRaw->diff($stale)->values();
+        }
+
+        $pending = $pendingRaw->map(fn ($p) => [
+            'id'          => $p->id,
+            'access_type' => AccessType::Shared->value,
+            'user'        => $p->recipient ? [
+                'id'    => $p->recipient->id,
+                'email' => $p->recipient->email,
+                'name'  => $p->recipient->name,
+            ] : null,
+            'is_favorite' => false,
+            'saved_at'    => null,
+            'contact_id'  => null,
+            'can_edit'    => (bool) $p->can_edit,
+            'is_pending'  => true,
+        ]);
 
         return $this->success(__('messages.files.accesses_fetched'), [
             'items' => $accesses->merge($pending)->values(),

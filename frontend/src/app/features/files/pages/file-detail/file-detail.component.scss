@@ -670,22 +670,83 @@
   margin-left: auto;
   margin-right: 4px;
 }
-.access-edit-toggle {
-  font-size: 0.72rem;
-  padding: 2px 8px;
-  border-radius: 99px;
+.access-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.access-popup-wrap {
+  position: relative;
+}
+
+.access-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border: 1px solid var(--border);
+  border-radius: 4px;
   background: var(--surface2);
-  color: var(--text-dim);
+  color: var(--text-muted);
   cursor: pointer;
-  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.12s;
   &:hover { border-color: var(--accent, #6366f1); color: var(--accent, #6366f1); }
-  &--on { background: color-mix(in srgb, var(--accent, #6366f1) 10%, transparent); border-color: var(--accent, #6366f1); color: var(--accent, #6366f1); }
+  &--edit {
+    border-color: var(--accent, #6366f1);
+    color: var(--accent, #6366f1);
+    background: color-mix(in srgb, var(--accent, #6366f1) 8%, transparent);
+  }
+}
+
+.access-popup {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 200;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  min-width: 190px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+}
+
+.access-popup-current {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  margin: 0 0 4px 0;
+}
+
+.access-popup-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  &:hover { background: var(--surface2); }
+  &--danger { color: #dc2626; }
+  &--danger:hover { background: color-mix(in srgb, #dc2626 8%, transparent); }
 }
 
 // ─── Task section ────────────────────────────────────────────────────────────
 .task-section { padding-top: 8px; }
+.task-status-readonly {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+}
 
 .task-status-row {
   display: flex;
@@ -747,23 +808,6 @@
   &--revoke:hover { border-color: #dc2626; color: #dc2626; }
 }
 
-.access-revoke-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  margin-left: auto;
-  flex-shrink: 0;
-  transition: all 0.12s;
-  &:hover { background: var(--surface3); color: #dc2626; }
-}
 
 .activity-item {
   display: flex;

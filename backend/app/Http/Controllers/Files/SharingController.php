@@ -13,6 +13,8 @@ use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\PendingReceivedFile;
 use App\Models\ShareLink;
+use App\Models\SharedFolder;
+use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderLink;
 use App\Models\User;
 use App\Services\ActivityService;
@@ -119,23 +121,51 @@ class SharingController extends Controller
         DB::transaction(function () use ($file, $contact, $request, $recipientUser, $canEdit) {
             $autoAdd = $recipientUser ? ($recipientUser->auto_add_received_files ?? true) : true;
 
-            if ($autoAdd) {
-                FileUserAccess::firstOrCreate([
-                    'file_id'     => $file->id,
-                    'user_id'     => $contact->resolved_user_id,
-                    'access_type' => AccessType::Shared,
-                ], [
-                    'contact_id' => $contact->id,
-                    'can_edit'   => $canEdit,
-                ]);
+            $alreadyHasAccess = $recipientUser && FileUserAccess::where('file_id', $file->id)
+                ->where('user_id', $recipientUser->id)
+                ->exists();
+
+            if ($autoAdd || $alreadyHasAccess) {
+                // If user already has any FileUserAccess, upgrade/confirm shared access directly
+                // (avoids a stale pending entry when user can already access the file)
+                $existing = FileUserAccess::where('file_id', $file->id)
+                    ->where('user_id', $contact->resolved_user_id)
+                    ->first();
+                if ($existing) {
+                    // Only update contact_id if not yet linked; don't downgrade access type
+                    if (!$existing->contact_id) {
+                        $existing->contact_id = $contact->id;
+                        $existing->save();
+                    }
+                } else {
+                    FileUserAccess::create([
+                        'file_id'     => $file->id,
+                        'user_id'     => $contact->resolved_user_id,
+                        'access_type' => AccessType::Shared,
+                        'contact_id'  => $contact->id,
+                        'can_edit'    => $canEdit,
+                    ]);
+                }
             } else {
-                PendingReceivedFile::firstOrCreate([
-                    'file_id'           => $file->id,
-                    'recipient_user_id' => $recipientUser->id,
-                ], [
-                    'sender_user_id' => $request->user()->id,
-                    'can_edit'       => $canEdit,
-                ]);
+                // If the recipient already has folder-level access to this file,
+                // grant FileUserAccess directly instead of creating a pending entry.
+                if ($this->userHasSharedFolderAccess($recipientUser, $file)) {
+                    FileUserAccess::create([
+                        'file_id'     => $file->id,
+                        'user_id'     => $contact->resolved_user_id,
+                        'access_type' => AccessType::Shared,
+                        'contact_id'  => $contact->id,
+                        'can_edit'    => $canEdit,
+                    ]);
+                } else {
+                    PendingReceivedFile::firstOrCreate([
+                        'file_id'           => $file->id,
+                        'recipient_user_id' => $recipientUser->id,
+                    ], [
+                        'sender_user_id' => $request->user()->id,
+                        'can_edit'       => $canEdit,
+                    ]);
+                }
             }
 
             $this->activityService->log($file, $request->user(), ActivityType::SharedToContact, [
@@ -154,7 +184,7 @@ class SharingController extends Controller
                     $recipientUser,
                     __('notifications.new_file_title'),
                     $file->original_name . ' — от ' . $senderName,
-                    $autoAdd
+                    ($autoAdd || $alreadyHasAccess)
                         ? config('app.url') . '/files/' . $file->id
                         : config('app.url') . '/communication/received',
                 );
@@ -197,6 +227,16 @@ class SharingController extends Controller
                 ->where('user_id', $revokedUserId)
                 ->delete();
 
+            // Also remove any pending share for this contact (covers unregistered contacts).
+            ContactPendingShare::where('contact_id', $contact->id)
+                ->where('file_id', $file->id)
+                ->delete();
+
+            // If the revoked user is the current task assignee, reassign to the owner.
+            if ($file->is_task && $file->task_assigned_user_id === $revokedUserId) {
+                $file->update(['task_assigned_user_id' => $file->owner_id]);
+            }
+
             // Release document lock if the revoked user currently holds it.
             DocumentLock::where('file_id', $file->id)
                 ->where('user_id', $revokedUserId)
@@ -212,12 +252,21 @@ class SharingController extends Controller
                 return $this->notFound('Contact not found');
             }
 
-            $deleted = FileUserAccess::where('file_id', $file->id)
+            $deletedAccess   = FileUserAccess::where('file_id', $file->id)
                 ->where('user_id', $targetUserId)
                 ->delete();
 
-            if (!$deleted) {
+            $deletedPending  = PendingReceivedFile::where('file_id', $file->id)
+                ->where('recipient_user_id', $targetUserId)
+                ->delete();
+
+            if (!$deletedAccess && !$deletedPending) {
                 return $this->notFound('Access not found');
+            }
+
+            // If the revoked user is the current task assignee, reassign to the owner.
+            if ($file->is_task && $file->task_assigned_user_id === $targetUserId) {
+                $file->update(['task_assigned_user_id' => $file->owner_id]);
             }
 
             // Release document lock if the revoked user currently holds it.
@@ -520,6 +569,24 @@ class SharingController extends Controller
         $html = str_replace('</head>', $ogTags . '</head>', $html);
 
         return response($html, 200, ['Content-Type' => 'text/html; charset=utf-8']);
+    }
+
+    private function userHasSharedFolderAccess(User $user, File $file): bool
+    {
+        $folderIds = $file->sharedFolderFiles()->pluck('shared_folder_id')->toArray();
+        if (empty($folderIds)) {
+            return false;
+        }
+
+        $allFolderIds = $folderIds;
+        $folders = SharedFolder::whereIn('id', $folderIds)->get();
+        foreach ($folders as $folder) {
+            $allFolderIds = array_merge($allFolderIds, $folder->ancestorIds());
+        }
+
+        return SharedFolderAccess::where('user_id', $user->id)
+            ->whereIn('shared_folder_id', array_unique($allFolderIds))
+            ->exists();
     }
 
     private function buildOgDescription(string $mime, int $size): string
