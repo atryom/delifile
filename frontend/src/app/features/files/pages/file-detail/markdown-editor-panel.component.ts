@@ -47,6 +47,8 @@ import { ImagePickerComponent } from '../markdown-editor/image-picker.component'
       </div>
     }
 
+    <!-- Sticky: header bar + toolbars -->
+    <div class="ep-sticky-top">
     <!-- Header bar -->
     <div class="ep-bar">
       <button
@@ -106,9 +108,7 @@ import { ImagePickerComponent } from '../markdown-editor/image-picker.component'
       </div>
     </div>
 
-    <!-- Collapsible: toolbar + body -->
-    <div class="ep-collapse-body" [style.display]="collapsed() ? 'none' : ''">
-
+    @if (!collapsed()) {
       <!-- Toolbar -->
       @if (canEdit()) {
         <div class="ep-toolbar" role="toolbar" aria-label="Форматирование текста">
@@ -124,13 +124,13 @@ import { ImagePickerComponent } from '../markdown-editor/image-picker.component'
           <span class="ep-sep" aria-hidden="true"></span>
 
           <!-- Inline formatting -->
-          <button type="button" class="ep-tb-btn ep-tb-text ep-tb-bold" [class.active]="editor?.isActive('bold')"
+          <button type="button" class="ep-tb-btn ep-tb-text ep-tb-bold" [class.active]="activeMarks().has('bold')"
             (click)="cmd('toggleBold')" aria-label="Жирный" title="Жирный (Ctrl+B)">B</button>
-          <button type="button" class="ep-tb-btn ep-tb-text ep-tb-italic" [class.active]="editor?.isActive('italic')"
+          <button type="button" class="ep-tb-btn ep-tb-text ep-tb-italic" [class.active]="activeMarks().has('italic')"
             (click)="cmd('toggleItalic')" aria-label="Курсив" title="Курсив (Ctrl+I)"><em>I</em></button>
-          <button type="button" class="ep-tb-btn ep-tb-text ep-tb-strike" [class.active]="editor?.isActive('strike')"
+          <button type="button" class="ep-tb-btn ep-tb-text ep-tb-strike" [class.active]="activeMarks().has('strike')"
             (click)="cmd('toggleStrike')" aria-label="Зачёркнутый" title="Зачёркнутый"><s>S</s></button>
-          <button type="button" class="ep-tb-btn" [class.active]="editor?.isActive('code')"
+          <button type="button" class="ep-tb-btn" [class.active]="activeMarks().has('code')"
             (click)="cmd('toggleCode')" aria-label="Код" title="Инлайн-код">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           </button>
@@ -138,25 +138,25 @@ import { ImagePickerComponent } from '../markdown-editor/image-picker.component'
           <span class="ep-sep" aria-hidden="true"></span>
 
           <!-- Headings -->
-          <button type="button" class="ep-tb-btn ep-tb-text" [class.active]="editor?.isActive('heading', {level:1})"
+          <button type="button" class="ep-tb-btn ep-tb-text" [class.active]="activeMarks().has('h1')"
             (click)="cmdHeading(1)" aria-label="Заголовок 1" title="Заголовок 1">H1</button>
-          <button type="button" class="ep-tb-btn ep-tb-text" [class.active]="editor?.isActive('heading', {level:2})"
+          <button type="button" class="ep-tb-btn ep-tb-text" [class.active]="activeMarks().has('h2')"
             (click)="cmdHeading(2)" aria-label="Заголовок 2" title="Заголовок 2">H2</button>
-          <button type="button" class="ep-tb-btn ep-tb-text" [class.active]="editor?.isActive('heading', {level:3})"
+          <button type="button" class="ep-tb-btn ep-tb-text" [class.active]="activeMarks().has('h3')"
             (click)="cmdHeading(3)" aria-label="Заголовок 3" title="Заголовок 3">H3</button>
 
           <span class="ep-sep" aria-hidden="true"></span>
 
           <!-- Lists -->
-          <button type="button" class="ep-tb-btn" [class.active]="editor?.isActive('bulletList')"
+          <button type="button" class="ep-tb-btn" [class.active]="activeMarks().has('bulletList')"
             (click)="cmd('toggleBulletList')" aria-label="Маркированный список" title="Маркированный список">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>
           </button>
-          <button type="button" class="ep-tb-btn" [class.active]="editor?.isActive('orderedList')"
+          <button type="button" class="ep-tb-btn" [class.active]="activeMarks().has('orderedList')"
             (click)="cmd('toggleOrderedList')" aria-label="Нумерованный список" title="Нумерованный список">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4" stroke-width="1.8"/><path d="M4 10h2" stroke-width="1.8"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke-width="1.8"/></svg>
           </button>
-          <button type="button" class="ep-tb-btn" [class.active]="editor?.isActive('taskList')"
+          <button type="button" class="ep-tb-btn" [class.active]="activeMarks().has('taskList')"
             (click)="cmd('toggleTaskList')" aria-label="Список задач" title="Список задач">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="M5 8l1.5 1.5L9 6"/><line x1="13" y1="8" x2="21" y2="8"/><rect x="3" y="14" width="6" height="6" rx="1"/><line x1="13" y1="17" x2="21" y2="17"/></svg>
           </button>
@@ -164,11 +164,11 @@ import { ImagePickerComponent } from '../markdown-editor/image-picker.component'
           <span class="ep-sep" aria-hidden="true"></span>
 
           <!-- Block elements -->
-          <button type="button" class="ep-tb-btn" [class.active]="editor?.isActive('blockquote')"
+          <button type="button" class="ep-tb-btn" [class.active]="activeMarks().has('blockquote')"
             (click)="cmd('toggleBlockquote')" aria-label="Цитата" title="Цитата">
             <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
           </button>
-          <button type="button" class="ep-tb-btn" [class.active]="editor?.isActive('codeBlock')"
+          <button type="button" class="ep-tb-btn" [class.active]="activeMarks().has('codeBlock')"
             (click)="cmd('toggleCodeBlock')" aria-label="Блок кода" title="Блок кода">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m9 9-3 3 3 3"/><path d="m15 9 3 3-3 3"/></svg>
           </button>
@@ -249,8 +249,11 @@ import { ImagePickerComponent } from '../markdown-editor/image-picker.component'
           </button>
         </div>
       }
+    } <!-- /@if !collapsed -->
+    </div> <!-- /ep-sticky-top -->
 
-      <!-- Editor body — клик в пустое пространство ниже текста тоже фокусирует редактор -->
+    <!-- Editor body — клик в пустое пространство ниже текста тоже фокусирует редактор -->
+    @if (!collapsed()) {
       <div class="ep-body" (click)="onBodyClick($event)">
         @if (loading()) {
           <div class="ep-state" aria-live="polite">Загрузка документа...</div>
@@ -265,7 +268,7 @@ import { ImagePickerComponent } from '../markdown-editor/image-picker.component'
           </div>
         }
       </div>
-    </div>
+    }
 
     @if (showImagePicker()) {
       <app-image-picker
@@ -301,6 +304,7 @@ export class MarkdownEditorPanelComponent implements OnInit, AfterViewInit, OnDe
   readonly lockState        = this.editorSvc.lockState;
   readonly canEdit          = this.editorSvc.canEdit;
   readonly lockedByOther    = this.editorSvc.lockedByOther;
+  readonly activeMarks      = this.editorSvc.activeMarks;
 
   readonly collapsed       = signal(false);
   readonly showImagePicker = signal(false);

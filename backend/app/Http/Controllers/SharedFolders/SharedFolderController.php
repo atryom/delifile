@@ -51,7 +51,7 @@ class SharedFolderController extends Controller
         return array_unique(array_merge($memberIds, $directIds));
     }
 
-    private function notifyFolderMembers(SharedFolder $folder, User $adder, string $contentType): void
+    private function notifyFolderMembers(SharedFolder $folder, User $adder, string $contentType, ?string $contentId = null): void
     {
         $memberIds = $this->getFolderMemberUserIds($folder);
         $adderName = $adder->name ?? $adder->email;
@@ -60,7 +60,9 @@ class SharedFolderController extends Controller
             'note' => 'заметку',
             default => 'файл',
         };
-        $notifUrl = config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id;
+        $notifUrl = $contentId
+            ? config('app.url') . '/files/' . $contentId
+            : config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id;
 
         foreach ($memberIds as $memberId) {
             if ($memberId === $adder->id) continue;
@@ -68,7 +70,7 @@ class SharedFolderController extends Controller
             if (!$member) continue;
 
             $this->notificationService->notifySharedFolderContentAdded(
-                $member, $adderName, $folder->name, $folder->id, $contentType,
+                $member, $adderName, $folder->name, $folder->id, $contentType, $contentId,
             );
             if ($member->notifications_enabled ?? true) {
                 $this->pushService->sendToUser(
@@ -691,7 +693,7 @@ class SharedFolderController extends Controller
 
         $result = $this->fileService->completeUpload($file, $user, $request->input('thumbnail_key'));
 
-        $this->notifyFolderMembers($folder, $user, 'file');
+        $this->notifyFolderMembers($folder, $user, 'file', $file->id);
 
         return $this->success('Upload completed', $result);
     }

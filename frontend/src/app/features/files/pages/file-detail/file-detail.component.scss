@@ -29,7 +29,7 @@
   border: 1px solid var(--border);
   border-radius: 14px;
   margin-bottom: 18px;
-  overflow: hidden;
+  overflow: clip;
   display: flex;
   flex-direction: column;
 
@@ -192,6 +192,7 @@
   svg { flex-shrink: 0; }
   &:hover:not(:disabled) { border-color: var(--accent); background: var(--surface); color: var(--text); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
+  @include v.focus-ring;
   &.card-link-btn-primary {
     background: var(--accent);
     color: #fff;

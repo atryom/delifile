@@ -135,11 +135,11 @@
 }
 
 // ── Collapsible wrapper ───────────────────────────────────────────────────────
-.ep-collapse-body {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
+.ep-sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
 }
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────

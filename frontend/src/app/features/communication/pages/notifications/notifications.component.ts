@@ -61,12 +61,14 @@ export class NotificationsComponent implements OnInit {
         list.map(n => n.id === item.id ? { ...n, read_at: new Date().toISOString() } : n)
       );
     }
-    this.router.navigate([this.routeFor(item)]);
+    this.router.navigateByUrl(this.routeFor(item));
   }
 
   private routeFor(item: AppNotification): string {
     switch (item.type) {
       case 'file_shared':
+        if (item.data?.['is_inbox']) return '/communication/received';
+        return item.data?.['file_id'] ? `/files/${item.data['file_id']}` : '/files';
       case 'access_changed':
         return item.data?.['file_id'] ? `/files/${item.data['file_id']}` : '/files';
       case 'folder_shared':
@@ -74,6 +76,7 @@ export class NotificationsComponent implements OnInit {
           ? `/folders?tab=shared&shared_folder_id=${item.data['folder_id']}`
           : '/folders';
       case 'shared_folder_content_added':
+        if (item.data?.['content_id']) return `/files/${item.data['content_id']}`;
         return item.data?.['folder_id']
           ? `/folders?tab=shared&shared_folder_id=${item.data['folder_id']}`
           : '/folders';

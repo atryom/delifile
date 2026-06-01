@@ -13,6 +13,7 @@ import { UserSettingsApiService } from '../../api/user-settings-api.service';
 import { FilesApiService } from '../../api/files-api.service';
 import { NotificationService } from '../../notifications/notification.service';
 import { NotificationsApiService } from '../../api/notifications-api.service';
+import { InboxApiService } from '../../api/inbox-api.service';
 import { PushService } from '../../notifications/push.service';
 import { FooterComponent } from '../../../shared/components/footer/footer.component';
 import { PwaInstallService } from '../../services/pwa-install.service';
@@ -36,6 +37,7 @@ export class AppLayoutComponent implements OnInit, OnDestroy {
   private readonly filesApi     = inject(FilesApiService);
   readonly notifService  = inject(NotificationService);
   private readonly notificationsApi = inject(NotificationsApiService);
+  private readonly inboxApi = inject(InboxApiService);
   readonly pwaInstall    = inject(PwaInstallService);
   private readonly pushService  = inject(PushService);
   private readonly translate    = inject(TranslateService);
@@ -114,9 +116,11 @@ readonly sidebarOpen         = signal(false);
   private _startPolling(): void {
     this._checkNewEvents();
     this.notificationsApi.refreshCount();
+    this.inboxApi.refreshPendingCount();
     this._pollTimer = setInterval(() => {
       this._checkNewEvents();
       this.notificationsApi.refreshCount();
+      this.inboxApi.refreshPendingCount();
     }, POLL_INTERVAL_MS);
   }
 

@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { NotificationsApiService } from '../../../../core/api/notifications-api.service';
+import { InboxApiService } from '../../../../core/api/inbox-api.service';
 
 @Component({
   selector: 'app-communication-page',
@@ -23,6 +24,9 @@ import { NotificationsApiService } from '../../../../core/api/notifications-api.
           class="tab-btn"
           role="tab">
           {{ 'nav.inbox' | translate }}
+          @if (inboxBadge() > 0) {
+            <span class="tab-badge">{{ inboxBadge() }}</span>
+          }
         </a>
         <a
           routerLink="notifications"
@@ -104,4 +108,5 @@ import { NotificationsApiService } from '../../../../core/api/notifications-api.
 })
 export class CommunicationPageComponent {
   readonly notifCount = inject(NotificationsApiService).unreadCount;
+  readonly inboxBadge = inject(InboxApiService).badgeCount;
 }

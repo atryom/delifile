@@ -193,6 +193,7 @@ class SharingController extends Controller
                     $senderName,
                     $file->display_name ?? $file->original_name,
                     $file->id,
+                    !($autoAdd || $alreadyHasAccess),
                 );
             }
         });

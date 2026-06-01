@@ -25,7 +25,7 @@ class NotificationService
         ]);
     }
 
-    public function notifyFileShared(User $recipient, string $senderName, string $fileName, string $fileId): void
+    public function notifyFileShared(User $recipient, string $senderName, string $fileName, string $fileId, bool $isInbox = false): void
     {
         if (!($recipient->notify_new_files ?? true)) {
             return;
@@ -35,7 +35,7 @@ class NotificationService
             NotificationType::FileShared,
             "Вам передан файл",
             "{$senderName} поделился файлом «{$fileName}»",
-            ['file_id' => $fileId],
+            ['file_id' => $fileId, 'is_inbox' => $isInbox],
         );
     }
 
@@ -67,7 +67,7 @@ class NotificationService
         );
     }
 
-    public function notifySharedFolderContentAdded(User $recipient, string $adderName, string $folderName, string $folderId, string $contentType): void
+    public function notifySharedFolderContentAdded(User $recipient, string $adderName, string $folderName, string $folderId, string $contentType, ?string $contentId = null): void
     {
         if (!($recipient->notify_shared_folder_updates ?? true)) {
             return;
@@ -79,12 +79,17 @@ class NotificationService
             default => 'файл',
         };
 
+        $data = ['folder_id' => $folderId];
+        if ($contentId !== null) {
+            $data['content_id'] = $contentId;
+        }
+
         $this->create(
             $recipient->id,
             NotificationType::SharedFolderContentAdded,
             'Новое в общей папке',
             "{$adderName} добавил {$contentLabel} в папку «{$folderName}»",
-            ['folder_id' => $folderId],
+            $data,
         );
     }
 

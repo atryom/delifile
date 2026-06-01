@@ -25,7 +25,7 @@ class SharedFolderFileController extends Controller
         private readonly PushNotificationService $pushService,
     ) {}
 
-    private function notifyFolderMembers(SharedFolder $folder, User $adder, string $contentType): void
+    private function notifyFolderMembers(SharedFolder $folder, User $adder, string $contentType, ?string $contentId = null): void
     {
         $memberIds = array_unique(array_merge(
             [$folder->owner_id],
@@ -40,7 +40,9 @@ class SharedFolderFileController extends Controller
             'note' => 'заметку',
             default => 'файл',
         };
-        $notifUrl = config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id;
+        $notifUrl = $contentId
+            ? config('app.url') . '/files/' . $contentId
+            : config('app.url') . '/folders?tab=shared&shared_folder_id=' . $folder->id;
 
         foreach ($memberIds as $memberId) {
             if ($memberId === $adder->id) continue;
@@ -48,7 +50,7 @@ class SharedFolderFileController extends Controller
             if (!$member) continue;
 
             $this->notificationService->notifySharedFolderContentAdded(
-                $member, $adderName, $folder->name, $folder->id, $contentType,
+                $member, $adderName, $folder->name, $folder->id, $contentType, $contentId,
             );
             if ($member->notifications_enabled ?? true) {
                 $this->pushService->sendToUser(
@@ -186,7 +188,7 @@ class SharedFolderFileController extends Controller
         foreach ($toAdd as $folderId) {
             $folder = $allFolders->get($folderId);
             if ($folder) {
-                $this->notifyFolderMembers($folder, $user, 'file');
+                $this->notifyFolderMembers($folder, $user, 'file', $file->id);
             }
         }
 
@@ -236,7 +238,7 @@ class SharedFolderFileController extends Controller
         }
 
         if ($sff->wasRecentlyCreated) {
-            $this->notifyFolderMembers($folder, $user, 'file');
+            $this->notifyFolderMembers($folder, $user, 'file', $file->id);
         }
 
         return $this->success('File added to folder');

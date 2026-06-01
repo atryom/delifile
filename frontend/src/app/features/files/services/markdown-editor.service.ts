@@ -42,6 +42,7 @@ export class MarkdownEditorService {
   readonly imgWidthPx       = signal('');
   readonly editorEmpty      = signal(true);
   readonly isInTable        = signal(false);
+  readonly activeMarks      = signal<Set<string>>(new Set());
 
   readonly lockState = this.lockService.lockState;
 
@@ -114,6 +115,7 @@ export class MarkdownEditorService {
         onUpdate: ({ editor }) => {
           this.zone.run(() => {
             this.editorEmpty.set(editor.isEmpty);
+            this.updateActiveMarks(editor);
             if (this.canEdit()) {
               this.saveStatus.set('unsaved');
             }
@@ -135,6 +137,7 @@ export class MarkdownEditorService {
               this.imgWidthPx.set('');
             }
             this.isInTable.set(editor.isActive('table'));
+            this.updateActiveMarks(editor);
           });
         },
       });
@@ -243,6 +246,17 @@ export class MarkdownEditorService {
   onImgWidthChange(event: Event): void {
     const val = Math.round(+(event.target as HTMLInputElement).value);
     if (val >= 40 && val <= 2000) this.setImgWidth(val);
+  }
+
+  private updateActiveMarks(editor: Editor): void {
+    const s = new Set<string>();
+    for (const m of ['bold', 'italic', 'strike', 'code', 'bulletList', 'orderedList', 'taskList', 'blockquote', 'codeBlock']) {
+      if (editor.isActive(m)) s.add(m);
+    }
+    if (editor.isActive('heading', { level: 1 })) s.add('h1');
+    if (editor.isActive('heading', { level: 2 })) s.add('h2');
+    if (editor.isActive('heading', { level: 3 })) s.add('h3');
+    this.activeMarks.set(s);
   }
 
   teardown(): void {

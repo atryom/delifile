@@ -35,6 +35,7 @@ export class InboxComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    this.inboxApi.dismissBadge();
     this.loadFiles();
     this.loadFolders();
   }
@@ -100,6 +101,7 @@ export class InboxComponent implements OnInit {
         this.files.update(fs => fs.filter(f => !target.includes(f.id)));
         this.selectedFileIds.set(new Set());
         this.actionPending.set(false);
+        this.inboxApi.refreshPendingCount();
       },
       error: () => this.actionPending.set(false),
     });
@@ -114,6 +116,7 @@ export class InboxComponent implements OnInit {
         this.files.update(fs => fs.filter(f => !target.includes(f.id)));
         this.selectedFileIds.set(new Set());
         this.actionPending.set(false);
+        this.inboxApi.refreshPendingCount();
       },
       error: () => this.actionPending.set(false),
     });
@@ -128,6 +131,7 @@ export class InboxComponent implements OnInit {
         this.folders.update(fs => fs.filter(f => !target.includes(f.id)));
         this.selectedFolderIds.set(new Set());
         this.actionPending.set(false);
+        this.inboxApi.refreshPendingCount();
       },
       error: () => this.actionPending.set(false),
     });
@@ -142,6 +146,7 @@ export class InboxComponent implements OnInit {
         this.folders.update(fs => fs.filter(f => !target.includes(f.id)));
         this.selectedFolderIds.set(new Set());
         this.actionPending.set(false);
+        this.inboxApi.refreshPendingCount();
       },
       error: () => this.actionPending.set(false),
     });

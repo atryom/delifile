@@ -74,31 +74,31 @@ import { ImagePickerComponent } from './image-picker.component';
 
       @if (canEdit()) {
         <div class="md-toolbar" role="toolbar" aria-label="Форматирование">
-          <button type="button" [class.active]="editor?.isActive('bold')"
+          <button type="button" [class.active]="activeMarks().has('bold')"
             (click)="cmd('toggleBold')" aria-label="Жирный">B</button>
-          <button type="button" [class.active]="editor?.isActive('italic')"
+          <button type="button" [class.active]="activeMarks().has('italic')"
             (click)="cmd('toggleItalic')" aria-label="Курсив"><em>I</em></button>
-          <button type="button" [class.active]="editor?.isActive('strike')"
+          <button type="button" [class.active]="activeMarks().has('strike')"
             (click)="cmd('toggleStrike')" aria-label="Зачёркнутый"><s>S</s></button>
-          <button type="button" [class.active]="editor?.isActive('code')"
+          <button type="button" [class.active]="activeMarks().has('code')"
             (click)="cmd('toggleCode')" aria-label="Код">&#x3C;&#x3E;</button>
           <span class="md-toolbar-sep" aria-hidden="true"></span>
-          <button type="button" [class.active]="editor?.isActive('heading', {level:1})"
+          <button type="button" [class.active]="activeMarks().has('h1')"
             (click)="cmdHeading(1)" aria-label="Заголовок 1">H1</button>
-          <button type="button" [class.active]="editor?.isActive('heading', {level:2})"
+          <button type="button" [class.active]="activeMarks().has('h2')"
             (click)="cmdHeading(2)" aria-label="Заголовок 2">H2</button>
-          <button type="button" [class.active]="editor?.isActive('heading', {level:3})"
+          <button type="button" [class.active]="activeMarks().has('h3')"
             (click)="cmdHeading(3)" aria-label="Заголовок 3">H3</button>
           <span class="md-toolbar-sep" aria-hidden="true"></span>
-          <button type="button" [class.active]="editor?.isActive('bulletList')"
+          <button type="button" [class.active]="activeMarks().has('bulletList')"
             (click)="cmd('toggleBulletList')" aria-label="Маркированный список">•–</button>
-          <button type="button" [class.active]="editor?.isActive('orderedList')"
+          <button type="button" [class.active]="activeMarks().has('orderedList')"
             (click)="cmd('toggleOrderedList')" aria-label="Нумерованный список">1.</button>
-          <button type="button" [class.active]="editor?.isActive('taskList')"
+          <button type="button" [class.active]="activeMarks().has('taskList')"
             (click)="cmd('toggleTaskList')" aria-label="Список задач">☑</button>
-          <button type="button" [class.active]="editor?.isActive('blockquote')"
+          <button type="button" [class.active]="activeMarks().has('blockquote')"
             (click)="cmd('toggleBlockquote')" aria-label="Цитата">"</button>
-          <button type="button" [class.active]="editor?.isActive('codeBlock')"
+          <button type="button" [class.active]="activeMarks().has('codeBlock')"
             (click)="cmd('toggleCodeBlock')" aria-label="Блок кода">&#123; &#125;</button>
           <span class="md-toolbar-sep" aria-hidden="true"></span>
           <button type="button" (click)="cmd('undo')" aria-label="Отменить">↩</button>
@@ -174,6 +174,7 @@ export class MarkdownEditorComponent implements OnInit, AfterViewInit, OnDestroy
   readonly lockState        = this.editorSvc.lockState;
   readonly canEdit          = this.editorSvc.canEdit;
   readonly lockedByOther    = this.editorSvc.lockedByOther;
+  readonly activeMarks      = this.editorSvc.activeMarks;
 
   readonly showImagePicker = signal(false);
 
