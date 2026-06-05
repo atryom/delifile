@@ -535,14 +535,14 @@ export default function FileDetailScreen() {
         </View>
       )}
 
-      {/* Meta */}
+      {/* Meta — скрываем техническую информацию для фильмов */}
       <View style={styles.meta}>
-        {file.content_kind === 'binary_file' && (
+        {!isMovie && file.content_kind === 'binary_file' && (
           <Row label="Размер" value={formatFileSize(file.size)} />
         )}
-        {file.mime_type && <Row label="Тип" value={file.mime_type} />}
-        {file.uploaded_at && <Row label="Загружен" value={formatDateTime(file.uploaded_at)} />}
-        {file.owner && <Row label="Владелец" value={file.owner.name ?? file.owner.email} />}
+        {!isMovie && file.mime_type && <Row label="Тип" value={file.mime_type} />}
+        {!isMovie && file.uploaded_at && <Row label="Загружен" value={formatDateTime(file.uploaded_at)} />}
+        {!isMovie && file.owner && <Row label="Владелец" value={file.owner.name ?? file.owner.email} />}
         {file.description && <Row label="Описание" value={file.description} />}
         {file.is_task && file.task_status && (
           <Row label="Задача" value={TASK_STATUSES.find((s) => s.value === file.task_status)?.label ?? file.task_status} />
@@ -601,8 +601,8 @@ export default function FileDetailScreen() {
 
           {/* Action menu */}
           <View style={styles.actionMenu}>
-            <ActionItem icon="🏷" label="Теги" onPress={() => openPanel('tags')} />
-            <ActionItem icon="📁" label="Переместить в папку" onPress={() => openPanel('folder')} />
+            {!isMovie && <ActionItem icon="🏷" label="Теги" onPress={() => openPanel('tags')} />}
+            {!isMovie && <ActionItem icon="📁" label="Переместить в папку" onPress={() => openPanel('folder')} />}
             <ActionItem
               icon="💬"
               label="Комментарии"
@@ -610,9 +610,9 @@ export default function FileDetailScreen() {
                 pathname: '/(app)/files/comments',
                 params: { targetType: 'file', targetId: file.id, targetName: name },
               } as any)}
-              last={!file.is_owner && !(file.is_owner || file.is_task) && !(file.content_kind === 'binary_file')}
+              last={isMovie || (!file.is_owner && !(file.is_owner || file.is_task) && !(file.content_kind === 'binary_file'))}
             />
-            {(file.is_owner || file.is_task) && (
+            {!isMovie && (file.is_owner || file.is_task) && (
               <>
                 <View style={styles.actionMenuDivider} />
                 {file.is_owner && <ActionItem icon="🔐" label="Управление доступом" onPress={() => openPanel('access')} />}
@@ -632,7 +632,7 @@ export default function FileDetailScreen() {
 
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteConfirm}>
             <Text style={styles.deleteBtnText}>
-              {file.is_owner ? '🗑 Удалить файл' : '✕ Убрать из моих файлов'}
+              {isMovie ? '🗑 Удалить из коллекции' : file.is_owner ? '🗑 Удалить файл' : '✕ Убрать из моих файлов'}
             </Text>
           </TouchableOpacity>
         </>

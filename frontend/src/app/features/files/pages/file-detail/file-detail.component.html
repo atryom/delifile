@@ -182,8 +182,8 @@
                   </div>
                 </div>
               </div>
-            } @else {
-              <!-- Regular file header card -->
+            } @else if (file()!.content_kind !== 'movie_item') {
+              <!-- Regular file header card (hidden for movie items) -->
               <div class="file-header-card">
                 <div class="file-card-left">
                   @if (displayPreviewUrl()) {
@@ -558,7 +558,8 @@
               </div>
             </div>
 
-            <!-- Folders -->
+            <!-- Folders (hidden for movies) -->
+            @if (file()!.content_kind !== 'movie_item') {
             <div class="sidebar-section">
               <h3 class="section-title">{{ 'files.detail.folders' | translate }}</h3>
               <div class="folder-block">
@@ -581,6 +582,7 @@
                 }
               </div>
             </div>
+            } <!-- /Folders -->
 
             <!-- Active share links -->
             <div class="sidebar-section">
@@ -620,7 +622,8 @@
               }
             </div>
 
-            <!-- Who has access -->
+            <!-- Who has access (hidden for movies) -->
+            @if (file()!.content_kind !== 'movie_item') {
             <div class="sidebar-section">
               <div class="section-header-row">
                 <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>
@@ -698,8 +701,10 @@
                 </div>
               }
             </div>
+            } <!-- /Access -->
 
-            <!-- Activity -->
+            <!-- Activity (hidden for movies) -->
+            @if (file()!.content_kind !== 'movie_item') {
             <div class="sidebar-section">
               <div class="section-header-row">
                 <h3 class="section-title">{{ 'files.detail.activity_section' | translate }}</h3>
@@ -719,6 +724,7 @@
                 }
               }
             </div>
+            } <!-- /Activity -->
 
           </aside>
         </div>

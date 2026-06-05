@@ -22,15 +22,17 @@ interface Props {
   onClose: () => void;
 }
 
-function VideoItem({ uri }: { uri: string }) {
-  if (!uri) return null;
+// Only renders the video when this slide is active — avoids multiple players competing
+function VideoSlide({ uri, isActive }: { uri: string; isActive: boolean }) {
+  if (!uri || !isActive) {
+    return <View style={styles.media} />;
+  }
   return (
     <Video
       source={{ uri }}
       style={styles.media}
       resizeMode={ResizeMode.CONTAIN}
       useNativeControls
-      shouldPlay
     />
   );
 }
@@ -40,8 +42,14 @@ export function GalleryViewer({ files, initialIndex, onClose }: Props) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
 
   useEffect(() => {
-    listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+    // Scroll to initial index after mount with a small delay
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+    }, 50);
+    return () => clearTimeout(timer);
   }, [initialIndex]);
+
+  const isVideo = (f: FileListItem) => !!f.mime_type?.startsWith('video/');
 
   return (
     <Modal visible animationType="fade" statusBarTranslucent onRequestClose={onClose}>
@@ -61,10 +69,16 @@ export function GalleryViewer({ files, initialIndex, onClose }: Props) {
             const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
             setCurrentIndex(idx);
           }}
-          renderItem={({ item }) => (
+          // Keep fewer items in memory to avoid multiple video players
+          windowSize={3}
+          maxToRenderPerBatch={1}
+          renderItem={({ item, index }) => (
             <View style={styles.page}>
-              {item.mime_type?.startsWith('video/') ? (
-                <VideoItem uri={item.view_url ?? item.preview_url ?? ''} />
+              {isVideo(item) ? (
+                <VideoSlide
+                  uri={item.view_url ?? item.preview_url ?? ''}
+                  isActive={index === currentIndex}
+                />
               ) : (
                 <Image
                   source={{ uri: item.view_url ?? item.preview_url ?? undefined }}
@@ -78,7 +92,7 @@ export function GalleryViewer({ files, initialIndex, onClose }: Props) {
         />
 
         {/* Counter */}
-        <View style={styles.counter}>
+        <View style={styles.counter} pointerEvents="none">
           <Text style={styles.counterText}>{currentIndex + 1} / {files.length}</Text>
         </View>
 

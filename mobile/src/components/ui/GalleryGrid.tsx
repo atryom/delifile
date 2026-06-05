@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { FileListItem } from '@/types';
@@ -54,12 +54,12 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
         numColumns={COLUMNS}
         contentContainerStyle={styles.grid}
         renderItem={({ item, index }) => (
-          <TouchableOpacity
+          <Pressable
             style={styles.cell}
             onPress={() => setViewerIndex(index)}
             onLongPress={() => handleLongPress(item)}
-            delayLongPress={400}
-            activeOpacity={0.85}
+            delayLongPress={500}
+            android_ripple={{ color: 'rgba(0,0,0,0.1)', borderless: false }}
           >
             <Image
               source={{ uri: item.preview_url ?? undefined }}
@@ -73,7 +73,7 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
                 <View style={styles.playIcon} />
               </View>
             )}
-          </TouchableOpacity>
+          </Pressable>
         )}
       />
 
