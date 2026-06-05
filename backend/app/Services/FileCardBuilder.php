@@ -123,7 +123,10 @@ class FileCardBuilder
             $item['view_url']           = null;
         }
 
-        if ($file->content_kind === 'url_file') {
+        if ($file->content_kind === 'movie_item') {
+            $item['custom_metadata'] = $file->custom_metadata;
+            $item['link_url']        = $file->link_url;
+        } elseif ($file->content_kind === 'url_file') {
             $item['link_url']       = $file->link_url;
             $item['link_title']     = $file->link_title;
             $item['link_image_url'] = $file->link_image_url;

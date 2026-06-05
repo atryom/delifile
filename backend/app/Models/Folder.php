@@ -18,7 +18,16 @@ class Folder extends Model
         'parent_id',
         'name',
         'sort_order',
+        'folder_type',
+        'schema_definition',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'schema_definition' => 'array',
+        ];
+    }
 
     // Relations
     public function user(): BelongsTo

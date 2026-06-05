@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
@@ -6,10 +6,13 @@ import {
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sharedFoldersApi } from '@/api/shared-folders';
+import { tariffsApi } from '@/api/tariffs';
+import { formatFileSize } from '@/utils/format';
 import { documentsApi } from '@/api/documents';
 import { Button } from '@/components/ui/Button';
+import { getApiError } from '@/utils/error';
 
 type Mode = 'menu' | 'link' | 'subfolder' | 'uploading' | 'document';
 
@@ -17,9 +20,15 @@ export default function SharedFolderAddScreen() {
   const params = useLocalSearchParams<{ shared_folder_id: string; folder_name?: string }>();
   const folderId = params.shared_folder_id;
   const qc = useQueryClient();
+  const { data: tariffUsage } = useQuery({
+    queryKey: ['tariffs', 'usage'],
+    queryFn: () => tariffsApi.usage().then((r) => r.data.data),
+    staleTime: 1000 * 60 * 5,
+  });
 
   const [mode, setMode] = useState<Mode>('menu');
   const [subfolderName, setSubfolderName] = useState('');
+  const [subfolderType, setSubfolderType] = useState<'default' | 'gallery' | 'movies'>('default');
   const [linkUrl, setLinkUrl] = useState('');
   const [savingLink, setSavingLink] = useState(false);
 
@@ -32,6 +41,12 @@ export default function SharedFolderAddScreen() {
   const uploadTaskRef = useRef<FileSystem.UploadTask | null>(null);
   const pendingFileIdRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    return () => {
+      uploadTaskRef.current?.cancelAsync().catch(() => {});
+    };
+  }, []);
+
   async function handleCreateDocument() {
     const name = docName.trim() || 'Новый документ';
     setCreatingDoc(true);
@@ -42,8 +57,8 @@ export default function SharedFolderAddScreen() {
       qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
       router.back();
       setTimeout(() => router.push(`/(app)/files/edit/${docId}` as any), 300);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось создать документ');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось создать документ'));
     } finally {
       setCreatingDoc(false);
     }
@@ -52,7 +67,7 @@ export default function SharedFolderAddScreen() {
   async function handleCreateSubfolder() {
     if (!subfolderName.trim()) return;
     try {
-      await sharedFoldersApi.createSubfolder(folderId, subfolderName.trim());
+      await sharedFoldersApi.createSubfolder(folderId, subfolderName.trim(), subfolderType);
       qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
       router.back();
     } catch {
@@ -70,8 +85,8 @@ export default function SharedFolderAddScreen() {
       await sharedFoldersApi.addUrlFile(folderId, url);
       qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
       router.back();
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось добавить ссылку');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось добавить ссылку'));
     } finally {
       setSavingLink(false);
     }
@@ -87,6 +102,12 @@ export default function SharedFolderAddScreen() {
       const name = asset.name;
       const size = asset.size ?? 0;
       const mimeType = asset.mimeType ?? 'application/octet-stream';
+
+      const limitBytes = tariffUsage?.file_size_limit_bytes;
+      if (limitBytes && size > limitBytes) {
+        Alert.alert('Файл слишком большой', `Максимальный размер файла: ${formatFileSize(limitBytes)}`);
+        return;
+      }
 
       setUploadFileName(name);
       setUploadProgress(0);
@@ -105,8 +126,8 @@ export default function SharedFolderAddScreen() {
         fileId = initRes.data.data.file.id;
         putUrl = initRes.data.data.upload.url;
         putHeaders = initRes.data.data.upload.headers;
-      } catch (e: any) {
-        setUploadError(e.response?.data?.message ?? 'Не удалось инициализировать загрузку');
+      } catch (e) {
+        setUploadError(getApiError(e, 'Не удалось инициализировать загрузку'));
         return;
       }
 
@@ -273,6 +294,24 @@ export default function SharedFolderAddScreen() {
               returnKeyType="done"
               onSubmitEditing={handleCreateSubfolder}
             />
+            <Text style={styles.typeLabel}>Тип папки</Text>
+            <View style={styles.typeRow}>
+              {([
+                { key: 'default', label: '🗂 Обычная' },
+                { key: 'gallery', label: '🖼 Галерея' },
+                { key: 'movies',  label: '🎬 Фильмы'  },
+              ] as const).map(({ key, label }) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.typeBtn, subfolderType === key && styles.typeBtnActive]}
+                  onPress={() => setSubfolderType(key)}
+                >
+                  <Text style={[styles.typeBtnText, subfolderType === key && styles.typeBtnTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <Button title="Создать" onPress={handleCreateSubfolder} />
           </View>
         )}
@@ -325,4 +364,10 @@ const styles = StyleSheet.create({
   uploadErrorText: { fontSize: 14, color: '#EF4444', textAlign: 'center' },
   retryBtn: { paddingVertical: 10, paddingHorizontal: 24, borderRadius: 10, backgroundColor: '#EFF6FF' },
   retryText: { fontSize: 15, color: '#2563EB', fontWeight: '600' },
+  typeLabel: { fontSize: 14, fontWeight: '600', color: '#475569' },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', backgroundColor: '#fff' },
+  typeBtnActive: { borderColor: '#6366f1', backgroundColor: '#EEF2FF' },
+  typeBtnText: { fontSize: 13, color: '#64748B' },
+  typeBtnTextActive: { color: '#6366f1', fontWeight: '600' },
 });

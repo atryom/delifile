@@ -19,6 +19,7 @@ class SharedFolder extends Model
         'is_private',
         'is_personal_root',
         'sort_order',
+        'folder_type',
     ];
 
     protected $casts = [

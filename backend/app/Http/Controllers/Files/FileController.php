@@ -9,6 +9,7 @@ use App\Http\Requests\Files\InitUploadRequest;
 use App\Http\Requests\Files\CompleteUploadRequest;
 use App\Models\File;
 use App\Models\FileUserAccess;
+use App\Models\Folder;
 use App\Models\PendingReceivedFile;
 use App\Services\FileService;
 use App\Services\ActivityService;
@@ -409,7 +410,26 @@ class FileController extends Controller
             return $this->notFound('File not found');
         }
 
-        $this->fileService->moveToFolder($file, $request->user(), $request->folder_id);
+        $targetFolderId = $request->folder_id;
+        if ($targetFolderId) {
+            $folder = Folder::where('id', $targetFolderId)
+                ->where('user_id', $userId)
+                ->first();
+
+            if ($folder && $folder->folder_type === 'gallery') {
+                $mime = $file->mime_type ?? '';
+                if (!str_starts_with($mime, 'image/') && !str_starts_with($mime, 'video/')) {
+                    return $this->error(
+                        'В мультимедиа-папку можно добавлять только фото и видео',
+                        'GALLERY_TYPE_MISMATCH',
+                        [],
+                        422
+                    );
+                }
+            }
+        }
+
+        $this->fileService->moveToFolder($file, $request->user(), $targetFolderId);
 
         return $this->success(__('messages.files.moved'));
     }

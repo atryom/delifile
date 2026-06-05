@@ -1,7 +1,20 @@
 export type FileStatus = 'uploading' | 'available' | 'processing' | 'expired' | 'deleted';
-export type ContentKind = 'binary_file' | 'url_file';
+export type ContentKind = 'binary_file' | 'url_file' | 'movie_item';
+
+export interface MovieMetadata {
+  kinopoisk_id: number | null;
+  title: string | null;
+  year: number | null;
+  poster_url: string | null;
+  rating_kp: number | null;
+  genres: string[];
+  director: string | null;
+  description: string | null;
+  kp_url: string | null;
+}
 export type FileFilter = 'all' | 'mine' | 'received' | 'favorites';
 export type AccessType = 'owner' | 'shared' | 'saved';
+export type TaskStatus = 'template' | 'in_progress' | 'under_review' | 'completed';
 
 export interface FileTag {
   id: string;
@@ -33,6 +46,7 @@ export interface FileListItem {
   link_title?: string | null;
   link_image_url?: string | null;
   link_site_name?: string | null;
+  custom_metadata?: MovieMetadata | null;
 }
 
 // Карточка файла — расширенная версия
@@ -47,6 +61,30 @@ export interface FileCard extends FileListItem {
   view_url?: string | null;
   versions: FileVersion[];
   link_description?: string | null;
+  is_task?: boolean;
+  task_status?: TaskStatus | null;
+  task_start_date?: string | null;
+  task_due_date?: string | null;
+  task_assigned_user?: UserRef | null;
+}
+
+export interface FileAccess {
+  id: string;
+  access_type: AccessType;
+  user: UserRef | null;
+  contact_id?: string | null;
+  can_edit?: boolean;
+  is_pending?: boolean;
+}
+
+export interface ShareLink {
+  id: string;
+  url: string;
+  status: 'active' | 'disabled' | 'expired';
+  ttl_hours: number;
+  allow_save: boolean;
+  expires_at: string | null;
+  created_at: string | null;
 }
 
 export interface FileVersion {

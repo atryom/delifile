@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'kinopoisk' => [
+        'token' => env('KINOPOISK_API_TOKEN'),
+    ],
+
 ];
