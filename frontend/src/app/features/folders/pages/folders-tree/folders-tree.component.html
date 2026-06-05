@@ -256,6 +256,17 @@
                class="create-input" maxlength="100"
                (keydown.enter)="saveCreate()" (keydown.escape)="cancelCreate()"
                aria-label="Название новой папки" />
+        <div class="create-type-row" role="group" aria-label="Тип папки">
+          @for (opt of [{v:'default',l:'🗂 Обычная'},{v:'gallery',l:'🖼 Галерея'},{v:'movies',l:'🎬 Фильмы'}]; track opt.v) {
+            <button type="button"
+                    class="create-type-btn"
+                    [class.active]="createFolderType() === opt.v"
+                    (click)="createFolderType.set($any(opt.v))"
+                    [attr.aria-pressed]="createFolderType() === opt.v">
+              {{ opt.l }}
+            </button>
+          }
+        </div>
         <button type="button" class="btn-sm btn-save" (click)="saveCreate()">Создать</button>
         <button type="button" class="btn-sm btn-cancel" (click)="cancelCreate()">Отмена</button>
       </div>
@@ -268,7 +279,7 @@
     }
 
     <!-- ── TABLE VIEW ─────────────────────────────────────────────────── -->
-    @if (!isLoading() && (viewMode() === 'table' || viewMode() === 'tasks')) {
+    @if (!isLoading() && (viewMode() === 'table' || viewMode() === 'tasks') && currentFolderType() === 'default') {
       <div class="table-container">
         @if (isEmpty()) {
           <div class="empty-state">
@@ -322,6 +333,8 @@
                           } @else {
                             <div class="file-name">
                               {{ folder.name }}
+                              @if (folder.folder_type === 'gallery') { <span class="folder-type-badge">🖼</span> }
+                              @if (folder.folder_type === 'movies')  { <span class="folder-type-badge">🎬</span> }
                               @if (folder.has_shared_access) {
                                 <span class="sf-badge sf-badge--shared" title="Поделились с другими">👥</span>
                               }
@@ -558,7 +571,7 @@
     }
 
     <!-- ── GRID VIEW ──────────────────────────────────────────────────── -->
-    @if (!isLoading() && viewMode() === 'grid') {
+    @if (!isLoading() && viewMode() === 'grid' && currentFolderType() === 'default') {
       <div class="grid-container">
         @if (isEmpty()) {
           <div class="empty-state">
@@ -666,7 +679,7 @@
     }
 
     <!-- ── PAGINATION ─────────────────────────────────────────────────── -->
-    @if (totalPages() > 1) {
+    @if (totalPages() > 1 && currentFolderType() === 'default') {
       <div class="pagination">
         <button type="button" [disabled]="page() === 1" (click)="goToPage(page() - 1)" aria-label="Предыдущая страница">←</button>
         <span>{{ page() }} / {{ totalPages() }}</span>
@@ -674,8 +687,35 @@
       </div>
     }
 
+    <!-- ── GALLERY VIEW ──────────────────────────────────────────────── -->
+    @if (!isLoading() && currentFolderType() === 'gallery') {
+      <app-gallery-view [files]="$any(files())" />
+    }
+
+    <!-- ── MOVIES VIEW ───────────────────────────────────────────────── -->
+    @if (!isLoading() && currentFolderType() === 'movies') {
+      <div class="movies-toolbar">
+        <button type="button" class="btn-action" (click)="showAddMovieDialog.set(true)">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Добавить фильм
+        </button>
+      </div>
+      <app-movie-view [files]="$any(files())" (addClick)="showAddMovieDialog.set(true)" />
+    }
+
   </div><!-- /main -->
 </div><!-- /explorer-app -->
+
+<!-- ── ADD MOVIE DIALOG ───────────────────────────────────────────────── -->
+@if (showAddMovieDialog() && currentSharedFolderId()) {
+  <app-add-movie-dialog
+    [folderId]="currentSharedFolderId()!"
+    (added)="onMovieAdded()"
+    (cancel)="showAddMovieDialog.set(false)"
+  />
+}
 
 
 <!-- ══════════════════════════════════════════════════════ ADD MODAL -->

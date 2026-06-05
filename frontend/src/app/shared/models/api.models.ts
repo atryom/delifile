@@ -288,11 +288,26 @@ export interface Tag {
 
 export type SharedFolderAccessType = 'view' | 'edit';
 
+export type FolderType = 'default' | 'gallery' | 'movies';
+
+export interface MovieMetadata {
+  kinopoisk_id: number | null;
+  title: string | null;
+  year: number | null;
+  poster_url: string | null;
+  rating_kp: number | null;
+  genres: string[];
+  director: string | null;
+  description: string | null;
+  kp_url: string | null;
+}
+
 export interface SharedFolder {
   id: string;
   name: string;
   owner_id: number;
   parent_id: string | null;
+  folder_type: FolderType;
   files_count: number;
   tasks_count: number;
   children_count: number;

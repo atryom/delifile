@@ -3,6 +3,8 @@ import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import {
   ApiResponse,
+  FolderType,
+  MovieMetadata,
   SharedFolder,
   SharedFolderAccess,
   SharedFolderLink,
@@ -23,12 +25,16 @@ export class SharedFoldersApiService {
     return this.api.get('/shared-folders');
   }
 
-  create(name: string): Observable<ApiResponse<{ folder: SharedFolder }>> {
-    return this.api.post('/shared-folders', { name });
+  create(name: string, folderType: FolderType = 'default'): Observable<ApiResponse<{ folder: SharedFolder }>> {
+    const body: Record<string, unknown> = { name };
+    if (folderType !== 'default') body['folder_type'] = folderType;
+    return this.api.post('/shared-folders', body);
   }
 
-  update(id: string, name: string): Observable<ApiResponse<{ folder: SharedFolder }>> {
-    return this.api.patch(`/shared-folders/${id}`, { name });
+  update(id: string, name: string, folderType?: FolderType): Observable<ApiResponse<{ folder: SharedFolder }>> {
+    const body: Record<string, unknown> = { name };
+    if (folderType) body['folder_type'] = folderType;
+    return this.api.patch(`/shared-folders/${id}`, body);
   }
 
   delete(id: string): Observable<ApiResponse<Record<string, never>>> {
@@ -133,8 +139,18 @@ export class SharedFoldersApiService {
     return this.api.get(`/shared-folders/${parentId}/subfolders${query}`);
   }
 
-  createSubfolder(parentId: string, name: string): Observable<ApiResponse<{ folder: SharedFolder }>> {
-    return this.api.post(`/shared-folders/${parentId}/subfolders`, { name });
+  createSubfolder(parentId: string, name: string, folderType: FolderType = 'default'): Observable<ApiResponse<{ folder: SharedFolder }>> {
+    const body: Record<string, unknown> = { name };
+    if (folderType !== 'default') body['folder_type'] = folderType;
+    return this.api.post(`/shared-folders/${parentId}/subfolders`, body);
+  }
+
+  searchMovies(folderId: string, input: string): Observable<ApiResponse<{ results?: MovieMetadata[]; movie?: MovieMetadata; auto_confirm?: boolean }>> {
+    return this.api.post(`/shared-folders/${folderId}/movies/search`, { input });
+  }
+
+  addMovie(folderId: string, kinopoiskId: number): Observable<ApiResponse<{ file: SharedFolderFileItem }>> {
+    return this.api.post(`/shared-folders/${folderId}/movies`, { kinopoisk_id: kinopoiskId });
   }
 
   removeFile(folderId: string, fileId: string): Observable<ApiResponse<Record<string, never>>> {
