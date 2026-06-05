@@ -7,59 +7,70 @@ use Illuminate\Support\Facades\Log;
 
 class KinopoiskService
 {
-    private const BASE_URL = 'https://api.kinopoisk.dev/v1.4';
+    // api.kinopoisk.dev redirects 301 → api.poiskkino.dev; используем конечный URL напрямую
+    private const BASE_URL = 'https://api.poiskkino.dev/v1.4';
 
     private function token(): string
     {
         return config('services.kinopoisk.token', '');
     }
 
+    public function isConfigured(): bool
+    {
+        return !empty($this->token());
+    }
+
     /**
      * Search movies by title. Returns up to 5 results.
+     * Throws \RuntimeException if API call fails (token missing, network error, etc.)
      */
     public function search(string $query): array
     {
-        try {
-            $response = Http::withHeaders(['X-API-KEY' => $this->token()])
-                ->timeout(10)
-                ->get(self::BASE_URL . '/movie/search', [
-                    'query' => $query,
-                    'limit' => 5,
-                    'page'  => 1,
-                ]);
-
-            if (!$response->successful()) {
-                Log::warning('Kinopoisk search failed', ['status' => $response->status(), 'query' => $query]);
-                return [];
-            }
-
-            $docs = $response->json('docs', []);
-            return array_map(fn ($d) => $this->normalize($d), $docs);
-        } catch (\Throwable $e) {
-            Log::error('Kinopoisk search error', ['error' => $e->getMessage()]);
-            return [];
+        if (!$this->isConfigured()) {
+            throw new \RuntimeException('KINOPOISK_API_TOKEN не настроен');
         }
+
+        $response = Http::withHeaders(['X-API-KEY' => $this->token()])
+            ->timeout(15)
+            ->get(self::BASE_URL . '/movie/search', [
+                'query' => $query,
+                'limit' => 5,
+                'page'  => 1,
+            ]);
+
+        if (!$response->successful()) {
+            Log::warning('Kinopoisk search failed', [
+                'status' => $response->status(),
+                'query'  => $query,
+                'body'   => substr($response->body(), 0, 200),
+            ]);
+            throw new \RuntimeException('Kinopoisk API вернул ' . $response->status());
+        }
+
+        $docs = $response->json('docs', []);
+        return array_map(fn ($d) => $this->normalize($d), $docs);
     }
 
     /**
      * Fetch movie by Kinopoisk ID.
+     * Throws \RuntimeException if API call fails.
      */
     public function fetchById(int $id): ?array
     {
-        try {
-            $response = Http::withHeaders(['X-API-KEY' => $this->token()])
-                ->timeout(10)
-                ->get(self::BASE_URL . '/movie/' . $id);
+        if (!$this->isConfigured()) {
+            throw new \RuntimeException('KINOPOISK_API_TOKEN не настроен');
+        }
 
-            if (!$response->successful()) {
-                return null;
-            }
+        $response = Http::withHeaders(['X-API-KEY' => $this->token()])
+            ->timeout(15)
+            ->get(self::BASE_URL . '/movie/' . $id);
 
-            return $this->normalize($response->json());
-        } catch (\Throwable $e) {
-            Log::error('Kinopoisk fetchById error', ['error' => $e->getMessage()]);
+        if (!$response->successful()) {
+            Log::warning('Kinopoisk fetchById failed', ['status' => $response->status(), 'id' => $id]);
             return null;
         }
+
+        return $this->normalize($response->json());
     }
 
     /**
