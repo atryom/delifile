@@ -8,7 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "ios": { "simulator": false }
+      "ios": { "simulator": true }
     },
     "preview": {
       "distribution": "internal",
@@ -17,12 +17,16 @@
     },
     "production": {
       "android": { "buildType": "app-bundle" },
-      "ios": { "resourceClass": "m-medium" }
+      "ios": { "resourceClass": "m-medium", "credentialsSource": "remote" }
     }
   },
   "submit": {
     "production": {
-      "android": { "track": "internal" }
+      "android": { "track": "internal" },
+      "ios": {
+        "ascAppId": "6776556322",
+        "appleTeamId": "6LBXV3GHST"
+      }
     }
   }
 }

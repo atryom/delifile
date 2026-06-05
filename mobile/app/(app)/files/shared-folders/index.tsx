@@ -4,6 +4,7 @@ import { Stack, router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sharedFoldersApi } from '@/api/shared-folders';
 import { Spinner } from '@/components/ui/Spinner';
+import { pluralFiles } from '@/utils/format';
 import type { SharedFolder } from '@/types';
 
 export default function SharedFoldersScreen() {
@@ -184,7 +185,7 @@ export default function SharedFoldersScreen() {
             <TouchableOpacity
               style={styles.row}
               activeOpacity={0.7}
-              onPress={() => router.push(`/(app)/files/shared-folders/${item.id}` as any)}
+              onPress={() => router.push({ pathname: '/(app)/files/shared-folders/[id]' as any, params: { id: item.id, folder_name: item.name } })}
             >
               <Text style={styles.folderIcon}>🗂</Text>
               <View style={styles.rowInfo}>
@@ -238,12 +239,6 @@ export default function SharedFoldersScreen() {
       )}
     </View>
   );
-}
-
-function pluralFiles(n: number) {
-  if (n % 10 === 1 && n % 100 !== 11) return '';
-  if (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) return 'а';
-  return 'ов';
 }
 
 const styles = StyleSheet.create({

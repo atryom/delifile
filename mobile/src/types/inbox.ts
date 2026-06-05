@@ -23,7 +23,7 @@ export interface InboxSharedFolder {
   id: string;
   shared_folder_id: string;
   folder: { id: string; name: string } | null;
-  access_type: string;
+  access_type: 'view' | 'edit';
   inviter: { id: string; email: string; name: string | null } | null;
   received_at: string | null;
 }

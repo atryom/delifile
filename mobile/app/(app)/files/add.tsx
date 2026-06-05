@@ -1,16 +1,19 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '@/api/files';
+import { tariffsApi } from '@/api/tariffs';
+import { formatFileSize } from '@/utils/format';
 import { documentsApi } from '@/api/documents';
 import { useCreateFolder } from '@/hooks/useFolders';
 import { Button } from '@/components/ui/Button';
+import { getApiError } from '@/utils/error';
 
 type Mode = 'menu' | 'link' | 'folder' | 'uploading' | 'document';
 
@@ -18,6 +21,11 @@ export default function AddScreen() {
   const params = useLocalSearchParams<{ folder_id?: string; folder_name?: string }>();
   const folderId = params.folder_id || null;
   const qc = useQueryClient();
+  const { data: tariffUsage } = useQuery({
+    queryKey: ['tariffs', 'usage'],
+    queryFn: () => tariffsApi.usage().then((r) => r.data.data),
+    staleTime: 1000 * 60 * 5,
+  });
 
   const [mode, setMode] = useState<Mode>('menu');
   const [folderName, setFolderName] = useState('');
@@ -33,9 +41,19 @@ export default function AddScreen() {
   const uploadTaskRef = useRef<FileSystem.UploadTask | null>(null);
   const pendingFileIdRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    return () => {
+      uploadTaskRef.current?.cancelAsync().catch(() => {});
+      if (pendingFileIdRef.current) {
+        filesApi.cancelUpload(pendingFileIdRef.current).catch(() => {});
+      }
+    };
+  }, []);
+
   const createFolder = useCreateFolder();
 
   const [docName, setDocName] = useState('');
+  const [docIsTask, setDocIsTask] = useState(false);
   const [creatingDoc, setCreatingDoc] = useState(false);
 
   async function handleCreateDocument() {
@@ -44,12 +62,14 @@ export default function AddScreen() {
     try {
       const res = await documentsApi.create(name);
       const docId = res.data.data.document.id;
+      if (docIsTask) {
+        await filesApi.updateTask(docId, { is_task: true, task_status: 'template' }).catch(() => {});
+      }
       qc.invalidateQueries({ queryKey: ['files'] });
       router.back();
-      // Navigate to editor after modal closes
       setTimeout(() => router.push(`/(app)/files/edit/${docId}` as any), 300);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось создать документ');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось создать документ'));
     } finally {
       setCreatingDoc(false);
     }
@@ -81,8 +101,8 @@ export default function AddScreen() {
       }
       qc.invalidateQueries({ queryKey: ['files'] });
       router.back();
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось добавить ссылку');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось добавить ссылку'));
     } finally {
       setSavingLink(false);
     }
@@ -99,6 +119,12 @@ export default function AddScreen() {
       const size = asset.size ?? 0;
       const mimeType = asset.mimeType ?? 'application/octet-stream';
 
+      const limitBytes = tariffUsage?.file_size_limit_bytes;
+      if (limitBytes && size > limitBytes) {
+        Alert.alert('Файл слишком большой', `Максимальный размер файла: ${formatFileSize(limitBytes)}`);
+        return;
+      }
+
       setUploadFileName(name);
       setUploadProgress(0);
       setUploadError(null);
@@ -112,8 +138,8 @@ export default function AddScreen() {
         fileId = initRes.data.data.file.id;
         putUrl = initRes.data.data.upload.url;
         putHeaders = initRes.data.data.upload.headers;
-      } catch (e: any) {
-        setUploadError(e.response?.data?.message ?? 'Не удалось инициализировать загрузку');
+      } catch (e) {
+        setUploadError(getApiError(e, 'Не удалось инициализировать загрузку'));
         return;
       }
 
@@ -309,6 +335,13 @@ export default function AddScreen() {
               returnKeyType="done"
               onSubmitEditing={handleCreateDocument}
             />
+            <View style={styles.taskRow}>
+              <View>
+                <Text style={styles.taskRowLabel}>Создать как задачу</Text>
+                <Text style={styles.taskRowSub}>Статус и исполнителя можно настроить позже</Text>
+              </View>
+              <Switch value={docIsTask} onValueChange={setDocIsTask} />
+            </View>
             <Button
               title="Создать и открыть"
               onPress={handleCreateDocument}
@@ -346,4 +379,7 @@ const styles = StyleSheet.create({
   uploadErrorText: { fontSize: 14, color: '#EF4444', textAlign: 'center' },
   retryBtn: { paddingVertical: 10, paddingHorizontal: 24, borderRadius: 10, backgroundColor: '#EFF6FF' },
   retryText: { fontSize: 15, color: '#2563EB', fontWeight: '600' },
+  taskRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' },
+  taskRowLabel: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
+  taskRowSub: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
 });

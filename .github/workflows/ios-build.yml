@@ -1,0 +1,93 @@
+name: iOS Build & Deploy
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'mobile/**'
+
+jobs:
+  ios:
+    name: Build & Submit iOS
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
+      - name: Build iOS (local)
+        id: build
+        working-directory: mobile
+        run: |
+          set -o pipefail
+          touch /tmp/build-start-marker
+          eas build \
+            --platform ios \
+            --profile production \
+            --local \
+            --non-interactive \
+            2>&1 | tee /tmp/ios-build.log
+          IPA=$(find . -name "*.ipa" -newer /tmp/build-start-marker | head -1)
+          echo "ipa_path=${IPA}" >> "$GITHUB_OUTPUT"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Submit to TestFlight
+        if: success()
+        working-directory: mobile
+        run: |
+          eas submit \
+            --platform ios \
+            --path "${{ steps.build.outputs.ipa_path }}" \
+            --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      # Загружает лог в Delifile всегда — и при успехе, и при ошибке.
+      # Имя файла содержит статус и временную метку: ios-build-success-20260605-143022.log
+      - name: Upload log to Delifile
+        if: always()
+        env:
+          DELIFILE_TOKEN: ${{ secrets.DELIFILE_TOKEN }}
+        run: |
+          LOG=/tmp/ios-build.log
+          [ -f "$LOG" ] || echo "(сборка не запускалась)" > "$LOG"
+
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          LOG_SIZE=$(wc -c < "$LOG" | tr -d ' ')
+          BUILD_STATUS="${{ job.status }}"
+          FILENAME="ios-build-${BUILD_STATUS}-${TIMESTAMP}.log"
+
+          # Шаг 1: инициализация загрузки
+          INIT=$(curl -sf -X POST "https://delifile.ru/api/v1/files/init-upload" \
+            -H "Authorization: Bearer ${DELIFILE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"original_name\": \"${FILENAME}\", \"size\": ${LOG_SIZE}, \"mime_type\": \"text/plain\"}")
+
+          FILE_ID=$(echo "$INIT" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['file']['id'])")
+          UPLOAD_URL=$(echo "$INIT" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['upload']['url'])")
+
+          # Шаг 2: загрузка в S3
+          curl -sf -X PUT "$UPLOAD_URL" \
+            -H "Content-Type: text/plain" \
+            --data-binary @"$LOG"
+
+          # Шаг 3: завершение загрузки
+          curl -sf -X POST "https://delifile.ru/api/v1/files/complete-upload" \
+            -H "Authorization: Bearer ${DELIFILE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"file_id\": \"${FILE_ID}\"}"
+
+          echo "Лог загружен в Delifile: ${FILENAME}"

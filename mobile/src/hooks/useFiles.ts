@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '@/api/files';
-import type { FileListParams } from '@/types';
+import type { FileListParams, TaskStatus } from '@/types';
 
 export function useFileList(params: FileListParams) {
   return useQuery({
@@ -71,9 +71,13 @@ export function useMoveFolder(id: string) {
 }
 
 export function useShareToContact(id: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ contact_id, can_edit }: { contact_id: string; can_edit?: boolean }) =>
       filesApi.shareToContact(id, contact_id, can_edit),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['file-accesses', id] });
+    },
   });
 }
 
@@ -96,9 +100,79 @@ export function useActivateVersion(fileId: string) {
 }
 
 export function useCreateLink(id: string) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (opts: { ttl_hours?: number; allow_save?: boolean }) =>
       filesApi.createLink(id, opts).then((r) => r.data.data.link),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['file-links', id] });
+    },
+  });
+}
+
+export function useFileLinks(id: string) {
+  return useQuery({
+    queryKey: ['file-links', id],
+    queryFn: () => filesApi.listLinks(id).then((r) => r.data.data.items),
+    staleTime: 0,
+    enabled: !!id,
+  });
+}
+
+export function useDisableFileLink(fileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) => filesApi.disableLink(linkId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['file-links', fileId] });
+    },
+  });
+}
+
+export function useFileAccesses(id: string) {
+  return useQuery({
+    queryKey: ['file-accesses', id],
+    queryFn: () => filesApi.listAccesses(id).then((r) => r.data.data.items),
+    staleTime: 0,
+    enabled: !!id,
+  });
+}
+
+export function useRevokeAccess(fileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (contactId: string) => filesApi.revokeAccess(fileId, contactId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['file-accesses', fileId] });
+    },
+  });
+}
+
+export function useUpdateAccess(fileId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ accessId, canEdit }: { accessId: string; canEdit: boolean }) =>
+      filesApi.updateAccess(fileId, accessId, canEdit),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['file-accesses', fileId] });
+    },
+  });
+}
+
+export function useUpdateTask(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      is_task?: boolean;
+      task_status?: TaskStatus | null;
+      task_start_date?: string | null;
+      task_due_date?: string | null;
+      task_assigned_user_id?: number | null;
+    }) => filesApi.updateTask(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['file', id] });
+      qc.invalidateQueries({ queryKey: ['files'] });
+    },
   });
 }
 

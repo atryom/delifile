@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { ApiResponse, PaginatedData, FileListItem, FileCard, FileListParams } from '@/types';
+import type { ApiResponse, PaginatedData, FileListItem, FileCard, FileListParams, FileAccess, ShareLink, TaskStatus } from '@/types';
 
 export interface InitUploadPayload {
   original_name: string;
@@ -47,38 +47,62 @@ export const filesApi = {
     apiClient.post<ApiResponse<{ file: FileCard }>>('/files/complete-upload', { file_id }),
 
   cancelUpload: (file_id: string) =>
-    apiClient.post(`/files/${file_id}/cancel-upload`),
+    apiClient.post<ApiResponse<Record<string, never>>>(`/files/${file_id}/cancel-upload`),
 
   moveFolder: (file_id: string, folder_id: string | null) =>
-    apiClient.post(`/files/${file_id}/move-folder`, { folder_id }),
+    apiClient.post<ApiResponse<Record<string, never>>>(`/files/${file_id}/move-folder`, { folder_id }),
 
   createUrlFile: (url: string) =>
     apiClient.post<ApiResponse<{ file: FileCard }>>('/url-files', { url }),
 
   delete: (id: string) =>
-    apiClient.delete(`/files/${id}`),
+    apiClient.delete<ApiResponse<Record<string, never>>>(`/files/${id}`),
 
   initVersionUpload: (fileId: string, payload: InitUploadPayload) =>
     apiClient.post<ApiResponse<InitVersionUploadResult>>(`/files/${fileId}/versions/init-upload`, payload),
 
   completeVersionUpload: (fileId: string, version_id: string) =>
-    apiClient.post(`/files/${fileId}/versions/complete-upload`, { version_id }),
+    apiClient.post<ApiResponse<Record<string, never>>>(`/files/${fileId}/versions/complete-upload`, { version_id }),
 
   downloadVersion: (fileId: string, versionId: string) =>
     apiClient.post<ApiResponse<{ url: string; expires_in: number }>>(`/files/${fileId}/versions/${versionId}/download`),
 
   activateVersion: (fileId: string, versionId: string) =>
-    apiClient.patch(`/files/${fileId}/versions/${versionId}`, { is_active: true }),
+    apiClient.patch<ApiResponse<Record<string, never>>>(`/files/${fileId}/versions/${versionId}`, { is_active: true }),
 
   setTags: (id: string, tag_ids: string[]) =>
-    apiClient.post(`/files/${id}/set-tags`, { tag_ids }),
+    apiClient.post<ApiResponse<Record<string, never>>>(`/files/${id}/set-tags`, { tag_ids }),
 
   shareToContact: (id: string, contact_id: string, can_edit = false) =>
-    apiClient.post(`/files/${id}/share-to-contact`, { contact_id, can_edit }),
+    apiClient.post<ApiResponse<Record<string, never>>>(`/files/${id}/share-to-contact`, { contact_id, can_edit }),
 
   createLink: (id: string, opts: { ttl_hours?: number; allow_save?: boolean }) =>
-    apiClient.post<ApiResponse<{ link: { id: string; url: string; allow_save: boolean; expires_at: string | null } }>>(
+    apiClient.post<ApiResponse<{ link: ShareLink }>>(
       `/files/${id}/create-link`,
       opts,
     ),
+
+  listLinks: (id: string) =>
+    apiClient.get<ApiResponse<{ items: ShareLink[] }>>(`/files/${id}/links`),
+
+  disableLink: (linkId: string) =>
+    apiClient.post<ApiResponse<Record<string, never>>>(`/links/${linkId}/disable`),
+
+  listAccesses: (id: string) =>
+    apiClient.get<ApiResponse<{ items: FileAccess[] }>>(`/files/${id}/accesses`),
+
+  revokeAccess: (fileId: string, contactId: string) =>
+    apiClient.delete<ApiResponse<Record<string, never>>>(`/files/${fileId}/share-to-contact/${contactId}`),
+
+  updateAccess: (fileId: string, accessId: string, canEdit: boolean) =>
+    apiClient.patch<ApiResponse<Record<string, never>>>(`/files/${fileId}/accesses/${accessId}`, { can_edit: canEdit }),
+
+  updateTask: (id: string, data: {
+    is_task?: boolean;
+    task_status?: TaskStatus | null;
+    task_start_date?: string | null;
+    task_due_date?: string | null;
+    task_assigned_user_id?: number | null;
+  }) =>
+    apiClient.patch<ApiResponse<{ file: FileCard }>>(`/files/${id}/task`, data),
 };

@@ -11,6 +11,7 @@ import type {
 } from '@/types/comment';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatDateTime } from '@/utils/format';
+import { getApiError } from '@/utils/error';
 
 type Tab = 'shared' | 'private';
 
@@ -136,8 +137,8 @@ export default function CommentsScreen() {
       setThreadsInfo(freshInfo);
       await loadThread(activeTabRef.current, freshInfo);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось отправить комментарий');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось отправить комментарий'));
     } finally {
       setSending(false);
     }
@@ -174,8 +175,8 @@ export default function CommentsScreen() {
             })),
         };
       });
-    } catch (e: any) {
-      setDeleteError(e?.response?.data?.message ?? 'Не удалось удалить комментарий');
+    } catch (e) {
+      setDeleteError(getApiError(e, 'Не удалось удалить комментарий'));
     } finally {
       setDeletingId(null);
     }

@@ -1,20 +1,29 @@
 import { useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { authApi } from '@/api/auth';
 import { useAuthStore } from '@/store/auth';
 import { getDeviceId, getDeviceType, getDeviceName } from '@/utils/device';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { isValidEmail } from '@/utils/format';
+import { getApiError } from '@/utils/error';
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const setAuth = useAuthStore((s) => s.setAuth);
 
   async function handleLogin() {
-    if (!email.trim() || !password) return;
+    const newErrors: typeof errors = {};
+    if (!isValidEmail(email.trim())) newErrors.email = 'Введите корректный email';
+    if (!password) newErrors.password = 'Введите пароль';
+    if (Object.keys(newErrors).length) { setErrors(newErrors); return; }
+    setErrors({});
     setLoading(true);
     try {
       const [deviceId, deviceType, deviceName] = await Promise.all([
@@ -35,8 +44,8 @@ export default function LoginScreen() {
       } else {
         Alert.alert('Ошибка', data.message);
       }
-    } catch (e: any) {
-      const msg = e.response?.data?.message ?? 'Не удалось подключиться к серверу';
+    } catch (e) {
+      const msg = getApiError(e, 'Не удалось подключиться к серверу');
       Alert.alert('Ошибка', msg);
     } finally {
       setLoading(false);
@@ -44,7 +53,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.flex, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.logoWrap}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} />
@@ -56,19 +65,21 @@ export default function LoginScreen() {
           <Input
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: undefined })); }}
             placeholder="you@example.com"
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
+            error={errors.email}
           />
           <Input
             label="Пароль"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(v) => { setPassword(v); setErrors((e) => ({ ...e, password: undefined })); }}
             placeholder="••••••••"
             secureTextEntry
             autoComplete="password"
+            error={errors.password}
           />
 
           <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>

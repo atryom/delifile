@@ -1,16 +1,20 @@
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { authApi } from '@/api/auth';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { getApiError } from '@/utils/error';
 
 export default function SecurityScreen() {
   const qc = useQueryClient();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
 
   const { data: sessions, isLoading } = useQuery({
     queryKey: ['sessions'],
@@ -24,9 +28,10 @@ export default function SecurityScreen() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setErrors({});
     },
-    onError: (e: any) => {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось сменить пароль');
+    onError: (e) => {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось сменить пароль'));
     },
   });
 
@@ -36,25 +41,21 @@ export default function SecurityScreen() {
   });
 
   function handleChangePassword() {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Ошибка', 'Заполните все поля');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Ошибка', 'Пароли не совпадают');
-      return;
-    }
-    if (newPassword.length < 8) {
-      Alert.alert('Ошибка', 'Пароль должен содержать минимум 8 символов');
-      return;
-    }
+    const newErrors: typeof errors = {};
+    if (!currentPassword) newErrors.current = 'Введите текущий пароль';
+    if (!newPassword) newErrors.new = 'Введите новый пароль';
+    else if (newPassword.length < 8) newErrors.new = 'Минимум 8 символов';
+    if (!confirmPassword) newErrors.confirm = 'Повторите новый пароль';
+    else if (newPassword && newPassword !== confirmPassword) newErrors.confirm = 'Пароли не совпадают';
+    if (Object.keys(newErrors).length) { setErrors(newErrors); return; }
+    setErrors({});
     changePassword.mutate();
   }
 
   function confirmRevoke(id: string, name: string) {
     Alert.alert('Отозвать сессию', `Завершить сессию «${name}»?`, [
       { text: 'Отмена', style: 'cancel' },
-      { text: 'Отозвать', style: 'destructive', onPress: () => revokeSession.mutate(id) },
+      { text: 'Отозвать', style: 'destructive', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); revokeSession.mutate(id); } },
     ]);
   }
 
@@ -65,29 +66,26 @@ export default function SecurityScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Смена пароля</Text>
         <View style={styles.inputGroup}>
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="Текущий пароль"
             value={currentPassword}
-            onChangeText={setCurrentPassword}
+            onChangeText={(v) => { setCurrentPassword(v); setErrors((e) => ({ ...e, current: undefined })); }}
             secureTextEntry
-            placeholderTextColor="#94A3B8"
+            error={errors.current}
           />
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="Новый пароль (мин. 8 символов)"
             value={newPassword}
-            onChangeText={setNewPassword}
+            onChangeText={(v) => { setNewPassword(v); setErrors((e) => ({ ...e, new: undefined })); }}
             secureTextEntry
-            placeholderTextColor="#94A3B8"
+            error={errors.new}
           />
-          <TextInput
-            style={styles.input}
+          <Input
             placeholder="Повторите новый пароль"
             value={confirmPassword}
-            onChangeText={setConfirmPassword}
+            onChangeText={(v) => { setConfirmPassword(v); setErrors((e) => ({ ...e, confirm: undefined })); }}
             secureTextEntry
-            placeholderTextColor="#94A3B8"
+            error={errors.confirm}
           />
         </View>
         <Button
@@ -136,7 +134,6 @@ const styles = StyleSheet.create({
   section: { gap: 12 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
   inputGroup: { gap: 10 },
-  input: { height: 48, backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, fontSize: 15, color: '#1E293B', borderWidth: 1, borderColor: '#E2E8F0' },
   sessionList: { backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden' },
   sessionItem: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12 },
   sessionInfo: { flex: 1 },

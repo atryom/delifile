@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { authApi } from '@/api/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { getApiError } from '@/utils/error';
 
 export default function ResetPasswordScreen() {
   const { email } = useLocalSearchParams<{ email?: string }>();
@@ -25,7 +26,7 @@ export default function ResetPasswordScreen() {
     setLoading(true);
     try {
       const verify = await authApi.verifyResetToken(code.trim(), email);
-      if (!verify.data.result) {
+      if (verify.data.result !== 'success') {
         Alert.alert('Ошибка', verify.data.message || 'Неверный или истёкший код');
         return;
       }
@@ -40,8 +41,8 @@ export default function ResetPasswordScreen() {
       } else {
         Alert.alert('Ошибка', reset.data.message);
       }
-    } catch (e: any) {
-      const msg = e.response?.data?.message ?? 'Не удалось сбросить пароль';
+    } catch (e) {
+      const msg = getApiError(e, 'Не удалось сбросить пароль');
       Alert.alert('Ошибка', msg);
     } finally {
       setLoading(false);

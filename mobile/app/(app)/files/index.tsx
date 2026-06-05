@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import { Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFileList } from '@/hooks/useFiles';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useEnsurePersonalRoot } from '@/hooks/useSharedFolders';
 import { sharedFoldersApi } from '@/api/shared-folders';
 import { Spinner } from '@/components/ui/Spinner';
+import { formatFileSize, pluralFiles } from '@/utils/format';
 import type { FileListItem, FileFilter } from '@/types';
 import type { SharedFolder } from '@/types';
 
@@ -15,13 +18,6 @@ const FILTERS: { key: FileFilter; label: string }[] = [
   { key: 'received',  label: 'Полученные' },
   { key: 'favorites', label: 'Избранное'  },
 ];
-
-function formatSize(bytes: number) {
-  if (!bytes || bytes === 0) return '0 Б';
-  const u = ['Б', 'КБ', 'МБ', 'ГБ'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
-}
 
 function formatDate(iso: string | null) {
   if (!iso) return '';
@@ -88,12 +84,6 @@ function FolderRow({ folder, onMenu, isRenaming, renameText, onRenameChange, onR
   );
 }
 
-function pluralFiles(n: number) {
-  if (n % 10 === 1 && n % 100 !== 11) return '';
-  if (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) return 'а';
-  return 'ов';
-}
-
 function FileRow({ item }: { item: FileListItem }) {
   return (
     <TouchableOpacity
@@ -104,7 +94,7 @@ function FileRow({ item }: { item: FileListItem }) {
       <View style={styles.rowMain}>
         <Text style={styles.fileName} numberOfLines={1}>{item.display_name ?? item.original_name}</Text>
         <Text style={styles.fileMeta}>
-          {item.content_kind === 'url_file' ? 'Ссылка' : formatSize(item.size)}
+          {item.content_kind === 'url_file' ? 'Ссылка' : formatFileSize(item.size)}
           {item.uploaded_at ? ` · ${formatDate(item.uploaded_at)}` : ''}
         </Text>
       </View>
@@ -115,6 +105,7 @@ function FileRow({ item }: { item: FileListItem }) {
 export default function FilesScreen() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [filter, setFilter] = useState<FileFilter>('all');
 
   // Rename state
@@ -135,7 +126,7 @@ export default function FilesScreen() {
 
   const { data: filesData, isLoading: filesLoading, isError, refetch: refetchFiles } = useFileList({
     folder_id: '',
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     filter,
   });
 
@@ -170,7 +161,7 @@ export default function FilesScreen() {
           onPress: () =>
             Alert.alert('Удалить папку?', `Папка «${folder.name}» и её содержимое будут удалены.`, [
               { text: 'Отмена', style: 'cancel' },
-              { text: 'Удалить', style: 'destructive', onPress: () => deleteFolder.mutate(folder.id) },
+              { text: 'Удалить', style: 'destructive', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); deleteFolder.mutate(folder.id); } },
             ]),
         },
         { text: 'Отмена', style: 'cancel' },
@@ -183,7 +174,7 @@ export default function FilesScreen() {
           onPress: () =>
             Alert.alert('Покинуть папку?', `Вы потеряете доступ к «${folder.name}».`, [
               { text: 'Отмена', style: 'cancel' },
-              { text: 'Покинуть', style: 'destructive', onPress: () => leaveFolder.mutate(folder.id) },
+              { text: 'Покинуть', style: 'destructive', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); leaveFolder.mutate(folder.id); } },
             ]),
         },
         { text: 'Отмена', style: 'cancel' },

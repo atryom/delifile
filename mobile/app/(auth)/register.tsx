@@ -1,33 +1,33 @@
 import { useState } from 'react';
 import { Alert, Image, KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { authApi } from '@/api/auth';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { isValidEmail } from '@/utils/format';
+import { getApiError } from '@/utils/error';
 
 export default function RegisterScreen() {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; confirm?: string; agreed?: string }>({});
   const setAuth = useAuthStore((s) => s.setAuth);
 
   async function handleRegister() {
-    if (!email.trim() || !password) return;
-    if (password !== passwordConfirm) {
-      Alert.alert('Ошибка', 'Пароли не совпадают');
-      return;
-    }
-    if (password.length < 8) {
-      Alert.alert('Ошибка', 'Пароль должен содержать минимум 8 символов');
-      return;
-    }
-    if (!agreed) {
-      Alert.alert('Ошибка', 'Необходимо принять политику конфиденциальности');
-      return;
-    }
+    const newErrors: typeof errors = {};
+    if (!isValidEmail(email.trim())) newErrors.email = 'Введите корректный email';
+    if (!password) newErrors.password = 'Введите пароль';
+    else if (password.length < 8) newErrors.password = 'Минимум 8 символов';
+    if (password && password !== passwordConfirm) newErrors.confirm = 'Пароли не совпадают';
+    if (!agreed) newErrors.agreed = 'Необходимо принять политику конфиденциальности';
+    if (Object.keys(newErrors).length) { setErrors(newErrors); return; }
+    setErrors({});
     setLoading(true);
     try {
       const { data } = await authApi.register({
@@ -41,8 +41,8 @@ export default function RegisterScreen() {
       } else {
         Alert.alert('Ошибка', data.message);
       }
-    } catch (e: any) {
-      const msg = e.response?.data?.message ?? 'Не удалось зарегистрироваться';
+    } catch (e) {
+      const msg = getApiError(e, 'Не удалось зарегистрироваться');
       Alert.alert('Ошибка', msg);
     } finally {
       setLoading(false);
@@ -50,7 +50,7 @@ export default function RegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.flex, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.logoWrap}>
           <Image source={require('../../assets/images/logo.png')} style={styles.logo} />
@@ -61,27 +61,30 @@ export default function RegisterScreen() {
           <Input
             label="Email"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(v) => { setEmail(v); setErrors((e) => ({ ...e, email: undefined })); }}
             placeholder="you@example.com"
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
+            error={errors.email}
           />
           <Input
             label="Пароль"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(v) => { setPassword(v); setErrors((e) => ({ ...e, password: undefined })); }}
             placeholder="Минимум 8 символов"
             secureTextEntry
             autoComplete="new-password"
+            error={errors.password}
           />
           <Input
             label="Подтверждение пароля"
             value={passwordConfirm}
-            onChangeText={setPasswordConfirm}
+            onChangeText={(v) => { setPasswordConfirm(v); setErrors((e) => ({ ...e, confirm: undefined })); }}
             placeholder="Повторите пароль"
             secureTextEntry
             autoComplete="new-password"
+            error={errors.confirm}
           />
 
           <TouchableOpacity style={styles.checkRow} onPress={() => setAgreed((v) => !v)} activeOpacity={0.7}>
@@ -98,6 +101,7 @@ export default function RegisterScreen() {
               </Text>
             </Text>
           </TouchableOpacity>
+          {errors.agreed && <Text style={styles.fieldError}>{errors.agreed}</Text>}
 
           <Button
             title="Зарегистрироваться"
@@ -127,4 +131,5 @@ const styles = StyleSheet.create({
   checkLabel: { flex: 1, fontSize: 14, color: '#64748B', lineHeight: 20 },
   link: { color: '#2563EB', textDecorationLine: 'underline' },
   loginLink: { fontSize: 14, color: '#2563EB', textAlign: 'center' },
+  fieldError: { fontSize: 12, color: '#EF4444', marginTop: -8 },
 });

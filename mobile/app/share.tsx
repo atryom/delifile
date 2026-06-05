@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { NativeModules } from 'react-native';
 import { filesApi } from '@/api/files';
 import { Spinner } from '@/components/ui/Spinner';
+import { getApiError } from '@/utils/error';
 
 type Phase =
   | { kind: 'loading' }
@@ -39,11 +40,13 @@ export default function ShareScreen() {
           if (urlMatch) {
             await handleUrl(urlMatch[0]);
           } else {
-            setPhase({ kind: 'error', message: `Получен текст:\n"${text.slice(0, 120)}"\n\nДеliFile поддерживает только ссылки и файлы.` });
+            setPhase({ kind: 'error', message: `Получен текст:\n"${text.slice(0, 120)}"\n\nDeliFile поддерживает только ссылки и файлы.` });
           }
         }
       } else if (data.type === 'file') {
-        await handleFile(data.uri, data.fileName ?? 'file', data.mimeType ?? 'application/octet-stream');
+        // Android: data.fileName  |  iOS extension: data.name (both stored by ShareViewController)
+        const fileName = data.fileName ?? data.name ?? 'file';
+        await handleFile(data.uri, fileName, data.mimeType ?? 'application/octet-stream');
       } else {
         router.back();
       }
@@ -65,8 +68,8 @@ export default function ShareScreen() {
       qc.invalidateQueries({ queryKey: ['files'] });
       setPhase({ kind: 'done' });
       setTimeout(() => router.back(), 1000);
-    } catch (e: any) {
-      setPhase({ kind: 'error', message: e.response?.data?.message ?? 'Не удалось сохранить ссылку' });
+    } catch (e) {
+      setPhase({ kind: 'error', message: getApiError(e, 'Не удалось сохранить ссылку') });
     }
   }
 
@@ -102,9 +105,9 @@ export default function ShareScreen() {
       fileId = initRes.data.data.file.id;
       putUrl = initRes.data.data.upload.url;
       putHeaders = initRes.data.data.upload.headers;
-    } catch (e: any) {
+    } catch (e) {
       if (cacheUri) FileSystem.deleteAsync(cacheUri, { idempotent: true }).catch(() => {});
-      setPhase({ kind: 'error', message: e.response?.data?.message ?? 'Не удалось начать загрузку' });
+      setPhase({ kind: 'error', message: getApiError(e, 'Не удалось начать загрузку') });
       return;
     }
 

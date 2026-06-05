@@ -1,10 +1,13 @@
 import { useRef, useEffect, useState } from 'react';
 import { Alert, Keyboard, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { useContacts, useContactRequests, useCreateContact, useAcceptContactRequest, useRejectContactRequest } from '@/hooks/useContacts';
 import { useInboxCount, useInboxFiles, useInboxSharedFolders, useAcceptInboxFile, useRejectInboxFile, useAcceptInboxFolder, useRejectInboxFolder } from '@/hooks/useInbox';
 import { Spinner } from '@/components/ui/Spinner';
+import { isValidEmail } from '@/utils/format';
 import type { Contact } from '@/types';
+import { getApiError } from '@/utils/error';
 
 type Tab = 'contacts' | 'requests';
 
@@ -70,13 +73,16 @@ function ContactsTab() {
   }
 
   async function handleInvite() {
-    if (!inviteEmail.trim()) return;
+    if (!isValidEmail(inviteEmail.trim())) {
+      Alert.alert('Ошибка', 'Введите корректный email');
+      return;
+    }
     try {
       await createContact.mutateAsync({ email: inviteEmail.trim(), name: inviteName.trim() || inviteEmail.trim() });
       closeForm();
       Alert.alert('Готово', 'Контакт добавлен');
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось добавить контакт');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось добавить контакт'));
     }
   }
 
@@ -242,6 +248,7 @@ function RequestsTab() {
 }
 
 export default function ConnectionsScreen() {
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('contacts');
   const { data: inboxCount } = useInboxCount();
   const { data: contactReqs } = useContactRequests();
@@ -252,7 +259,7 @@ export default function ConnectionsScreen() {
     <View style={styles.flex}>
       <Stack.Screen options={{ title: 'Связи', headerShown: false }} />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>Связи</Text>
       </View>
 
@@ -285,7 +292,7 @@ export default function ConnectionsScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  header: { backgroundColor: '#fff', paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   headerTitle: { fontSize: 28, fontWeight: '700', color: '#1E293B' },
   segmented: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingHorizontal: 16, gap: 0 },
   segBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },

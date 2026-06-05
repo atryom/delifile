@@ -1,7 +1,12 @@
-import { useEffect, useRef } from 'react';
-import { AppState, NativeModules, Platform } from 'react-native';
+import { Component, useEffect, useRef } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import { AppState, NativeModules, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router } from 'expo-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StatusBar } from 'expo-status-bar';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useFonts } from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +15,40 @@ import { useAuthStore } from '@/store/auth';
 import { useNetworkStore } from '@/store/network';
 
 SplashScreen.preventAutoHideAsync();
+
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: 'rq-cache',
+  throttleTime: 1000,
+});
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(_error: Error, _info: ErrorInfo) {}
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={errStyles.container}>
+          <Text style={errStyles.title}>Что-то пошло не так</Text>
+          <Text style={errStyles.sub}>Произошла непредвиденная ошибка.</Text>
+          <TouchableOpacity style={errStyles.btn} onPress={() => this.setState({ error: null })}>
+            <Text style={errStyles.btnText}>Попробовать снова</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const errStyles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#fff' },
+  title: { fontSize: 18, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
+  sub: { fontSize: 14, color: '#64748B', marginBottom: 24, textAlign: 'center' },
+  btn: { paddingVertical: 12, paddingHorizontal: 32, backgroundColor: '#2563EB', borderRadius: 10 },
+  btnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,14 +76,14 @@ function RootLayoutInner() {
     return unsubscribe;
   }, []);
 
-  // Handle Android share intent — opens /share modal on launch and on each foreground resume
+  // Handle share intent (Android) / Share Extension (iOS)
+  // Opens /share modal on launch and on each foreground resume
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
     const mod = NativeModules.ShareIntent;
     if (!mod) return;
 
     function checkIntent() {
-      mod.getSharedData().then((data: any) => {
+      mod.getSharedData().then((data: unknown) => {
         if (data) router.push('/share' as any);
       }).catch(() => {});
     }
@@ -58,13 +97,17 @@ function RootLayoutInner() {
   }, []);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(app)" />
-      <Stack.Screen name="link/[token]" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
-    </Stack>
+    <>
+      <StatusBar style="auto" />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(app)" />
+        <Stack.Screen name="+not-found" />
+        <Stack.Screen name="link/[token]" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="share" options={{ presentation: 'modal', headerShown: false }} />
+      </Stack>
+    </>
   );
 }
 
@@ -82,8 +125,13 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <RootLayoutInner />
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: asyncStoragePersister }}
+      >
+        <RootLayoutInner />
+      </PersistQueryClientProvider>
+    </AppErrorBoundary>
   );
 }

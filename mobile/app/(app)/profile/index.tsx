@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authApi } from '@/api/auth';
@@ -19,6 +21,7 @@ const PLAN_LABELS: Record<TariffPlan, string> = {
 };
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { user, clearAuth } = useAuthStore();
   const qc = useQueryClient();
   const [tariffModal, setTariffModal] = useState(false);
@@ -51,11 +54,10 @@ export default function ProfileScreen() {
       {
         text: 'Выйти', style: 'destructive',
         onPress: async () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
           try {
-            const tokenData = await Notifications.getExpoPushTokenAsync({
-              projectId: '5cb7a68e-9f9c-45e8-ac2f-1c9d58b84b5c',
-            });
-            await pushApi.unregisterToken(tokenData.data);
+            const tokenData = await Notifications.getDevicePushTokenAsync();
+            await pushApi.unregisterToken(tokenData.data as string);
           } catch {}
           try { await authApi.logout(); } catch {}
           await clearAuth();
@@ -73,7 +75,7 @@ export default function ProfileScreen() {
     : 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.card}>
         <Text style={styles.name}>{user.name ?? 'Без имени'}</Text>
         <Text style={styles.email}>{user.email}</Text>
