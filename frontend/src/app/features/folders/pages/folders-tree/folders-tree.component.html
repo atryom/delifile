@@ -689,7 +689,11 @@
 
     <!-- ── GALLERY VIEW ──────────────────────────────────────────────── -->
     @if (!isLoading() && currentFolderType() === 'gallery') {
-      <app-gallery-view [files]="$any(files())" />
+      <app-gallery-view
+        [files]="$any(files())"
+        (removeFile)="removeFileFromGallery($event)"
+        (viewFile)="openFileDetail($any($event))"
+      />
     }
 
     <!-- ── MOVIES VIEW ───────────────────────────────────────────────── -->

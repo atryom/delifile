@@ -572,6 +572,16 @@ export class FoldersTreeComponent implements OnInit {
     if (sfId) this.loadSharedFolderFiles(sfId);
   }
 
+  removeFileFromGallery(fileId: string): void {
+    const sfId = this.currentSharedFolderId();
+    if (!sfId) return;
+    if (!confirm('Убрать файл из галереи?')) return;
+    this.sfApi.removeFile(sfId, fileId).subscribe({
+      next: () => this.loadSharedFolderFiles(sfId),
+      error: () => alert('Не удалось убрать файл из папки'),
+    });
+  }
+
   // ── Create folder ─────────────────────────────────────────────────────────
   startCreate(event?: Event): void {
     event?.stopPropagation();
