@@ -23,12 +23,14 @@ interface Props {
 }
 
 function VideoItem({ uri }: { uri: string }) {
+  if (!uri) return null;
   return (
     <Video
       source={{ uri }}
       style={styles.media}
       resizeMode={ResizeMode.CONTAIN}
       useNativeControls
+      shouldPlay
     />
   );
 }
@@ -62,10 +64,10 @@ export function GalleryViewer({ files, initialIndex, onClose }: Props) {
           renderItem={({ item }) => (
             <View style={styles.page}>
               {item.mime_type?.startsWith('video/') ? (
-                <VideoItem uri={item.preview_url ?? ''} />
+                <VideoItem uri={item.view_url ?? item.preview_url ?? ''} />
               ) : (
                 <Image
-                  source={{ uri: item.preview_url ?? undefined }}
+                  source={{ uri: item.view_url ?? item.preview_url ?? undefined }}
                   style={styles.media}
                   contentFit="contain"
                   transition={100}

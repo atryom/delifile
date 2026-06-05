@@ -702,7 +702,7 @@
           Добавить фильм
         </button>
       </div>
-      <app-movie-view [files]="$any(files())" (addClick)="showAddMovieDialog.set(true)" />
+      <app-movie-view [files]="$any(files())" (addClick)="showAddMovieDialog.set(true)" (fileClick)="openFileDetail($any($event))" />
     }
 
   </div><!-- /main -->

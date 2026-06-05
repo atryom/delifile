@@ -42,6 +42,7 @@ export interface FileListItem {
   folder_id?: string | null;
   description?: string | null;
   preview_url?: string | null;
+  view_url?: string | null;
   link_url?: string | null;
   link_title?: string | null;
   link_image_url?: string | null;
@@ -61,6 +62,7 @@ export interface FileCard extends FileListItem {
   view_url?: string | null;
   versions: FileVersion[];
   link_description?: string | null;
+  custom_metadata?: MovieMetadata | null;
   is_task?: boolean;
   task_status?: TaskStatus | null;
   task_start_date?: string | null;

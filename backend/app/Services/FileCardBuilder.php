@@ -62,7 +62,12 @@ class FileCardBuilder
             'task_assigned_user' => $this->formatTaskAssignee($file),
         ];
 
-        if ($file->isUrlFile()) {
+        if ($file->content_kind === 'movie_item') {
+            $base['custom_metadata'] = $file->custom_metadata;
+            $base['link_url']        = $file->link_url;
+            $base['preview_url']     = null;
+            $base['view_url']        = null;
+        } elseif ($file->isUrlFile()) {
             $base['link_url']         = $file->link_url;
             $base['link_title']       = $file->link_title;
             $base['link_description'] = $file->link_description;

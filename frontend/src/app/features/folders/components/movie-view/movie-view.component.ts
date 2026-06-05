@@ -2,6 +2,7 @@ import {
   Component, input, output, ChangeDetectionStrategy,
 } from '@angular/core';
 import { SharedFolderFileItem, MovieMetadata } from '../../../../shared/models/api.models';
+// @ts-ignore — AnyFile union is imported in parent; here we use SharedFolderFileItem directly
 
 @Component({
   selector: 'app-movie-view',
@@ -9,7 +10,10 @@ import { SharedFolderFileItem, MovieMetadata } from '../../../../shared/models/a
   template: `
     <div class="movies-grid" role="list">
       @for (file of files(); track file.id) {
-        <div class="movie-card" role="listitem">
+        <div class="movie-card" role="listitem"
+             (click)="fileClick.emit(file)" style="cursor:pointer"
+             tabindex="0" (keydown.enter)="fileClick.emit(file)"
+             [attr.aria-label]="file.display_name ?? file.original_name">
           <div class="movie-poster-wrap">
             @if (poster(file)) {
               <img [src]="poster(file)!" [alt]="file.display_name ?? file.original_name" class="movie-poster" loading="lazy" />
@@ -50,8 +54,9 @@ import { SharedFolderFileItem, MovieMetadata } from '../../../../shared/models/a
   styleUrl: './movie-view.component.scss',
 })
 export class MovieViewComponent {
-  readonly files     = input.required<SharedFolderFileItem[]>();
-  readonly addClick  = output<void>();
+  readonly files      = input.required<SharedFolderFileItem[]>();
+  readonly addClick   = output<void>();
+  readonly fileClick  = output<SharedFolderFileItem>();
 
   meta(file: SharedFolderFileItem): MovieMetadata | null {
     return (file as any).custom_metadata ?? null;

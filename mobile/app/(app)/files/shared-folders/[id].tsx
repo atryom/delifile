@@ -328,7 +328,15 @@ export default function SharedFolderScreen() {
 
       {/* Gallery view */}
       {folderType === 'gallery' && (
-        <GalleryGrid files={files} />
+        <GalleryGrid
+          files={files}
+          folderId={id}
+          onRemoved={(fileId) => {
+            sharedFoldersApi.removeFile(id, fileId)
+              .then(() => qc.invalidateQueries({ queryKey: ['shared-folders', id] }))
+              .catch(() => Alert.alert('Ошибка', 'Не удалось убрать файл из папки'));
+          }}
+        />
       )}
 
       {/* Movies view */}

@@ -45,7 +45,7 @@ export type FileStatus =
 
 export type AccessType = 'owner' | 'shared' | 'saved';
 
-export type ContentKind = 'binary_file' | 'url_file';
+export type ContentKind = 'binary_file' | 'url_file' | 'movie_item';
 
 export interface FileVersion {
   id: string;
@@ -106,6 +106,8 @@ export interface FileCard extends FileListItem {
   task_start_date: string | null;
   task_due_date: string | null;
   task_assigned_user: UserRef | null;
+  // movie item
+  custom_metadata?: MovieMetadata | null;
 }
 
 export interface FileAccess {

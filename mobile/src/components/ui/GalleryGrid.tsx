@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import type { FileListItem } from '@/types';
 import { GalleryViewer } from './GalleryViewer';
 
@@ -11,14 +12,39 @@ const CELL_SIZE = (SCREEN_WIDTH - GAP * (COLUMNS + 1)) / COLUMNS;
 
 interface Props {
   files: FileListItem[];
+  folderId?: string;
+  onRemoved?: (fileId: string) => void;
 }
 
-export function GalleryGrid({ files }: Props) {
+export function GalleryGrid({ files, folderId, onRemoved }: Props) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const media = files.filter(
-    (f) => f.content_kind === 'binary_file' && f.mime_type && (f.mime_type.startsWith('image/') || f.mime_type.startsWith('video/'))
+    (f) => f.content_kind === 'binary_file' && f.mime_type &&
+           (f.mime_type.startsWith('image/') || f.mime_type.startsWith('video/'))
   );
+
+  function handleLongPress(file: FileListItem) {
+    const name = file.display_name ?? file.original_name;
+    const options: Array<{ text: string; onPress?: () => void; style?: 'cancel' | 'destructive' }> = [
+      {
+        text: 'Открыть детали',
+        onPress: () => router.push(`/(app)/files/${file.id}` as any),
+      },
+    ];
+
+    if (onRemoved && folderId) {
+      options.push({
+        text: 'Убрать из папки',
+        style: 'destructive',
+        onPress: () => onRemoved(file.id),
+      });
+    }
+
+    options.push({ text: 'Отмена', style: 'cancel' });
+
+    Alert.alert(name, undefined, options);
+  }
 
   return (
     <View style={styles.container}>
@@ -31,6 +57,8 @@ export function GalleryGrid({ files }: Props) {
           <TouchableOpacity
             style={styles.cell}
             onPress={() => setViewerIndex(index)}
+            onLongPress={() => handleLongPress(item)}
+            delayLongPress={400}
             activeOpacity={0.85}
           >
             <Image
