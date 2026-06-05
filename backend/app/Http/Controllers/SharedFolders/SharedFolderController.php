@@ -138,6 +138,7 @@ class SharedFolderController extends Controller
             'name'              => $folder->name,
             'owner_id'          => $folder->owner_id,
             'parent_id'         => $folder->parent_id,
+            'folder_type'       => $folder->folder_type ?? 'default',
             'files_count'       => $folder->files_count ?? 0,
             'tasks_count'       => $folder->tasks_count ?? 0,
             'children_count'    => $folder->children_count ?? 0,
@@ -289,11 +290,15 @@ class SharedFolderController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $data = $request->validate(['name' => 'required|string|max:100']);
+        $data = $request->validate([
+            'name'        => 'required|string|max:100',
+            'folder_type' => 'nullable|string|in:default,gallery,movies',
+        ]);
 
         $folder = SharedFolder::create([
-            'owner_id' => $request->user()->id,
-            'name'     => $data['name'],
+            'owner_id'    => $request->user()->id,
+            'name'        => $data['name'],
+            'folder_type' => $data['folder_type'] ?? 'default',
         ]);
 
         $folder->files_count    = 0;
@@ -320,12 +325,16 @@ class SharedFolderController extends Controller
             return $this->forbidden('Edit access required to create subfolders');
         }
 
-        $data = $request->validate(['name' => 'required|string|max:100']);
+        $data = $request->validate([
+            'name'        => 'required|string|max:100',
+            'folder_type' => 'nullable|string|in:default,gallery,movies',
+        ]);
 
         $folder = SharedFolder::create([
-            'owner_id'  => $request->user()->id,
-            'parent_id' => $parent->id,
-            'name'      => $data['name'],
+            'owner_id'    => $request->user()->id,
+            'parent_id'   => $parent->id,
+            'name'        => $data['name'],
+            'folder_type' => $data['folder_type'] ?? 'default',
         ]);
 
         $folder->files_count    = 0;
@@ -411,8 +420,9 @@ class SharedFolderController extends Controller
         }
 
         $data = $request->validate([
-            'name'       => 'required|string|max:100',
-            'sort_order' => 'nullable|integer|min:0',
+            'name'        => 'required|string|max:100',
+            'sort_order'  => 'nullable|integer|min:0',
+            'folder_type' => 'nullable|string|in:default,gallery,movies',
         ]);
         $folder->update(array_filter($data, fn ($v) => $v !== null) + ['name' => $data['name']]);
 
@@ -635,6 +645,18 @@ class SharedFolderController extends Controller
             'thumbnail_size' => 'nullable|integer|min:1',
             'thumbnail_mime' => 'nullable|string|max:100',
         ]);
+
+        if ($folder->folder_type === 'gallery') {
+            $mime = $data['mime_type'] ?? '';
+            if (!str_starts_with($mime, 'image/') && !str_starts_with($mime, 'video/')) {
+                return $this->error(
+                    'В мультимедиа-папку можно загружать только фото и видео',
+                    'GALLERY_TYPE_MISMATCH',
+                    [],
+                    422
+                );
+            }
+        }
 
         if ($error = $this->fileService->validateFileSizeLimit($user, $data['size'])) {
             return $this->error('File size exceeds plan limit', $error['code'], $error['data'], 422);

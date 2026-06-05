@@ -1,8 +1,18 @@
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Б';
+  if (bytes <= 0) return '0 Б';
   const units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+export function pluralFiles(n: number): string {
+  if (n % 10 === 1 && n % 100 !== 11) return '';
+  if (n % 10 >= 2 && n % 10 <= 4 && !(n % 100 >= 12 && n % 100 <= 14)) return 'а';
+  return 'ов';
 }
 
 export function formatDate(iso: string): string {

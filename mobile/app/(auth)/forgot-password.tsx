@@ -4,6 +4,8 @@ import { router } from 'expo-router';
 import { authApi } from '@/api/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { isValidEmail } from '@/utils/format';
+import { getApiError } from '@/utils/error';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -11,13 +13,16 @@ export default function ForgotPasswordScreen() {
   const [sent, setSent] = useState(false);
 
   async function handleSubmit() {
-    if (!email.trim()) return;
+    if (!isValidEmail(email.trim())) {
+      Alert.alert('Ошибка', 'Введите корректный email');
+      return;
+    }
     setLoading(true);
     try {
       await authApi.forgotPassword(email.trim());
       setSent(true);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось отправить письмо');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось отправить письмо'));
     } finally {
       setLoading(false);
     }

@@ -32,9 +32,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   loadToken: async () => {
-    const token = await SecureStore.getItemAsync('auth_token');
-    const userJson = await SecureStore.getItemAsync('auth_user');
-    const user = userJson ? (JSON.parse(userJson) as User) : null;
-    set({ token, user, isLoading: false });
+    try {
+      const token = await SecureStore.getItemAsync('auth_token');
+      const userJson = await SecureStore.getItemAsync('auth_user');
+      try {
+        const user = userJson ? (JSON.parse(userJson) as User) : null;
+        set({ token, user, isLoading: false });
+      } catch {
+        await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('auth_user');
+        set({ user: null, token: null, isLoading: false });
+      }
+    } catch {
+      set({ user: null, token: null, isLoading: false });
+    }
   },
 }));

@@ -1,18 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert, BackHandler, StyleSheet, Text, TouchableOpacity, View,
+  Alert, BackHandler, Platform, StyleSheet, Text, TouchableOpacity, View,
   Keyboard,
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import WebView, { WebViewMessageEvent } from 'react-native-webview';
 import { Animated } from 'react-native';
+import { Asset } from 'expo-asset';
 import { documentsApi } from '@/api/documents';
 import type { MarkdownDocument } from '@/types/document';
 import { Spinner } from '@/components/ui/Spinner';
+import { getApiError } from '@/utils/error';
+import { isAxiosError } from 'axios';
 
-// Editor HTML + TipTap bundle are in android/app/src/main/assets/
-// file:///android_asset/ is the standard path for Android APK assets in WebView
-const EDITOR_URI = 'file:///android_asset/editor.html';
+async function resolveEditorUri(): Promise<string> {
+  if (Platform.OS === 'android') {
+    return 'file:///android_asset/editor.html';
+  }
+  // iOS: editor-inline.html has the TipTap bundle inlined — no separate .js asset needed
+  const [asset] = await Asset.loadAsync([
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('../../../../assets/editor/editor-inline.html'),
+  ]);
+  return asset.localUri!;
+}
 
 
 const TOOLBAR_HEIGHT = 52;
@@ -21,6 +32,7 @@ export default function EditDocumentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [phase, setPhase] = useState<'loading' | 'lockPending' | 'ready' | 'lockedByOther' | 'error'>('loading');
+  const [editorUri, setEditorUri] = useState<string | null>(null);
   const [doc, setDoc] = useState<MarkdownDocument | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -37,6 +49,13 @@ export default function EditDocumentScreen() {
 
   // Keyboard offset for back button area (not toolbar — toolbar is inside WebView)
   const kbOffset = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    resolveEditorUri().then(setEditorUri).catch(() => {
+      setPhase('error');
+      setErrorMsg('Не удалось загрузить редактор');
+    });
+  }, []);
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', (e) => {
@@ -73,8 +92,8 @@ export default function EditDocumentScreen() {
         // Try to acquire lock
         try {
           await documentsApi.acquireLock(id);
-        } catch (e: any) {
-          if (e.response?.status === 423) {
+        } catch (e) {
+          if (isAxiosError(e) && e.response?.status === 423) {
             if (cancelled) return;
             setPhase('lockedByOther');
             return;
@@ -150,15 +169,15 @@ export default function EditDocumentScreen() {
       hasChangedRef.current = false;
       const now = new Date();
       setSavedAt(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
-    } catch (e: any) {
-      if (e.response?.status === 409) {
+    } catch (e) {
+      if (isAxiosError(e) && e.response?.status === 409) {
         Alert.alert(
           'Конфликт',
           'Документ был изменён другим пользователем. Ваши изменения не были сохранены.',
           [{ text: 'OK' }],
         );
       } else {
-        Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось сохранить документ');
+        Alert.alert('Ошибка', getApiError(e, 'Не удалось сохранить документ'));
       }
     } finally {
       if (showSaving) setIsSaving(false);
@@ -192,11 +211,14 @@ export default function EditDocumentScreen() {
       const msg = JSON.parse(event.nativeEvent.data);
 
       if (msg.type === 'scriptLoaded') {
-        // TipTap JS loaded — send init command via postMessage (window listener in HTML)
+        // Send init command via document.dispatchEvent — window.postMessage from
+        // injectJavaScript is intercepted by react-native-webview's WKScriptMessageHandler
+        // on iOS and never reaches window.addEventListener('message') inside the HTML.
+        // document.dispatchEvent targets the document listener registered in the HTML.
         const content = docRef.current?.content ?? '';
         const initMsg = JSON.stringify({ cmd: 'init', content, readOnly: false });
         webViewRef.current?.injectJavaScript(
-          `window.postMessage(${JSON.stringify(initMsg)}, '*'); void 0;`,
+          `document.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(initMsg)}}));void 0;`,
         );
       } else if (msg.type === 'ready') {
         editorReadyRef.current = true;
@@ -283,22 +305,33 @@ export default function EditDocumentScreen() {
         }}
       />
 
-      <WebView
-        ref={webViewRef}
-        style={styles.webview}
-        source={{ uri: EDITOR_URI }}
-        originWhitelist={['*']}
-        javaScriptEnabled
-        domStorageEnabled
-        allowFileAccess
-        allowUniversalAccessFromFileURLs
-        mixedContentMode="always"
-        keyboardDisplayRequiresUserAction={false}
-        onMessage={handleMessage}
-        scrollEnabled
-        nestedScrollEnabled
-        showsVerticalScrollIndicator={false}
-      />
+      {editorUri && (
+        <WebView
+          ref={webViewRef}
+          style={styles.webview}
+          source={{ uri: editorUri }}
+          originWhitelist={['*']}
+          javaScriptEnabled
+          domStorageEnabled
+          allowFileAccess
+          allowFileAccessFromFileURLs
+          allowUniversalAccessFromFileURLs
+          keyboardDisplayRequiresUserAction={false}
+          onMessage={handleMessage}
+          onLoadEnd={() => {
+            // Primary init path: call window._editorInit directly via injectJavaScript.
+            // This works even when window.ReactNativeWebView is unavailable on file:// origins,
+            // which would silently block the scriptLoaded → init postMessage round-trip.
+            const content = docRef.current?.content ?? '';
+            webViewRef.current?.injectJavaScript(
+              `(function(){if(typeof window._editorInit==='function')window._editorInit(${JSON.stringify(content)},false);})();void 0;`
+            );
+          }}
+          scrollEnabled
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 }

@@ -13,7 +13,7 @@ export interface User {
   account_status: AccountStatus;
   email_verification_deadline_at: string | null;
   plan: TariffPlan | null;
-  is_superuser: boolean;
+  is_superuser?: never;
   notifications_enabled: boolean;
   notify_new_files: boolean;
   notify_contacts_added: boolean;

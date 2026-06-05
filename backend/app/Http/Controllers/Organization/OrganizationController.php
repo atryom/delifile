@@ -78,6 +78,7 @@ class OrganizationController extends Controller
                 'name'        => $f->name,
                 'parent_id'   => $f->parent_id,
                 'sort_order'  => $f->sort_order,
+                'folder_type' => $f->folder_type ?? 'default',
                 'files_count' => $f->files_count,
                 'created_at'  => $f->created_at?->toIso8601String(),
             ]);
@@ -91,9 +92,10 @@ class OrganizationController extends Controller
     public function createFolder(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'       => 'required|string|max:100',
-            'parent_id'  => 'nullable|string',
-            'sort_order' => 'nullable|integer',
+            'name'        => 'required|string|max:100',
+            'parent_id'   => 'nullable|string',
+            'sort_order'  => 'nullable|integer',
+            'folder_type' => 'nullable|string|in:default,gallery,movies',
         ]);
 
         if (!empty($data['parent_id'])) {
@@ -107,10 +109,11 @@ class OrganizationController extends Controller
         }
 
         $folder = Folder::create([
-            'user_id'    => $request->user()->id,
-            'name'       => $data['name'],
-            'parent_id'  => $data['parent_id'] ?? null,
-            'sort_order' => $data['sort_order'] ?? null,
+            'user_id'     => $request->user()->id,
+            'name'        => $data['name'],
+            'parent_id'   => $data['parent_id'] ?? null,
+            'sort_order'  => $data['sort_order'] ?? null,
+            'folder_type' => $data['folder_type'] ?? 'default',
         ]);
 
         return $this->success('Folder created successfully', [
@@ -124,9 +127,10 @@ class OrganizationController extends Controller
     public function updateFolder(Request $request, string $folderId): JsonResponse
     {
         $data = $request->validate([
-            'name'       => 'sometimes|string|max:100',
-            'parent_id'  => 'nullable|string',
-            'sort_order' => 'nullable|integer',
+            'name'        => 'sometimes|string|max:100',
+            'parent_id'   => 'nullable|string',
+            'sort_order'  => 'nullable|integer',
+            'folder_type' => 'sometimes|string|in:default,gallery,movies',
         ]);
 
         $folder = Folder::where('id', $folderId)
@@ -420,6 +424,7 @@ class OrganizationController extends Controller
                 'id'          => $f->id,
                 'name'        => $f->name,
                 'sort_order'  => $f->sort_order,
+                'folder_type' => $f->folder_type ?? 'default',
                 'files_count' => $f->files_count,
                 'children'    => $this->buildTree($folders, $f->id),
             ])
@@ -433,6 +438,7 @@ class OrganizationController extends Controller
             'name'        => $folder->name,
             'parent_id'   => $folder->parent_id,
             'sort_order'  => $folder->sort_order,
+            'folder_type' => $folder->folder_type ?? 'default',
             'created_at'  => $folder->created_at?->toIso8601String(),
         ];
     }

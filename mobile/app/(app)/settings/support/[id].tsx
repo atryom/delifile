@@ -34,7 +34,7 @@ export default function TicketChatScreen() {
   const { data: ticket, isLoading, isError } = useQuery({
     queryKey: ['support', 'ticket', id],
     queryFn: () => supportApi.getTicket(id).then((r) => r.data.data.ticket),
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
     staleTime: 0,
   });
 

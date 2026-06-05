@@ -2,7 +2,7 @@
   "expo": {
     "name": "DeliFile",
     "slug": "delifile",
-    "version": "1.1.6",
+    "version": "1.1.16",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,23 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.delifile.app"
+      "bundleIdentifier": "com.delifile.app",
+      "appleTeamId": "6LBXV3GHST",
+      "requireFullScreen": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "delifile.ru": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            }
+          }
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -34,6 +50,7 @@
       "expo-router",
       "expo-secure-store",
       "expo-asset",
+      "./plugins/withShareExtension",
       [
         "expo-notifications",
         {
@@ -41,7 +58,22 @@
           "color": "#2563EB",
           "defaultChannel": "default"
         }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {}
+        }
       ]
+    ],
+    "assetBundlePatterns": [
+      "assets/*",
+      "assets/editor/*",
+      "assets/images/*"
     ],
     "experiments": {
       "typedRoutes": true
@@ -49,7 +81,24 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "5cb7a68e-9f9c-45e8-ac2f-1c9d58b84b5c"
+        "projectId": "5cb7a68e-9f9c-45e8-ac2f-1c9d58b84b5c",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ShareExtension",
+                  "bundleIdentifier": "com.delifile.app.ShareExtension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.delifile.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     }
   }

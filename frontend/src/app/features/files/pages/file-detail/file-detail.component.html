@@ -55,6 +55,44 @@
               </div>
             }
 
+            <!-- Movie item card -->
+            @if (file()!.content_kind === 'movie_item' && file()!.custom_metadata) {
+              <div class="movie-detail-card">
+                <div class="movie-detail-hero">
+                  @if (file()!.custom_metadata!.poster_url) {
+                    <img [src]="file()!.custom_metadata!.poster_url" [alt]="file()!.custom_metadata!.title ?? ''" class="movie-detail-poster" loading="lazy" />
+                  } @else {
+                    <div class="movie-detail-poster-placeholder" aria-hidden="true">🎬</div>
+                  }
+                  <div class="movie-detail-info">
+                    <h2 class="movie-detail-title">{{ file()!.custom_metadata!.title ?? file()!.display_name ?? file()!.original_name }}</h2>
+                    <div class="movie-detail-row">
+                      @if (file()!.custom_metadata!.year) { <span class="movie-detail-year">{{ file()!.custom_metadata!.year }}</span> }
+                      @if (file()!.custom_metadata!.rating_kp) { <span class="movie-detail-rating">★ {{ file()!.custom_metadata!.rating_kp }}</span> }
+                    </div>
+                    @if (file()!.custom_metadata!.director) {
+                      <div class="movie-detail-director">Реж. {{ file()!.custom_metadata!.director }}</div>
+                    }
+                    @if (file()!.custom_metadata!.genres && file()!.custom_metadata!.genres.length > 0) {
+                      <div class="movie-detail-genres">
+                        @for (g of file()!.custom_metadata!.genres.slice(0, 4); track g) {
+                          <span class="movie-detail-genre-tag">{{ g }}</span>
+                        }
+                      </div>
+                    }
+                    @if (file()!.custom_metadata!.kp_url) {
+                      <a [href]="file()!.custom_metadata!.kp_url" target="_blank" rel="noopener noreferrer" class="kp-link">
+                        Открыть на Кинопоиске →
+                      </a>
+                    }
+                  </div>
+                </div>
+                @if (file()!.custom_metadata!.description) {
+                  <p class="movie-detail-description">{{ file()!.custom_metadata!.description }}</p>
+                }
+              </div>
+            }
+
             <!-- URL file card -->
             @if (file()!.content_kind === 'url_file') {
               <div class="url-card">
@@ -144,8 +182,8 @@
                   </div>
                 </div>
               </div>
-            } @else {
-              <!-- Regular file header card -->
+            } @else if (file()!.content_kind !== 'movie_item') {
+              <!-- Regular file header card (hidden for movie items) -->
               <div class="file-header-card">
                 <div class="file-card-left">
                   @if (displayPreviewUrl()) {
@@ -520,7 +558,8 @@
               </div>
             </div>
 
-            <!-- Folders -->
+            <!-- Folders (hidden for movies) -->
+            @if (file()!.content_kind !== 'movie_item') {
             <div class="sidebar-section">
               <h3 class="section-title">{{ 'files.detail.folders' | translate }}</h3>
               <div class="folder-block">
@@ -543,6 +582,7 @@
                 }
               </div>
             </div>
+            } <!-- /Folders -->
 
             <!-- Active share links -->
             <div class="sidebar-section">
@@ -582,7 +622,8 @@
               }
             </div>
 
-            <!-- Who has access -->
+            <!-- Who has access (hidden for movies) -->
+            @if (file()!.content_kind !== 'movie_item') {
             <div class="sidebar-section">
               <div class="section-header-row">
                 <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>
@@ -660,8 +701,10 @@
                 </div>
               }
             </div>
+            } <!-- /Access -->
 
-            <!-- Activity -->
+            <!-- Activity (hidden for movies) -->
+            @if (file()!.content_kind !== 'movie_item') {
             <div class="sidebar-section">
               <div class="section-header-row">
                 <h3 class="section-title">{{ 'files.detail.activity_section' | translate }}</h3>
@@ -681,6 +724,7 @@
                 }
               }
             </div>
+            } <!-- /Activity -->
 
           </aside>
         </div>

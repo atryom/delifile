@@ -15,6 +15,12 @@ const [major, minor, patch] = appJson.expo.version.split('.').map(Number);
 const newPatch = patch + 1;
 const newVersion = `${major}.${minor}.${newPatch}`;
 appJson.expo.version = newVersion;
+
+// Increment iOS buildNumber alongside Android versionCode
+const oldBuildNumber = parseInt(appJson.expo.ios?.buildNumber ?? '0', 10);
+const newBuildNumber = oldBuildNumber + 1;
+if (appJson.expo.ios) appJson.expo.ios.buildNumber = String(newBuildNumber);
+
 writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + '\n');
 
 // --- android/app/build.gradle ---
@@ -31,4 +37,4 @@ gradle = gradle
 
 writeFileSync(gradlePath, gradle);
 
-console.log(`${major}.${minor}.${patch} (${vcMatch[1]})  →  ${newVersion} (${newVersionCode})`);
+console.log(`${major}.${minor}.${patch} (android:${vcMatch[1]}, ios:${oldBuildNumber})  →  ${newVersion} (android:${newVersionCode}, ios:${newBuildNumber})`);

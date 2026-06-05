@@ -15,8 +15,8 @@ export const supportApi = {
     apiClient.post<ApiResponse<Record<string, unknown>>>(`/support/tickets/${ticketId}/messages`, { body }),
 
   markRead: (ticketId: string) =>
-    apiClient.post(`/support/tickets/${ticketId}/mark-read`),
+    apiClient.post<ApiResponse<Record<string, never>>>(`/support/tickets/${ticketId}/mark-read`),
 
   confirmTicket: (ticketId: string) =>
-    apiClient.post(`/support/tickets/${ticketId}/confirm`),
+    apiClient.post<ApiResponse<Record<string, never>>>(`/support/tickets/${ticketId}/confirm`),
 };

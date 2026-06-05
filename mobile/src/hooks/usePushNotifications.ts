@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { pushApi } from '@/api/push';
@@ -15,7 +15,7 @@ Notifications.setNotificationHandler({
 });
 
 export function usePushNotifications() {
-  const responseListener = useRef<Notifications.EventSubscription>();
+  const responseListener = useRef<Notifications.EventSubscription | undefined>(undefined);
 
   useEffect(() => {
     registerForPushAsync();
@@ -39,8 +39,20 @@ async function registerForPushAsync(): Promise<void> {
   }
 
   // Request permission (Android 13+ requires explicit request)
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') return;
+  const { status, canAskAgain } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    if (!canAskAgain) {
+      Alert.alert(
+        'Уведомления отключены',
+        'Разрешите уведомления в настройках, чтобы получать оповещения о файлах.',
+        [
+          { text: 'Отмена', style: 'cancel' },
+          { text: 'Открыть настройки', onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
+    return;
+  }
 
   try {
     // Raw FCM token — works without Expo Dashboard credentials
@@ -53,7 +65,7 @@ async function registerForPushAsync(): Promise<void> {
 }
 
 function handleNotificationTap(response: Notifications.NotificationResponse): void {
-  const url: string | undefined = response.notification.request.content.data?.url;
+  const url = response.notification.request.content.data?.url as string | undefined;
   if (!url) return;
   try {
     const path = new URL(url).pathname;

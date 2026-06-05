@@ -13,11 +13,14 @@ import { FileUploadService } from '../../../files/services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import {
-  SharedFolder, FileListItem, SharedFolderFileItem,
+  FolderType, SharedFolder, FileListItem, SharedFolderFileItem,
   Tag, FileTypeGroup, LinkPreview, TaskStatus,
 } from '../../../../shared/models/api.models';
 import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialogs/access/shared-folder-access-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
+import { GalleryViewComponent } from '../../components/gallery-view/gallery-view.component';
+import { MovieViewComponent } from '../../components/movie-view/movie-view.component';
+import { AddMovieDialogComponent } from '../../components/add-movie-dialog/add-movie-dialog.component';
 import { formatSize } from '../../../../shared/utils/format';
 import { classifyMimeType } from '../../../../shared/utils/file';
 import { FileUpdatesService } from '../../../../core/services/file-updates.service';
@@ -52,7 +55,7 @@ type AnyFile = FileListItem | SharedFolderFileItem;
 @Component({
   selector: 'app-folders-tree',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, FormsModule, ReactiveFormsModule, TranslateModule, SharedFolderAccessDialogComponent, ThreadCommentsComponent],
+  imports: [DatePipe, FormsModule, ReactiveFormsModule, TranslateModule, SharedFolderAccessDialogComponent, ThreadCommentsComponent, GalleryViewComponent, MovieViewComponent, AddMovieDialogComponent],
   templateUrl: './folders-tree.component.html',
   styleUrl: './folders-tree.component.scss',
   host: {},
@@ -150,10 +153,26 @@ export class FoldersTreeComponent implements OnInit {
   // ── Shared folder discussion ──────────────────────────────────────────────
   readonly folderNotesOpen = signal(false);
 
+  // ── Current folder type ───────────────────────────────────────────────────
+  readonly currentFolder = computed<SharedFolder | null>(() => {
+    const sfId = this.currentSharedFolderId();
+    if (!sfId) return null;
+    return (
+      this.sharedFolders().find(f => f.id === sfId) ??
+      this.sfSubfolders().find(f => f.id === sfId) ??
+      null
+    );
+  });
+  readonly currentFolderType = computed<FolderType>(() => this.currentFolder()?.folder_type ?? 'default');
+
   // ── Create folder ─────────────────────────────────────────────────────────
   readonly creating = signal(false);
+  readonly createFolderType = signal<FolderType>('default');
   createNameValue = '';
   private readonly createNameInput = viewChild<ElementRef<HTMLInputElement>>('createNameInput');
+
+  // ── Add movie dialog ───────────────────────────────────────────────────────
+  readonly showAddMovieDialog = signal(false);
 
   // ── Rename ────────────────────────────────────────────────────────────────
   readonly renamingId   = signal<string | null>(null);
@@ -547,6 +566,22 @@ export class FoldersTreeComponent implements OnInit {
     this.loadFiles();
   }
 
+  onMovieAdded(): void {
+    this.showAddMovieDialog.set(false);
+    const sfId = this.currentSharedFolderId();
+    if (sfId) this.loadSharedFolderFiles(sfId);
+  }
+
+  removeFileFromGallery(fileId: string): void {
+    const sfId = this.currentSharedFolderId();
+    if (!sfId) return;
+    if (!confirm('Убрать файл из галереи?')) return;
+    this.sfApi.removeFile(sfId, fileId).subscribe({
+      next: () => this.loadSharedFolderFiles(sfId),
+      error: () => alert('Не удалось убрать файл из папки'),
+    });
+  }
+
   // ── Create folder ─────────────────────────────────────────────────────────
   startCreate(event?: Event): void {
     event?.stopPropagation();
@@ -560,19 +595,21 @@ export class FoldersTreeComponent implements OnInit {
   cancelCreate(): void {
     this.creating.set(false);
     this.createNameValue = '';
+    this.createFolderType.set('default');
   }
 
   saveCreate(): void {
     const name = this.createNameValue.trim();
     if (!name) return;
-    const parentId = this.currentSharedFolderId();
+    const parentId   = this.currentSharedFolderId();
+    const folderType = this.createFolderType();
     if (parentId) {
-      this.sfApi.createSubfolder(parentId, name).subscribe({
+      this.sfApi.createSubfolder(parentId, name, folderType).subscribe({
         next: () => { this.cancelCreate(); this.loadSfSubfolders(parentId); },
         error: (err) => alert(err.message ?? 'Ошибка создания папки'),
       });
     } else {
-      this.sfApi.create(name).subscribe({
+      this.sfApi.create(name, folderType).subscribe({
         next: () => { this.cancelCreate(); this.loadShared(); },
         error: (err) => alert(err.message ?? 'Ошибка создания папки'),
       });

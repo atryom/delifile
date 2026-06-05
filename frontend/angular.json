@@ -36,7 +36,10 @@
             "stylePreprocessorOptions": {
               "includePaths": ["src"]
             },
-            "scripts": []
+            "scripts": [],
+            "allowedCommonJsDependencies": [
+              "markdown-it-task-lists"
+            ]
           },
           "configurations": {
             "production": {

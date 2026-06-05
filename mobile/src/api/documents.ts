@@ -20,10 +20,10 @@ export const documentsApi = {
     apiClient.post<ApiResponse<{ lock: { expiresAt: string } }>>(`/documents/${id}/lock`),
 
   heartbeat: (id: string) =>
-    apiClient.post(`/documents/${id}/lock/heartbeat`),
+    apiClient.post<ApiResponse<Record<string, never>>>(`/documents/${id}/lock/heartbeat`),
 
   releaseLock: (id: string) =>
-    apiClient.delete(`/documents/${id}/lock`),
+    apiClient.delete<ApiResponse<Record<string, never>>>(`/documents/${id}/lock`),
 
   takeoverLock: (id: string) =>
     apiClient.post<ApiResponse<{ lock: { expiresAt: string } }>>(`/documents/${id}/lock/takeover`),

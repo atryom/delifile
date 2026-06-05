@@ -5,7 +5,7 @@ export function useFolderTree() {
   return useQuery({
     queryKey: ['folders', 'tree'],
     queryFn: () => foldersApi.tree().then((r) => r.data.data.items),
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 60 * 24,
   });
 }

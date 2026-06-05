@@ -10,10 +10,14 @@ function TabBarIcon({ name, color, size }: { name: any; color: string; size: num
   return <Ionicons name={name} size={size} color={color} />;
 }
 
-function ConnectionsTabIcon({ color, size }: { color: string; size: number }) {
+function useConnectionsBadge() {
   const { data: inbox } = useInboxCount();
   const { data: requests } = useContactRequests();
-  const count = (inbox?.total ?? 0) + (requests?.filter((r) => r.status === 'pending').length ?? 0);
+  return (inbox?.total ?? 0) + (requests?.filter((r) => r.status === 'pending').length ?? 0);
+}
+
+function ConnectionsTabIcon({ color, size }: { color: string; size: number }) {
+  const count = useConnectionsBadge();
   return (
     <View>
       <Ionicons name="people-outline" size={size} color={color} />

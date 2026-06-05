@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\SuggestionAdminController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Files\FileController;
 use App\Http\Controllers\Files\FileVersionController;
+use App\Http\Controllers\Files\MovieController;
 use App\Http\Controllers\Files\SharingController;
 use App\Http\Controllers\Files\SharedFolderFileController;
 use App\Http\Controllers\Contacts\ContactController;
@@ -183,6 +184,10 @@ Route::prefix('v1')->group(function () {
         Route::patch('folders/{id}',  [OrganizationController::class, 'updateFolder']);
         Route::delete('folders/{id}', [OrganizationController::class, 'deleteFolder']);
 
+        // Movie folders
+        Route::post('folders/{folder}/movies/search', [MovieController::class, 'search']);
+        Route::post('folders/{folder}/movies',        [MovieController::class, 'store']);
+
         // Organization — Tags
         Route::get('tags',            [OrganizationController::class, 'listTags']);
         Route::post('tags',           [OrganizationController::class, 'createTag']);
@@ -277,6 +282,8 @@ Route::prefix('v1')->group(function () {
             Route::patch('{id}/files/{fileId}/privacy',     [SharedFolderController::class, 'setFilePrivacy']);
             Route::patch('{id}/privacy',                    [SharedFolderController::class, 'setFolderPrivacy']);
             Route::delete('{id}/leave',                     [SharedFolderController::class, 'leave']);
+            Route::post('{id}/movies/search',               [MovieController::class, 'searchShared']);
+            Route::post('{id}/movies',                      [MovieController::class, 'storeShared']);
         });
 
         // Comments — threads

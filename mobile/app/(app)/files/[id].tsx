@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, Linking, ScrollView, Share, StyleSheet, Switch,
+  Alert, BackHandler, Linking, ScrollView, Share, StyleSheet, Switch,
   Text, TouchableOpacity, View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
@@ -12,36 +13,31 @@ import {
   useFile, useDownloadUrl, useToggleFavorite,
   useSetTags, useMoveFolder, useShareToContact, useCreateLink, useDeleteFile,
   useVersionDownload, useActivateVersion,
+  useFileLinks, useDisableFileLink, useFileAccesses, useRevokeAccess, useUpdateAccess,
+  useUpdateTask,
 } from '@/hooks/useFiles';
 import { useTags } from '@/hooks/useTags';
 import { useSharedFolderAllFlat } from '@/hooks/useSharedFolders';
-import type { SharedFolder } from '@/types';
+import { sharedFoldersApi } from '@/api/shared-folders';
+import type { SharedFolder, TaskStatus } from '@/types';
 import { useContacts } from '@/hooks/useContacts';
 import { filesApi } from '@/api/files';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
+import { DatePickerModal, isoToDisplayRu } from '@/components/ui/DatePickerModal';
+import { Image } from 'expo-image';
 import { useNetworkStore } from '@/store/network';
 import { formatFileSize, formatDateTime } from '@/utils/format';
+import { getApiError } from '@/utils/error';
 
-type ActionPanel = 'tags' | 'folder' | 'share' | 'link' | 'versions';
+type ActionPanel = 'tags' | 'folder' | 'versions' | 'access' | 'task' | 'links-list';
 
-function buildSharedFolderMoveTree(folders: SharedFolder[]): Array<{ folder: SharedFolder; depth: number }> {
-  const result: Array<{ folder: SharedFolder; depth: number }> = [];
-  function walk(parentId: string | null, depth: number) {
-    for (const f of folders) {
-      if ((f.parent_id ?? null) === parentId) {
-        result.push({ folder: f, depth });
-        walk(f.id, depth + 1);
-      }
-    }
-  }
-  walk(null, 0);
-  const placed = new Set(result.map((r) => r.folder.id));
-  for (const f of folders) {
-    if (!placed.has(f.id)) result.push({ folder: f, depth: 0 });
-  }
-  return result;
-}
+const TASK_STATUSES: Array<{ value: TaskStatus; label: string }> = [
+  { value: 'template', label: 'Шаблон' },
+  { value: 'in_progress', label: 'В работе' },
+  { value: 'under_review', label: 'На проверке' },
+  { value: 'completed', label: 'Выполнено' },
+];
 
 const TTL_OPTIONS = [
   { label: '12 часов', hours: 12 },
@@ -51,7 +47,9 @@ const TTL_OPTIONS = [
 ];
 
 export default function FileDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, ctx_folder_id } = useLocalSearchParams<{ id: string; ctx_folder_id?: string }>();
+  // ctx_folder_id — shared folder the file was opened from (passed by shared-folders/[id] screen)
+  const contextFolderId = Array.isArray(ctx_folder_id) ? ctx_folder_id[0] : (ctx_folder_id || null);
   const qc = useQueryClient();
   const { data: file, isLoading, isError } = useFile(id);
   const downloadUrl = useDownloadUrl(id);
@@ -64,6 +62,12 @@ export default function FileDetailScreen() {
   const versionDownload = useVersionDownload(id);
   const activateVersion = useActivateVersion(id);
   const isOnline = useNetworkStore((s) => s.isOnline);
+  const fileLinks = useFileLinks(id);
+  const disableFileLink = useDisableFileLink(id);
+  const fileAccesses = useFileAccesses(id);
+  const revokeAccess = useRevokeAccess(id);
+  const updateAccess = useUpdateAccess(id);
+  const updateTask = useUpdateTask(id);
 
   // Version upload state
   type VersionUploadState =
@@ -78,12 +82,30 @@ export default function FileDetailScreen() {
   // Action panels
   const [panel, setPanel] = useState<ActionPanel | null>(null);
 
+  // Android back — close panel instead of navigating away
+  useEffect(() => {
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (panel !== null) {
+        setPanel(null);
+        setDatePickerTarget(null);
+        return true;
+      }
+      return false;
+    });
+    return () => handler.remove();
+  }, [panel]);
+
   // Tags panel
   const { data: allTags } = useTags();
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
-  // Folder panel
+  // Folder panel: shared folders where user can write (excluding personal root, which isn't browsable in mobile)
   const { data: allFolders } = useSharedFolderAllFlat();
+  const writableFolders = useMemo(
+    () => (allFolders ?? []).filter((f) => !f.is_personal_root && (f.is_owner || f.my_access_type === 'edit')),
+    [allFolders],
+  );
+  const folderTree = useMemo(() => buildFolderTree(writableFolders), [writableFolders]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
   // Share panel
@@ -96,11 +118,31 @@ export default function FileDetailScreen() {
   const [allowSave, setAllowSave] = useState(false);
   const [createdLink, setCreatedLink] = useState<{ url: string; expires_at: string | null } | null>(null);
 
+  // Task panel
+  const [taskIsTask, setTaskIsTask] = useState(false);
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>('template');
+  const [taskStartDate, setTaskStartDate] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskAssigneeUserId, setTaskAssigneeUserId] = useState<number | null>(null);
+  const [datePickerTarget, setDatePickerTarget] = useState<'start' | 'due' | null>(null);
+
+  // Access panel — grant access sub-state
+  const [grantContactId, setGrantContactId] = useState<string | null>(null);
+  const [grantCanEdit, setGrantCanEdit] = useState(false);
+  const [showingGrant, setShowingGrant] = useState(false);
+
   function openPanel(p: ActionPanel) {
     if (p === 'tags') setSelectedTagIds(file?.tags.map((t) => t.id) ?? []);
     if (p === 'folder') setSelectedFolderId(file?.folder_id ?? null);
-    if (p === 'share') { setSelectedContactId(null); setCanEdit(false); }
-    if (p === 'link') { setTtlHours(24); setAllowSave(false); setCreatedLink(null); }
+    if (p === 'task') {
+      setTaskIsTask(file?.is_task ?? false);
+      setTaskStatus(file?.task_status ?? 'template');
+      setTaskStartDate(file?.task_start_date ?? '');
+      setTaskDueDate(file?.task_due_date ?? '');
+      setTaskAssigneeUserId(file?.task_assigned_user ? Number(file.task_assigned_user.id) : null);
+    }
+    if (p === 'access') { setShowingGrant(false); setGrantContactId(null); setGrantCanEdit(false); }
+    if (p === 'links-list') { setTtlHours(24); setAllowSave(false); setCreatedLink(null); }
     setPanel(p);
   }
 
@@ -138,17 +180,56 @@ export default function FileDetailScreen() {
     try {
       await setTags.mutateAsync(selectedTagIds);
       setPanel(null);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось сохранить теги');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось сохранить теги'));
     }
   }
 
   async function handleMoveFolder() {
     try {
-      await moveFolder.mutateAsync(selectedFolderId);
+      // file.folder_id may be null for files added to shared folders via other means;
+      // fall back to contextFolderId (the folder the screen was opened from)
+      const oldFolderId = file?.folder_id || contextFolderId || null;
+      const isOwner = file?.is_owner ?? false;
+
+      // Перемещение обратно в корень: убираем из текущей папки
+      if (selectedFolderId === null) {
+        const folderToRemoveFrom = oldFolderId || contextFolderId;
+        if (!folderToRemoveFrom) return;
+        await sharedFoldersApi.removeFile(folderToRemoveFrom, id);
+        qc.invalidateQueries({ queryKey: ['file', id] });
+        qc.invalidateQueries({ queryKey: ['shared-folders'] });
+        qc.invalidateQueries({ queryKey: ['files'] });
+        setPanel(null);
+        return;
+      }
+
+      if (oldFolderId && oldFolderId !== selectedFolderId) {
+        // Перемещение из одной общей папки в другую — последовательно для атомарности
+        await sharedFoldersApi.removeFile(oldFolderId, id);
+        try {
+          await sharedFoldersApi.addFile(selectedFolderId, id);
+        } catch (addErr) {
+          // Откатываем: возвращаем файл в исходную папку
+          await sharedFoldersApi.addFile(oldFolderId, id).catch(() => {});
+          throw addErr;
+        }
+      } else if (isOwner) {
+        // Владелец переносит из корня — { move: true } просит бэкенд убрать из личных файлов
+        await sharedFoldersApi.addFile(selectedFolderId, id, true);
+      } else {
+        // Не владелец: сначала добавляем в папку, затем явно убираем личную копию
+        await sharedFoldersApi.addFile(selectedFolderId, id);
+        await filesApi.delete(id);
+      }
+
+      qc.removeQueries({ queryKey: ['file', id] });
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
+      qc.invalidateQueries({ queryKey: ['files'] });
       setPanel(null);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось переместить файл');
+      router.back();
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось переместить файл'));
     }
   }
 
@@ -158,8 +239,8 @@ export default function FileDetailScreen() {
       await shareToContact.mutateAsync({ contact_id: selectedContactId, can_edit: canEdit });
       Alert.alert('Готово', 'Файл отправлен контакту');
       setPanel(null);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось поделиться файлом');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось поделиться файлом'));
     }
   }
 
@@ -180,8 +261,8 @@ export default function FileDetailScreen() {
   async function handleActivateVersion(versionId: string) {
     try {
       await activateVersion.mutateAsync(versionId);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось переключить версию');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось переключить версию'));
     }
   }
 
@@ -205,8 +286,8 @@ export default function FileDetailScreen() {
         versionId = initRes.data.data.version.id;
         putUrl = initRes.data.data.upload.url;
         putHeaders = initRes.data.data.upload.headers;
-      } catch (e: any) {
-        setVersionUpload({ phase: 'error', name: asset.name, message: e.response?.data?.message ?? 'Ошибка инициализации' });
+      } catch (e) {
+        setVersionUpload({ phase: 'error', name: asset.name, message: getApiError(e, 'Ошибка инициализации') });
         return;
       }
 
@@ -281,11 +362,12 @@ export default function FileDetailScreen() {
           text: isOwner ? 'Удалить' : 'Убрать',
           style: 'destructive',
           onPress: async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             try {
               await deleteFile.mutateAsync(id);
               router.back();
-            } catch (e: any) {
-              Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось удалить файл');
+            } catch (e) {
+              Alert.alert('Ошибка', getApiError(e, 'Не удалось удалить файл'));
             }
           },
         },
@@ -297,8 +379,60 @@ export default function FileDetailScreen() {
     try {
       const link = await createLink.mutateAsync({ ttl_hours: ttlHours, allow_save: allowSave });
       setCreatedLink(link);
-    } catch (e: any) {
-      Alert.alert('Ошибка', e.response?.data?.message ?? 'Не удалось создать ссылку');
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось создать ссылку'));
+    }
+  }
+
+  async function handleSaveTask() {
+    try {
+      await updateTask.mutateAsync({
+        is_task: taskIsTask,
+        task_status: taskIsTask ? taskStatus : null,
+        task_start_date: taskIsTask && taskStartDate ? taskStartDate : null,
+        task_due_date: taskIsTask && taskDueDate ? taskDueDate : null,
+        task_assigned_user_id: taskIsTask ? taskAssigneeUserId : null,
+      });
+      setPanel(null);
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось сохранить задачу'));
+    }
+  }
+
+  async function handleGrantAccess() {
+    if (!grantContactId) return;
+    try {
+      await shareToContact.mutateAsync({ contact_id: grantContactId, can_edit: grantCanEdit });
+      setShowingGrant(false);
+      setGrantContactId(null);
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось предоставить доступ'));
+    }
+  }
+
+  async function handleRevokeAccess(contactId: string, name: string) {
+    Alert.alert(`Отозвать доступ у ${name}?`, undefined, [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Отозвать',
+        style: 'destructive',
+        onPress: async () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          try {
+            await revokeAccess.mutateAsync(contactId);
+          } catch (e) {
+            Alert.alert('Ошибка', getApiError(e, 'Не удалось отозвать доступ'));
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleDisableLink(linkId: string) {
+    try {
+      await disableFileLink.mutateAsync(linkId);
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось деактивировать ссылку'));
     }
   }
 
@@ -314,33 +448,114 @@ export default function FileDetailScreen() {
   }
 
   const name = file.display_name ?? file.original_name;
+  const isMovie = file.content_kind === 'movie_item';
+  const movie = isMovie ? (file as any).custom_metadata : null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: name }} />
+      <Stack.Screen options={{ title: isMovie ? (movie?.title ?? name) : name }} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.name}>{name}</Text>
-        <View style={styles.actions}>
+      {/* ── Movie hero block ── */}
+      {isMovie && movie && (
+        <View style={styles.movieHero}>
+          {movie.poster_url ? (
+            <Image
+              source={{ uri: movie.poster_url }}
+              style={styles.moviePoster}
+              contentFit="cover"
+              placeholderContentFit="cover"
+            />
+          ) : (
+            <View style={[styles.moviePoster, styles.moviePosterPlaceholder]}>
+              <Text style={styles.moviePosterEmoji}>🎬</Text>
+            </View>
+          )}
+          <View style={styles.movieMeta}>
+            <Text style={styles.movieTitle}>{movie.title ?? name}</Text>
+            <View style={styles.movieRow}>
+              {movie.year  && <Text style={styles.movieYear}>{movie.year}</Text>}
+              {movie.rating_kp && <Text style={styles.movieRating}>★ {movie.rating_kp}</Text>}
+            </View>
+            {movie.director && (
+              <Text style={styles.movieDirector}>Реж. {movie.director}</Text>
+            )}
+            {movie.genres?.length > 0 && (
+              <View style={styles.movieGenres}>
+                {movie.genres.slice(0, 4).map((g: string) => (
+                  <View key={g} style={styles.genreTag}>
+                    <Text style={styles.genreTagText}>{g}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {isMovie && movie?.description && (
+        <View style={styles.movieDescription}>
+          <Text style={styles.movieDescriptionText}>{movie.description}</Text>
+        </View>
+      )}
+
+      {isMovie && movie?.kp_url && (
+        <TouchableOpacity
+          style={styles.kpBtn}
+          onPress={() => Linking.openURL(movie.kp_url)}
+        >
+          <Text style={styles.kpBtnText}>🎬 Открыть на Кинопоиске</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Header (для не-фильмов — название и избранное) */}
+      {!isMovie && (
+        <View style={styles.header}>
+          <Text style={styles.name}>{name}</Text>
+          <View style={styles.actions}>
+            <TouchableOpacity
+              onPress={() => toggleFavorite.mutate({ id: file.id, isFavorite: file.is_favorite })}
+              style={styles.iconBtn}
+            >
+              <Text style={file.is_favorite ? styles.starActive : styles.star}>★</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {isMovie && (
+        <View style={styles.movieFavoriteRow}>
           <TouchableOpacity
             onPress={() => toggleFavorite.mutate({ id: file.id, isFavorite: file.is_favorite })}
-            style={styles.iconBtn}
+            style={styles.movieFavoriteBtn}
           >
-            <Text style={file.is_favorite ? styles.starActive : styles.star}>★</Text>
+            <Text style={[styles.star, file.is_favorite && styles.starActive]}>
+              {file.is_favorite ? '★ В избранном' : '☆ В избранное'}
+            </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      )}
 
-      {/* Meta */}
+      {/* Meta — скрываем техническую информацию для фильмов */}
       <View style={styles.meta}>
-        {file.content_kind === 'binary_file' && (
+        {!isMovie && file.content_kind === 'binary_file' && (
           <Row label="Размер" value={formatFileSize(file.size)} />
         )}
-        {file.mime_type && <Row label="Тип" value={file.mime_type} />}
-        {file.uploaded_at && <Row label="Загружен" value={formatDateTime(file.uploaded_at)} />}
-        {file.owner && <Row label="Владелец" value={file.owner.name ?? file.owner.email} />}
+        {!isMovie && file.mime_type && <Row label="Тип" value={file.mime_type} />}
+        {!isMovie && file.uploaded_at && <Row label="Загружен" value={formatDateTime(file.uploaded_at)} />}
+        {!isMovie && file.owner && <Row label="Владелец" value={file.owner.name ?? file.owner.email} />}
         {file.description && <Row label="Описание" value={file.description} />}
+        {file.is_task && file.task_status && (
+          <Row label="Задача" value={TASK_STATUSES.find((s) => s.value === file.task_status)?.label ?? file.task_status} />
+        )}
+        {file.is_task && file.task_assigned_user && (
+          <Row label="Исполнитель" value={file.task_assigned_user.name ?? file.task_assigned_user.email} />
+        )}
+        {file.is_task && file.task_start_date && (
+          <Row label="Начало" value={isoToDisplayRu(file.task_start_date)} />
+        )}
+        {file.is_task && file.task_due_date && (
+          <Row label="Срок" value={isoToDisplayRu(file.task_due_date)} />
+        )}
         {file.tags.length > 0 && (
           <View style={styles.tags}>
             {file.tags.map((t) => (
@@ -375,7 +590,7 @@ export default function FileDetailScreen() {
 
           {file.content_kind === 'url_file' && file.link_url ? (
             <Button title="Открыть ссылку" onPress={() => Linking.openURL(file.link_url!)} style={styles.btn} />
-          ) : file.mime_type !== 'text/markdown' ? (
+          ) : file.content_kind !== 'movie_item' && file.mime_type !== 'text/markdown' ? (
             <Button
               title={downloading ? 'Скачивание...' : 'Скачать'}
               onPress={handleDownload}
@@ -384,27 +599,40 @@ export default function FileDetailScreen() {
             />
           ) : null}
 
-          {/* Action buttons grid */}
-          <View style={styles.actionGrid}>
-            <ActionBtn label="🏷 Теги" onPress={() => openPanel('tags')} />
-            <ActionBtn label="📁 Переместить" onPress={() => openPanel('folder')} />
-            {file.is_owner && <ActionBtn label="👤 Поделиться" onPress={() => openPanel('share')} />}
-            {file.is_owner && <ActionBtn label="🔗 Публичная ссылка" onPress={() => openPanel('link')} />}
-            {file.content_kind === 'binary_file' && (file.has_versions || file.is_owner) && (
-              <ActionBtn label="🕓 Версии" onPress={() => openPanel('versions')} />
-            )}
-            <ActionBtn
-              label="💬 Комментарии"
+          {/* Action menu */}
+          <View style={styles.actionMenu}>
+            {!isMovie && <ActionItem icon="🏷" label="Теги" onPress={() => openPanel('tags')} />}
+            {!isMovie && <ActionItem icon="📁" label="Переместить в папку" onPress={() => openPanel('folder')} />}
+            <ActionItem
+              icon="💬"
+              label="Комментарии"
               onPress={() => router.push({
                 pathname: '/(app)/files/comments',
                 params: { targetType: 'file', targetId: file.id, targetName: name },
               } as any)}
+              last={isMovie || (!file.is_owner && !(file.is_owner || file.is_task) && !(file.content_kind === 'binary_file'))}
             />
+            {!isMovie && (file.is_owner || file.is_task) && (
+              <>
+                <View style={styles.actionMenuDivider} />
+                {file.is_owner && <ActionItem icon="🔐" label="Управление доступом" onPress={() => openPanel('access')} />}
+                {file.is_owner && <ActionItem icon="🔗" label="Публичные ссылки" onPress={() => openPanel('links-list')} />}
+                {file.content_kind === 'binary_file' && (file.has_versions || file.is_owner) && (
+                  <ActionItem icon="🕓" label="Версии файла" onPress={() => openPanel('versions')} />
+                )}
+                <ActionItem
+                  icon={file.is_task ? '✅' : '☐'}
+                  label={file.is_task ? 'Настройки задачи' : 'Сделать задачей'}
+                  onPress={() => openPanel('task')}
+                  last
+                />
+              </>
+            )}
           </View>
 
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteConfirm}>
             <Text style={styles.deleteBtnText}>
-              {file.is_owner ? '🗑 Удалить файл' : '✕ Убрать из моих файлов'}
+              {isMovie ? '🗑 Удалить из коллекции' : file.is_owner ? '🗑 Удалить файл' : '✕ Убрать из моих файлов'}
             </Text>
           </TouchableOpacity>
         </>
@@ -533,66 +761,249 @@ export default function FileDetailScreen() {
             <Text style={styles.backText}>← Назад</Text>
           </TouchableOpacity>
           <Text style={styles.panelTitle}>Переместить в папку</Text>
-          {buildSharedFolderMoveTree(allFolders ?? []).map(({ folder, depth }) => (
+          {(file.folder_id || contextFolderId) && (
+            <TouchableOpacity style={styles.radioRow} onPress={() => setSelectedFolderId(null)}>
+              <View style={[styles.radio, selectedFolderId === null && styles.radioActive]} />
+              <Text style={styles.checkLabel}>🏠 Корень (убрать из папки)</Text>
+            </TouchableOpacity>
+          )}
+          {folderTree.map(({ folder, depth }) => (
             <TouchableOpacity
               key={folder.id}
-              style={[styles.radioRow, { paddingLeft: depth * 20 }]}
+              style={[styles.radioRow, { paddingLeft: 16 + depth * 20 }]}
               onPress={() => setSelectedFolderId(folder.id)}
             >
               <View style={[styles.radio, selectedFolderId === folder.id && styles.radioActive]} />
               <Text style={styles.checkLabel}>
-                {folder.is_personal_root ? '🏠 ' : folder.is_private ? '🔒 ' : ''}{folder.name}
+                {folder.is_personal_root ? '🏠 ' : folder.is_private ? '🔒 ' : '🗂 '}{folder.name}
               </Text>
             </TouchableOpacity>
           ))}
-          <Button title="Переместить" onPress={handleMoveFolder} loading={moveFolder.isPending} style={styles.btn} />
-        </View>
-      )}
-
-      {/* Share panel */}
-      {panel === 'share' && (
-        <View style={styles.panel}>
-          <TouchableOpacity onPress={() => setPanel(null)} style={styles.back}>
-            <Text style={styles.backText}>← Назад</Text>
-          </TouchableOpacity>
-          <Text style={styles.panelTitle}>Поделиться с контактом</Text>
-          {(contacts ?? []).length === 0 && (
-            <Text style={styles.emptyText}>Нет контактов. Добавьте контакты во вкладке «Связи».</Text>
+          {writableFolders.length === 0 && (
+            <Text style={styles.emptyText}>Нет доступных папок для перемещения.</Text>
           )}
-          {(contacts ?? []).map((c) => (
-            <TouchableOpacity
-              key={c.id}
-              style={styles.radioRow}
-              onPress={() => setSelectedContactId(c.id)}
-            >
-              <View style={[styles.radio, selectedContactId === c.id && styles.radioActive]} />
-              <View>
-                <Text style={styles.checkLabel}>{c.name}</Text>
-                {c.email && <Text style={styles.subLabel}>{c.email}</Text>}
-              </View>
-            </TouchableOpacity>
-          ))}
-          <View style={styles.switchRow}>
-            <Text style={styles.checkLabel}>Разрешить редактирование</Text>
-            <Switch value={canEdit} onValueChange={setCanEdit} />
-          </View>
           <Button
-            title="Отправить"
-            onPress={handleShare}
-            loading={shareToContact.isPending}
-            disabled={!selectedContactId}
+            title="Переместить"
+            onPress={handleMoveFolder}
+            disabled={selectedFolderId === null && !(file.folder_id || contextFolderId)}
             style={styles.btn}
           />
         </View>
       )}
 
-      {/* Link panel */}
-      {panel === 'link' && (
+      {/* Task panel */}
+      {panel === 'task' && (
         <View style={styles.panel}>
           <TouchableOpacity onPress={() => setPanel(null)} style={styles.back}>
             <Text style={styles.backText}>← Назад</Text>
           </TouchableOpacity>
-          <Text style={styles.panelTitle}>Публичная ссылка</Text>
+          <Text style={styles.panelTitle}>Задача</Text>
+          {file.is_owner && (
+            <View style={styles.switchRow}>
+              <Text style={styles.checkLabel}>Это задача</Text>
+              <Switch value={taskIsTask} onValueChange={setTaskIsTask} />
+            </View>
+          )}
+          {taskIsTask && (
+            <>
+              <Text style={styles.fieldLabel}>Статус</Text>
+              <View style={styles.ttlGrid}>
+                {TASK_STATUSES.map((s) => (
+                  <TouchableOpacity
+                    key={s.value}
+                    style={[styles.ttlBtn, taskStatus === s.value && styles.ttlBtnActive]}
+                    onPress={() => setTaskStatus(s.value)}
+                  >
+                    <Text style={[styles.ttlLabel, taskStatus === s.value && styles.ttlLabelActive]}>
+                      {s.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Дата начала</Text>
+              <View style={styles.datePickerRow}>
+                <TouchableOpacity style={[styles.datePicker, { flex: 1 }]} onPress={() => setDatePickerTarget('start')}>
+                  <Text style={taskStartDate ? styles.datePickerValue : styles.datePickerPlaceholder}>
+                    {taskStartDate ? isoToDisplayRu(taskStartDate) : 'Не выбрана'}
+                  </Text>
+                  <Text style={styles.datePickerIcon}>📅</Text>
+                </TouchableOpacity>
+                {taskStartDate ? (
+                  <TouchableOpacity style={styles.dateClearBtn} onPress={() => setTaskStartDate('')}>
+                    <Text style={styles.dateClearBtnText}>✕</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <Text style={styles.fieldLabel}>Срок выполнения</Text>
+              <View style={styles.datePickerRow}>
+                <TouchableOpacity style={[styles.datePicker, { flex: 1 }]} onPress={() => setDatePickerTarget('due')}>
+                  <Text style={taskDueDate ? styles.datePickerValue : styles.datePickerPlaceholder}>
+                    {taskDueDate ? isoToDisplayRu(taskDueDate) : 'Не выбран'}
+                  </Text>
+                  <Text style={styles.datePickerIcon}>📅</Text>
+                </TouchableOpacity>
+                {taskDueDate ? (
+                  <TouchableOpacity style={styles.dateClearBtn} onPress={() => setTaskDueDate('')}>
+                    <Text style={styles.dateClearBtnText}>✕</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {file.is_owner && (() => {
+                const accessUsers = (fileAccesses.data ?? []).filter(
+                  (a) => a.access_type !== 'owner' && a.user && !a.is_pending,
+                );
+                return (
+                  <>
+                    <Text style={styles.fieldLabel}>Исполнитель</Text>
+                    <TouchableOpacity
+                      style={styles.radioRow}
+                      onPress={() => setTaskAssigneeUserId(null)}
+                    >
+                      <View style={[styles.radio, taskAssigneeUserId === null && styles.radioActive]} />
+                      <Text style={styles.checkLabel}>Я (владелец)</Text>
+                    </TouchableOpacity>
+                    {accessUsers.map((acc) => {
+                      const userId = acc.user!.id;
+                      const displayName = acc.user!.name ?? acc.user!.email;
+                      return (
+                        <TouchableOpacity
+                          key={acc.id}
+                          style={styles.radioRow}
+                          onPress={() => setTaskAssigneeUserId(userId)}
+                        >
+                          <View style={[styles.radio, taskAssigneeUserId === userId && styles.radioActive]} />
+                          <View>
+                            <Text style={styles.checkLabel}>{displayName}</Text>
+                            {acc.user!.name && <Text style={styles.subLabel}>{acc.user!.email}</Text>}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {accessUsers.length === 0 && (
+                      <Text style={styles.subLabel}>Предоставьте доступ к файлу, чтобы назначить исполнителя.</Text>
+                    )}
+                  </>
+                );
+              })()}
+            </>
+          )}
+          <Button title="Сохранить" onPress={handleSaveTask} loading={updateTask.isPending} style={styles.btn} />
+        </View>
+      )}
+
+      <DatePickerModal
+        visible={datePickerTarget !== null}
+        value={datePickerTarget === 'start' ? taskStartDate : taskDueDate}
+        onConfirm={(iso) => {
+          if (datePickerTarget === 'start') setTaskStartDate(iso);
+          else setTaskDueDate(iso);
+          setDatePickerTarget(null);
+        }}
+        onCancel={() => setDatePickerTarget(null)}
+      />
+
+      {/* Access panel */}
+      {panel === 'access' && (
+        <View style={styles.panel}>
+          <TouchableOpacity onPress={() => setPanel(null)} style={styles.back}>
+            <Text style={styles.backText}>← Назад</Text>
+          </TouchableOpacity>
+          <Text style={styles.panelTitle}>Кто имеет доступ</Text>
+          {fileAccesses.isLoading && <Spinner />}
+          {(fileAccesses.data ?? []).map((acc) => {
+            const displayName = acc.user?.name ?? acc.user?.email ?? 'Неизвестный';
+            const isOwnerEntry = acc.access_type === 'owner';
+            const isPending = acc.is_pending ?? false;
+            return (
+              <View key={acc.id} style={styles.accessRow}>
+                <View style={styles.accessInfo}>
+                  <Text style={styles.checkLabel}>{displayName}</Text>
+                  <View style={styles.accessBadges}>
+                    {isOwnerEntry && <View style={styles.badgeOwner}><Text style={styles.badgeText}>Владелец</Text></View>}
+                    {isPending && <View style={styles.badgePending}><Text style={styles.badgeText}>Ожидает</Text></View>}
+                    {!isOwnerEntry && !isPending && (
+                      <View style={[styles.badgeAccess, acc.can_edit && styles.badgeEdit]}>
+                        <Text style={styles.badgeText}>{acc.can_edit ? 'Редактор' : 'Просмотр'}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                {!isOwnerEntry && acc.contact_id && (
+                  <View style={styles.accessActions}>
+                    {!isPending && (
+                      <TouchableOpacity
+                        style={styles.accessToggle}
+                        onPress={() => updateAccess.mutate({ accessId: acc.id, canEdit: !(acc.can_edit ?? false) })}
+                        disabled={updateAccess.isPending}
+                      >
+                        <Text style={styles.accessToggleText}>{acc.can_edit ? '→ Просмотр' : '→ Редактор'}</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={styles.revokeBtn}
+                      onPress={() => handleRevokeAccess(acc.contact_id!, displayName)}
+                      disabled={revokeAccess.isPending}
+                    >
+                      <Text style={styles.revokeBtnText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+          {(fileAccesses.data ?? []).filter((a) => a.access_type !== 'owner').length === 0 && !fileAccesses.isLoading && (
+            <Text style={styles.emptyText}>Доступ не предоставлен никому кроме вас.</Text>
+          )}
+
+          {/* Grant access section */}
+          {!showingGrant ? (
+            <TouchableOpacity style={styles.grantBtn} onPress={() => setShowingGrant(true)}>
+              <Text style={styles.grantBtnText}>+ Предоставить доступ</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.grantForm}>
+              <Text style={styles.fieldLabel}>Выберите контакт</Text>
+              {(contacts ?? []).map((c) => (
+                <TouchableOpacity key={c.id} style={styles.radioRow} onPress={() => setGrantContactId(c.id)}>
+                  <View style={[styles.radio, grantContactId === c.id && styles.radioActive]} />
+                  <View>
+                    <Text style={styles.checkLabel}>{c.name}</Text>
+                    {c.email && <Text style={styles.subLabel}>{c.email}</Text>}
+                  </View>
+                </TouchableOpacity>
+              ))}
+              {(contacts ?? []).length === 0 && (
+                <Text style={styles.emptyText}>Нет контактов. Добавьте во вкладке «Связи».</Text>
+              )}
+              <View style={styles.switchRow}>
+                <Text style={styles.checkLabel}>Разрешить редактирование</Text>
+                <Switch value={grantCanEdit} onValueChange={setGrantCanEdit} />
+              </View>
+              <View style={styles.grantFormBtns}>
+                <Button
+                  title="Предоставить"
+                  onPress={handleGrantAccess}
+                  loading={shareToContact.isPending}
+                  disabled={!grantContactId}
+                  style={{ flex: 1 }}
+                />
+                <Button title="Отмена" variant="secondary" onPress={() => setShowingGrant(false)} style={{ flex: 1 }} />
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Links list panel */}
+      {panel === 'links-list' && (
+        <View style={styles.panel}>
+          <TouchableOpacity onPress={() => setPanel(null)} style={styles.back}>
+            <Text style={styles.backText}>← Назад</Text>
+          </TouchableOpacity>
+          <Text style={styles.panelTitle}>Публичные ссылки</Text>
 
           {!createdLink ? (
             <>
@@ -620,31 +1031,73 @@ export default function FileDetailScreen() {
             <>
               <Text style={styles.linkUrl} selectable>{createdLink.url}</Text>
               {createdLink.expires_at && (
-                <Text style={styles.subLabel}>
-                  Действует до: {formatDateTime(createdLink.expires_at)}
-                </Text>
+                <Text style={styles.subLabel}>Действует до: {formatDateTime(createdLink.expires_at)}</Text>
               )}
-              <Button
-                title="Поделиться ссылкой"
-                onPress={() => Share.share({ message: createdLink.url })}
-                style={styles.btn}
-              />
-              <Button
-                title="Создать ещё одну"
-                variant="secondary"
-                onPress={() => setCreatedLink(null)}
-                style={styles.btn}
-              />
+              <Button title="Поделиться ссылкой" onPress={() => Share.share({ message: createdLink.url })} style={styles.btn} />
+              <Button title="Создать ещё одну" variant="secondary" onPress={() => setCreatedLink(null)} style={styles.btn} />
+            </>
+          )}
+
+          {fileLinks.isLoading && <Spinner />}
+          {(fileLinks.data ?? []).length > 0 && (
+            <>
+              <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Существующие ссылки</Text>
+              {(fileLinks.data ?? []).map((link) => (
+                <View key={link.id} style={styles.linkCard}>
+                  <View style={styles.linkCardHeader}>
+                    <View style={[
+                      styles.linkStatusBadge,
+                      link.status === 'active' ? styles.linkStatusActive :
+                      link.status === 'expired' ? styles.linkStatusExpired : styles.linkStatusDisabled,
+                    ]}>
+                      <Text style={styles.linkStatusText}>
+                        {link.status === 'active' ? 'Активна' : link.status === 'expired' ? 'Истекла' : 'Откл.'}
+                      </Text>
+                    </View>
+                    {link.status === 'active' && (
+                      <TouchableOpacity
+                        style={styles.linkDisableBtn}
+                        onPress={() => handleDisableLink(link.id)}
+                        disabled={disableFileLink.isPending}
+                      >
+                        <Text style={styles.linkDisableBtnText}>Отключить</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <Text style={styles.linkUrlSmall} selectable numberOfLines={1}>{link.url}</Text>
+                  <TouchableOpacity onPress={() => Share.share({ message: link.url })}>
+                    <Text style={styles.linkCopyText}>📋 Скопировать / поделиться</Text>
+                  </TouchableOpacity>
+                  {link.expires_at && (
+                    <Text style={styles.subLabel}>До: {formatDateTime(link.expires_at)}</Text>
+                  )}
+                </View>
+              ))}
             </>
           )}
         </View>
       )}
 
-      <TouchableOpacity onPress={() => router.back()} style={styles.back}>
-        <Text style={styles.backText}>← Назад</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
+}
+
+function buildFolderTree(folders: SharedFolder[]): Array<{ folder: SharedFolder; depth: number }> {
+  const result: Array<{ folder: SharedFolder; depth: number }> = [];
+  function walk(parentId: string | null, depth: number) {
+    for (const f of folders) {
+      if ((f.parent_id ?? null) === parentId) {
+        result.push({ folder: f, depth });
+        walk(f.id, depth + 1);
+      }
+    }
+  }
+  walk(null, 0);
+  const placed = new Set(result.map((r) => r.folder.id));
+  for (const f of folders) {
+    if (!placed.has(f.id)) result.push({ folder: f, depth: 0 });
+  }
+  return result;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -656,10 +1109,12 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActionBtn({ label, onPress }: { label: string; onPress: () => void }) {
+function ActionItem({ icon, label, onPress, last = false }: { icon: string; label: string; onPress: () => void; last?: boolean }) {
   return (
-    <TouchableOpacity style={styles.actionBtn} onPress={onPress}>
-      <Text style={styles.actionBtnText}>{label}</Text>
+    <TouchableOpacity style={[styles.actionItem, !last && styles.actionItemBorder]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={styles.actionItemIcon}>{icon}</Text>
+      <Text style={styles.actionItemLabel}>{label}</Text>
+      <Text style={styles.actionItemChevron}>›</Text>
     </TouchableOpacity>
   );
 }
@@ -686,13 +1141,14 @@ const styles = StyleSheet.create({
   errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 },
   errorText: { fontSize: 16, color: '#EF4444', fontWeight: '600' },
 
-  // Action grid
-  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  actionBtn: {
-    backgroundColor: '#fff', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14,
-    borderWidth: 1, borderColor: '#E2E8F0',
-  },
-  actionBtnText: { fontSize: 14, color: '#1E293B', fontWeight: '500' },
+  // Action menu (list style)
+  actionMenu: { backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0' },
+  actionMenuDivider: { height: 1, backgroundColor: '#E2E8F0' },
+  actionItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 16, gap: 12, backgroundColor: '#fff' },
+  actionItemBorder: { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  actionItemIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+  actionItemLabel: { flex: 1, fontSize: 15, color: '#1E293B' },
+  actionItemChevron: { fontSize: 20, color: '#CBD5E1' },
 
   // Panels
   panel: { backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12 },
@@ -750,6 +1206,53 @@ const styles = StyleSheet.create({
   // Created link
   linkUrl: { fontSize: 13, color: '#2563EB', backgroundColor: '#EFF6FF', borderRadius: 8, padding: 12, lineHeight: 20 },
 
+  // Date picker trigger
+  datePickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dateClearBtn: { width: 36, height: 46, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2', borderRadius: 10 },
+  dateClearBtnText: { fontSize: 16, color: '#EF4444', fontWeight: '600' },
+  datePicker: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#F1F5F9', borderRadius: 10, paddingHorizontal: 14,
+    paddingVertical: 12, borderWidth: 1, borderColor: '#E2E8F0',
+  },
+  datePickerValue: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
+  datePickerPlaceholder: { fontSize: 15, color: '#94A3B8' },
+  datePickerIcon: { fontSize: 18 },
+
+  // Grant access
+  grantBtn: { marginTop: 8, paddingVertical: 12, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  grantBtnText: { fontSize: 14, color: '#2563EB', fontWeight: '600' },
+  grantForm: { gap: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, marginTop: 4 },
+  grantFormBtns: { flexDirection: 'row', gap: 8 },
+
+  // Access management
+  accessRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, gap: 8 },
+  accessInfo: { flex: 1, gap: 4 },
+  accessBadges: { flexDirection: 'row', gap: 6 },
+  badgeOwner: { backgroundColor: '#D1FAE5', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  badgePending: { backgroundColor: '#FEF3C7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  badgeAccess: { backgroundColor: '#F1F5F9', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  badgeEdit: { backgroundColor: '#EFF6FF' },
+  badgeText: { fontSize: 12, color: '#374151', fontWeight: '500' },
+  accessActions: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  accessToggle: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
+  accessToggleText: { fontSize: 12, color: '#475569' },
+  revokeBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  revokeBtnText: { fontSize: 14, color: '#EF4444', fontWeight: '700' },
+
+  // Links management
+  linkCard: { backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, gap: 6, borderWidth: 1, borderColor: '#E2E8F0' },
+  linkCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  linkStatusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  linkStatusActive: { backgroundColor: '#D1FAE5' },
+  linkStatusExpired: { backgroundColor: '#FEF3C7' },
+  linkStatusDisabled: { backgroundColor: '#F1F5F9' },
+  linkStatusText: { fontSize: 12, color: '#374151', fontWeight: '600' },
+  linkDisableBtn: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#fff' },
+  linkDisableBtnText: { fontSize: 12, color: '#EF4444' },
+  linkUrlSmall: { fontSize: 12, color: '#2563EB' },
+  linkCopyText: { fontSize: 13, color: '#2563EB' },
+
   // Document actions
   docActions: { flexDirection: 'row', gap: 10 },
   docBtn: {
@@ -763,4 +1266,25 @@ const styles = StyleSheet.create({
   // Delete
   deleteBtn: { paddingVertical: 14, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#FCA5A5', backgroundColor: '#FFF5F5' },
   deleteBtnText: { fontSize: 15, color: '#EF4444', fontWeight: '500' },
+
+  // Movie hero
+  movieHero: { flexDirection: 'row', gap: 14, padding: 16, backgroundColor: '#fff' },
+  moviePoster: { width: 100, height: 150, borderRadius: 8, backgroundColor: '#E2E8F0', flexShrink: 0 },
+  moviePosterPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  moviePosterEmoji: { fontSize: 36 },
+  movieMeta: { flex: 1, gap: 6, justifyContent: 'center' },
+  movieTitle: { fontSize: 18, fontWeight: '700', color: '#1E293B', lineHeight: 24 },
+  movieRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  movieYear: { fontSize: 14, color: '#64748B' },
+  movieRating: { fontSize: 14, color: '#F59E0B', fontWeight: '600' },
+  movieDirector: { fontSize: 13, color: '#94A3B8' },
+  movieGenres: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  genreTag: { backgroundColor: '#F1F5F9', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2 },
+  genreTagText: { fontSize: 11, color: '#475569' },
+  movieDescription: { padding: 16, paddingTop: 0, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  movieDescriptionText: { fontSize: 14, color: '#475569', lineHeight: 20 },
+  kpBtn: { marginHorizontal: 16, marginTop: 12, paddingVertical: 12, backgroundColor: '#FF6600', borderRadius: 10, alignItems: 'center' },
+  kpBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  movieFavoriteRow: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#fff' },
+  movieFavoriteBtn: { paddingVertical: 6 },
 });

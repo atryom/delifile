@@ -48,6 +48,7 @@ class File extends Model
         'task_assigned_user_id',
         'task_start_date',
         'task_due_date',
+        'custom_metadata',
     ];
 
     protected function casts(): array
@@ -65,6 +66,7 @@ class File extends Model
             'is_task'            => 'boolean',
             'task_start_date'    => 'datetime',
             'task_due_date'      => 'datetime',
+            'custom_metadata'    => 'array',
         ];
     }
 

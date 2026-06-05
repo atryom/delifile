@@ -1,7 +1,8 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { router } from 'expo-router';
+import { useAuthStore } from '@/store/auth';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.delifile.com/api/v1';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://delifile.ru/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -9,8 +10,8 @@ export const apiClient = axios.create({
   timeout: 15000,
 });
 
-apiClient.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync('auth_token');
+apiClient.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -21,7 +22,11 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await SecureStore.deleteItemAsync('auth_token');
+      const { token, clearAuth } = useAuthStore.getState();
+      if (token) {
+        await clearAuth();
+        router.replace('/(auth)/login');
+      }
     }
     return Promise.reject(error);
   }
