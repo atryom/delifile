@@ -54,7 +54,7 @@ import { MovieMetadata } from '../../../../shared/models/api.models';
                       @if (movie.year) { <span>{{ movie.year }}</span> }
                       @if (movie.rating_kp) { <span class="result-rating">★ {{ movie.rating_kp }}</span> }
                     </div>
-                    @if (movie.genres?.length) {
+                    @if (movie.genres && movie.genres.length) {
                       <div class="result-genres">{{ movie.genres.slice(0, 3).join(', ') }}</div>
                     }
                   </div>

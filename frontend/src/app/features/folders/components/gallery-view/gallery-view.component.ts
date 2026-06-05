@@ -67,7 +67,7 @@ import { SharedFolderFileItem } from '../../../../shared/models/api.models';
     <!-- Lightbox -->
     @if (lightboxOpen()) {
       <div class="lightbox-backdrop" role="dialog" aria-modal="true"
-           [attr.aria-label]="currentFile()?.display_name ?? currentFile()?.original_name ?? 'Просмотр'"
+           aria-label="Просмотр медиафайла"
            (click)="close()">
         <div class="lightbox-content" (click)="$event.stopPropagation()">
           <button type="button" class="lightbox-close" (click)="close()" aria-label="Закрыть">✕</button>
