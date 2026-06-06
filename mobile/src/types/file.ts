@@ -48,6 +48,9 @@ export interface FileListItem {
   link_image_url?: string | null;
   link_site_name?: string | null;
   custom_metadata?: MovieMetadata | null;
+  likes_count?: number;
+  is_liked?: boolean;
+  comments_count?: number;
 }
 
 // Карточка файла — расширенная версия

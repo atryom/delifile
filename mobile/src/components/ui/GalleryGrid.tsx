@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Dimensions, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { FileListItem } from '@/types';
@@ -42,7 +42,6 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
     }
 
     options.push({ text: 'Отмена', style: 'cancel' });
-
     Alert.alert(name, undefined, options);
   }
 
@@ -59,7 +58,7 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
             onPress={() => setViewerIndex(index)}
             onLongPress={() => handleLongPress(item)}
             delayLongPress={500}
-            android_ripple={{ color: 'rgba(0,0,0,0.1)', borderless: false }}
+            android_ripple={{ color: 'rgba(0,0,0,0.2)', borderless: false }}
           >
             <Image
               source={{ uri: item.preview_url ?? undefined }}
@@ -68,9 +67,25 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
               transition={150}
               placeholderContentFit="cover"
             />
+
+            {/* Video badge */}
             {item.mime_type?.startsWith('video/') && (
-              <View style={styles.videoOverlay}>
-                <View style={styles.playIcon} />
+              <View style={styles.videoBadge}>
+                <View style={styles.playTriangle} />
+              </View>
+            )}
+
+            {/* Stats overlay: likes + comments */}
+            {((item.likes_count ?? 0) > 0 || (item.comments_count ?? 0) > 0) && (
+              <View style={styles.statsOverlay}>
+                <View style={styles.stat}>
+                  <Text style={styles.statText}>♥ {item.likes_count ?? 0}</Text>
+                </View>
+                {(item.comments_count ?? 0) > 0 && (
+                  <View style={styles.stat}>
+                    <Text style={styles.statText}>💬 {item.comments_count ?? 0}</Text>
+                  </View>
+                )}
               </View>
             )}
           </Pressable>
@@ -89,31 +104,52 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  grid: { padding: GAP },
+  container: { flex: 1, backgroundColor: '#000' },
+  grid: { paddingBottom: 8 },
   cell: {
     width: CELL_SIZE,
     height: CELL_SIZE,
     margin: GAP / 2,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#111',
     overflow: 'hidden',
   },
   thumbnail: { width: '100%', height: '100%' },
-  videoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
+
+  videoBadge: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
   },
-  playIcon: {
+  playTriangle: {
     width: 0,
     height: 0,
-    borderTopWidth: 10,
-    borderBottomWidth: 10,
-    borderLeftWidth: 18,
+    borderTopWidth: 7,
+    borderBottomWidth: 7,
+    borderLeftWidth: 12,
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
     borderLeftColor: 'rgba(255,255,255,0.9)',
-    marginLeft: 4,
+  },
+
+  statsOverlay: {
+    position: 'absolute',
+    bottom: 5,
+    left: 5,
+    right: 5,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  stat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  statText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });

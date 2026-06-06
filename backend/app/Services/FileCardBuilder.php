@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AccessType;
 use App\Enums\FileStatus;
 use App\Models\File;
+use App\Models\FileLike;
 use App\Models\FileUserAccess;
 use App\Models\FileVersion;
 use App\Models\User;
@@ -121,6 +122,12 @@ class FileCardBuilder
             'is_task'        => (bool) $file->is_task,
             'task_status'    => $file->task_status,
         ];
+
+        $owner = $file->relationLoaded('owner') ? $file->owner : null;
+        $item['owner']          = $owner ? ['id' => $owner->id, 'name' => $owner->name, 'email' => $owner->email] : null;
+        $item['likes_count']    = (int) ($file->getAttribute('likes_count_cached') ?? FileLike::where('file_id', $file->id)->count());
+        $item['is_liked']       = (bool) ($file->getAttribute('is_liked_cached') ?? ($user ? FileLike::where('file_id', $file->id)->where('user_id', $user->id)->exists() : false));
+        $item['comments_count'] = (int) ($file->getAttribute('comments_count_cached') ?? 0);
 
         if ($inSharedFolderContext) {
             $item['added_by']           = $addedBy;

@@ -364,6 +364,11 @@ export interface SharedFolderFileItem {
   is_private?: boolean;
   is_task?: boolean;
   task_status?: TaskStatus | null;
+  custom_metadata?: MovieMetadata | null;
+  owner?: { id: number; name: string | null; email: string } | null;
+  likes_count?: number;
+  is_liked?: boolean;
+  comments_count?: number;
 }
 
 // ─── Invitation Models ───────────────────────────────────────────────────────

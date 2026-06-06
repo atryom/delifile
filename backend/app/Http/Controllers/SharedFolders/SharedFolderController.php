@@ -9,6 +9,7 @@ use App\Enums\ShareLinkStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Contact;
 use App\Models\File;
+use App\Models\FileLike;
 use App\Models\FileUserAccess;
 use App\Models\PendingReceivedSharedFolder;
 use App\Models\SharedFolder;
@@ -582,10 +583,41 @@ class SharedFolderController extends Controller
 
         $total = $baseQuery->count();
 
-        $sharedFiles = $baseQuery->with('file')
+        $sharedFiles = $baseQuery->with(['file', 'file.owner'])
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
+
+        // Batch-load likes and comment counts to avoid N+1 queries
+        $fileIds = $sharedFiles->pluck('file.id')->filter()->all();
+        if (!empty($fileIds)) {
+            $likeCounts = FileLike::whereIn('file_id', $fileIds)
+                ->selectRaw('file_id, COUNT(*) as cnt')
+                ->groupBy('file_id')
+                ->pluck('cnt', 'file_id')
+                ->all();
+            $likedSet = FileLike::where('user_id', $user->id)
+                ->whereIn('file_id', $fileIds)
+                ->pluck('file_id')
+                ->flip()
+                ->all();
+            $commentCounts = DB::table('comment_threads')
+                ->where('target_type', 'file')
+                ->whereIn('target_id', $fileIds)
+                ->where('scope', 'shared')
+                ->select('target_id', DB::raw('SUM(comments_count) as cnt'))
+                ->groupBy('target_id')
+                ->pluck('cnt', 'target_id')
+                ->all();
+
+            foreach ($sharedFiles as $sf) {
+                if ($sf->file) {
+                    $sf->file->setAttribute('likes_count_cached',    $likeCounts[$sf->file->id] ?? 0);
+                    $sf->file->setAttribute('is_liked_cached',       isset($likedSet[$sf->file->id]));
+                    $sf->file->setAttribute('comments_count_cached', $commentCounts[$sf->file->id] ?? 0);
+                }
+            }
+        }
 
         $items = $sharedFiles
             ->filter(fn (SharedFolderFile $sf) => $sf->file !== null)

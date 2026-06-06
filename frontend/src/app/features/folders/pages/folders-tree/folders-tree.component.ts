@@ -164,6 +164,10 @@ export class FoldersTreeComponent implements OnInit {
     );
   });
   readonly currentFolderType = computed<FolderType>(() => this.currentFolder()?.folder_type ?? 'default');
+  readonly canEditCurrentFolder = computed(() => {
+    const f = this.currentFolder();
+    return f ? (f.is_owner || f.my_access_type === 'edit') : false;
+  });
 
   // ── Create folder ─────────────────────────────────────────────────────────
   readonly creating = signal(false);

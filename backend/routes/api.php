@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\SupportAdminController;
 use App\Http\Controllers\Admin\SuggestionAdminController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Files\FileController;
+use App\Http\Controllers\Files\FileLikeController;
 use App\Http\Controllers\Files\FileVersionController;
 use App\Http\Controllers\Files\MovieController;
 use App\Http\Controllers\Files\SharingController;
@@ -122,6 +123,8 @@ Route::prefix('v1')->group(function () {
         Route::post('files/{id}/unpin',            [FileController::class, 'unpin']);
         Route::post('files/{id}/favorite',         [FileController::class, 'favorite']);
         Route::post('files/{id}/unfavorite',       [FileController::class, 'unfavorite']);
+        Route::post('files/{id}/like',             [FileLikeController::class, 'store']);
+        Route::delete('files/{id}/like',           [FileLikeController::class, 'destroy']);
         Route::post('files/{id}/move-folder',      [FileController::class, 'moveFolder']);
         Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
         Route::patch('files/{id}/description',     [FileController::class, 'updateDescription']);

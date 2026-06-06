@@ -1,0 +1,268 @@
+<!-- ── Gallery grid ──────────────────────────────────────────────────────── -->
+<div class="gallery-grid" role="list">
+  @for (file of mediaFiles(); track file.id; let i = $index) {
+    <button
+      type="button"
+      class="gallery-cell"
+      role="listitem"
+      (click)="open(i)"
+      [attr.aria-label]="'Открыть ' + (file.display_name ?? file.original_name)"
+    >
+      @if (file.preview_url) {
+        <img
+          [src]="file.preview_url"
+          [alt]="file.display_name ?? file.original_name"
+          class="gallery-thumb"
+          loading="lazy"
+        />
+      } @else {
+        <div class="gallery-placeholder" aria-hidden="true">
+          @if (isVideo(file)) { ▶ } @else { ◻ }
+        </div>
+      }
+
+      @if (isVideo(file)) {
+        <div class="gallery-video-badge" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+            <polygon points="5,3 19,12 5,21"/>
+          </svg>
+        </div>
+      }
+
+      <!-- Hover overlay: likes + comments -->
+      <div class="gallery-hover-overlay" aria-hidden="true">
+        <span class="gallery-stat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          {{ getLikeCount(file.id) }}
+        </span>
+        <span class="gallery-stat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          {{ getCommentsCount(file.id) }}
+        </span>
+      </div>
+    </button>
+  }
+
+  @if (mediaFiles().length === 0) {
+    <div class="gallery-empty">
+      <p>В галерее нет фото и видео</p>
+    </div>
+  }
+</div>
+
+<!-- ── Lightbox ──────────────────────────────────────────────────────────── -->
+@if (lightboxOpen() && currentFile()) {
+  <div
+    class="lightbox-backdrop"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Просмотр фото"
+    (click)="close()"
+  >
+    <div class="lightbox-post" (click)="$event.stopPropagation()">
+
+      <!-- Left: media -->
+      <div class="lightbox-media-panel">
+        <button
+          type="button"
+          class="lb-nav lb-nav-prev"
+          (click)="prev()"
+          [disabled]="lightboxIndex() === 0"
+          aria-label="Предыдущее"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" aria-hidden="true">
+            <polyline points="15,18 9,12 15,6"/>
+          </svg>
+        </button>
+
+        <div class="lightbox-media">
+          @if (isVideo(currentFile()!)) {
+            @if (currentFile()!.view_url) {
+              <video
+                [src]="currentFile()!.view_url!"
+                class="lb-video"
+                controls
+                autoplay
+                (click)="$event.stopPropagation()"
+              ></video>
+            } @else {
+              <div class="lb-unavailable">Видео недоступно</div>
+            }
+          } @else {
+            <img
+              [src]="currentFile()!.view_url ?? currentFile()!.preview_url ?? ''"
+              [alt]="currentFile()!.display_name || currentFile()!.original_name"
+              class="lb-image"
+            />
+          }
+        </div>
+
+        <button
+          type="button"
+          class="lb-nav lb-nav-next"
+          (click)="next()"
+          [disabled]="lightboxIndex() === mediaFiles().length - 1"
+          aria-label="Следующее"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" aria-hidden="true">
+            <polyline points="9,18 15,12 9,6"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Right: info panel -->
+      <div class="lightbox-info-panel">
+
+        <!-- Header -->
+        <header class="lb-header">
+          <div class="lb-avatar" aria-hidden="true">{{ getUserInitial() }}</div>
+          <span class="lb-username">{{ getUserDisplayName() }}</span>
+          <div class="lb-header-btns">
+            @if (canEdit()) {
+              <button
+                type="button"
+                class="lb-icon-btn lb-icon-btn--danger"
+                title="Убрать из папки"
+                aria-label="Убрать из папки"
+                (click)="removeFile.emit(currentFile()!.id)"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6"/><path d="M14 11v6"/>
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+              </button>
+            }
+            <button
+              type="button"
+              class="lb-icon-btn"
+              title="Детали файла"
+              aria-label="Детали файла"
+              (click)="viewFile.emit(currentFile()!)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="lb-close-btn"
+              (click)="close()"
+              aria-label="Закрыть"
+            >✕</button>
+          </div>
+        </header>
+
+        <!-- Comments scroll area -->
+        <div class="lb-scroll-area">
+          <!-- Caption -->
+          @if (currentFile()!.display_name && currentFile()!.display_name !== currentFile()!.original_name) {
+            <div class="lb-caption">
+              <span class="lb-caption-author">{{ getUserDisplayName() }}</span>
+              {{ currentFile()!.display_name }}
+            </div>
+          }
+
+          <!-- Time -->
+          <p class="lb-upload-time">{{ currentFile()!.uploaded_at | date:'d MMMM yyyy':'':'ru' }}</p>
+
+          <hr class="lb-divider" aria-hidden="true" />
+
+          <!-- Comments -->
+          <div class="lb-comments-list">
+            @if (commentsLoading()) {
+              <p class="lb-status-text">Загрузка комментариев...</p>
+            } @else if (comments().length === 0) {
+              <p class="lb-status-text">Комментариев пока нет</p>
+            } @else {
+              @for (comment of comments(); track comment.id) {
+                <div class="lb-comment">
+                  <div class="lb-comment-avatar" aria-hidden="true">{{ getCommentInitial(comment) }}</div>
+                  <div class="lb-comment-body">
+                    <span class="lb-comment-author">{{ getCommentAuthorName(comment) }}</span>
+                    <span class="lb-comment-text">{{ comment.is_deleted ? '[удалён]' : comment.body }}</span>
+                    <span class="lb-comment-time">{{ comment.created_at | date:'d MMM':'':'ru' }}</span>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+          <div #commentsEnd></div>
+        </div>
+
+        <!-- Footer: actions + likes + comment input -->
+        <footer class="lb-footer">
+          <div class="lb-actions-row">
+            <button
+              type="button"
+              class="lb-action-btn"
+              [class.lb-action-btn--liked]="isLiked(currentFile()!.id)"
+              [disabled]="likeLoading()"
+              (click)="toggleLike()"
+              [attr.aria-label]="isLiked(currentFile()!.id) ? 'Убрать лайк' : 'Поставить лайк'"
+            >
+              @if (isLiked(currentFile()!.id)) {
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="#ed4956" stroke="#ed4956" stroke-width="1.5" aria-hidden="true">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+              } @else {
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+              }
+            </button>
+            <button
+              type="button"
+              class="lb-action-btn"
+              (click)="focusCommentInput()"
+              aria-label="Оставить комментарий"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+          </div>
+
+          @if (getLikeCount(currentFile()!.id) > 0) {
+            <p class="lb-likes-count">
+              <strong>{{ getLikeCount(currentFile()!.id) }}</strong>
+              {{ getLikeCount(currentFile()!.id) === 1 ? 'лайк' : 'лайков' }}
+            </p>
+          }
+
+          @if (canWriteComments()) {
+            <div class="lb-comment-form">
+              <textarea
+                #commentInputEl
+                class="lb-comment-input"
+                placeholder="Добавить комментарий..."
+                [value]="commentInput()"
+                (input)="commentInput.set($any($event.target).value)"
+                rows="1"
+                (keydown.enter)="onCommentEnter($event)"
+                aria-label="Ввод комментария"
+              ></textarea>
+              <button
+                type="button"
+                class="lb-send-btn"
+                (click)="submitComment()"
+                [disabled]="!commentInput().trim() || commentSubmitting()"
+                aria-label="Отправить"
+              >
+                Опубликовать
+              </button>
+            </div>
+          }
+        </footer>
+
+      </div>
+    </div>
+  </div>
+}

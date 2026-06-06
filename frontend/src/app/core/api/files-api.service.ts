@@ -108,6 +108,14 @@ export class FilesApiService {
     return this.api.post(`/files/${id}/unfavorite`);
   }
 
+  likeFile(id: string): Observable<ApiResponse<{ likes_count: number; is_liked: boolean }>> {
+    return this.api.post(`/files/${id}/like`);
+  }
+
+  unlikeFile(id: string): Observable<ApiResponse<{ likes_count: number; is_liked: boolean }>> {
+    return this.api.delete(`/files/${id}/like`);
+  }
+
   moveFolder(id: string, folderId: string | null): Observable<ApiResponse<Record<string, never>>> {
     return this.api.post(`/files/${id}/move-folder`, { folder_id: folderId });
   }

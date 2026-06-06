@@ -691,6 +691,8 @@
     @if (!isLoading() && currentFolderType() === 'gallery') {
       <app-gallery-view
         [files]="$any(files())"
+        [contextFolderId]="currentSharedFolderId()"
+        [canEdit]="canEditCurrentFolder()"
         (removeFile)="removeFileFromGallery($event)"
         (viewFile)="openFileDetail($any($event))"
       />
