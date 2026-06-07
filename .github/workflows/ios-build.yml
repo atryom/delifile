@@ -29,6 +29,19 @@ jobs:
       - name: Unlock login keychain
         run: security unlock-keychain -p "${{ secrets.MAC_KEYCHAIN_PASSWORD }}" "$HOME/Library/Keychains/login.keychain-db"
 
+      - name: Install Apple WWDR certificates
+        run: |
+          # Без WWDR intermediate-сертификата цепочка доверия сломана и find-identity -v возвращает пусто
+          for CERT in AppleWWDRCAG4.cer AppleWWDRCAG5.cer AppleWWDRCAG6.cer; do
+            curl -fsSL -o /tmp/$CERT "https://www.apple.com/certificateauthority/$CERT" && \
+              security import /tmp/$CERT -k ~/Library/Keychains/login.keychain-db 2>&1 | grep -v "already exists" || true
+            rm -f /tmp/$CERT
+          done
+          echo "=== Valid code signing identities (должно быть не пусто если WWDR в порядке) ==="
+          security find-identity -v -p codesigning || true
+          echo "=== WWDR certs in login keychain ==="
+          security find-certificate -a -c "Apple Worldwide Developer Relations" ~/Library/Keychains/login.keychain-db 2>&1 | grep "labl" || echo "(none)"
+
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
         id: build
