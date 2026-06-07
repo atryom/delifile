@@ -26,6 +26,9 @@ jobs:
         working-directory: mobile
         run: npm ci && npm install -g eas-cli
 
+      - name: Unlock login keychain
+        run: security unlock-keychain -p "${{ secrets.MAC_KEYCHAIN_PASSWORD }}" "$HOME/Library/Keychains/login.keychain-db"
+
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
         id: build
