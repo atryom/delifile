@@ -8,7 +8,7 @@ export default function NotFoundScreen() {
       <View style={styles.container}>
         <Text style={styles.code}>404</Text>
         <Text style={styles.title}>Страница не найдена</Text>
-        <Text style={styles.subtitle}>Запрошенный адрес не существует.</Text>
+        <Text style={styles.subtitle}>Запрошенный адрес не существует</Text>
         <TouchableOpacity style={styles.btn} onPress={() => router.replace('/(app)/files')}>
           <Text style={styles.btnText}>На главную</Text>
         </TouchableOpacity>
