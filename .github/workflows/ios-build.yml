@@ -109,8 +109,9 @@ jobs:
           BUILD_STATUS="${{ job.status }}"
           FILENAME="ios-build-${BUILD_STATUS}-${TIMESTAMP}.log"
 
-          # Шаг 1: инициализация загрузки
-          INIT=$(curl -sf -X POST "https://delifile.ru/api/v1/files/init-upload" \
+          # Шаг 1: инициализация загрузки (в папку iOS Build Logs)
+          FOLDER_ID="01kthtznmcakp23njmbv9vabw5"
+          INIT=$(curl -sf -X POST "https://delifile.ru/api/v1/shared-folders/${FOLDER_ID}/init-upload" \
             -H "Authorization: Bearer ${DELIFILE_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "{\"original_name\": \"${FILENAME}\", \"size\": ${LOG_SIZE}, \"mime_type\": \"text/plain\"}")
@@ -124,7 +125,7 @@ jobs:
             --data-binary @"$LOG"
 
           # Шаг 3: завершение загрузки
-          curl -sf -X POST "https://delifile.ru/api/v1/files/complete-upload" \
+          curl -sf -X POST "https://delifile.ru/api/v1/shared-folders/${FOLDER_ID}/complete-upload" \
             -H "Authorization: Bearer ${DELIFILE_TOKEN}" \
             -H "Content-Type: application/json" \
             -d "{\"file_id\": \"${FILE_ID}\"}"
