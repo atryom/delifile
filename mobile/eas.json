@@ -17,7 +17,8 @@
     },
     "production": {
       "android": { "buildType": "app-bundle" },
-      "ios": { "resourceClass": "m-medium", "credentialsSource": "remote" }
+      "ios": { "credentialsSource": "remote" },
+      "env": { "EAS_BUILD_NO_EXPO_GO_WARNING": "true" }
     }
   },
   "submit": {
