@@ -43,6 +43,7 @@ jobs:
           echo "ipa_path=${IPA}" >> "$GITHUB_OUTPUT"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_BUILD_NO_EXPO_GO_WARNING: true
 
       - name: Submit to TestFlight
         if: success()
