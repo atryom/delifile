@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: mobile
-        run: npm ci
+        run: npm ci && npm install -g eas-cli
 
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
