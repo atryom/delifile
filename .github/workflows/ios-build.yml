@@ -49,6 +49,19 @@ jobs:
           echo "Patched $COUNT file(s)"
           [ "$COUNT" -eq 0 ] && echo "No keychain.js in cache yet" || true
 
+      - name: Set iOS build number
+        working-directory: mobile
+        run: |
+          python3 -c "
+          import json
+          with open('app.json') as f:
+              cfg = json.load(f)
+          cfg['expo'].setdefault('ios', {})['buildNumber'] = '${{ github.run_number }}'
+          with open('app.json', 'w') as f:
+              json.dump(cfg, f, indent=2, ensure_ascii=False)
+          print('Build number set to: ${{ github.run_number }}')
+          "
+
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
         id: build

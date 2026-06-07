@@ -18,7 +18,6 @@ module.exports = function withShareExtension(config) {
   config = fixResourceBundleSigning(config);
   config = addAppGroupToMainApp(config);
   config = addShareExtensionTarget(config);
-  config = syncShareExtensionVersion(config);
   return config;
 };
 
@@ -83,7 +82,11 @@ function addShareExtensionTarget(config) {
     const alreadyAdded = Object.values(targets).some(
       (t) => t && (t.name === EXTENSION_NAME || t.name === EXTENSION_NAME_QUOTED)
     );
-    if (alreadyAdded) return c;
+    if (alreadyAdded) {
+      // Target exists (local dev): still sync version so it matches the app.
+      patchInfoPlistVersion(path.join(iosRoot, EXTENSION_NAME, 'Info.plist'), c.version);
+      return c;
+    }
 
     // ── Copy files ───────────────────────────────────────────────────────────
     const extDir = path.join(iosRoot, EXTENSION_NAME);
@@ -92,6 +95,11 @@ function addShareExtensionTarget(config) {
       const src = path.join(pluginSrc, f);
       if (fs.existsSync(src)) fs.copyFileSync(src, path.join(extDir, f));
     }
+
+    // ── Sync version immediately after copy ───────────────────────────────────
+    // withDangerousMod runs before withXcodeProject in the mod pipeline (LIFO),
+    // so version sync must happen here, not in a separate withDangerousMod hook.
+    patchInfoPlistVersion(path.join(extDir, 'Info.plist'), c.version);
 
     const mainAppDir = path.join(iosRoot, projectName);
     for (const f of ['ShareIntentModule.swift', 'ShareIntentModule.m']) {
@@ -202,24 +210,13 @@ function addShareExtensionTarget(config) {
   });
 }
 
-// ─── 3. Sync ShareExtension version with main app ────────────────────────────
-// EAS updates ios/DeliFile/Info.plist but not the extension's Info.plist.
-// Mismatched CFBundleShortVersionString causes App Store rejection.
-function syncShareExtensionVersion(config) {
-  return withDangerousMod(config, [
-    'ios',
-    (c) => {
-      const version = c.version;
-      if (!version) return c;
-      const plistPath = path.join(c.modRequest.platformProjectRoot, EXTENSION_NAME, 'Info.plist');
-      if (!fs.existsSync(plistPath)) return c;
-      let plist = fs.readFileSync(plistPath, 'utf8');
-      plist = plist.replace(
-        /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]*(<\/string>)/,
-        `$1${version}$2`
-      );
-      fs.writeFileSync(plistPath, plist);
-      return c;
-    },
-  ]);
+// Updates CFBundleShortVersionString in an Info.plist to match the app version.
+function patchInfoPlistVersion(plistPath, version) {
+  if (!version || !fs.existsSync(plistPath)) return;
+  let plist = fs.readFileSync(plistPath, 'utf8');
+  plist = plist.replace(
+    /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]*(<\/string>)/,
+    `$1${version}$2`
+  );
+  fs.writeFileSync(plistPath, plist);
 }
