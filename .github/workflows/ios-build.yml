@@ -39,34 +39,25 @@ jobs:
 
       - name: Patch EAS keychain.js для macOS 14
         run: |
-          # EAS использует find-identity -v (strict), которая на macOS 14 возвращает 0
-          # даже при успешном импорте. Убираем -v чтобы пройти валидацию.
           KEYCHAIN_JS=$(find ~/.npm/_npx -name "keychain.js" -path "*/ios/credentials/keychain.js" 2>/dev/null | head -1)
-          if [ -z "$KEYCHAIN_JS" ]; then
-            echo "keychain.js не найден в кэше (будет при первом запуске eas)"
-            exit 0
-          fi
-          echo "Патчим: $KEYCHAIN_JS"
-          python3 - "$KEYCHAIN_JS" <<'PYEOF'
+          [ -z "$KEYCHAIN_JS" ] && echo "keychain.js not in cache yet" && exit 0
+          echo "Patching: $KEYCHAIN_JS"
+          python3 -c "
 import sys
 path = sys.argv[1]
-with open(path, 'r') as f:
-    content = f.read()
-original = content
-
-# Убрать -v из find-identity (строгая проверка failing на macOS 14)
-content = content.replace("'find-identity', '-v', '-s'", "'find-identity', '-s'")
-content = content.replace('"find-identity", "-v", "-s"', '"find-identity", "-s"')
-
-if content != original:
-    with open(path, 'w') as f:
-        f.write(content)
-    print("OK: -v убран из find-identity")
+with open(path) as f: c = f.read()
+orig = c
+q = chr(39)
+old = q+'find-identity'+q+', '+q+'-v'+q+', '+q+'-s'+q
+new = q+'find-identity'+q+', '+q+'-s'+q
+c = c.replace(old, new)
+if c != orig:
+    open(path,'w').write(c)
+    print('OK: -v removed from find-identity')
 else:
-    # Показать контекст вокруг find-identity
-    idx = content.find('find-identity')
-    print(f"WARN: паттерн не найден. Контекст: {repr(content[max(0,idx-10):idx+80])}")
-PYEOF
+    i = c.find('find-identity')
+    print('WARN pattern not found, context:', repr(c[max(0,i-5):i+80]))
+" "$KEYCHAIN_JS"
 
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
