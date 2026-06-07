@@ -209,7 +209,7 @@ function syncShareExtensionVersion(config) {
   return withDangerousMod(config, [
     'ios',
     (c) => {
-      const version = c.modRequest.expoConfig.version;
+      const version = c.version;
       if (!version) return c;
       const plistPath = path.join(c.modRequest.platformProjectRoot, EXTENSION_NAME, 'Info.plist');
       if (!fs.existsSync(plistPath)) return c;
