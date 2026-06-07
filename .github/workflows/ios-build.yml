@@ -42,22 +42,9 @@ jobs:
           KEYCHAIN_JS=$(find ~/.npm/_npx -name "keychain.js" -path "*/ios/credentials/keychain.js" 2>/dev/null | head -1)
           [ -z "$KEYCHAIN_JS" ] && echo "keychain.js not in cache yet" && exit 0
           echo "Patching: $KEYCHAIN_JS"
-          python3 -c "
-import sys
-path = sys.argv[1]
-with open(path) as f: c = f.read()
-orig = c
-q = chr(39)
-old = q+'find-identity'+q+', '+q+'-v'+q+', '+q+'-s'+q
-new = q+'find-identity'+q+', '+q+'-s'+q
-c = c.replace(old, new)
-if c != orig:
-    open(path,'w').write(c)
-    print('OK: -v removed from find-identity')
-else:
-    i = c.find('find-identity')
-    print('WARN pattern not found, context:', repr(c[max(0,i-5):i+80]))
-" "$KEYCHAIN_JS"
+          sed -i '' "s/'find-identity', '-v', '-s'/'find-identity', '-s'/g" "$KEYCHAIN_JS" \
+            && echo "OK: -v removed from find-identity" \
+            || echo "WARN: sed failed"
 
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
