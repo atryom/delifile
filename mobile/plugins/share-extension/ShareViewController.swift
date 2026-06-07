@@ -116,7 +116,9 @@ class ShareViewController: UIViewController {
                 try FileManager.default.removeItem(at: destURL)
             }
             try FileManager.default.copyItem(at: tempURL, to: destURL)
+            NSLog("[ShareExtension] copied shared file to App Group container: \(fileName)")
         } catch {
+            NSLog("[ShareExtension] failed to copy shared file: \(error.localizedDescription)")
             DispatchQueue.main.async { self.cancel() }
             return
         }
@@ -146,13 +148,50 @@ class ShareViewController: UIViewController {
         let defaults = UserDefaults(suiteName: appGroupId)
         defaults?.set(data, forKey: "sharedData")
         defaults?.synchronize()
+        NSLog("[ShareExtension] sharedData written (type=\(type))")
 
         openMainApp()
     }
 
     private func openMainApp() {
         guard let url = URL(string: appScheme) else { complete(); return }
-        extensionContext?.open(url) { [weak self] _ in self?.complete() }
+
+        // `extensionContext?.open` is unreliable from a Share Extension on modern
+        // iOS — it frequently fails silently and the host app never opens (the user
+        // sees a flicker and stays in the share sheet). The proven workaround is to
+        // walk the responder chain to the real UIApplication and call openURL:
+        // directly. Give the system a beat first, then complete the request only
+        // after the open attempt so dismissing the extension doesn't cancel it.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self else { return }
+            if self.openURLViaResponderChain(url) {
+                NSLog("[ShareExtension] opened main app via responder chain openURL:")
+                self.complete()
+            } else {
+                NSLog("[ShareExtension] responder chain miss — falling back to extensionContext.open")
+                self.extensionContext?.open(url) { success in
+                    NSLog("[ShareExtension] extensionContext.open success=\(success)")
+                    self.complete()
+                }
+            }
+        }
+    }
+
+    /// Walks the responder chain to the host UIApplication and invokes the
+    /// (deprecated) openURL: selector — the only way to launch the host app from a
+    /// Share Extension, since UIApplication.shared is unavailable in extensions.
+    @discardableResult
+    private func openURLViaResponderChain(_ url: URL) -> Bool {
+        let selector = NSSelectorFromString("openURL:")
+        var responder: UIResponder? = self
+        while let r = responder {
+            if let app = r as? UIApplication, app.responds(to: selector) {
+                app.perform(selector, with: url)
+                return true
+            }
+            responder = r.next
+        }
+        return false
     }
 
     private func complete() {
