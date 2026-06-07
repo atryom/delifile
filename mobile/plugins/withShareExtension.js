@@ -18,6 +18,7 @@ module.exports = function withShareExtension(config) {
   config = fixResourceBundleSigning(config);
   config = addAppGroupToMainApp(config);
   config = addShareExtensionTarget(config);
+  config = syncShareExtensionVersion(config);
   return config;
 };
 
@@ -199,4 +200,26 @@ function addShareExtensionTarget(config) {
 
     return c;
   });
+}
+
+// ─── 3. Sync ShareExtension version with main app ────────────────────────────
+// EAS updates ios/DeliFile/Info.plist but not the extension's Info.plist.
+// Mismatched CFBundleShortVersionString causes App Store rejection.
+function syncShareExtensionVersion(config) {
+  return withDangerousMod(config, [
+    'ios',
+    (c) => {
+      const version = c.modRequest.expoConfig.version;
+      if (!version) return c;
+      const plistPath = path.join(c.modRequest.platformProjectRoot, EXTENSION_NAME, 'Info.plist');
+      if (!fs.existsSync(plistPath)) return c;
+      let plist = fs.readFileSync(plistPath, 'utf8');
+      plist = plist.replace(
+        /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]*(<\/string>)/,
+        `$1${version}$2`
+      );
+      fs.writeFileSync(plistPath, plist);
+      return c;
+    },
+  ]);
 }
