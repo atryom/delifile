@@ -39,12 +39,15 @@ jobs:
 
       - name: Patch EAS keychain.js для macOS 14
         run: |
-          KEYCHAIN_JS=$(find ~/.npm/_npx -name "keychain.js" -path "*/ios/credentials/keychain.js" 2>/dev/null | head -1)
-          [ -z "$KEYCHAIN_JS" ] && echo "keychain.js not in cache yet" && exit 0
-          echo "Patching: $KEYCHAIN_JS"
-          sed -i '' "s/'find-identity', '-v', '-s'/'find-identity', '-s'/g" "$KEYCHAIN_JS" \
-            && echo "OK: -v removed from find-identity" \
-            || echo "WARN: sed failed"
+          COUNT=0
+          while IFS= read -r KEYCHAIN_JS; do
+            sed -i '' "s/'find-identity', '-v', '-s'/'find-identity', '-s'/g" "$KEYCHAIN_JS" \
+              && echo "OK: $KEYCHAIN_JS" \
+              || echo "WARN: $KEYCHAIN_JS"
+            COUNT=$((COUNT+1))
+          done < <(find ~/.npm/_npx -name "keychain.js" -path "*/ios/credentials/keychain.js" 2>/dev/null)
+          echo "Patched $COUNT file(s)"
+          [ "$COUNT" -eq 0 ] && echo "No keychain.js in cache yet" || true
 
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
