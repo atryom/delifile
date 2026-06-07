@@ -27,9 +27,10 @@ export default function ShareScreen() {
 
     mod.getSharedData().then(async (data: any) => {
       if (!data) { router.back(); return; }
-      mod.clearSharedData().catch(() => {});
 
       if (data.type === 'text') {
+        // Text/URL is already in memory — safe to clear the shared payload now.
+        mod.clearSharedData().catch(() => {});
         const text: string = data.text ?? '';
         const isUrl = text.startsWith('http://') || text.startsWith('https://');
         if (isUrl) {
@@ -46,8 +47,12 @@ export default function ShareScreen() {
       } else if (data.type === 'file') {
         // Android: data.fileName  |  iOS extension: data.name (both stored by ShareViewController)
         const fileName = data.fileName ?? data.name ?? 'file';
+        // NOTE: do NOT clear shared data here. On iOS clearSharedData() also wipes
+        // the file from the App Group container, and handleFile reads it from there.
+        // handleFile clears only after it has secured a local cache copy.
         await handleFile(data.uri, fileName, data.mimeType ?? 'application/octet-stream');
       } else {
+        mod.clearSharedData().catch(() => {});
         router.back();
       }
     }).catch(() => {
@@ -76,20 +81,26 @@ export default function ShareScreen() {
   async function handleFile(uri: string, name: string, mimeType: string) {
     setPhase({ kind: 'uploading', name, progress: 0 });
 
-    // content:// URIs from Android share intent cannot be used directly by
-    // FileSystem.createUploadTask — copy to app cache first to get a file:// URI
+    // Always copy the shared source into the app cache first to obtain a stable
+    // file:// copy we fully control, THEN clear the shared payload. This is
+    // required on iOS, where the source lives in the App Group container and
+    // clearSharedData() also wipes that container — reading it directly races
+    // with the cleanup and aborts the upload. content:// (Android) likewise needs
+    // a file:// copy because FileSystem.createUploadTask can't read content://.
     let localUri = uri;
     let cacheUri: string | null = null;
-    if (uri.startsWith('content://')) {
-      try {
-        cacheUri = (FileSystem.cacheDirectory ?? '') + name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        await FileSystem.copyAsync({ from: uri, to: cacheUri });
-        localUri = cacheUri;
-      } catch {
-        setPhase({ kind: 'error', message: 'Не удалось прочитать файл. Возможно, приложение не имеет к нему доступа.' });
-        return;
-      }
+    try {
+      cacheUri = (FileSystem.cacheDirectory ?? '') + name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      await FileSystem.copyAsync({ from: uri, to: cacheUri });
+      localUri = cacheUri;
+    } catch {
+      NativeModules.ShareIntent?.clearSharedData?.().catch(() => {});
+      setPhase({ kind: 'error', message: 'Не удалось прочитать файл. Возможно, приложение не имеет к нему доступа.' });
+      return;
     }
+
+    // Local copy secured — now safe to clear the shared payload / App Group file.
+    NativeModules.ShareIntent?.clearSharedData?.().catch(() => {});
 
     let size = 0;
     try {

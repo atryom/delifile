@@ -131,7 +131,10 @@ html,body{height:100%;background:#fff;color:#1e293b;font-family:-apple-system,Bl
     tb.style.display='block';
   }
 
+  var _initialized=false;
   function initEditor(content,readOnly){
+    if(_initialized) return;
+    _initialized=true;
     var T=window.TipTap;
     editor=new T.Editor({
       element:document.getElementById('editor'),
@@ -156,6 +159,11 @@ html,body{height:100%;background:#fff;color:#1e293b;font-family:-apple-system,Bl
     if(!readOnly) buildToolbar();
     post({type:'ready'});
   }
+
+  // Exposed for direct invocation via injectJavaScript from native onLoadEnd.
+  // This path does not depend on window.ReactNativeWebView or postMessage working,
+  // which is required on iOS where the bridge is unavailable on file:// origins.
+  window._editorInit=function(content,readOnly){initEditor(content,readOnly||false);};
 
   // With adjustResize the OS already shrinks the viewport when keyboard opens.
   // Toolbar stays at bottom:0; just ensure content scrolls above it.

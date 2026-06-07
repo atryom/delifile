@@ -271,11 +271,21 @@ class SharedFolderFileController extends Controller
             ->where('file_id', $fileId)
             ->delete();
 
-        // Resolve orphan: if this was the last shared folder, reset shared_folder_only
+        // Resolve orphan: a shared_folder_only file lives ONLY inside shared folders.
         if ($file->shared_folder_only) {
             $remainingCount = SharedFolderFile::where('file_id', $fileId)->count();
             if ($remainingCount === 0) {
-                $file->update(['shared_folder_only' => false]);
+                if ($isFileOwner) {
+                    // The owner removed it from its last folder — delete it outright.
+                    // Previously we reset shared_folder_only=false, which leaked the
+                    // file back into the owner's root view; re-uploading the same file
+                    // then produced a visible duplicate (one in root + one in folder).
+                    $this->fileService->deleteFile($file, $user);
+                } else {
+                    // A non-owner editor orphaned it — keep it accessible to the owner
+                    // in their root rather than silently losing it.
+                    $file->update(['shared_folder_only' => false]);
+                }
             }
         }
 

@@ -78,13 +78,25 @@ function RootLayoutInner() {
 
   // Handle share intent (Android) / Share Extension (iOS)
   // Opens /share modal on launch and on each foreground resume
+  const sharePendingRef = useRef(false);
   useEffect(() => {
     const mod = NativeModules.ShareIntent;
     if (!mod) return;
 
     function checkIntent() {
       mod.getSharedData().then((data: unknown) => {
-        if (data) router.push('/share' as any);
+        if (data) {
+          // Guard against opening /share twice: checkIntent runs on mount and on
+          // every AppState→active, but the shared payload persists until /share
+          // consumes and clears it. Push only once per payload.
+          if (!sharePendingRef.current) {
+            sharePendingRef.current = true;
+            router.push('/share' as any);
+          }
+        } else {
+          // Payload consumed/cleared — ready for the next share.
+          sharePendingRef.current = false;
+        }
       }).catch(() => {});
     }
 

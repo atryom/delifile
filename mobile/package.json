@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "bump": "node scripts/bump-version.mjs"
+    "bump": "node scripts/bump-version.mjs",
+    "build:editor": "node scripts/build-editor-inline.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

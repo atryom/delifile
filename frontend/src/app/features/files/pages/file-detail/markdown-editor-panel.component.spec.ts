@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { of, throwError, Subject } from 'rxjs';
 import { MarkdownEditorPanelComponent } from './markdown-editor-panel.component';
 import { DocumentsApiService } from '../../../../core/api/documents-api.service';
 import { DocumentLockService } from '../../services/document-lock.service';
@@ -366,6 +366,29 @@ describe('MarkdownEditorPanelComponent', () => {
     component.ngOnDestroy();
 
     expect(docsApiMock['save']).toHaveBeenCalled();
+  });
+
+  it('ngOnDestroy() releases lock only AFTER the unsaved save completes (no LOCK_REQUIRED race)', () => {
+    fixture.detectChanges();
+    component.editor = createMockEditor();
+    component.saveStatus.set('unsaved');
+    lockStateSig.set('held');
+
+    // Control the save completion timing manually
+    const save$ = new Subject<ReturnType<typeof makeSaveResponse>>();
+    docsApiMock['save'].mockReturnValue(save$.asObservable());
+
+    component.ngOnDestroy();
+
+    // Save must be in flight, but the lock must NOT be released yet
+    expect(docsApiMock['save']).toHaveBeenCalledWith('doc_1', '# Panel content', '"abc123"');
+    expect((lockServiceMock['release'] as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+
+    // Once the save resolves, the lock is released in the completion callback
+    save$.next(makeSaveResponse());
+    save$.complete();
+
+    expect((lockServiceMock['release'] as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('doc_1');
   });
 
   it('autosave fires docsApi.save after 30 s when unsaved and no conflictError', () => {

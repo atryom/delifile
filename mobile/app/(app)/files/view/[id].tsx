@@ -7,6 +7,15 @@ import type { MarkdownDocument } from '@/types/document';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatDateTime } from '@/utils/format';
 
+// react-native-markdown-display (markdown-it 10) has no GitHub task-list support,
+// so "- [ ]" / "- [x]" would render as the literal text "[]". For this read-only
+// view, rewrite the checkbox marker at the start of each list item to a glyph.
+const TASK_ITEM_RE = /^(\s*(?:[-*+]|\d+[.)])\s+)\[([ xX])\]\s+/gm;
+function renderTaskCheckboxes(md: string): string {
+  return md.replace(TASK_ITEM_RE, (_m, marker: string, state: string) =>
+    `${marker}${state.toLowerCase() === 'x' ? '☑' : '☐'} `);
+}
+
 export default function ViewDocumentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [doc, setDoc] = useState<MarkdownDocument | null>(null);
@@ -67,7 +76,7 @@ export default function ViewDocumentScreen() {
         )}
 
         {doc.content.trim() ? (
-          <Markdown style={markdownStyles}>{doc.content}</Markdown>
+          <Markdown style={markdownStyles}>{renderTaskCheckboxes(doc.content)}</Markdown>
         ) : (
           <Text style={styles.empty}>Документ пуст</Text>
         )}
