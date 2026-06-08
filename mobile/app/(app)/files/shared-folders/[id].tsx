@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Alert, FlatList, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Keyboard, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sharedFoldersApi } from '@/api/shared-folders';
@@ -40,6 +40,11 @@ export default function SharedFolderScreen() {
   const folderType = (cachedFolder?.folder_type ?? resolvedParamType ?? 'default') as 'default' | 'gallery' | 'movies';
   const canEdit = cachedFolder ? (cachedFolder.is_owner || cachedFolder.my_access_type === 'edit') : false;
   const [showAddMovie, setShowAddMovie] = useState(false);
+
+  // Multi-select state (default view only)
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showMoveModal, setShowMoveModal] = useState(false);
 
   // Movie filter state
   const [movieFilter, setMovieFilter] = useState<MovieFilter>('all');
@@ -218,6 +223,68 @@ export default function SharedFolderScreen() {
     });
   }, [localMovieMeta]);
 
+  function enterSelectMode(fileId: string) {
+    setIsSelectMode(true);
+    setSelectedIds([fileId]);
+  }
+
+  function exitSelectMode() {
+    setIsSelectMode(false);
+    setSelectedIds([]);
+  }
+
+  function toggleSelect(fileId: string) {
+    setSelectedIds((ids) =>
+      ids.includes(fileId) ? ids.filter((x) => x !== fileId) : [...ids, fileId]
+    );
+  }
+
+  async function handleBulkDelete() {
+    Alert.alert(
+      `Убрать ${selectedIds.length} файл(а) из папки?`, undefined,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Убрать',
+          style: 'destructive',
+          onPress: async () => {
+            await Promise.allSettled(selectedIds.map((fid) => sharedFoldersApi.removeFile(id, fid)));
+            qc.invalidateQueries({ queryKey: ['shared-folders', id] });
+            exitSelectMode();
+          },
+        },
+      ]
+    );
+  }
+
+  async function handleBulkDownload() {
+    for (const fid of selectedIds) {
+      try {
+        const res = await filesApi.download(fid);
+        await Linking.openURL(res.data.data.url);
+      } catch { /* ignore individual errors */ }
+    }
+    exitSelectMode();
+  }
+
+  async function handleBulkShareAccess() {
+    await Promise.allSettled(
+      selectedIds.map((fid) => sharedFoldersApi.setFilePrivacy(id, fid, false))
+    );
+    qc.invalidateQueries({ queryKey: ['shared-folders', id] });
+    exitSelectMode();
+  }
+
+  async function handleBulkMove(targetFolderId: string) {
+    await Promise.allSettled(
+      selectedIds.map((fid) => sharedFoldersApi.addFile(targetFolderId, fid, true))
+    );
+    qc.invalidateQueries({ queryKey: ['shared-folders', id] });
+    qc.invalidateQueries({ queryKey: ['shared-folders', targetFolderId] });
+    setShowMoveModal(false);
+    exitSelectMode();
+  }
+
   const files = (folderData?.files ?? []) as FileListItemWithPrivacy[];
   const subfolders = folderData?.subfolders ?? [];
 
@@ -242,32 +309,34 @@ export default function SharedFolderScreen() {
     <View style={styles.flex}>
       <Stack.Screen
         options={{
-          title: folderTitle,
-          headerRight: () => (
-            <View style={styles.headerBtns}>
-              <TouchableOpacity
-                onPress={() => setShowMembers(true)}
-                style={styles.headerBtn}
-              >
-                <Text style={styles.headerBtnText}>👥</Text>
+          title: isSelectMode ? `${selectedIds.length} выбрано` : folderTitle,
+          headerRight: () =>
+            isSelectMode ? (
+              <TouchableOpacity onPress={exitSelectMode} style={styles.headerBtn}>
+                <Text style={styles.cancelBtnText}>Отменить</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  if (folderType === 'movies') {
-                    setShowAddMovie(true);
-                  } else {
-                    router.push({
-                      pathname: '/(app)/files/shared-folders/add' as any,
-                      params: { shared_folder_id: id, folder_name: folderTitle, folder_type: folderType },
-                    });
-                  }
-                }}
-                style={styles.addBtn}
-              >
-                <Text style={styles.addBtnText}>＋</Text>
-              </TouchableOpacity>
-            </View>
-          ),
+            ) : (
+              <View style={styles.headerBtns}>
+                <TouchableOpacity onPress={() => setShowMembers(true)} style={styles.headerBtn}>
+                  <Text style={styles.headerBtnText}>👥</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (folderType === 'movies') {
+                      setShowAddMovie(true);
+                    } else {
+                      router.push({
+                        pathname: '/(app)/files/shared-folders/add' as any,
+                        params: { shared_folder_id: id, folder_name: folderTitle, folder_type: folderType },
+                      });
+                    }
+                  }}
+                  style={styles.addBtn}
+                >
+                  <Text style={styles.addBtnText}>＋</Text>
+                </TouchableOpacity>
+              </View>
+            ),
         }}
       />
 
@@ -435,112 +504,181 @@ export default function SharedFolderScreen() {
 
       {/* Default view */}
       {folderType === 'default' && (
-        <FlatList
-          data={listData}
-          keyExtractor={(item, i) =>
-            item.kind === 'header' ? `h-${i}` :
-            item.kind === 'subfolder' ? `sf-${item.data.id}` :
-            `f-${item.data.id}`
-          }
-          onRefresh={refetch}
-          refreshing={isLoading}
-          ListHeaderComponent={
-            <TouchableOpacity
-              style={styles.commentsEntry}
-              onPress={() => router.push({
-                pathname: '/(app)/files/comments',
-                params: { targetType: 'shared_folder', targetId: id, targetName: folderTitle },
-              } as any)}
-            >
-              <Text style={styles.commentsEntryText}>💬 Комментарии к папке</Text>
-              <Text style={styles.commentsChevron}>›</Text>
-            </TouchableOpacity>
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>Папка пуста</Text>
-              <Text style={styles.emptySub}>Нажмите «＋» чтобы добавить файл или ссылку</Text>
-            </View>
-          }
-          renderItem={({ item }) => {
-            if (item.kind === 'header') {
-              return <Text style={styles.sectionHeader}>{item.text}</Text>;
+        <View style={styles.flex}>
+          <FlatList
+            data={listData}
+            keyExtractor={(item, i) =>
+              item.kind === 'header' ? `h-${i}` :
+              item.kind === 'subfolder' ? `sf-${item.data.id}` :
+              `f-${item.data.id}`
             }
+            onRefresh={refetch}
+            refreshing={isLoading}
+            ListHeaderComponent={
+              !isSelectMode ? (
+                <TouchableOpacity
+                  style={styles.commentsEntry}
+                  onPress={() => router.push({
+                    pathname: '/(app)/files/comments',
+                    params: { targetType: 'shared_folder', targetId: id, targetName: folderTitle },
+                  } as any)}
+                >
+                  <Text style={styles.commentsEntryText}>💬 Комментарии к папке</Text>
+                  <Text style={styles.commentsChevron}>›</Text>
+                </TouchableOpacity>
+              ) : null
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyTitle}>Папка пуста</Text>
+                <Text style={styles.emptySub}>Нажмите «＋» чтобы добавить файл или ссылку</Text>
+              </View>
+            }
+            renderItem={({ item }) => {
+              if (item.kind === 'header') {
+                return <Text style={styles.sectionHeader}>{item.text}</Text>;
+              }
 
-            if (item.kind === 'subfolder') {
-              if (renamingId === item.data.id) {
+              if (item.kind === 'subfolder') {
+                if (renamingId === item.data.id) {
+                  return (
+                    <View style={styles.row}>
+                      <Text style={styles.fileIcon}>🗂</Text>
+                      <TextInput
+                        ref={renameInputRef}
+                        style={styles.renameInput}
+                        value={renameText}
+                        onChangeText={setRenameText}
+                        autoFocus
+                        returnKeyType="done"
+                        onSubmitEditing={saveRename}
+                        selectTextOnFocus
+                      />
+                      <TouchableOpacity onPress={saveRename} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
+                        <Text style={styles.renameConfirm}>✓</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={cancelRename} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
+                        <Text style={styles.menuBtnText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }
                 return (
-                  <View style={styles.row}>
-                    <Text style={styles.fileIcon}>🗂</Text>
-                    <TextInput
-                      ref={renameInputRef}
-                      style={styles.renameInput}
-                      value={renameText}
-                      onChangeText={setRenameText}
-                      autoFocus
-                      returnKeyType="done"
-                      onSubmitEditing={saveRename}
-                      selectTextOnFocus
-                    />
-                    <TouchableOpacity onPress={saveRename} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
-                      <Text style={styles.renameConfirm}>✓</Text>
+                  <TouchableOpacity
+                    style={styles.row}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(app)/files/shared-folders/[id]' as any,
+                        params: { id: item.data.id, folder_name: item.data.name, folder_type: item.data.folder_type ?? 'default' },
+                      })
+                    }
+                  >
+                    <Text style={styles.fileIcon}>{item.data.is_private ? '🔒' : getFolderTypeIcon(item.data.folder_type)}</Text>
+                    <View style={styles.rowInfo}>
+                      <Text style={styles.fileName} numberOfLines={1}>{item.data.name}</Text>
+                      <Text style={styles.fileMeta}>{item.data.files_count} файлов</Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleSubfolderMenu(item.data)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      style={styles.menuBtn}
+                    >
+                      <Text style={styles.menuBtnText}>⋯</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={cancelRename} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
-                      <Text style={styles.menuBtnText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 );
               }
-              return (
-                <TouchableOpacity
-                  style={styles.row}
-                  activeOpacity={0.7}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/(app)/files/shared-folders/[id]' as any,
-                      params: { id: item.data.id, folder_name: item.data.name, folder_type: item.data.folder_type ?? 'default' },
-                    })
-                  }
-                >
-                  <Text style={styles.fileIcon}>{item.data.is_private ? '🔒' : getFolderTypeIcon(item.data.folder_type)}</Text>
-                  <View style={styles.rowInfo}>
-                    <Text style={styles.fileName} numberOfLines={1}>{item.data.name}</Text>
-                    <Text style={styles.fileMeta}>{item.data.files_count} файлов</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleSubfolderMenu(item.data)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    style={styles.menuBtn}
-                  >
-                    <Text style={styles.menuBtnText}>⋯</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            }
 
-            return <FileRow file={item.data} folderId={id} onMenu={() => handleFileMenu(item.data)} />;
-          }}
+              return (
+                <FileRow
+                  file={item.data}
+                  folderId={id}
+                  onMenu={() => handleFileMenu(item.data)}
+                  isSelectMode={isSelectMode}
+                  isSelected={selectedIds.includes(item.data.id)}
+                  onSelect={() => isSelectMode ? toggleSelect(item.data.id) : undefined}
+                  onLongPress={() => enterSelectMode(item.data.id)}
+                />
+              );
+            }}
+          />
+
+          {/* Multi-select action bar */}
+          {isSelectMode && selectedIds.length > 0 && (
+            <View style={styles.selectBar}>
+              <TouchableOpacity style={styles.selectBarBtn} onPress={() => setShowMoveModal(true)}>
+                <Text style={styles.selectBarIcon}>📁</Text>
+                <Text style={styles.selectBarText}>Переместить</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.selectBarBtn} onPress={handleBulkDownload}>
+                <Text style={styles.selectBarIcon}>⬇️</Text>
+                <Text style={styles.selectBarText}>Скачать</Text>
+              </TouchableOpacity>
+              {canEdit && (
+                <>
+                  <TouchableOpacity style={styles.selectBarBtn} onPress={handleBulkShareAccess}>
+                    <Text style={styles.selectBarIcon}>👁</Text>
+                    <Text style={styles.selectBarText}>Открыть</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.selectBarBtn, styles.selectBarBtnDanger]} onPress={handleBulkDelete}>
+                    <Text style={styles.selectBarIcon}>🗑</Text>
+                    <Text style={[styles.selectBarText, styles.selectBarTextDanger]}>Удалить</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Move to folder modal */}
+      {showMoveModal && (
+        <MoveFolderModal
+          currentFolderId={id}
+          onMove={handleBulkMove}
+          onClose={() => setShowMoveModal(false)}
         />
       )}
     </View>
   );
 }
 
-function FileRow({ file, folderId, onMenu }: { file: FileListItemWithPrivacy; folderId: string; onMenu: () => void }) {
+function FileRow({
+  file, folderId, onMenu, isSelectMode, isSelected, onSelect, onLongPress,
+}: {
+  file: FileListItemWithPrivacy;
+  folderId: string;
+  onMenu: () => void;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  onLongPress?: () => void;
+}) {
   const isUrl = file.content_kind === 'url_file';
   const icon = file.is_private ? '🔒' : isUrl ? '🔗' : getFileIcon(file.mime_type);
   const name = file.display_name || file.original_name;
 
   return (
     <TouchableOpacity
-      style={styles.row}
+      style={[styles.row, isSelected && styles.rowSelected]}
       activeOpacity={0.7}
-      onPress={() => router.push({
-        pathname: '/(app)/files/[id]' as any,
-        params: { id: file.id, ctx_folder_id: folderId },
-      })}
+      onPress={() => {
+        if (isSelectMode) { onSelect?.(); return; }
+        router.push({
+          pathname: '/(app)/files/[id]' as any,
+          params: { id: file.id, ctx_folder_id: folderId },
+        });
+      }}
+      onLongPress={onLongPress}
     >
-      <Text style={styles.fileIcon}>{icon}</Text>
+      {isSelectMode ? (
+        <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+      ) : (
+        <Text style={styles.fileIcon}>{icon}</Text>
+      )}
       <View style={styles.rowInfo}>
         <Text style={styles.fileName} numberOfLines={1}>{name}</Text>
         {!isUrl && <Text style={styles.fileMeta}>{formatFileSize(file.size)}</Text>}
@@ -551,10 +689,61 @@ function FileRow({ file, folderId, onMenu }: { file: FileListItemWithPrivacy; fo
           <Text style={styles.fileDate}>{formatDateTime(file.uploaded_at)}</Text>
         )}
       </View>
-      <TouchableOpacity onPress={onMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
-        <Text style={styles.menuBtnText}>⋯</Text>
-      </TouchableOpacity>
+      {!isSelectMode && (
+        <TouchableOpacity onPress={onMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.menuBtn}>
+          <Text style={styles.menuBtnText}>⋯</Text>
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
+  );
+}
+
+function MoveFolderModal({
+  currentFolderId,
+  onMove,
+  onClose,
+}: {
+  currentFolderId: string;
+  onMove: (targetId: string) => void;
+  onClose: () => void;
+}) {
+  const { data: folders = [], isLoading } = useQuery({
+    queryKey: ['shared-folders-all-flat'],
+    queryFn: () => sharedFoldersApi.allFlat().then((r) => r.data.data.items),
+    staleTime: 1000 * 60,
+  });
+  const available = folders.filter((f) => f.id !== currentFolderId);
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Переместить в папку</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={styles.modalClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        {isLoading && <Spinner />}
+        <FlatList
+          data={available}
+          keyExtractor={(f) => f.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.row} activeOpacity={0.7} onPress={() => onMove(item.id)}>
+              <Text style={styles.fileIcon}>{getFolderTypeIcon(item.folder_type)}</Text>
+              <View style={styles.rowInfo}>
+                <Text style={styles.fileName}>{item.name}</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            !isLoading ? (
+              <Text style={styles.emptyMembers}>Нет доступных папок</Text>
+            ) : null
+          }
+        />
+      </View>
+    </Modal>
   );
 }
 
@@ -582,10 +771,10 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: 14, color: '#94A3B8', textAlign: 'center' },
   moviesList: { paddingVertical: 8 },
   filterBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  filterChip: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, backgroundColor: '#F8FAFC' },
+  filterChip: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, backgroundColor: '#F8FAFC', minHeight: 30, justifyContent: 'center' },
   filterChipActive: { borderColor: '#6366F1', backgroundColor: '#EDE9FE' },
-  filterChipText: { fontSize: 13, color: '#64748B' },
-  filterChipTextActive: { color: '#6366F1', fontWeight: '600' },
+  filterChipText: { fontSize: 13, fontWeight: '500', color: '#64748B', lineHeight: 18 },
+  filterChipTextActive: { color: '#6366F1' },
 
   sectionHeader: {
     fontSize: 12, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase',
@@ -647,4 +836,32 @@ const styles = StyleSheet.create({
   },
   commentsEntryText: { fontSize: 15, color: '#2563EB', fontWeight: '500' },
   commentsChevron: { fontSize: 20, color: '#2563EB' },
+
+  cancelBtnText: { fontSize: 15, color: '#2563EB', fontWeight: '500' },
+
+  rowSelected: { backgroundColor: '#EFF6FF' },
+  checkbox: {
+    width: 24, height: 24, borderRadius: 12,
+    borderWidth: 2, borderColor: '#CBD5E1',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxActive: { borderColor: '#6366F1', backgroundColor: '#6366F1' },
+  checkmark: { fontSize: 13, color: '#fff', fontWeight: '700', lineHeight: 16 },
+
+  selectBar: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingVertical: 10,
+    paddingBottom: 24,
+    paddingHorizontal: 4,
+  },
+  selectBarBtn: {
+    flex: 1, alignItems: 'center', gap: 4, paddingVertical: 6,
+  },
+  selectBarBtnDanger: {},
+  selectBarIcon: { fontSize: 20 },
+  selectBarText: { fontSize: 11, color: '#2563EB', fontWeight: '500' },
+  selectBarTextDanger: { color: '#EF4444' },
 });

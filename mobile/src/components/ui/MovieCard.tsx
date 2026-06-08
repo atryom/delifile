@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { FileListItem } from '@/types';
+
+const RATINGS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 interface Props {
   item: FileListItem;
@@ -22,8 +24,7 @@ export function MovieCard({ item, onDelete, onWatchedToggle, onRatingChange }: P
   const watched        = !!(meta as any)?.watched;
   const personalRating = (meta as any)?.personal_rating as number | null | undefined;
 
-  const [editingRating, setEditingRating] = useState(false);
-  const [ratingDraft,   setRatingDraft]   = useState('');
+  const [showPicker, setShowPicker] = useState(false);
 
   function handleLongPress() {
     const actions: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [];
@@ -35,7 +36,7 @@ export function MovieCard({ item, onDelete, onWatchedToggle, onRatingChange }: P
       });
     }
     if (onRatingChange) {
-      actions.push({ text: 'Изменить оценку', onPress: openRatingEdit });
+      actions.push({ text: 'Изменить оценку', onPress: () => setShowPicker(true) });
     }
     if (onDelete) {
       actions.push({ text: 'Удалить из списка', style: 'destructive', onPress: onDelete });
@@ -45,36 +46,14 @@ export function MovieCard({ item, onDelete, onWatchedToggle, onRatingChange }: P
     Alert.alert(title, undefined, actions);
   }
 
-  function openRatingEdit() {
-    if (Platform.OS === 'ios') {
-      Alert.prompt(
-        'Личная оценка',
-        'Введите оценку от 0 до 10',
-        (text) => {
-          if (text === null || text === undefined) return;
-          const trimmed = text.trim();
-          if (trimmed === '') { onRatingChange?.(null); return; }
-          const num = parseFloat(trimmed);
-          if (!isNaN(num)) onRatingChange?.(Math.min(10, Math.max(0, num)));
-        },
-        'plain-text',
-        personalRating !== null && personalRating !== undefined ? String(personalRating) : '',
-        'numeric',
-      );
-    } else {
-      setRatingDraft(personalRating !== null && personalRating !== undefined ? String(personalRating) : '');
-      setEditingRating(true);
-    }
+  function selectRating(r: number) {
+    onRatingChange?.(r);
+    setShowPicker(false);
   }
 
-  function commitRating() {
-    const trimmed = ratingDraft.trim();
-    if (trimmed === '') { onRatingChange?.(null); }
-    else {
-      const num = parseFloat(trimmed);
-      if (!isNaN(num)) onRatingChange?.(Math.min(10, Math.max(0, num)));
-    }
-    setEditingRating(false);
+  function clearRating() {
+    onRatingChange?.(null);
+    setShowPicker(false);
   }
 
   return (
@@ -88,7 +67,6 @@ export function MovieCard({ item, onDelete, onWatchedToggle, onRatingChange }: P
         source={{ uri: poster ?? undefined }}
         style={styles.poster}
         contentFit="cover"
-        placeholderContentFit="cover"
         transition={150}
       />
       <View style={styles.info}>
@@ -117,24 +95,22 @@ export function MovieCard({ item, onDelete, onWatchedToggle, onRatingChange }: P
         )}
 
         {/* Quick action buttons */}
-        {(onWatchedToggle || onRatingChange) && (
+        {(onWatchedToggle || onRatingChange) && !showPicker && (
           <View style={styles.actions}>
             {onWatchedToggle && (
               <Pressable
                 style={[styles.actionBtn, watched && styles.actionBtnActive]}
                 onPress={(e) => { e.stopPropagation?.(); onWatchedToggle(!watched); }}
-                accessibilityLabel={watched ? 'Убрать отметку просмотрено' : 'Отметить как просмотренный'}
               >
                 <Text style={[styles.actionBtnText, watched && styles.actionBtnTextActive]}>
                   {watched ? '👁 Смотрел' : '👁 Отметить'}
                 </Text>
               </Pressable>
             )}
-            {onRatingChange && !editingRating && (
+            {onRatingChange && (
               <Pressable
                 style={styles.actionBtn}
-                onPress={(e) => { e.stopPropagation?.(); openRatingEdit(); }}
-                accessibilityLabel="Изменить личную оценку"
+                onPress={(e) => { e.stopPropagation?.(); setShowPicker(true); }}
               >
                 <Text style={styles.actionBtnText}>
                   {personalRating !== null && personalRating !== undefined
@@ -143,21 +119,30 @@ export function MovieCard({ item, onDelete, onWatchedToggle, onRatingChange }: P
                 </Text>
               </Pressable>
             )}
-            {editingRating && (
-              <View style={styles.ratingInputRow}>
-                <TextInput
-                  style={styles.ratingInput}
-                  value={ratingDraft}
-                  onChangeText={setRatingDraft}
-                  keyboardType="numeric"
-                  placeholder="0–10"
-                  autoFocus
-                  onSubmitEditing={commitRating}
-                  onBlur={commitRating}
-                  maxLength={4}
-                />
-              </View>
-            )}
+          </View>
+        )}
+
+        {/* Inline rating picker — 0-10 integer buttons */}
+        {showPicker && (
+          <View style={styles.pickerWrap}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerScroll}>
+              {RATINGS.map((r) => (
+                <Pressable
+                  key={r}
+                  style={[styles.ratingBtn, personalRating === r && styles.ratingBtnActive]}
+                  onPress={() => selectRating(r)}
+                >
+                  <Text style={[styles.ratingBtnText, personalRating === r && styles.ratingBtnTextActive]}>
+                    {r}
+                  </Text>
+                </Pressable>
+              ))}
+              {personalRating !== null && personalRating !== undefined && (
+                <Pressable style={styles.ratingClearBtn} onPress={clearRating}>
+                  <Text style={styles.ratingClearText}>✕</Text>
+                </Pressable>
+              )}
+            </ScrollView>
           </View>
         )}
       </View>
@@ -179,9 +164,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 4,
   },
-  cardWatched: {
-    opacity: 0.6,
-  },
+  cardWatched: { opacity: 0.6 },
   poster: {
     width: 80,
     height: 120,
@@ -205,14 +188,8 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     lineHeight: 20,
   },
-  watchedBadge: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  meta: {
-    fontSize: 13,
-    color: '#64748B',
-  },
+  watchedBadge: { fontSize: 14, marginTop: 2 },
+  meta: { fontSize: 13, color: '#64748B' },
   genres: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -225,10 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  genreText: {
-    fontSize: 11,
-    color: '#475569',
-  },
+  genreText: { fontSize: 11, color: '#475569' },
   actions: {
     flexDirection: 'row',
     gap: 6,
@@ -246,25 +220,45 @@ const styles = StyleSheet.create({
     borderColor: '#6366F1',
     backgroundColor: '#EDE9FE',
   },
-  actionBtnText: {
-    fontSize: 11,
+  actionBtnText: { fontSize: 11, color: '#64748B' },
+  actionBtnTextActive: { color: '#6366F1' },
+
+  pickerWrap: {
+    marginTop: 4,
+  },
+  pickerScroll: {
+    flexGrow: 0,
+  },
+  ratingBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  ratingBtnActive: {
+    borderColor: '#6366F1',
+    backgroundColor: '#6366F1',
+  },
+  ratingBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#64748B',
   },
-  actionBtnTextActive: {
-    color: '#6366F1',
-  },
-  ratingInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingInput: {
+  ratingBtnTextActive: { color: '#fff' },
+  ratingClearBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#6366F1',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    fontSize: 13,
-    width: 60,
-    color: '#1E293B',
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FFF5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  ratingClearText: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
 });

@@ -29,6 +29,7 @@ export default function AddScreen() {
 
   const [mode, setMode] = useState<Mode>('menu');
   const [folderName, setFolderName] = useState('');
+  const [folderType, setFolderType] = useState<'default' | 'gallery' | 'movies'>('default');
 
   // Link state
   const [linkUrl, setLinkUrl] = useState('');
@@ -78,7 +79,7 @@ export default function AddScreen() {
   async function handleCreateFolder() {
     if (!folderName.trim()) return;
     try {
-      await createFolder.mutateAsync({ name: folderName.trim(), parent_id: folderId });
+      await createFolder.mutateAsync({ name: folderName.trim(), parent_id: folderId, folder_type: folderType });
       router.back();
     } catch {
       Alert.alert('Ошибка', 'Не удалось создать папку');
@@ -312,6 +313,23 @@ export default function AddScreen() {
               returnKeyType="done"
               onSubmitEditing={handleCreateFolder}
             />
+            <Text style={styles.typeLabel}>Тип папки</Text>
+            <View style={styles.typeRow}>
+              {([
+                { val: 'default' as const, icon: '🗂', label: 'Обычная' },
+                { val: 'gallery' as const, icon: '🖼', label: 'Галерея' },
+                { val: 'movies'  as const, icon: '🎬', label: 'Фильмы' },
+              ]).map((t) => (
+                <TouchableOpacity
+                  key={t.val}
+                  style={[styles.typeBtn, folderType === t.val && styles.typeBtnActive]}
+                  onPress={() => setFolderType(t.val)}
+                >
+                  <Text style={styles.typeBtnIcon}>{t.icon}</Text>
+                  <Text style={[styles.typeBtnText, folderType === t.val && styles.typeBtnTextActive]}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <Button
               title="Создать"
               onPress={handleCreateFolder}
@@ -382,4 +400,11 @@ const styles = StyleSheet.create({
   taskRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 10, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' },
   taskRowLabel: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
   taskRowSub: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+  typeLabel: { fontSize: 13, fontWeight: '600', color: '#64748B', marginBottom: 8 },
+  typeRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  typeBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', gap: 4 },
+  typeBtnActive: { borderColor: '#6366F1', backgroundColor: '#EDE9FE' },
+  typeBtnIcon: { fontSize: 22 },
+  typeBtnText: { fontSize: 12, color: '#64748B' },
+  typeBtnTextActive: { color: '#6366F1', fontWeight: '600' },
 });

@@ -8,8 +8,8 @@ export const foldersApi = {
   list: () =>
     apiClient.get<ApiResponse<{ items: Folder[] }>>('/folders'),
 
-  create: (name: string, parent_id?: string | null) =>
-    apiClient.post<ApiResponse<{ folder: Folder }>>('/folders', { name, parent_id: parent_id ?? null }),
+  create: (name: string, parent_id?: string | null, folder_type?: 'default' | 'gallery' | 'movies') =>
+    apiClient.post<ApiResponse<{ folder: Folder }>>('/folders', { name, parent_id: parent_id ?? null, folder_type: folder_type ?? 'default' }),
 
   update: (id: string, data: { name?: string; parent_id?: string | null; sort_order?: number | null }) =>
     apiClient.patch<ApiResponse<{ folder: Folder }>>(`/folders/${id}`, data),

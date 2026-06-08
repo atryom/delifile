@@ -40,6 +40,7 @@ export default function EditDocumentScreen() {
 
   const webViewRef = useRef<WebView>(null);
   const editorReadyRef = useRef(false);
+  const editorLoadedRef = useRef(false);
   const hasChangedRef = useRef(false);
   const etagRef = useRef('');
   const pendingContentResolve = useRef<((md: string) => void) | null>(null);
@@ -80,6 +81,14 @@ export default function EditDocumentScreen() {
         docRef.current = document;
         etagRef.current = document.etag;
         setDoc(document);
+
+        // If WebView already loaded before API responded, inject content now
+        if (editorLoadedRef.current) {
+          const content = document.content ?? '';
+          webViewRef.current?.injectJavaScript(
+            `(function(){if(typeof window._editorInit==='function')window._editorInit(${JSON.stringify(content)},false);})();void 0;`
+          );
+        }
 
         if (!document.capabilities.canEdit) {
           setPhase('error');
@@ -319,13 +328,15 @@ export default function EditDocumentScreen() {
           keyboardDisplayRequiresUserAction={false}
           onMessage={handleMessage}
           onLoadEnd={() => {
-            // Primary init path: call window._editorInit directly via injectJavaScript.
-            // This works even when window.ReactNativeWebView is unavailable on file:// origins,
-            // which would silently block the scriptLoaded → init postMessage round-trip.
-            const content = docRef.current?.content ?? '';
-            webViewRef.current?.injectJavaScript(
-              `(function(){if(typeof window._editorInit==='function')window._editorInit(${JSON.stringify(content)},false);})();void 0;`
-            );
+            editorLoadedRef.current = true;
+            // If API already responded, inject now; otherwise editorLoadedRef
+            // tells the init() callback to inject once the document arrives.
+            if (docRef.current) {
+              const content = docRef.current.content ?? '';
+              webViewRef.current?.injectJavaScript(
+                `(function(){if(typeof window._editorInit==='function')window._editorInit(${JSON.stringify(content)},false);})();void 0;`
+              );
+            }
           }}
           scrollEnabled
           nestedScrollEnabled

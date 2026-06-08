@@ -44,10 +44,11 @@ export function useDeleteFolder() {
 export function useCreateFolder() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, parent_id }: { name: string; parent_id?: string | null }) =>
-      foldersApi.create(name, parent_id),
+    mutationFn: ({ name, parent_id, folder_type }: { name: string; parent_id?: string | null; folder_type?: 'default' | 'gallery' | 'movies' }) =>
+      foldersApi.create(name, parent_id, folder_type),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['folders'] });
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
     },
   });
 }

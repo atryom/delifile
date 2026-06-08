@@ -2,7 +2,7 @@
   "expo": {
     "name": "DeliFile",
     "slug": "delifile",
-    "version": "1.1.19",
+    "version": "1.1.20",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -52,6 +52,7 @@
       "expo-secure-store",
       "expo-asset",
       "./plugins/withShareExtension",
+      "./plugins/withAndroidEditorAsset",
       [
         "expo-notifications",
         {
