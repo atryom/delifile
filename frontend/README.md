@@ -142,4 +142,3 @@ Errors normalized by `error.interceptor.ts` — components receive the same shap
 - HTTP calls only through typed API services — never directly in components
 - `FileUploadService` owns the full 3-step upload flow
 - `APP_INITIALIZER` restores session on every page load via `/auth/me`
-
