@@ -44,6 +44,34 @@
                   }
                 </div>
               </div>
+            } @else if (isMovie()) {
+              <!-- Фильм -->
+              <div class="movie-card">
+                @if (moviePoster()) {
+                  <img [src]="moviePoster()!" [alt]="movieMeta()?.title ?? fileInfo()!.original_name" class="movie-poster" loading="lazy" />
+                } @else {
+                  <div class="movie-poster-placeholder" aria-hidden="true">🎬</div>
+                }
+                <div class="movie-info">
+                  <h2 class="movie-title">{{ movieMeta()?.title ?? fileInfo()!.original_name }}</h2>
+                  @if (movieMeta()?.year || movieMeta()?.rating_kp) {
+                    <div class="movie-meta-row">
+                      @if (movieMeta()?.year) { <span>{{ movieMeta()!.year }}</span> }
+                      @if (movieMeta()?.rating_kp) { <span class="movie-rating">★ {{ movieMeta()!.rating_kp }}</span> }
+                    </div>
+                  }
+                  @if (movieMeta()?.director) {
+                    <p class="movie-director">Режиссёр: {{ movieMeta()!.director }}</p>
+                  }
+                  @if (movieMeta()?.genres?.length) {
+                    <div class="movie-genres">
+                      @for (g of movieMeta()!.genres!; track g) {
+                        <span class="genre-tag">{{ g }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
             } @else {
               <!-- Обычный файл -->
               @if (isVideo() && fileInfo()?.view_url) {

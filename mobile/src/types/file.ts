@@ -11,6 +11,8 @@ export interface MovieMetadata {
   director: string | null;
   description: string | null;
   kp_url: string | null;
+  watched?: boolean | null;
+  personal_rating?: number | null;
 }
 export type FileFilter = 'all' | 'mine' | 'received' | 'favorites';
 export type AccessType = 'owner' | 'shared' | 'saved';

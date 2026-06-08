@@ -128,6 +128,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('files/{id}/like',           [FileLikeController::class, 'destroy']);
         Route::post('files/{id}/move-folder',      [FileController::class, 'moveFolder']);
         Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
+        Route::patch('files/{id}/movie-meta',       [MovieController::class, 'updateMeta']);
         Route::patch('files/{id}/description',     [FileController::class, 'updateDescription']);
         Route::patch('files/{id}/rename',          [FileController::class, 'rename']);
         Route::patch('files/{id}/task',            [FileController::class, 'updateTask']);

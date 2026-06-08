@@ -1,19 +1,20 @@
-import { Component, inject, signal, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, inject, signal, computed, OnInit, input, ChangeDetectionStrategy } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { TranslateModule } from '@ngx-translate/core';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
-import { SharedFolder, SharedFolderAccessType, SharedFolderFileItem } from '../../../../shared/models/api.models';
+import { SharedFolder, SharedFolderAccessType, SharedFolderFileItem, FolderType, MovieMetadata } from '../../../../shared/models/api.models';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { formatSize } from '../../../../shared/utils/format';
 import { classifyMimeType } from '../../../../shared/utils/file';
+import { MovieViewComponent } from '../../../folders/components/movie-view/movie-view.component';
 
 @Component({
   selector: 'app-public-shared-link',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslateModule, RouterLink, DatePipe],
+  imports: [TranslateModule, RouterLink, DatePipe, MovieViewComponent],
   template: `
-    <div class="page">
+    <div class="page" [class.page-wide]="folderType() !== 'default'">
       @if (resolving()) {
         <div class="state-center">{{ 'shared_folders.public_link_resolving' | translate }}</div>
       }
@@ -34,52 +35,99 @@ import { classifyMimeType } from '../../../../shared/utils/file';
             </div>
           }
 
-          <h1>{{ folder()!.name }}</h1>
-          <p class="access-info">
-            Доступ: <strong>{{ linkAccessType() === 'view' ? 'Просмотр' : 'Редактирование' }}</strong>
-          </p>
+          <div class="folder-header">
+            <div>
+              <h1>{{ folder()!.name }}</h1>
+              <p class="access-info">Доступ: <strong>{{ linkAccessType() === 'view' ? 'Просмотр' : 'Редактирование' }}</strong></p>
+            </div>
+            @if (isAuthenticated()) {
+              <a [routerLink]="['/folders']" [queryParams]="{shared_folder_id: folder()!.id}" class="btn-open">
+                Открыть в приложении
+              </a>
+            }
+          </div>
 
-          @if (isAuthenticated()) {
-            <a [routerLink]="['/folders']" [queryParams]="{shared_folder_id: folder()!.id}" class="btn-open">
-              Открыть папку
-            </a>
-          }
-
-          <!-- File list -->
           @if (filesLoading()) {
-            <p class="files-loading">Загрузка файлов...</p>
+            <p class="files-loading">Загрузка...</p>
           } @else if (files().length === 0) {
             <p class="files-empty">В папке нет файлов</p>
           } @else {
-            <ul class="file-list" role="list">
-              @for (file of files(); track file.id) {
-                <li class="file-item">
-                  @if (file.preview_url) {
-                    <img [src]="file.preview_url" alt="" class="file-thumb" loading="lazy" />
-                  } @else if (file.link_image_url) {
-                    <img [src]="file.link_image_url" alt="" class="file-thumb" loading="lazy" />
-                  } @else {
-                    <div class="file-icon">{{ mimeIcon(file.mime_type) }}</div>
+            @switch (folderType()) {
+
+              @case ('gallery') {
+                <div class="gallery-grid" role="list">
+                  @for (file of files(); track file.id) {
+                    <a class="gallery-cell" role="listitem"
+                       [href]="file.view_url ?? '#'" target="_blank" rel="noopener noreferrer"
+                       [attr.aria-label]="file.display_name ?? file.original_name">
+                      <img [src]="file.preview_url ?? file.link_image_url ?? ''" [alt]="file.display_name ?? file.original_name" loading="lazy" />
+                    </a>
                   }
-                  <div class="file-info">
-                    <span class="file-name">{{ file.original_name }}</span>
-                    <span class="file-meta">
-                      @if (file.content_kind !== 'url_file') { {{ formatSize(file.size) }} · }
-                      {{ file.uploaded_at | date:'d MMM y' }}
-                    </span>
-                  </div>
-                  <div class="file-btns">
-                    @if (file.content_kind === 'url_file' && file.link_url) {
-                      <a [href]="file.link_url" target="_blank" rel="noopener noreferrer" class="btn-view" aria-label="Перейти по ссылке" title="Перейти по ссылке">🔗</a>
-                    }
-                    @if (file.content_kind !== 'url_file' && file.view_url) {
-                      <a [href]="file.view_url" target="_blank" rel="noopener noreferrer" class="btn-view" aria-label="Просмотр" title="Просмотр">👁</a>
-                      <a [href]="file.view_url" target="_blank" rel="noopener noreferrer" class="btn-view" [attr.download]="file.original_name" aria-label="Скачать" title="Скачать">⬇</a>
-                    }
-                  </div>
-                </li>
+                </div>
               }
-            </ul>
+
+              @case ('movies') {
+                <app-movie-view [files]="files()" [canEdit]="false" (fileClick)="selectedMovie.set($event)" />
+                @if (selectedMovie(); as mv) {
+                  <div class="movie-modal-backdrop" (click)="selectedMovie.set(null)" role="dialog" aria-modal="true" [attr.aria-label]="movieMeta(mv)?.title ?? mv.original_name">
+                    <div class="movie-modal" (click)="$event.stopPropagation()">
+                      <button class="movie-modal-close" type="button" (click)="selectedMovie.set(null)" aria-label="Закрыть">✕</button>
+                      @if (moviePoster(mv)) {
+                        <img class="movie-modal-poster" [src]="moviePoster(mv)!" [alt]="mv.original_name" />
+                      }
+                      <div class="movie-modal-info">
+                        <h2>{{ movieMeta(mv)?.title ?? mv.original_name }}</h2>
+                        @if (movieMeta(mv); as m) {
+                          <div class="movie-modal-meta">
+                            @if (m.year) { <span>{{ m.year }}</span> }
+                            @if (m.rating_kp) { <span class="modal-rating">★ {{ m.rating_kp }}</span> }
+                          </div>
+                          @if (m.director) { <p class="movie-modal-director">Режиссёр: {{ m.director }}</p> }
+                          @if (m.genres?.length) {
+                            <div class="movie-modal-genres">
+                              @for (g of m.genres!; track g) { <span class="genre-tag">{{ g }}</span> }
+                            </div>
+                          }
+                        }
+                      </div>
+                    </div>
+                  </div>
+                }
+              }
+
+              @default {
+                <ul class="file-list" role="list">
+                  @for (file of files(); track file.id) {
+                    <li class="file-item">
+                      @if (file.preview_url) {
+                        <img [src]="file.preview_url" alt="" class="file-thumb" loading="lazy" />
+                      } @else if (file.link_image_url) {
+                        <img [src]="file.link_image_url" alt="" class="file-thumb" loading="lazy" />
+                      } @else {
+                        <div class="file-icon">{{ mimeIcon(file.mime_type) }}</div>
+                      }
+                      <div class="file-info">
+                        <span class="file-name">{{ file.original_name }}</span>
+                        <span class="file-meta">
+                          @if (file.content_kind !== 'url_file') { {{ formatSize(file.size) }} · }
+                          {{ file.uploaded_at | date:'d MMM y' }}
+                        </span>
+                      </div>
+                      <div class="file-btns">
+                        @if (file.content_kind === 'url_file' && file.link_url) {
+                          <a [href]="file.link_url" target="_blank" rel="noopener noreferrer" class="btn-view" aria-label="Перейти по ссылке" title="Перейти по ссылке">🔗</a>
+                        }
+                        @if (file.content_kind !== 'url_file' && file.view_url) {
+                          <a [href]="file.view_url" target="_blank" rel="noopener noreferrer" class="btn-view" aria-label="Просмотр" title="Просмотр">👁</a>
+                          <a [href]="file.view_url" target="_blank" rel="noopener noreferrer" class="btn-view" [attr.download]="file.original_name" aria-label="Скачать" title="Скачать">⬇</a>
+                        }
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            }
+
             @if (totalPages() > 1) {
               <div class="pagination">
                 <button [disabled]="page() === 1" (click)="prevPage()" class="btn-page">←</button>
@@ -94,9 +142,9 @@ import { classifyMimeType } from '../../../../shared/utils/file';
   `,
   styles: [`
     .page { max-width: 720px; margin: 60px auto; padding: 0 24px; }
+    .page-wide { max-width: 960px; }
     .state-center { color: #9ca3af; font-size: 1rem; padding: 60px 0; text-align: center; }
     .state-center.error { color: #dc2626; }
-    .folder-view { }
     .save-banner {
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
       background: #ede9fe; border: 1px solid #c4b5fd; border-radius: 10px; padding: 14px 20px; margin-bottom: 24px;
@@ -104,11 +152,35 @@ import { classifyMimeType } from '../../../../shared/utils/file';
     }
     .btn-auth { padding: 7px 16px; background: #6366f1; color: #fff; border-radius: 7px; text-decoration: none; font-size: 0.85rem; font-weight: 600; }
     .btn-auth:hover { background: #4f46e5; }
-    h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 6px; }
-    .access-info { color: #6b7280; font-size: 0.9rem; margin-bottom: 20px; }
-    .btn-open { display: inline-block; padding: 9px 22px; background: #6366f1; color: #fff; border-radius: 9px; text-decoration: none; font-size: 0.92rem; font-weight: 600; margin-bottom: 24px; }
+    .folder-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+    h1 { font-size: 1.6rem; font-weight: 700; margin: 0 0 4px; }
+    .access-info { color: #6b7280; font-size: 0.9rem; margin: 0; }
+    .btn-open { flex-shrink: 0; display: inline-block; padding: 9px 22px; background: #6366f1; color: #fff; border-radius: 9px; text-decoration: none; font-size: 0.92rem; font-weight: 600; white-space: nowrap; }
     .btn-open:hover { background: #4f46e5; }
     .files-loading, .files-empty { color: #9ca3af; text-align: center; padding: 30px 0; }
+
+    /* Gallery grid */
+    .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 8px; }
+    .gallery-cell { display: block; aspect-ratio: 1; overflow: hidden; background: #f1f5f9; }
+    .gallery-cell img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity 0.15s; }
+    .gallery-cell:hover img { opacity: 0.88; }
+    @media (max-width: 480px) { .gallery-grid { grid-template-columns: repeat(3, 1fr); gap: 2px; } }
+
+    /* Movie detail modal */
+    .movie-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .movie-modal { background: #fff; border-radius: 14px; max-width: 480px; width: 100%; display: flex; gap: 20px; padding: 20px; position: relative; max-height: 90vh; overflow-y: auto; }
+    .movie-modal-close { position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 18px; cursor: pointer; color: #94a3b8; padding: 4px 8px; border-radius: 6px; line-height: 1; }
+    .movie-modal-close:hover { background: #f1f5f9; color: #1e293b; }
+    .movie-modal-poster { width: 120px; height: 180px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+    .movie-modal-info { flex: 1; padding-top: 4px; }
+    .movie-modal-info h2 { font-size: 1.1rem; font-weight: 700; margin: 0 0 8px; padding-right: 28px; line-height: 1.3; }
+    .movie-modal-meta { display: flex; gap: 10px; font-size: 13px; color: #64748b; margin-bottom: 6px; }
+    .modal-rating { color: #f59e0b; font-weight: 600; }
+    .movie-modal-director { font-size: 13px; color: #64748b; margin: 4px 0; }
+    .movie-modal-genres { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .genre-tag { background: #f1f5f9; border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #475569; }
+
+    /* Default list */
     .file-list { list-style: none; padding: 0; margin: 20px 0 0; display: flex; flex-direction: column; gap: 6px; }
     .file-item { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 14px; }
     .file-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
@@ -129,7 +201,6 @@ export class PublicSharedLinkComponent implements OnInit {
 
   private readonly sfApi     = inject(SharedFoldersApiService);
   private readonly authState = inject(AuthStateService);
-  private readonly router    = inject(Router);
 
   readonly resolving      = signal(true);
   readonly invalid        = signal(false);
@@ -137,11 +208,13 @@ export class PublicSharedLinkComponent implements OnInit {
   readonly linkAccessType = signal<SharedFolderAccessType>('view');
   readonly linkAllowSave  = signal(false);
 
-  readonly files        = signal<SharedFolderFileItem[]>([]);
-  readonly filesLoading = signal(false);
-  readonly page         = signal(1);
-  readonly totalPages   = signal(1);
+  readonly files          = signal<SharedFolderFileItem[]>([]);
+  readonly filesLoading   = signal(false);
+  readonly page           = signal(1);
+  readonly totalPages     = signal(1);
+  readonly selectedMovie  = signal<SharedFolderFileItem | null>(null);
 
+  readonly folderType     = computed<FolderType>(() => this.folder()?.folder_type ?? 'default');
   readonly isAuthenticated = this.authState.isAuthenticated;
 
   ngOnInit(): void {
@@ -151,12 +224,6 @@ export class PublicSharedLinkComponent implements OnInit {
         this.folder.set(res.data.folder);
         this.linkAccessType.set(res.data.link.access_type);
         this.linkAllowSave.set(res.data.link.allow_save);
-
-        if (this.isAuthenticated()) {
-          this.router.navigate(['/folders'], { queryParams: { tab: 'shared', shared_folder_id: res.data.folder.id } });
-          return;
-        }
-
         this.loadFiles(1);
       },
       error: () => { this.resolving.set(false); this.invalid.set(true); },
@@ -179,6 +246,14 @@ export class PublicSharedLinkComponent implements OnInit {
 
   prevPage(): void { if (this.page() > 1) this.loadFiles(this.page() - 1); }
   nextPage(): void { if (this.page() < this.totalPages()) this.loadFiles(this.page() + 1); }
+
+  movieMeta(file: SharedFolderFileItem): MovieMetadata | null {
+    return (file as any).custom_metadata ?? null;
+  }
+
+  moviePoster(file: SharedFolderFileItem): string | null {
+    return this.movieMeta(file)?.poster_url ?? file.link_image_url ?? null;
+  }
 
   mimeIcon(mime: string | null): string {
     const ICONS: Record<string, string> = { image: '🖼️', video: '🎬', audio: '🎵', pdf: '📄' };

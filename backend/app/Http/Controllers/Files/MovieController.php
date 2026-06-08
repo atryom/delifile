@@ -125,6 +125,41 @@ class MovieController extends Controller
     }
 
     /**
+     * PATCH /api/v1/files/{id}/movie-meta
+     *
+     * Updates user-specific movie metadata (watched, personal_rating).
+     * Preserves all Kinopoisk fields.
+     */
+    public function updateMeta(Request $request, string $fileId): JsonResponse
+    {
+        $data = $request->validate([
+            'watched'         => 'nullable|boolean',
+            'personal_rating' => 'nullable|numeric|min:0|max:10',
+        ]);
+
+        $file = File::where('id', $fileId)
+            ->where('owner_id', $request->user()->id)
+            ->where('content_kind', 'movie_item')
+            ->first();
+
+        if (!$file) {
+            return $this->notFound('Файл не найден');
+        }
+
+        $meta = $file->custom_metadata ?? [];
+        if (array_key_exists('watched', $data)) {
+            $meta['watched'] = $data['watched'];
+        }
+        if (array_key_exists('personal_rating', $data)) {
+            $meta['personal_rating'] = $data['personal_rating'];
+        }
+        $file->custom_metadata = $meta;
+        $file->save();
+
+        return $this->success('Метаданные обновлены', ['custom_metadata' => $file->custom_metadata]);
+    }
+
+    /**
      * POST /api/v1/shared-folders/{id}/movies/search
      */
     public function searchShared(Request $request, string $folderId): JsonResponse

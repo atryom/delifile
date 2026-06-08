@@ -34,10 +34,21 @@ export class PublicLinkComponent implements OnInit {
     link_description?: string | null;
     link_image_url?: string | null;
     link_site_name?: string | null;
+    custom_metadata?: {
+      title?: string | null;
+      year?: number | null;
+      rating_kp?: number | null;
+      genres?: string[] | null;
+      director?: string | null;
+      poster_url?: string | null;
+    } | null;
   } | null>(null);
 
-  readonly isVideo = computed(() => (this.fileInfo()?.mime_type ?? '').startsWith('video/'));
-  readonly isAudio = computed(() => (this.fileInfo()?.mime_type ?? '').startsWith('audio/'));
+  readonly isVideo    = computed(() => (this.fileInfo()?.mime_type ?? '').startsWith('video/'));
+  readonly isAudio    = computed(() => (this.fileInfo()?.mime_type ?? '').startsWith('audio/'));
+  readonly isMovie    = computed(() => this.fileInfo()?.content_kind === 'movie_item');
+  readonly movieMeta  = computed(() => this.fileInfo()?.custom_metadata ?? null);
+  readonly moviePoster = computed(() => this.movieMeta()?.poster_url ?? this.fileInfo()?.link_image_url ?? null);
   readonly expiresAt   = signal<string | null>(null);
   readonly allowSave   = signal(false);
   readonly downloading = signal(false);

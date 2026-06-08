@@ -1,3 +1,39 @@
+.movie-view-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.movies-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.filter-chips,
+.sort-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover { background: #e2e8f0; }
+  &.active { background: #6366f1; color: #fff; }
+  &:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+}
+
 .movies-grid {
   display: flex;
   flex-direction: column;
@@ -10,8 +46,32 @@
   padding: 16px;
   border-bottom: 1px solid #f1f5f9;
   align-items: flex-start;
+  transition: opacity 0.15s;
 
   &:hover { background: #f8fafc; }
+  &:hover .movie-delete-btn { opacity: 1; }
+  &:hover .movie-actions { opacity: 1; }
+
+  &.watched { opacity: 0.65; }
+  &.watched:hover { opacity: 1; }
+}
+
+.movie-delete-btn {
+  align-self: flex-start;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+
+  &:hover { background: #fee2e2; color: #ef4444; }
+  &:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; opacity: 1; }
 }
 
 .movie-poster-wrap {
@@ -84,6 +144,52 @@
 .movie-director {
   font-size: 12px;
   color: #94a3b8;
+}
+
+.personal-rating {
+  color: #6366f1;
+  font-weight: 600;
+}
+
+.movie-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.action-btn {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #64748b;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+
+  &:hover { border-color: #6366f1; color: #6366f1; }
+  &:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+
+  .muted { color: #cbd5e1; }
+}
+
+.watch-btn {
+  &.active { background: #ede9fe; border-color: #6366f1; color: #6366f1; }
+}
+
+.rating-input {
+  width: 60px;
+  border: 1px solid #6366f1;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: #1e293b;
+  outline: none;
+
+  &:focus { box-shadow: 0 0 0 2px #c7d2fe; }
 }
 
 .movies-empty {

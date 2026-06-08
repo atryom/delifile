@@ -111,4 +111,7 @@ export const filesApi = {
 
   unlike: (id: string) =>
     apiClient.delete<ApiResponse<Record<string, never>>>(`/files/${id}/like`),
+
+  updateMovieMeta: (id: string, data: { watched?: boolean | null; personal_rating?: number | null }) =>
+    apiClient.patch<ApiResponse<{ custom_metadata: Record<string, unknown> }>>(`/files/${id}/movie-meta`, data),
 };

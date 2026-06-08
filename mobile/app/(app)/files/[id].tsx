@@ -600,6 +600,17 @@ export default function FileDetailScreen() {
                 <TouchableOpacity
                   style={styles.previewContainer}
                   onPress={() => setMediaViewerOpen(true)}
+                  onLongPress={() => {
+                    const isOwner = file?.is_owner ?? false;
+                    const buttons: Parameters<typeof Alert.alert>[2] = [
+                      { text: file.mime_type?.startsWith('video/') ? 'Воспроизвести' : 'Просмотреть', onPress: () => setMediaViewerOpen(true) },
+                      { text: 'Переместить', onPress: () => setPanel('folder') },
+                      { text: 'Поделиться', onPress: () => handleShare() },
+                    ];
+                    if (isOwner) buttons.push({ text: 'Удалить', style: 'destructive', onPress: handleDeleteConfirm });
+                    buttons.push({ text: 'Отмена', style: 'cancel' });
+                    Alert.alert(file.display_name ?? file.original_name, undefined, buttons);
+                  }}
                   activeOpacity={0.85}
                 >
                   <Image

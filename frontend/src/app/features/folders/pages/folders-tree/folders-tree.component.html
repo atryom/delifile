@@ -222,6 +222,17 @@
         </svg>
         <span class="add-folder-label">Новая папка</span>
       </button>
+      @if (currentSharedFolderId() && currentFolder()?.is_owner) {
+        <button type="button" class="btn-add-folder" (click)="openAccessDialog(currentFolder()!)" title="Управление доступом" aria-label="Управление доступом к папке">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span class="add-folder-label">Доступы</span>
+        </button>
+      }
     </div>
 
     <!-- ── SHARED FOLDER DISCUSSION ──────────────────────────────────────── -->
@@ -712,7 +723,7 @@
           Добавить фильм
         </button>
       </div>
-      <app-movie-view [files]="$any(files())" (addClick)="showAddMovieDialog.set(true)" (fileClick)="openFileDetail($any($event))" />
+      <app-movie-view [files]="$any(files())" [canEdit]="canEditCurrentFolder()" (addClick)="showAddMovieDialog.set(true)" (fileClick)="openFileDetail($any($event))" (deleteClick)="confirmDeleteFile($any($event))" />
     }
 
   </div><!-- /main -->

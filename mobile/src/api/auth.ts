@@ -34,4 +34,11 @@ export const authApi = {
 
   revokeSession: (id: string) =>
     apiClient.delete<ApiResponse<null>>(`/auth/sessions/${id}`),
+
+  updateSettings: (settings: Partial<Pick<User,
+    'notifications_enabled' | 'notify_new_files' | 'notify_folder_shared' | 'notify_shared_folder_updates' |
+    'notify_comments' | 'notify_mentions' | 'notify_support_reply' | 'notify_contacts_added' | 'notify_task_assigned' |
+    'allow_contacts_without_confirmation' | 'auto_add_received_files'
+  >>) =>
+    apiClient.patch<ApiResponse<{ user: User }>>('/user/settings', settings),
 };

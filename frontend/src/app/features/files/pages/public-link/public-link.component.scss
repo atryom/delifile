@@ -31,6 +31,17 @@
 .error h2 { color: #dc2626; margin: 0 0 8px; }
 .error p  { color: #6b7280; font-size: 0.9rem; }
 
+.movie-card { display: flex; gap: 16px; width: 100%; text-align: left; margin-bottom: 16px; }
+.movie-poster { width: 100px; height: 150px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.movie-poster-placeholder { width: 100px; height: 150px; background: #f1f5f9; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; flex-shrink: 0; }
+.movie-info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.movie-title { font-size: 1.15rem; font-weight: 700; margin: 0; line-height: 1.3; color: #1e293b; word-break: break-word; }
+.movie-meta-row { display: flex; gap: 10px; font-size: 13px; color: #64748b; }
+.movie-rating { color: #f59e0b; font-weight: 600; }
+.movie-director { font-size: 13px; color: #64748b; margin: 0; }
+.movie-genres { display: flex; flex-wrap: wrap; gap: 6px; }
+.genre-tag { background: #f1f5f9; border-radius: 4px; padding: 2px 8px; font-size: 11px; color: #475569; }
+
 .url-card { width: 100%; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 12px; text-align: left; }
 .url-card-img { width: 100%; max-height: 180px; object-fit: cover; display: block; }
 .url-card-body { padding: 14px 16px; }

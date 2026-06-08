@@ -10,6 +10,8 @@ type SettingsItem = {
 };
 
 const ITEMS: SettingsItem[] = [
+  { title: 'Уведомления', subtitle: 'Push-уведомления и их типы', icon: 'notifications-outline', route: '/(app)/settings/notifications' },
+  { title: 'Приватность', subtitle: 'Контакты и полученные файлы', icon: 'eye-outline', route: '/(app)/settings/privacy' },
   { title: 'Теги', subtitle: 'Создание и управление тегами', icon: 'pricetag-outline', route: '/(app)/settings/tags' },
   { title: 'Безопасность', subtitle: 'Пароль и сессии устройств', icon: 'shield-outline', route: '/(app)/settings/security' },
   { title: 'Техподдержка', subtitle: 'Обращения и вопросы', icon: 'help-circle-outline', route: '/(app)/settings/support' },

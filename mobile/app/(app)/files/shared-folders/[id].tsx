@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
-import { Alert, FlatList, Keyboard, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useRef, useState, useCallback } from 'react';
+import { Alert, FlatList, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sharedFoldersApi } from '@/api/shared-folders';
+import { filesApi } from '@/api/files';
 import { useSharedFolderAccesses, useAddFolderMember, useRemoveFolderMember } from '@/hooks/useSharedFolders';
 import { useContacts } from '@/hooks/useContacts';
 import { Spinner } from '@/components/ui/Spinner';
@@ -17,6 +18,8 @@ import { getApiError } from '@/utils/error';
 interface FileListItemWithPrivacy extends FileListItem {
   is_private?: boolean;
 }
+
+type MovieFilter = 'all' | 'watched' | 'unwatched';
 
 function getFolderTypeIcon(type?: string | null): string {
   if (type === 'gallery') return '🖼';
@@ -35,7 +38,14 @@ export default function SharedFolderScreen() {
   const folderTitle = paramName || cachedFolder?.name || 'Общая папка';
   const resolvedParamType = Array.isArray(paramFolderType) ? paramFolderType[0] : paramFolderType;
   const folderType = (cachedFolder?.folder_type ?? resolvedParamType ?? 'default') as 'default' | 'gallery' | 'movies';
+  const canEdit = cachedFolder ? (cachedFolder.is_owner || cachedFolder.my_access_type === 'edit') : false;
   const [showAddMovie, setShowAddMovie] = useState(false);
+
+  // Movie filter state
+  const [movieFilter, setMovieFilter] = useState<MovieFilter>('all');
+  // Optimistic meta overrides keyed by file id
+  const [localMovieMeta, setLocalMovieMeta] = useState<Record<string, { watched?: boolean | null; personal_rating?: number | null }>>({});
+
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const renameInputRef = useRef<TextInput>(null);
@@ -191,6 +201,22 @@ export default function SharedFolderScreen() {
       ]);
     }
   }
+
+  const handleMovieWatched = useCallback((fileId: string, watched: boolean) => {
+    const prev = localMovieMeta[fileId]?.watched;
+    setLocalMovieMeta(m => ({ ...m, [fileId]: { ...m[fileId], watched } }));
+    filesApi.updateMovieMeta(fileId, { watched }).catch(() => {
+      setLocalMovieMeta(m => ({ ...m, [fileId]: { ...m[fileId], watched: prev } }));
+    });
+  }, [localMovieMeta]);
+
+  const handleMovieRating = useCallback((fileId: string, rating: number | null) => {
+    const prev = localMovieMeta[fileId]?.personal_rating;
+    setLocalMovieMeta(m => ({ ...m, [fileId]: { ...m[fileId], personal_rating: rating } }));
+    filesApi.updateMovieMeta(fileId, { personal_rating: rating }).catch(() => {
+      setLocalMovieMeta(m => ({ ...m, [fileId]: { ...m[fileId], personal_rating: prev } }));
+    });
+  }, [localMovieMeta]);
 
   const files = (folderData?.files ?? []) as FileListItemWithPrivacy[];
   const subfolders = folderData?.subfolders ?? [];
@@ -348,20 +374,63 @@ export default function SharedFolderScreen() {
 
       {/* Movies view */}
       {folderType === 'movies' && (
-        <FlatList
-          data={files}
-          keyExtractor={(f) => f.id}
-          onRefresh={refetch}
-          refreshing={isLoading}
-          contentContainerStyle={styles.moviesList}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>Фильмов нет</Text>
-              <Text style={styles.emptySub}>Нажмите «＋» чтобы добавить фильм</Text>
-            </View>
-          }
-          renderItem={({ item }) => <MovieCard item={item} />}
-        />
+        <View style={styles.flex}>
+          {/* Filter chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar}>
+            {([
+              { val: 'all' as MovieFilter, label: 'Все' },
+              { val: 'watched' as MovieFilter, label: 'Смотрел' },
+              { val: 'unwatched' as MovieFilter, label: 'Не смотрел' },
+            ]).map((chip) => (
+              <Pressable
+                key={chip.val}
+                style={[styles.filterChip, movieFilter === chip.val && styles.filterChipActive]}
+                onPress={() => setMovieFilter(chip.val)}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.filterChipText, movieFilter === chip.val && styles.filterChipTextActive]}>
+                  {chip.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <FlatList
+            data={files.filter((f) => {
+              if (movieFilter === 'all') return true;
+              const localW = localMovieMeta[f.id]?.watched;
+              const watched = localW !== undefined ? localW : !!(f.custom_metadata as any)?.watched;
+              return movieFilter === 'watched' ? !!watched : !watched;
+            })}
+            keyExtractor={(f) => f.id}
+            onRefresh={refetch}
+            refreshing={isLoading}
+            contentContainerStyle={styles.moviesList}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyTitle}>{movieFilter === 'all' ? 'Фильмов нет' : 'Нет фильмов с таким фильтром'}</Text>
+                {movieFilter === 'all' && <Text style={styles.emptySub}>Нажмите «＋» чтобы добавить фильм</Text>}
+              </View>
+            }
+            renderItem={({ item }) => {
+              const localMeta = localMovieMeta[item.id];
+              const mergedItem = localMeta
+                ? { ...item, custom_metadata: { ...(item.custom_metadata ?? {}), ...localMeta } as any }
+                : item;
+              return (
+                <MovieCard
+                  item={mergedItem}
+                  onDelete={canEdit ? () => {
+                    sharedFoldersApi.removeFile(id, item.id)
+                      .then(() => qc.invalidateQueries({ queryKey: ['shared-folders', id] }))
+                      .catch(() => Alert.alert('Ошибка', 'Не удалось убрать фильм из списка'));
+                  } : undefined}
+                  onWatchedToggle={(watched) => handleMovieWatched(item.id, watched)}
+                  onRatingChange={(rating) => handleMovieRating(item.id, rating)}
+                />
+              );
+            }}
+          />
+        </View>
       )}
 
       {/* Default view */}
@@ -512,6 +581,11 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
   emptySub: { fontSize: 14, color: '#94A3B8', textAlign: 'center' },
   moviesList: { paddingVertical: 8 },
+  filterBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  filterChip: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, backgroundColor: '#F8FAFC' },
+  filterChipActive: { borderColor: '#6366F1', backgroundColor: '#EDE9FE' },
+  filterChipText: { fontSize: 13, color: '#64748B' },
+  filterChipTextActive: { color: '#6366F1', fontWeight: '600' },
 
   sectionHeader: {
     fontSize: 12, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase',
