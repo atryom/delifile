@@ -35,7 +35,15 @@ interface FolderRowProps {
 }
 
 function FolderRow({ folder, onMenu, isRenaming, renameText, onRenameChange, onRenameSave, onRenameCancel }: FolderRowProps) {
-  const icon = folder.is_personal_root ? '🏠' : folder.is_private ? '🔒' : '🗂';
+  const icon = folder.is_personal_root
+    ? '🏠'
+    : folder.folder_type === 'gallery'
+    ? '🖼'
+    : folder.folder_type === 'movies'
+    ? '🎬'
+    : folder.is_private
+    ? '🔒'
+    : '🗂';
 
   if (isRenaming) {
     return (
