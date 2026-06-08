@@ -44,8 +44,9 @@ export function AddMovieModal({ folderId, onAdded, onClose }: Props) {
         return;
       }
       setResults(data.results ?? []);
-    } catch {
-      Alert.alert('Ошибка', 'Не удалось найти фильм. Проверьте запрос.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? 'Не удалось найти фильм. Проверьте запрос.';
+      Alert.alert('Ошибка', msg);
     } finally {
       setLoading(false);
     }

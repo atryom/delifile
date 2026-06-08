@@ -54,7 +54,11 @@ class MovieController extends Controller
         }
 
         // Text search — return list for user confirmation
-        $results = $this->kinopoisk->search($input);
+        try {
+            $results = $this->kinopoisk->search($input);
+        } catch (\RuntimeException $e) {
+            return $this->error('Сервис Кинопоиска временно недоступен. Попробуйте позже.', 'KINOPOISK_UNAVAILABLE', [], 503);
+        }
         return $this->success('Результаты поиска', ['results' => $results]);
     }
 
@@ -145,7 +149,11 @@ class MovieController extends Controller
             return $this->success('Фильм найден', ['movie' => $movie, 'auto_confirm' => true]);
         }
 
-        $results = $this->kinopoisk->search($input);
+        try {
+            $results = $this->kinopoisk->search($input);
+        } catch (\RuntimeException $e) {
+            return $this->error('Сервис Кинопоиска временно недоступен. Попробуйте позже.', 'KINOPOISK_UNAVAILABLE', [], 503);
+        }
         return $this->success('Результаты поиска', ['results' => $results]);
     }
 
