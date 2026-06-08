@@ -173,25 +173,39 @@ class ShareViewController: UIViewController {
 
         messageLabel.text = "Открываем DeliFile..."
 
-        // Brief delay so the UI has time to render before attempting to open the app.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        // IMPORTANT: extensionContext.open(_:) is documented by Apple to work ONLY for
+        // Today widgets / iMessage apps — for a Share Extension it returns false (or its
+        // completion handler never fires), so the app never launches. The reliable,
+        // production-proven approach (used by expo-share-intent) is:
+        //   1. complete the request first,
+        //   2. then walk the responder chain to find the UIApplication of the extension
+        //      process and call its `openURL:` selector.
+        // Completing first lets the extension dismiss cleanly while the host app launches.
+        extensionContext?.completeRequest(returningItems: []) { [weak self] _ in
             guard let self = self else { return }
-            self.extensionContext?.open(url) { success in
-                if success {
-                    NSLog("[ShareExtension] main app opened via extensionContext.open")
-                    self.complete()
-                } else {
-                    NSLog("[ShareExtension] failed to open main app — instructing user")
-                    self.messageLabel.text = "Файл получен.\nОткройте DeliFile, чтобы завершить загрузку."
-                    self.spinner.stopAnimating()
-                    // Keep the extension alive for a bit so the user can read the message,
-                    // then dismiss cleanly.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        self.complete()
-                    }
-                }
+            if self.openURLViaResponderChain(url) {
+                NSLog("[ShareExtension] main app opened via responder chain")
+            } else {
+                NSLog("[ShareExtension] failed to open main app via responder chain")
             }
         }
+    }
+
+    /// Walks the responder chain to find the extension process's UIApplication and
+    /// invokes its `openURL:` selector. UIApplication.shared is unavailable in app
+    /// extensions, but the running instance is still reachable via the responder chain.
+    @discardableResult
+    private func openURLViaResponderChain(_ url: URL) -> Bool {
+        var responder: UIResponder? = self
+        let selector = NSSelectorFromString("openURL:")
+        while let current = responder {
+            if let application = current as? UIApplication, application.responds(to: selector) {
+                application.perform(selector, with: url)
+                return true
+            }
+            responder = current.next
+        }
+        return false
     }
 
     private func complete() {

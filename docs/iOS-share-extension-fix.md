@@ -8,28 +8,51 @@
 
 ## Причина
 
-Share Extension (`ShareViewController.swift`) пытался открыть main app двумя способами:
+История исправлялась в два захода.
 
-1. **`openURLViaResponderChain()`** — ходит по цепочке responder'ов в поисках `UIApplication`. В iOS Share Extension `UIApplication.shared` недоступен, responder chain **не содержит UIApplication**. На iOS 15+ этот метод всегда возвращает `false`.
+### Заход 1 (ошибочный диагноз)
 
-2. **`extensionContext?.open(url)`** (fallback) — документированная Apple нестабильность при вызове из Share Extension. Часто тихо падает без ошибки, особенно если приложение не было предварительно запущено (cold start).
+Сначала проблему объяснили так: оба способа открытия main app не работают —
+`openURLViaResponderChain()` якобы мёртв, а `extensionContext?.open(url)` нестабилен.
+Поэтому `openURLViaResponderChain()` **удалили** и оставили только
+`extensionContext?.open(url)`. Это убрало фликер, но привело к новому симптому:
+экран расширения **застревал** на надписи «Открываем DeliFile...», и приложение
+так и не запускалось.
 
-**Результат:** оба метода терпели неудачу → `completeRequest()` вызывался немедленно (через 0.1с) → extension схлопывался, main app не открыт. Пользователь видел фликер. Данные оставались в App Group до следующего ручного foreground'а приложения, где `checkIntent()` в `_layout.tsx` их подхватывал.
+### Заход 2 (реальная причина)
 
-Дополнительная проблема: на JS-стороне не было обработчика deep link `delifile://share` через `Linking.addEventListener`, поэтому даже при удачном открытии URL не доставлялся в JS-код.
+`extensionContext?.open(url)` **по документации Apple работает только для
+Today-виджетов и iMessage-приложений**. Для Share Extension он возвращает `false`
+(или его completion-handler не вызывается вовсе) — поэтому main app не открывался,
+а `messageLabel` навсегда оставался на «Открываем DeliFile...».
+
+Метод `openURLViaResponderChain()`, наоборот, — **рабочий** способ. Несмотря на
+расхожее утверждение, что `UIApplication` нет в responder chain, в share-расширении
+на основе `UIViewController` цепочка responder'ов доходит до экземпляра
+`UIApplication` процесса расширения, и `application.perform(openURL:)` срабатывает.
+Это проверенный в продакшене подход (его использует библиотека `expo-share-intent`).
+
+**Ключевой нюанс рабочего паттерна:** сначала `completeRequest`, и уже в его
+completion-handler'е — открытие URL через responder chain. Это даёт расширению
+корректно закрыться, пока хост-приложение запускается.
+
+Дополнительная проблема (была решена ещё в заходе 1): на JS-стороне не было
+обработчика deep link `delifile://share` через `Linking.addEventListener`, поэтому
+даже при удачном открытии URL не доставлялся в JS-код.
 
 ## Процесс исправления
 
 ### 1. `mobile/plugins/share-extension/ShareViewController.swift`
 
-- **Удалён метод `openURLViaResponderChain()`** — мёртвый код, никогда не работал на iOS 15+.
 - **Добавлен `UILabel` (`messageLabel`)** для отображения статуса пользователю (вместо пустого экрана).
-- **Изменена `openMainApp()`**:
-  - Задержка перед попыткой уменьшена до 0.3с (было 0.1с — слишком мало).
-  - Используется только `extensionContext?.open(url)` — легитимный API.
-  - При успехе → `complete()` сразу.
-  - При неудаче → показываем сообщение «Файл получен. Откройте DeliFile, чтобы завершить загрузку.» и завершаем extension через 2 секунды.
-  - Спиннер и сообщение дают пользователю понятную обратную связь вместо фликера.
+- **Восстановлен метод `openURLViaResponderChain()`** — рабочий способ открытия
+  main app: ищет `UIApplication` процесса расширения через цепочку responder'ов и
+  вызывает селектор `openURL:`.
+- **Переписана `openMainApp()`** по паттерну `expo-share-intent`:
+  - Убран `extensionContext?.open(url)` — он не работает для Share Extension.
+  - Сначала вызывается `extensionContext?.completeRequest(...)`, и уже в его
+    completion-handler'е выполняется `openURLViaResponderChain(url)`.
+  - Это позволяет расширению корректно закрыться, пока запускается хост-приложение.
 
 ### 2. `mobile/app/_layout.tsx`
 
@@ -57,7 +80,7 @@ Share Extension (`ShareViewController.swift`) пытался открыть main
 
 | Файл | Изменения |
 |------|-----------|
-| `mobile/plugins/share-extension/ShareViewController.swift` | Удалён `openURLViaResponderChain`, добавлен `messageLabel`, переписана `openMainApp()` с увеличенной задержкой и пользовательским сообщением |
+| `mobile/plugins/share-extension/ShareViewController.swift` | Восстановлен `openURLViaResponderChain`, переписана `openMainApp()` по паттерну `expo-share-intent` (`completeRequest` → открытие через responder chain), добавлен `messageLabel` |
 | `mobile/app/_layout.tsx` | Добавлены `Linking.getInitialURL` + `Linking.addEventListener` для deep link `delifile://share`; добавлен retry с backoff (0.5/1/2с) в `checkIntent()` |
 
 ### Логика после исправления
@@ -69,11 +92,12 @@ iOS Share Sheet
 ShareViewController.swift
   │  Копирует файл в App Group
   │  Пишет metadata в UserDefaults
-  │  extensionContext?.open("delifile://share")
-  │    ├── success → complete() (app открыт, deep link доставлен)
-  │    └── fail    → показываем «Откройте DeliFile» → complete() через 2с
+  │  extensionContext?.completeRequest(...) { in completion:
+  │      openURLViaResponderChain("delifile://share")
+  │      (UIApplication процесса расширения → openURL:)
+  │  }
   ▼
-Main app открывается (если open сработал)
+Main app открывается, deep link доставлен
   │
   ▼
 _layout.tsx
@@ -88,8 +112,8 @@ share.tsx — загрузка файла через API
 
 ### Остаточные риски
 
-- `extensionContext?.open()` может не сработать при cold start на некоторых версиях iOS (известная проблема Apple). В этом случае пользователь увидит сообщение «Файл получен. Откройте DeliFile» (вместо фликера) и должен будет открыть приложение вручную.
-- Если extension не открыл приложение, данные загрузятся при первом же foreground'е приложения (через AppState 'active' → checkIntent()).
+- `openURLViaResponderChain()` опирается на то, что `UIApplication` процесса расширения достижим через responder chain. На практике работает на iOS 15–18, но формально это «обход» — теоретически Apple может изменить поведение в будущих версиях.
+- Если extension не открыл приложение, данные всё равно загрузятся при первом же foreground'е приложения (через AppState 'active' → checkIntent()), так что потери данных не происходит.
 
 ## Откат
 
