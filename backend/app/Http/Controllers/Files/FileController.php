@@ -16,6 +16,7 @@ use App\Services\ActivityService;
 use App\Services\S3UrlService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class FileController extends Controller
 {
@@ -310,6 +311,50 @@ class FileController extends Controller
         if (!$url) { abort(503); }
 
         return redirect()->away($url);
+    }
+
+    /**
+     * GET /api/v1/files/{fileId}/text-content
+     * Return the raw UTF-8 text of a small plain-text file for read-only in-app
+     * viewing (.txt, .log, .csv, …). Read server-side from S3 to avoid CORS.
+     */
+    public function textContent(Request $request, string $fileId): JsonResponse
+    {
+        $file = File::find($fileId);
+
+        if (!$file || !$file->isAvailable() || $file->isUrlFile()) {
+            return $this->notFound('File not found');
+        }
+
+        if (!$this->fileService->canAccess($request->user(), $file)) {
+            return $this->forbidden();
+        }
+
+        if (!$this->fileService->isPlainTextViewable($file)) {
+            return $this->error('File is not a viewable text format', 'NOT_TEXT_VIEWABLE', [], 422);
+        }
+
+        $maxBytes = 1024 * 1024; // 1 MB cap for inline preview
+        if ((int) ($file->size ?? 0) > $maxBytes) {
+            return $this->error('File is too large to preview', 'TEXT_TOO_LARGE', ['max_bytes' => $maxBytes], 422);
+        }
+
+        try {
+            $content = Storage::disk('s3')->get($file->storage_key);
+        } catch (\Throwable) {
+            return $this->error('Storage service unavailable', 'S3_ERROR', [], 503);
+        }
+
+        if ($content === null) {
+            return $this->notFound('File content not found');
+        }
+
+        // Guarantee valid UTF-8 so the JSON response never breaks on binary bytes.
+        if (!mb_check_encoding($content, 'UTF-8')) {
+            $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+        }
+
+        return $this->success('Text content', ['content' => $content]);
     }
 
     /**

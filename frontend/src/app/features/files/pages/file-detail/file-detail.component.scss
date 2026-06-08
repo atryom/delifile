@@ -1131,3 +1131,35 @@
   border-top: 1px solid #f1f5f9;
   padding-top: 16px;
 }
+
+/* ── Read-only text viewer (.txt, .log, .csv, …) ───────────────────────────── */
+.text-viewer-card {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.text-viewer-state {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted, #94a3b8);
+
+  &--error { color: #ef4444; }
+}
+
+.text-viewer-content {
+  margin: 0;
+  padding: 16px;
+  max-height: 70vh;
+  overflow: auto;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text, #1e293b);
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 4;
+}

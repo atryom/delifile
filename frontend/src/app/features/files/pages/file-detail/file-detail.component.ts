@@ -11,7 +11,7 @@ import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode, SharedFolder, TaskStatus } from '../../../../shared/models/api.models';
 import { formatSize } from '../../../../shared/utils/format';
-import { canViewInBrowser } from '../../../../shared/utils/file';
+import { canViewInBrowser, isPlainTextFile } from '../../../../shared/utils/file';
 import { flattenTree } from '../../../../shared/utils/tree';
 import { ShareContactDialogComponent } from '../../dialogs/share-contact/share-contact-dialog.component';
 import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link-dialog.component';
@@ -118,6 +118,15 @@ export class FileDetailComponent implements OnInit, OnDestroy {
   readonly editorPanelOpen        = signal(false);
   readonly editorExpanded         = signal(false);
   readonly editorRefreshTrigger   = signal(0);
+
+  // ─── Read-only text preview (.txt, .log, .csv, …) ─────────────────────────────
+  readonly isTextFile = computed<boolean>(() => {
+    const f = this.file();
+    return !!f && isPlainTextFile(f.mime_type, f.original_name, f.content_kind);
+  });
+  readonly textContent = signal<string | null>(null);
+  readonly textLoading = signal(false);
+  readonly textError   = signal(false);
 
   // ─── Versioning state ────────────────────────────────────────────────────────
 
@@ -236,6 +245,8 @@ export class FileDetailComponent implements OnInit, OnDestroy {
         this.loading.set(false);
         if (res.data.file.mime_type === 'text/markdown') {
           this.editorPanelOpen.set(true);
+        } else if (isPlainTextFile(res.data.file.mime_type, res.data.file.original_name, res.data.file.content_kind)) {
+          this.loadTextContent();
         }
         // Direct link: set back to local folder if file belongs to one
         const fromParam = this.route.snapshot.queryParamMap.get('from');
@@ -864,6 +875,16 @@ export class FileDetailComponent implements OnInit, OnDestroy {
     this.editorPanelOpen.set(false);
     this.editorExpanded.set(false);
     this.syncEditorUrl();
+  }
+
+  private loadTextContent(): void {
+    this.textLoading.set(true);
+    this.textError.set(false);
+    this.textContent.set(null);
+    this.filesApi.getTextContent(this.id()).subscribe({
+      next: (res) => { this.textContent.set(res.data.content); this.textLoading.set(false); },
+      error: () => { this.textError.set(true); this.textLoading.set(false); },
+    });
   }
 
   toggleEditorExpanded(): void {

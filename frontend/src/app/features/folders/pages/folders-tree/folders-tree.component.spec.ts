@@ -7,7 +7,7 @@ import { CommentsApiService } from '../../../../core/api/comments-api.service';
 import { FileUploadService } from '../../../files/services/file-upload.service';
 import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { signal } from '@angular/core';
@@ -86,7 +86,7 @@ describe('FoldersTreeComponent', () => {
         { provide: CommentsApiService, useValue: mockCommentsApi },
         { provide: Router, useValue: mockRouter },
         { provide: TranslateService, useValue: translateMock },
-        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } }, queryParamMap: of(convertToParamMap({})) } },
       ],
     }).compileComponents();
   });

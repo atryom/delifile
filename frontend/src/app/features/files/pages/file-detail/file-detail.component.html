@@ -27,6 +27,19 @@
               </div>
             }
 
+            <!-- Read-only text viewer (.txt, .log, .csv, …) -->
+            @if (isTextFile()) {
+              <div class="text-viewer-card">
+                @if (textLoading()) {
+                  <div class="text-viewer-state" role="status" aria-live="polite">Загрузка содержимого...</div>
+                } @else if (textError()) {
+                  <div class="text-viewer-state text-viewer-state--error" role="alert">Не удалось загрузить содержимое файла</div>
+                } @else if (textContent() !== null) {
+                  <pre class="text-viewer-content">{{ textContent() }}</pre>
+                }
+              </div>
+            }
+
             <!-- Version selector bar (versions + add button) -->
             @if ((file()!.has_versions && file()!.versions.length > 0) || canAddVersion()) {
               <div class="versions-selector-bar" role="group" [attr.aria-label]="'files.versions.selector_label' | translate">

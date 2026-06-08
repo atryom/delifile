@@ -226,6 +226,33 @@ class FileService
     }
 
     /**
+     * Whether a file is a simple text format that can be shown read-only in-app.
+     * Markdown is excluded — it has its own editor.
+     */
+    public function isPlainTextViewable(File $file): bool
+    {
+        $mime = strtolower($file->mime_type ?? '');
+        if ($mime === 'text/markdown') {
+            return false;
+        }
+        if (str_starts_with($mime, 'text/')) {
+            return true;
+        }
+        $textMimes = [
+            'application/json', 'application/xml', 'application/x-yaml', 'application/yaml',
+            'application/x-sh', 'application/javascript', 'application/x-ndjson',
+        ];
+        if (in_array($mime, $textMimes, true)) {
+            return true;
+        }
+        $ext = strtolower(pathinfo($file->original_name ?? '', PATHINFO_EXTENSION));
+        return in_array($ext, [
+            'txt', 'log', 'csv', 'tsv', 'json', 'xml', 'yml', 'yaml',
+            'ini', 'conf', 'cfg', 'env', 'properties', 'sh', 'bash',
+        ], true);
+    }
+
+    /**
      * Validate that a file size fits within the plan's per-file limit.
      * Returns null if OK, or ['code' => ..., 'data' => [...]] if exceeded.
      */

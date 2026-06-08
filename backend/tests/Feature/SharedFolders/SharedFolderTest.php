@@ -388,6 +388,25 @@ class SharedFolderTest extends TestCase
             ->assertJsonPath('result', 'success');
     }
 
+    public function test_all_flat_includes_file_counts(): void
+    {
+        $user   = User::factory()->create();
+        $folder = SharedFolder::factory()->create(['owner_id' => $user->id]);
+        $f1 = File::factory()->create(['owner_id' => $user->id]);
+        $f2 = File::factory()->create(['owner_id' => $user->id]);
+        SharedFolderFile::create(['shared_folder_id' => $folder->id, 'file_id' => $f1->id, 'added_by' => $user->id]);
+        SharedFolderFile::create(['shared_folder_id' => $folder->id, 'file_id' => $f2->id, 'added_by' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->getJson('/api/v1/shared-folders/all-flat');
+
+        $response->assertOk();
+        $item = collect($response->json('data.items'))->firstWhere('id', $folder->id);
+        // Counts must be present here too — folders rendered from this endpoint
+        // (deep-link / PWA restore) previously showed 0 until a refresh.
+        $this->assertSame(2, $item['files_count']);
+    }
+
     public function test_unauthenticated_user_cannot_access_shared_folders(): void
     {
         $response = $this->getJson('/api/v1/shared-folders');

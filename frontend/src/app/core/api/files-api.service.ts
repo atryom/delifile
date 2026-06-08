@@ -92,6 +92,11 @@ export class FilesApiService {
     return this.api.post(`/files/${id}/download`);
   }
 
+  /** Read-only text content for simple formats (.txt, .log, .csv, …). */
+  getTextContent(id: string): Observable<ApiResponse<{ content: string }>> {
+    return this.api.get(`/files/${id}/text-content`);
+  }
+
   pin(id: string): Observable<ApiResponse<Record<string, never>>> {
     return this.api.post(`/files/${id}/pin`);
   }

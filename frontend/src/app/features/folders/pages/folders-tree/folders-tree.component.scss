@@ -17,7 +17,10 @@
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 64px);
-  overflow: hidden;
+  // overflow-x: clip (not `hidden`) guards against horizontal blow-out without
+  // creating a scroll container — otherwise it would capture position:sticky and
+  // break the sticky .topbar (the window is the real scroller).
+  overflow-x: clip;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -106,7 +109,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: clip; // see .explorer-app — keep window as the sticky scroll container
   min-width: 0;
   background: var(--bg);
 }
@@ -122,6 +125,16 @@
   padding: 10px 16px;
   flex-shrink: 0;
   background: var(--surface);
+  // Pin the add/view bar to the top while the form scrolls.
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+// Below the desktop breakpoint a fixed 56px mobile header occupies the top,
+// so the sticky topbar must sit just beneath it.
+@media (max-width: #{v.$bp-desktop - 1px}) {
+  .topbar { top: 56px; }
 }
 
 .btn-action {
@@ -1396,6 +1409,15 @@ tbody tr.row-selected:hover { background: var(--accent-dim); }
   .breadcrumb { font-size: 12px; }
   .add-folder-label { display: none; }
   .btn-add-folder { padding: 6px 8px; }
+
+  /* Create-folder bar: stack onto multiple rows so it fits narrow screens
+     (previously overflowed and the Create button was unreachable). */
+  .inline-create-bar { flex-wrap: wrap; }
+  .inline-create-bar .create-input { flex: 1 1 100%; }
+  .create-type-row { flex-wrap: wrap; width: 100%; margin: 0; }
+  .create-type-btn { flex: 1 1 auto; text-align: center; }
+  .inline-create-bar .btn-save,
+  .inline-create-bar .btn-cancel { flex: 1 1 auto; }
 
   /* Table → card list on mobile */
   thead { display: none; }

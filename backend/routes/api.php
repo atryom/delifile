@@ -115,6 +115,7 @@ Route::prefix('v1')->group(function () {
 
         // Files — stable content/preview URLs (used in markdown documents)
         Route::get('files/{id}/content',  [FileController::class, 'content']);
+        Route::get('files/{id}/text-content', [FileController::class, 'textContent']);
         Route::get('files/{id}/preview',  [FileController::class, 'preview']);
 
         // Files — actions

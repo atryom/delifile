@@ -16,6 +16,7 @@ import { FileAccess } from '../../../../shared/models/api.models';
 describe('FileDetailComponent', () => {
   const mockFilesApi = {
     get: vi.fn(),
+    getTextContent: vi.fn(() => of({ result: 'success', data: { content: '' } })),
     listLinks: vi.fn(() => of({ result: 'success', data: { items: [] } })),
     accesses: vi.fn(() => of({ result: 'success', data: { items: [] } })),
     activity: vi.fn(() => of({ result: 'success', data: { items: [] } })),

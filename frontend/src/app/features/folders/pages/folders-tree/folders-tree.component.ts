@@ -1,6 +1,7 @@
 import {
-  Component, inject, signal, computed, OnInit, effect, ChangeDetectionStrategy, viewChild, ElementRef,
+  Component, inject, signal, computed, OnInit, effect, ChangeDetectionStrategy, viewChild, ElementRef, DestroyRef,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
 import { DatePipe } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -68,6 +69,7 @@ export class FoldersTreeComponent implements OnInit {
   private readonly urlFilesApi  = inject(UrlFilesApiService);
   private readonly router       = inject(Router);
   private readonly route        = inject(ActivatedRoute);
+  private readonly destroyRef   = inject(DestroyRef);
   private readonly fb           = inject(FormBuilder);
   private readonly docsApi      = inject(DocumentsApiService);
   private readonly fileUpdates = inject(FileUpdatesService);
@@ -342,6 +344,29 @@ export class FoldersTreeComponent implements OnInit {
       this.loadShared();
       this.loadFiles();
     }
+
+    // The folder navigation lives in component state, not in the route path, so
+    // tapping the "Файлы и папки" nav item (routerLink="/folders") while already
+    // inside a folder only clears the shared_folder_id query param without
+    // re-running ngOnInit. React to that to return to the root. Our own syncUrl()
+    // keeps the param in sync with state, so this only fires on external nav.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((qpm) => {
+        if (!qpm.get('shared_folder_id') && this.currentSharedFolderId() !== null) {
+          this.resetToRoot();
+        }
+      });
+  }
+
+  private resetToRoot(): void {
+    this.currentSharedFolderId.set(null);
+    this.breadcrumbs.set([{ label: 'Папки', sharedFolderId: null }]);
+    this.folderNotesOpen.set(false);
+    this.sfSubfolders.set([]);
+    this.resetFiltersKeepTag();
+    this.loadShared();
+    this.loadFiles();
   }
 
   // ── Breadcrumb navigation ─────────────────────────────────────────────────

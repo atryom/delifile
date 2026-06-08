@@ -20,6 +20,32 @@ export function classifyMimeType(
   return 'file';
 }
 
+/**
+ * Return true for simple text formats we can show read-only in-app (.txt, .log,
+ * .csv, …). Markdown is excluded — it opens in the markdown editor. Mirrors
+ * FileService::isPlainTextViewable() on the backend.
+ */
+export function isPlainTextFile(
+  mimeType: string | null | undefined,
+  fileName: string | null | undefined,
+  contentKind?: ContentKind | string | null,
+): boolean {
+  if (contentKind === 'url_file') return false;
+  const m = (mimeType ?? '').toLowerCase();
+  if (m === 'text/markdown') return false;
+  if (m.startsWith('text/')) return true;
+  const textMimes = [
+    'application/json', 'application/xml', 'application/x-yaml', 'application/yaml',
+    'application/x-sh', 'application/javascript', 'application/x-ndjson',
+  ];
+  if (textMimes.includes(m)) return true;
+  const ext = (fileName ?? '').split('.').pop()?.toLowerCase() ?? '';
+  return [
+    'txt', 'log', 'csv', 'tsv', 'json', 'xml', 'yml', 'yaml',
+    'ini', 'conf', 'cfg', 'env', 'properties', 'sh', 'bash',
+  ].includes(ext);
+}
+
 /** Return true when the file can be opened inline in the browser. */
 export function canViewInBrowser(
   mimeType: string | null | undefined,

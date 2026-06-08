@@ -266,12 +266,21 @@ class SharedFolderController extends Controller
         $accessRootIds = SharedFolderAccess::where('user_id', $user->id)->pluck('shared_folder_id');
         $rootIds       = $ownedRootIds->merge($accessRootIds)->unique();
 
-        // BFS to collect all descendants
-        $all       = SharedFolder::whereIn('id', $rootIds)->withCount(['children', 'accesses'])->get();
+        // BFS to collect all descendants.
+        // Include file/task counts so folders rendered straight from this endpoint
+        // (e.g. deep-link / PWA restore into a folder) show correct counts instead
+        // of 0 until a refresh routes through index().
+        $countAggregates = [
+            'sharedFiles as files_count',
+            'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
+            'children',
+            'accesses',
+        ];
+        $all       = SharedFolder::whereIn('id', $rootIds)->withCount($countAggregates)->get();
         $nextIds   = $all->pluck('id');
 
         while ($nextIds->isNotEmpty()) {
-            $children = SharedFolder::whereIn('parent_id', $nextIds)->withCount(['children', 'accesses'])->get();
+            $children = SharedFolder::whereIn('parent_id', $nextIds)->withCount($countAggregates)->get();
             if ($children->isEmpty()) break;
             $all     = $all->merge($children);
             $nextIds = $children->pluck('id');
