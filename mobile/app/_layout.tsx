@@ -1,6 +1,6 @@
 import { Component, useEffect, useRef } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import { AppState, NativeModules, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, Linking, NativeModules, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient } from '@tanstack/react-query';
@@ -83,6 +83,10 @@ function RootLayoutInner() {
     const mod = NativeModules.ShareIntent;
     if (!mod) return;
 
+    let retryCount = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let linkSubscription: { remove: () => void } | null = null;
+
     function checkIntent() {
       mod.getSharedData().then((data: unknown) => {
         if (data) {
@@ -93,19 +97,51 @@ function RootLayoutInner() {
             sharePendingRef.current = true;
             router.push('/share' as any);
           }
+          if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
         } else {
           // Payload consumed/cleared — ready for the next share.
           sharePendingRef.current = false;
+          // Retry with backoff — UserDefaults may not have synced yet
+          // after Share Extension wrote to the App Group container.
+          if (retryCount < 3) {
+            const delay = [500, 1000, 2000][retryCount];
+            retryCount++;
+            retryTimer = setTimeout(checkIntent, delay);
+          }
         }
       }).catch(() => {});
     }
 
+    // Check on mount — catches cold start with pending share
     checkIntent();
 
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') checkIntent();
+    // Check when app comes to foreground
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        retryCount = 0;
+        checkIntent();
+      }
     });
-    return () => sub.remove();
+
+    // Handle deep link delifile://share from Share Extension
+    Linking.getInitialURL().then((url) => {
+      if (url && url.startsWith('delifile://')) {
+        retryCount = 0;
+        checkIntent();
+      }
+    });
+    linkSubscription = Linking.addEventListener('url', (event) => {
+      if (event.url.startsWith('delifile://')) {
+        retryCount = 0;
+        checkIntent();
+      }
+    });
+
+    return () => {
+      appStateSub.remove();
+      linkSubscription?.remove();
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, []);
 
   return (

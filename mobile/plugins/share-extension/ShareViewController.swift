@@ -7,16 +7,31 @@ class ShareViewController: UIViewController {
     private let appScheme  = "delifile://share"
 
     private let spinner = UIActivityIndicatorView(style: .large)
+    private let messageLabel = UILabel()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+
         spinner.color = UIColor(red: 0.15, green: 0.39, blue: 0.92, alpha: 1)
         spinner.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(spinner)
+
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        messageLabel.text = "Подготовка..."
+        messageLabel.textColor = .secondaryLabel
+        messageLabel.font = .systemFont(ofSize: 15)
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        view.addSubview(messageLabel)
+
         NSLayoutConstraint.activate([
             spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -20),
+
+            messageLabel.topAnchor.constraint(equalTo: spinner.bottomAnchor, constant: 16),
+            messageLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
+            messageLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
         ])
         spinner.startAnimating()
     }
@@ -156,42 +171,27 @@ class ShareViewController: UIViewController {
     private func openMainApp() {
         guard let url = URL(string: appScheme) else { complete(); return }
 
-        // `extensionContext?.open` is unreliable from a Share Extension on modern
-        // iOS — it frequently fails silently and the host app never opens (the user
-        // sees a flicker and stays in the share sheet). The proven workaround is to
-        // walk the responder chain to the real UIApplication and call openURL:
-        // directly. Give the system a beat first, then complete the request only
-        // after the open attempt so dismissing the extension doesn't cancel it.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        messageLabel.text = "Открываем DeliFile..."
+
+        // Brief delay so the UI has time to render before attempting to open the app.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self = self else { return }
-            if self.openURLViaResponderChain(url) {
-                NSLog("[ShareExtension] opened main app via responder chain openURL:")
-                self.complete()
-            } else {
-                NSLog("[ShareExtension] responder chain miss — falling back to extensionContext.open")
-                self.extensionContext?.open(url) { success in
-                    NSLog("[ShareExtension] extensionContext.open success=\(success)")
+            self.extensionContext?.open(url) { success in
+                if success {
+                    NSLog("[ShareExtension] main app opened via extensionContext.open")
                     self.complete()
+                } else {
+                    NSLog("[ShareExtension] failed to open main app — instructing user")
+                    self.messageLabel.text = "Файл получен.\nОткройте DeliFile, чтобы завершить загрузку."
+                    self.spinner.stopAnimating()
+                    // Keep the extension alive for a bit so the user can read the message,
+                    // then dismiss cleanly.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        self.complete()
+                    }
                 }
             }
         }
-    }
-
-    /// Walks the responder chain to the host UIApplication and invokes the
-    /// (deprecated) openURL: selector — the only way to launch the host app from a
-    /// Share Extension, since UIApplication.shared is unavailable in extensions.
-    @discardableResult
-    private func openURLViaResponderChain(_ url: URL) -> Bool {
-        let selector = NSSelectorFromString("openURL:")
-        var responder: UIResponder? = self
-        while let r = responder {
-            if let app = r as? UIApplication, app.responds(to: selector) {
-                app.perform(selector, with: url)
-                return true
-            }
-            responder = r.next
-        }
-        return false
     }
 
     private func complete() {
