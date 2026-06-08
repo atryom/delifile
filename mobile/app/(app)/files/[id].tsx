@@ -23,6 +23,7 @@ import type { SharedFolder, TaskStatus } from '@/types';
 import { useContacts } from '@/hooks/useContacts';
 import { filesApi } from '@/api/files';
 import { Spinner } from '@/components/ui/Spinner';
+import { GalleryViewer } from '@/components/ui/GalleryViewer';
 import { Button } from '@/components/ui/Button';
 import { DatePickerModal, isoToDisplayRu } from '@/components/ui/DatePickerModal';
 import { Image } from 'expo-image';
@@ -68,6 +69,8 @@ export default function FileDetailScreen() {
   const revokeAccess = useRevokeAccess(id);
   const updateAccess = useUpdateAccess(id);
   const updateTask = useUpdateTask(id);
+
+  const [mediaViewerOpen, setMediaViewerOpen] = useState(false);
 
   // Version upload state
   type VersionUploadState =
@@ -591,12 +594,54 @@ export default function FileDetailScreen() {
           {file.content_kind === 'url_file' && file.link_url ? (
             <Button title="Открыть ссылку" onPress={() => Linking.openURL(file.link_url!)} style={styles.btn} />
           ) : file.content_kind !== 'movie_item' && file.mime_type !== 'text/markdown' ? (
-            <Button
-              title={downloading ? 'Скачивание...' : 'Скачать'}
-              onPress={handleDownload}
-              loading={downloading || downloadUrl.isPending}
-              style={styles.btn}
-            />
+            <>
+              {/* Image / video — inline preview + viewer */}
+              {(file.mime_type?.startsWith('image/') || file.mime_type?.startsWith('video/')) && (
+                <TouchableOpacity
+                  style={styles.previewContainer}
+                  onPress={() => setMediaViewerOpen(true)}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: file.preview_url ?? undefined }}
+                    style={styles.previewImage}
+                    contentFit="cover"
+                  />
+                  <View style={styles.previewOverlay}>
+                    <Text style={styles.previewOverlayText}>
+                      {file.mime_type?.startsWith('video/') ? '▶ Воспроизвести' : '🔍 Просмотреть'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              {/* PDF — open in system viewer via presigned URL */}
+              {file.mime_type === 'application/pdf' ? (
+                <Button
+                  title={downloadUrl.isPending ? 'Открываем...' : '📄 Открыть PDF'}
+                  onPress={async () => {
+                    const url = await downloadUrl.mutateAsync();
+                    Linking.openURL(url);
+                  }}
+                  loading={downloadUrl.isPending}
+                  style={styles.btn}
+                />
+              ) : (
+                <Button
+                  title={downloading ? 'Скачивание...' : 'Скачать'}
+                  onPress={handleDownload}
+                  loading={downloading || downloadUrl.isPending}
+                  style={styles.btn}
+                />
+              )}
+              {/* Gallery viewer modal */}
+              {mediaViewerOpen && (
+                <GalleryViewer
+                  files={[file]}
+                  initialIndex={0}
+                  onClose={() => setMediaViewerOpen(false)}
+                />
+              )}
+            </>
           ) : null}
 
           {/* Action menu */}
@@ -1252,6 +1297,24 @@ const styles = StyleSheet.create({
   linkDisableBtnText: { fontSize: 12, color: '#EF4444' },
   linkUrlSmall: { fontSize: 12, color: '#2563EB' },
   linkCopyText: { fontSize: 13, color: '#2563EB' },
+
+  // Media preview
+  previewContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    aspectRatio: 1,
+    position: 'relative',
+  },
+  previewImage: { width: '100%', height: '100%' },
+  previewOverlay: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  previewOverlayText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 
   // Document actions
   docActions: { flexDirection: 'row', gap: 10 },

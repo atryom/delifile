@@ -3,7 +3,7 @@ import { Alert, Dimensions, FlatList, Pressable, StyleSheet, Text, View } from '
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { FileListItem } from '@/types';
-import { GalleryViewer } from './GalleryViewer';
+import { GalleryItemSheet } from './GalleryItemSheet';
 
 const COLUMNS = 3;
 const GAP = 2;
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function GalleryGrid({ files, folderId, onRemoved }: Props) {
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [sheetIndex, setSheetIndex] = useState<number | null>(null);
 
   const media = files.filter(
     (f) => f.content_kind === 'binary_file' && f.mime_type &&
@@ -55,7 +55,7 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
         renderItem={({ item, index }) => (
           <Pressable
             style={styles.cell}
-            onPress={() => setViewerIndex(index)}
+            onPress={() => setSheetIndex(index)}
             onLongPress={() => handleLongPress(item)}
             delayLongPress={500}
             android_ripple={{ color: 'rgba(0,0,0,0.2)', borderless: false }}
@@ -92,11 +92,13 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
         )}
       />
 
-      {viewerIndex !== null && (
-        <GalleryViewer
+      {sheetIndex !== null && (
+        <GalleryItemSheet
           files={media}
-          initialIndex={viewerIndex}
-          onClose={() => setViewerIndex(null)}
+          initialIndex={sheetIndex}
+          onClose={() => setSheetIndex(null)}
+          folderId={folderId}
+          onRemoved={onRemoved}
         />
       )}
     </View>

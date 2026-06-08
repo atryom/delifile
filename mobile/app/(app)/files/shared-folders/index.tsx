@@ -7,12 +7,19 @@ import { Spinner } from '@/components/ui/Spinner';
 import { pluralFiles } from '@/utils/format';
 import type { SharedFolder } from '@/types';
 
+function getFolderTypeIcon(type?: string | null): string {
+  if (type === 'gallery') return '🖼';
+  if (type === 'movies') return '🎬';
+  return '🗂';
+}
+
 export default function SharedFoldersScreen() {
   const qc = useQueryClient();
 
   // Create form
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newFolderType, setNewFolderType] = useState<'default' | 'gallery' | 'movies'>('default');
   const createInputRef = useRef<TextInput>(null);
 
   // Rename state
@@ -35,7 +42,8 @@ export default function SharedFoldersScreen() {
   });
 
   const createFolder = useMutation({
-    mutationFn: (n: string) => sharedFoldersApi.create(n),
+    mutationFn: ({ name, folderType }: { name: string; folderType: 'default' | 'gallery' | 'movies' }) =>
+      sharedFoldersApi.create(name, undefined, folderType),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['shared-folders'] });
       closeCreate();
@@ -74,12 +82,13 @@ export default function SharedFoldersScreen() {
     Keyboard.dismiss();
     setCreating(false);
     setNewName('');
+    setNewFolderType('default');
   }
 
   function handleCreate() {
     const n = newName.trim();
     if (!n || createFolder.isPending) return;
-    createFolder.mutate(n);
+    createFolder.mutate({ name: n, folderType: newFolderType });
   }
 
   function startRename(folder: SharedFolder) {
@@ -161,7 +170,7 @@ export default function SharedFoldersScreen() {
           if (renamingId === item.id) {
             return (
               <View style={styles.row}>
-                <Text style={styles.folderIcon}>🗂</Text>
+                <Text style={styles.folderIcon}>{getFolderTypeIcon(item.folder_type)}</Text>
                 <TextInput
                   ref={renameInputRef}
                   style={styles.renameInput}
@@ -185,9 +194,9 @@ export default function SharedFoldersScreen() {
             <TouchableOpacity
               style={styles.row}
               activeOpacity={0.7}
-              onPress={() => router.push({ pathname: '/(app)/files/shared-folders/[id]' as any, params: { id: item.id, folder_name: item.name } })}
+              onPress={() => router.push({ pathname: '/(app)/files/shared-folders/[id]' as any, params: { id: item.id, folder_name: item.name, folder_type: item.folder_type ?? 'default' } })}
             >
-              <Text style={styles.folderIcon}>🗂</Text>
+              <Text style={styles.folderIcon}>{getFolderTypeIcon(item.folder_type)}</Text>
               <View style={styles.rowInfo}>
                 <Text style={styles.folderName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.folderMeta}>
@@ -223,6 +232,23 @@ export default function SharedFoldersScreen() {
             returnKeyType="done"
             onSubmitEditing={handleCreate}
           />
+          <View style={styles.typeRow}>
+            {([
+              { key: 'default', label: '🗂 Обычная' },
+              { key: 'gallery', label: '🖼 Галерея' },
+              { key: 'movies',  label: '🎬 Фильмы'  },
+            ] as const).map(({ key, label }) => (
+              <TouchableOpacity
+                key={key}
+                style={[styles.typeBtn, newFolderType === key && styles.typeBtnActive]}
+                onPress={() => setNewFolderType(key)}
+              >
+                <Text style={[styles.typeBtnText, newFolderType === key && styles.typeBtnTextActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <View style={styles.barButtons}>
             <TouchableOpacity style={styles.cancelBtn} onPress={closeCreate}>
               <Text style={styles.cancelText}>Отмена</Text>
@@ -288,4 +314,9 @@ const styles = StyleSheet.create({
   createBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
   createBtnDisabled: { opacity: 0.5 },
   createText: { fontSize: 15, color: '#fff', fontWeight: '600' },
+  typeRow: { flexDirection: 'row', gap: 6 },
+  typeBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
+  typeBtnActive: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
+  typeBtnText: { fontSize: 12, color: '#64748B' },
+  typeBtnTextActive: { color: '#2563EB', fontWeight: '600' },
 });

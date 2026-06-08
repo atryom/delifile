@@ -105,4 +105,10 @@ export const filesApi = {
     task_assigned_user_id?: number | null;
   }) =>
     apiClient.patch<ApiResponse<{ file: FileCard }>>(`/files/${id}/task`, data),
+
+  like: (id: string) =>
+    apiClient.post<ApiResponse<Record<string, never>>>(`/files/${id}/like`),
+
+  unlike: (id: string) =>
+    apiClient.delete<ApiResponse<Record<string, never>>>(`/files/${id}/like`),
 };

@@ -18,8 +18,14 @@ interface FileListItemWithPrivacy extends FileListItem {
   is_private?: boolean;
 }
 
+function getFolderTypeIcon(type?: string | null): string {
+  if (type === 'gallery') return '🖼';
+  if (type === 'movies') return '🎬';
+  return '🗂';
+}
+
 export default function SharedFolderScreen() {
-  const { id, folder_name } = useLocalSearchParams<{ id: string; folder_name?: string }>();
+  const { id, folder_name, folder_type: paramFolderType } = useLocalSearchParams<{ id: string; folder_name?: string; folder_type?: string }>();
   const qc = useQueryClient();
 
   // folder_name from nav params; fall back to cache from shared folders list
@@ -27,7 +33,8 @@ export default function SharedFolderScreen() {
   const cachedFolders = qc.getQueryData<SharedFolder[]>(['shared-folders']);
   const cachedFolder = cachedFolders?.find((f) => f.id === id);
   const folderTitle = paramName || cachedFolder?.name || 'Общая папка';
-  const folderType = cachedFolder?.folder_type ?? 'default';
+  const resolvedParamType = Array.isArray(paramFolderType) ? paramFolderType[0] : paramFolderType;
+  const folderType = (cachedFolder?.folder_type ?? resolvedParamType ?? 'default') as 'default' | 'gallery' | 'movies';
   const [showAddMovie, setShowAddMovie] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
@@ -225,7 +232,7 @@ export default function SharedFolderScreen() {
                   } else {
                     router.push({
                       pathname: '/(app)/files/shared-folders/add' as any,
-                      params: { shared_folder_id: id, folder_name: folderTitle },
+                      params: { shared_folder_id: id, folder_name: folderTitle, folder_type: folderType },
                     });
                   }
                 }}
@@ -422,11 +429,11 @@ export default function SharedFolderScreen() {
                   onPress={() =>
                     router.push({
                       pathname: '/(app)/files/shared-folders/[id]' as any,
-                      params: { id: item.data.id, folder_name: item.data.name },
+                      params: { id: item.data.id, folder_name: item.data.name, folder_type: item.data.folder_type ?? 'default' },
                     })
                   }
                 >
-                  <Text style={styles.fileIcon}>{item.data.is_private ? '🔒' : '🗂'}</Text>
+                  <Text style={styles.fileIcon}>{item.data.is_private ? '🔒' : getFolderTypeIcon(item.data.folder_type)}</Text>
                   <View style={styles.rowInfo}>
                     <Text style={styles.fileName} numberOfLines={1}>{item.data.name}</Text>
                     <Text style={styles.fileMeta}>{item.data.files_count} файлов</Text>

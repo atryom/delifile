@@ -17,8 +17,9 @@ import { getApiError } from '@/utils/error';
 type Mode = 'menu' | 'link' | 'subfolder' | 'uploading' | 'document';
 
 export default function SharedFolderAddScreen() {
-  const params = useLocalSearchParams<{ shared_folder_id: string; folder_name?: string }>();
+  const params = useLocalSearchParams<{ shared_folder_id: string; folder_name?: string; folder_type?: string }>();
   const folderId = params.shared_folder_id;
+  const isGallery = params.folder_type === 'gallery';
   const qc = useQueryClient();
   const { data: tariffUsage } = useQuery({
     queryKey: ['tariffs', 'usage'],
@@ -94,7 +95,11 @@ export default function SharedFolderAddScreen() {
 
   async function handlePickFile() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+        type: isGallery ? ['image/*', 'video/*'] : undefined,
+      });
       if (result.canceled || !result.assets?.length) return;
 
       const asset = result.assets[0];
@@ -206,13 +211,15 @@ export default function SharedFolderAddScreen() {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => setMode('link')}>
-              <Text style={styles.menuIcon}>🔗</Text>
-              <View>
-                <Text style={styles.menuTitle}>Добавить ссылку</Text>
-                <Text style={styles.menuSub}>URL на внешний ресурс</Text>
-              </View>
-            </TouchableOpacity>
+            {!isGallery && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => setMode('link')}>
+                <Text style={styles.menuIcon}>🔗</Text>
+                <View>
+                  <Text style={styles.menuTitle}>Добавить ссылку</Text>
+                  <Text style={styles.menuSub}>URL на внешний ресурс</Text>
+                </View>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity style={styles.menuItem} onPress={() => setMode('subfolder')}>
               <Text style={styles.menuIcon}>🗂</Text>
@@ -222,13 +229,15 @@ export default function SharedFolderAddScreen() {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => setMode('document')}>
-              <Text style={styles.menuIcon}>📝</Text>
-              <View>
-                <Text style={styles.menuTitle}>Создать документ</Text>
-                <Text style={styles.menuSub}>Markdown-документ для записей</Text>
-              </View>
-            </TouchableOpacity>
+            {!isGallery && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => setMode('document')}>
+                <Text style={styles.menuIcon}>📝</Text>
+                <View>
+                  <Text style={styles.menuTitle}>Создать документ</Text>
+                  <Text style={styles.menuSub}>Markdown-документ для записей</Text>
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 

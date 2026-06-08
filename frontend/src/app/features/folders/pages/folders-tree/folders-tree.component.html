@@ -5,13 +5,15 @@
 
     <!-- ── TOPBAR: кнопки добавления + переключатель вида ───────────── -->
     <header class="topbar">
-      <button type="button" class="btn-action" (click)="openAddModal($event)" title="Добавить файл или ссылку">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        <span>Добавить файл</span>
-      </button>
+      @if (currentFolderType() !== 'movies') {
+        <button type="button" class="btn-action" (click)="openAddModal($event)" title="Добавить файл или ссылку">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Добавить файл</span>
+        </button>
+      }
 
       <button type="button" class="btn-action" (click)="startNoteCreate($event)"
               [disabled]="creatingDoc() || showNoteInput()" title="Создать заметку">
@@ -750,29 +752,31 @@
           </svg>
           Файл
         </button>
-        <button type="button" role="tab" class="add-tab"
-                [class.active]="addModalTab() === 'link'"
-                [attr.aria-selected]="addModalTab() === 'link'"
-                (click)="addModalTab.set('link')">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-          </svg>
-          Ссылка
-        </button>
-        <button type="button" role="tab" class="add-tab"
-                [class.active]="addModalTab() === 'note'"
-                [attr.aria-selected]="addModalTab() === 'note'"
-                (click)="addModalTab.set('note')">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="12" y1="18" x2="12" y2="12"/>
-            <line x1="9" y1="15" x2="15" y2="15"/>
-          </svg>
-          Заметка
-        </button>
+        @if (currentFolderType() !== 'gallery') {
+          <button type="button" role="tab" class="add-tab"
+                  [class.active]="addModalTab() === 'link'"
+                  [attr.aria-selected]="addModalTab() === 'link'"
+                  (click)="addModalTab.set('link')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+              <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            Ссылка
+          </button>
+          <button type="button" role="tab" class="add-tab"
+                  [class.active]="addModalTab() === 'note'"
+                  [attr.aria-selected]="addModalTab() === 'note'"
+                  (click)="addModalTab.set('note')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+            Заметка
+          </button>
+        }
       </div>
 
       <!-- ── Tab: Файл ──────────────────────────────────────────── -->
