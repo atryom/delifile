@@ -50,6 +50,8 @@ node scripts/bump-version.js
 ok "Version bumped"
 
 info "Frontend: building (production)..."
+# Limit Node.js heap to prevent OOM kill on low-memory servers
+export NODE_OPTIONS="--max-old-space-size=512"
 npm run build:prod
 ok "Build done"
 
