@@ -173,39 +173,61 @@ class ShareViewController: UIViewController {
 
         messageLabel.text = "Открываем DeliFile..."
 
-        // IMPORTANT: extensionContext.open(_:) is documented by Apple to work ONLY for
-        // Today widgets / iMessage apps — for a Share Extension it returns false (or its
-        // completion handler never fires), so the app never launches. The reliable,
-        // production-proven approach (used by expo-share-intent) is:
-        //   1. complete the request first,
-        //   2. then walk the responder chain to find the UIApplication of the extension
-        //      process and call its `openURL:` selector.
-        // Completing first lets the extension dismiss cleanly while the host app launches.
-        extensionContext?.completeRequest(returningItems: []) { [weak self] _ in
-            guard let self = self else { return }
-            if self.openURLViaResponderChain(url) {
-                NSLog("[ShareExtension] main app opened via responder chain")
-            } else {
-                NSLog("[ShareExtension] failed to open main app via responder chain")
+        // CRITICAL ORDER: open the host app BEFORE completing the request.
+        //
+        // extensionContext.completeRequest(...) tears the extension's view controller
+        // off the window. Once detached, the responder chain no longer reaches the
+        // extension process's UIApplication, so any openURL attempt fails — and the
+        // user sees the extension flicker open/closed without the app launching.
+        //
+        // While this VC is still on screen, the responder chain
+        // (self → view → window → UIWindowScene → UIApplication) does reach a live
+        // UIApplication instance. We grab it and call the modern
+        // open(_:options:completionHandler:) — the deprecated `openURL:` selector is a
+        // silent no-op on iOS 17/18. We only complete() (dismiss) once the open call
+        // reports back, so there is no flicker: the main app is already in the
+        // foreground by the time the extension closes behind it.
+        if let application = findHostApplication() {
+            application.open(url, options: [:]) { [weak self] success in
+                self?.finishOpen(success: success)
             }
+            return
+        }
+
+        // Fallback: no UIApplication reachable via the responder chain — try the
+        // extension context API (works for some iOS versions / host apps).
+        extensionContext?.open(url) { [weak self] success in
+            self?.finishOpen(success: success)
         }
     }
 
-    /// Walks the responder chain to find the extension process's UIApplication and
-    /// invokes its `openURL:` selector. UIApplication.shared is unavailable in app
-    /// extensions, but the running instance is still reachable via the responder chain.
-    @discardableResult
-    private func openURLViaResponderChain(_ url: URL) -> Bool {
+    /// Walks the responder chain to find the extension process's live UIApplication.
+    /// UIApplication.shared is unavailable in app extensions, but the running instance
+    /// is reachable through the responder chain while the VC is attached to the window.
+    private func findHostApplication() -> UIApplication? {
         var responder: UIResponder? = self
-        let selector = NSSelectorFromString("openURL:")
         while let current = responder {
-            if let application = current as? UIApplication, application.responds(to: selector) {
-                application.perform(selector, with: url)
-                return true
-            }
+            if let application = current as? UIApplication { return application }
             responder = current.next
         }
-        return false
+        return nil
+    }
+
+    /// Dismisses the extension on success; otherwise shows a brief instruction so the
+    /// user knows to open the app manually (data is already saved to the App Group and
+    /// will be picked up on the next foreground via checkIntent()).
+    private func finishOpen(success: Bool) {
+        if success {
+            NSLog("[ShareExtension] main app opened")
+            complete()
+        } else {
+            NSLog("[ShareExtension] failed to open main app — instructing user")
+            messageLabel.text = "Файл получен.\nОткройте DeliFile, чтобы завершить загрузку."
+            spinner.stopAnimating()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.complete()
+            }
+        }
     }
 
     private func complete() {
