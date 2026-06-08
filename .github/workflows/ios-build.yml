@@ -96,9 +96,15 @@ jobs:
           # в submit-профиль eas.json на лету — в репозиторий ничего не коммитим.
           python3 -c "
           import base64, json, os
-          p8 = os.environ['ASC_API_KEY_P8_BASE64']
-          with open('/tmp/asc_api_key.p8', 'wb') as f:
-              f.write(base64.b64decode(p8))
+          raw = os.environ['ASC_API_KEY_P8_BASE64'].strip()
+          # Секрет может содержать либо сырой PEM (-----BEGIN...), либо base64 от него.
+          # Оба варианта поддерживаем: пишем то, что получилось, в текстовом режиме.
+          if raw.startswith('-----'):
+              pem = raw
+          else:
+              pem = base64.b64decode(raw).decode('utf-8')
+          with open('/tmp/asc_api_key.p8', 'w') as f:
+              f.write(pem)
           with open('eas.json') as f:
               cfg = json.load(f)
           ios = cfg['submit']['production']['ios']
