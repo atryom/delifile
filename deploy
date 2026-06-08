@@ -36,6 +36,10 @@ php artisan cache:clear    --quiet
 ok "Caches cleared"
 
 # ── 2. Frontend: npm ci + build ───────────────────────────────────────────────
+info "Setting permissions on storage & cache..."
+chmod -R 775 "$BACKEND/storage" "$BACKEND/bootstrap/cache"
+ok "Permissions set"
+
 info "Frontend: npm ci..."
 cd "$FRONTEND"
 npm ci --silent --legacy-peer-deps
@@ -61,6 +65,11 @@ find "$PUBLIC" -maxdepth 1 ! -name 'backend' ! -path "$PUBLIC" -exec rm -rf {} +
 
 cp -r "$DIST/." "$PUBLIC/"
 ok "Frontend deployed to public/"
+
+# ── 4. Restart queue workers ────────────────────────────────────────────────────
+info "Restarting queue workers..."
+sudo supervisorctl restart delifile-worker: 2>/dev/null || info "supervisorctl not available, skipping"
+ok "Queue workers restarted"
 
 echo ""
 echo -e "${GREEN}  Deploy complete.${NC}"
