@@ -9,7 +9,8 @@ on:
 jobs:
   ios:
     name: Build & Submit iOS
-    runs-on: self-hosted
+    # Метка macOS разводит iOS-сборку с web-деплоем (тот идёт на runner Linux).
+    runs-on: [self-hosted, macOS]
 
     steps:
       - name: Checkout

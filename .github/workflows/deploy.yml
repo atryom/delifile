@@ -1,0 +1,46 @@
+name: Web Deploy (production)
+
+# Автодеплой web на прод при push в master, если менялись backend/ или frontend/.
+# Выполняется НА прод-сервере через self-hosted runner (метка Linux), деплой
+# идёт «на месте» в живой каталог /var/www/delifile (его и отдаёт nginx).
+# См. docs/github-actions-deploy.md — одноразовая настройка раннера.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+
+# Не запускать два деплоя одновременно; текущий не прерывать (опасно во время
+# composer/migrate) — новые запуски ждут в очереди.
+concurrency:
+  group: web-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy web to production
+    # Метка Linux разводит этот джоб с iOS-сборкой (та идёт на runner с меткой macOS).
+    runs-on: [self-hosted, Linux]
+
+    # Путь к живому каталогу прода. Меняется через переменную репозитория
+    # DEPLOY_PATH (Settings → Secrets and variables → Actions → Variables),
+    # иначе используется значение по умолчанию.
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/atryom/data/www/delifile.ru' }}
+
+    steps:
+      # Намеренно без actions/checkout: деплой выполняется в живом рабочем дереве
+      # прода, а не во временной копии раннера (_work).
+      - name: Pull latest & deploy
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          echo "▸ Deploy dir: $(pwd)"
+          git fetch --prune origin
+          # Жёсткий сброс на запушенный master. Затрагивает только отслеживаемые
+          # файлы — .env, storage/, public/backend/ (в .gitignore) не трогаются.
+          git reset --hard origin/master
+          echo "▸ Now at: $(git log --oneline -1)"
+          ./deploy
