@@ -88,12 +88,37 @@ jobs:
         if: success()
         working-directory: mobile
         run: |
+          # Неинтерактивный submit требует App Store Connect API Key.
+          # Без него eas submit зависает на "Looking up credentials configuration",
+          # пытаясь авторизоваться через Apple ID (логин/2FA), что в CI невозможно.
+          #
+          # Материализуем .p8 из секрета (base64) и подставляем путь/ID/Issuer ID
+          # в submit-профиль eas.json на лету — в репозиторий ничего не коммитим.
+          python3 -c "
+          import base64, json, os
+          p8 = os.environ['ASC_API_KEY_P8_BASE64']
+          with open('/tmp/asc_api_key.p8', 'wb') as f:
+              f.write(base64.b64decode(p8))
+          with open('eas.json') as f:
+              cfg = json.load(f)
+          ios = cfg['submit']['production']['ios']
+          ios['ascApiKeyPath']     = '/tmp/asc_api_key.p8'
+          ios['ascApiKeyId']       = os.environ['ASC_KEY_ID']
+          ios['ascApiKeyIssuerId'] = os.environ['ASC_ISSUER_ID']
+          with open('eas.json', 'w') as f:
+              json.dump(cfg, f, indent=2, ensure_ascii=False)
+          print('ASC API Key подставлен в eas.json (ascApiKeyId=' + os.environ['ASC_KEY_ID'] + ')')
+          "
           eas submit \
             --platform ios \
             --path "${{ steps.build.outputs.ipa_path }}" \
             --non-interactive
+          rm -f /tmp/asc_api_key.p8
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
 
       # Загружает лог в Delifile всегда — и при успехе, и при ошибке.
       # Имя файла содержит статус и временную метку: ios-build-success-20260605-143022.log
