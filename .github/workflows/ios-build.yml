@@ -1,10 +1,12 @@
 name: iOS Build & Deploy
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths:
       - 'mobile/**'
+      - '.github/workflows/ios-build.yml'
 
 jobs:
   ios:
