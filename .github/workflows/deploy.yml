@@ -2,8 +2,8 @@ name: Web Deploy (production)
 
 # Автодеплой web на прод при push в master, если менялись backend/ или frontend/.
 # Выполняется НА прод-сервере через self-hosted runner (метка Linux), деплой
-# идёт «на месте» в живой каталог /var/www/delifile (его и отдаёт nginx).
-# См. docs/github-actions-deploy.md — одноразовая настройка раннера.
+# идёт «на месте» в живой каталог (его и отдаёт nginx).
+# Одноразовая настройка раннера и git-каталога — см. docs/github-actions-deploy.md.
 
 on:
   push:
@@ -24,11 +24,13 @@ jobs:
     # Метка Linux разводит этот джоб с iOS-сборкой (та идёт на runner с меткой macOS).
     runs-on: [self-hosted, Linux]
 
-    # Путь к живому каталогу прода. Меняется через переменную репозитория
-    # DEPLOY_PATH (Settings → Secrets and variables → Actions → Variables),
-    # иначе используется значение по умолчанию.
     env:
+      # Путь к живому каталогу прода. Можно переопределить переменной репозитория
+      # DEPLOY_PATH (Settings → Secrets and variables → Actions → Variables).
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/atryom/data/www/delifile.ru' }}
+      REPO_URL: https://github.com/atryom/delifile.git
+      # Встроенный токен джоба — даёт доступ на чтение репозитория для git fetch.
+      GH_TOKEN: ${{ github.token }}
 
     steps:
       # Намеренно без actions/checkout: деплой выполняется в живом рабочем дереве
@@ -38,9 +40,18 @@ jobs:
           set -euo pipefail
           cd "$DEPLOY_PATH"
           echo "▸ Deploy dir: $(pwd)"
-          git fetch --prune origin
-          # Жёсткий сброс на запушенный master. Затрагивает только отслеживаемые
-          # файлы — .env, storage/, public/backend/ (в .gitignore) не трогаются.
-          git reset --hard origin/master
+
+          # Каталог прода — обычный git working tree (см. docs). Аутентификация
+          # к приватному репозиторию через GITHUB_TOKEN джоба (как в actions/checkout),
+          # токен не сохраняется в конфиге.
+          AUTH="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c http."https://github.com/".extraheader="$AUTH" \
+            fetch --prune "$REPO_URL" +refs/heads/master:refs/remotes/origin/master
+
+          # Жёсткое выравнивание на запушенный master. Затрагивает только
+          # отслеживаемые файлы; .env, storage/, vendor/, node_modules/, public/
+          # (в .gitignore) не трогаются.
+          git checkout -f -B master origin/master
           echo "▸ Now at: $(git log --oneline -1)"
+
           ./deploy
