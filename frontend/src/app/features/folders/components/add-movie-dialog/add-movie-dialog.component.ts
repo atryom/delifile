@@ -115,9 +115,9 @@ export class AddMovieDialogComponent {
         }
         this.results.set(data.results ?? []);
       },
-      error: () => {
+      error: (err) => {
         this.loading.set(false);
-        this.error.set('Не удалось выполнить поиск. Проверьте запрос.');
+        this.error.set(err?.error?.message ?? 'Не удалось выполнить поиск. Проверьте запрос.');
       },
     });
   }
