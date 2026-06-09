@@ -936,6 +936,12 @@
         <p>«{{ deleteTarget()!.name }}» будет убран из этой общей папки. Сам файл не удалится.</p>
       } @else if (deleteTarget()!.kind === 'file') {
         <p>«{{ deleteTarget()!.name }}» будет удалён. Если файл ваш — удалится навсегда, если получен — уберётся из вашего списка.</p>
+      } @else if (folderHasFilesCount() !== null) {
+        <div class="alert-warning" role="alert">
+          В папке {{ folderHasFilesCount() === 1 ? 'находится' : 'находятся' }}
+          <strong>{{ folderHasFilesCount() }} {{ folderHasFilesCount() === 1 ? 'файл' : folderHasFilesCount()! <= 4 ? 'файла' : 'файлов' }}</strong>.
+          Они будут удалены безвозвратно. Это действие невозможно отменить.
+        </div>
       } @else {
         <p>Вы уверены, что хотите удалить «{{ deleteTarget()!.name }}»?</p>
       }
@@ -943,7 +949,9 @@
         <div class="alert-error" role="alert">{{ deleteError() }}</div>
       }
       <div class="modal-actions">
-        <button type="button" class="btn-danger" (click)="executeDelete()" [disabled]="deleting()">Удалить</button>
+        <button type="button" class="btn-danger" (click)="executeDelete()" [disabled]="deleting()">
+          {{ folderHasFilesCount() !== null ? 'Удалить вместе с файлами' : 'Удалить' }}
+        </button>
         <button type="button" class="btn-secondary" (click)="cancelDelete()">Отмена</button>
       </div>
     </div>

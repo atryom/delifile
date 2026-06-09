@@ -186,9 +186,10 @@ export class FoldersTreeComponent implements OnInit {
   renameNameValue = '';
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  readonly deleteTarget = signal<{ id: string; name: string; kind: 'shared-folder' | 'file' } | null>(null);
-  readonly deleteError  = signal<string | null>(null);
-  readonly deleting     = signal(false);
+  readonly deleteTarget         = signal<{ id: string; name: string; kind: 'shared-folder' | 'file' } | null>(null);
+  readonly deleteError          = signal<string | null>(null);
+  readonly deleting             = signal(false);
+  readonly folderHasFilesCount  = signal<number | null>(null);
 
   // ── Leave shared folder ───────────────────────────────────────────────────
   readonly leaveTarget  = signal<{ id: string; name: string } | null>(null);
@@ -689,6 +690,7 @@ export class FoldersTreeComponent implements OnInit {
   cancelDelete(): void {
     this.deleteTarget.set(null);
     this.deleteError.set(null);
+    this.folderHasFilesCount.set(null);
   }
 
   executeDelete(): void {
@@ -698,10 +700,12 @@ export class FoldersTreeComponent implements OnInit {
     this.deleteError.set(null);
 
     if (target.kind === 'shared-folder') {
-      this.sfApi.delete(target.id).subscribe({
+      const force = this.folderHasFilesCount() !== null;
+      this.sfApi.delete(target.id, force).subscribe({
         next: () => {
           this.deleting.set(false);
           this.deleteTarget.set(null);
+          this.folderHasFilesCount.set(null);
           const parentId = this.currentSharedFolderId();
           if (parentId) {
             this.loadSfSubfolders(parentId);
@@ -709,7 +713,14 @@ export class FoldersTreeComponent implements OnInit {
             this.loadShared();
           }
         },
-        error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
+        error: (err) => {
+          this.deleting.set(false);
+          if (err?.data?.code === 'FOLDER_HAS_FILES') {
+            this.folderHasFilesCount.set(err.data.errors?.file_count ?? 0);
+          } else {
+            this.deleteError.set(err.message ?? 'Ошибка');
+          }
+        },
       });
     } else {
       const sfId = this.currentSharedFolderId();

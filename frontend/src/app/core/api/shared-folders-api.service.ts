@@ -37,8 +37,8 @@ export class SharedFoldersApiService {
     return this.api.patch(`/shared-folders/${id}`, body);
   }
 
-  delete(id: string): Observable<ApiResponse<Record<string, never>>> {
-    return this.api.delete(`/shared-folders/${id}`);
+  delete(id: string, force = false): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.delete(`/shared-folders/${id}`, force ? { force: '1' } : undefined);
   }
 
   // ── Files ─────────────────────────────────────────────────────────────────

@@ -908,6 +908,17 @@ td { padding: 12px 20px; font-size: 13px; }
   margin-bottom: 14px;
 }
 
+.alert-warning {
+  background: rgba(245, 158, 11, .1);
+  border: 1px solid rgba(245, 158, 11, .35);
+  color: #92400e;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    ADD MODAL
    ───────────────────────────────────────────────────────────────────────── */
