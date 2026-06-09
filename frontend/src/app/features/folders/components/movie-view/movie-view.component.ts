@@ -1,5 +1,6 @@
 import {
   Component, input, output, ChangeDetectionStrategy, signal, computed, inject,
+  viewChild, ElementRef, afterNextRender, DestroyRef, effect,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { SharedFolderFileItem, MovieMetadata } from '../../../../shared/models/api.models';
@@ -116,6 +117,12 @@ type SortBy = 'default' | 'kp_rating' | 'personal_rating';
             <p>Нет фильмов, соответствующих фильтру</p>
           </div>
         }
+        @if (hasMore()) {
+          <div #sentinel class="scroll-sentinel" aria-hidden="true"></div>
+        }
+        @if (loading()) {
+          <div class="movies-loading" role="status" aria-live="polite">Загрузка...</div>
+        }
       </div>
     </div>
   `,
@@ -123,12 +130,20 @@ type SortBy = 'default' | 'kp_rating' | 'personal_rating';
 })
 export class MovieViewComponent {
   private http = inject(HttpClient);
+  private destroyRef = inject(DestroyRef);
 
   readonly files       = input.required<SharedFolderFileItem[]>();
   readonly canEdit     = input<boolean>(false);
+  readonly hasMore     = input<boolean>(false);
+  readonly loading     = input<boolean>(false);
   readonly addClick    = output<void>();
   readonly fileClick   = output<SharedFolderFileItem>();
   readonly deleteClick = output<SharedFolderFileItem>();
+  readonly loadMore    = output<void>();
+
+  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
+
+  private observer: IntersectionObserver | null = null;
 
   filterStatus = signal<FilterStatus>('all');
   sortBy       = signal<SortBy>('default');
@@ -136,6 +151,31 @@ export class MovieViewComponent {
   localMeta      = signal<Record<string, { watched?: boolean | null; personal_rating?: number | null }>>({});
   editingRatingId = signal<string | null>(null);
   ratingInput     = signal<string>('');
+
+  constructor() {
+    this.destroyRef.onDestroy(() => this.observer?.disconnect());
+    afterNextRender(() => {
+      this.setupObserver();
+      effect(() => {
+        this.hasMore();
+        this.loading();
+        afterNextRender(() => this.setupObserver());
+      });
+    });
+  }
+
+  private setupObserver(): void {
+    this.observer?.disconnect();
+    this.observer = null;
+    const el = this.sentinel()?.nativeElement;
+    if (!el) return;
+    this.observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && this.hasMore() && !this.loading()) {
+        this.loadMore.emit();
+      }
+    }, { rootMargin: '300px' });
+    this.observer.observe(el);
+  }
 
   readonly filterOpts: { val: FilterStatus; label: string }[] = [
     { val: 'all',       label: 'Все' },

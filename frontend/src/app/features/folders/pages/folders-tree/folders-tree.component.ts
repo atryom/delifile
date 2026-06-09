@@ -132,6 +132,12 @@ export class FoldersTreeComponent implements OnInit {
   readonly page             = signal(1);
   readonly totalPages       = signal(1);
 
+  // ── Movies infinite scroll ─────────────────────────────────────────────────
+  private readonly moviePage    = signal(1);
+  private readonly moviePerPage = 20;
+  readonly movieHasMore         = signal(false);
+  readonly movieLoading         = signal(false);
+
   // Client-side filtering for shared folder files (is_owner); personal root files are filtered server-side
   readonly files = computed<AnyFile[]>(() => {
     const raw = this.rawFiles();
@@ -367,6 +373,8 @@ export class FoldersTreeComponent implements OnInit {
     this.folderNotesOpen.set(false);
     this.sfSubfolders.set([]);
     this.resetFiltersKeepTag();
+    this.moviePage.set(1);
+    this.movieHasMore.set(false);
     this.loadShared();
     this.loadFiles();
   }
@@ -378,6 +386,8 @@ export class FoldersTreeComponent implements OnInit {
     this.currentSharedFolderId.set(crumb.sharedFolderId);
     this.folderNotesOpen.set(false);
     this.resetFiltersKeepTag();
+    this.moviePage.set(1);
+    this.movieHasMore.set(false);
     this.syncUrl();
     this.loadFiles();
     if (crumb.sharedFolderId) {
@@ -394,6 +404,8 @@ export class FoldersTreeComponent implements OnInit {
     this.breadcrumbs.update(c => [...c, { label: folder.name, sharedFolderId: folder.id }]);
     this.closeMenu();
     this.resetFiltersKeepTag();
+    this.moviePage.set(1);
+    this.movieHasMore.set(false);
     this.syncUrl();
     this.loadSharedFolderFiles(folder.id);
     this.loadSfSubfolders(folder.id);
@@ -418,6 +430,8 @@ export class FoldersTreeComponent implements OnInit {
   setViewMode(mode: 'table' | 'grid' | 'tasks'): void {
     this.viewMode.set(mode);
     this.page.set(1);
+    this.moviePage.set(1);
+    this.movieHasMore.set(false);
     this.clearSelection();
     this.syncUrl();
     this.loadFiles();
@@ -442,6 +456,10 @@ export class FoldersTreeComponent implements OnInit {
   loadFiles(): void {
     const sfId = this.currentSharedFolderId();
     if (sfId !== null) {
+      if (this.currentFolderType() === 'movies') {
+        this.moviePage.set(1);
+        this.movieHasMore.set(false);
+      }
       this.loadSharedFolderFiles(sfId);
       return;
     }
@@ -479,6 +497,10 @@ export class FoldersTreeComponent implements OnInit {
   }
 
   private loadSharedFolderFiles(sfId: string): void {
+    if (this.currentFolderType() === 'movies') {
+      this.loadMovies(sfId);
+      return;
+    }
     const isTasksMode = this.viewMode() === 'tasks';
     this.filesLoading.set(true);
     this.sfApi.listFiles(sfId, this.page(), 20, isTasksMode ? {
@@ -496,6 +518,31 @@ export class FoldersTreeComponent implements OnInit {
       },
       error: () => this.filesLoading.set(false),
     });
+  }
+
+  private loadMovies(sfId: string): void {
+    const page = this.moviePage();
+    this.movieLoading.set(true);
+    this.sfApi.listFiles(sfId, page, this.moviePerPage).subscribe({
+      next: (res) => {
+        if (page === 1) {
+          this.rawFiles.set(res.data.items);
+        } else {
+          this.rawFiles.update(items => [...items, ...res.data.items]);
+        }
+        const total = res.data.pagination.total;
+        this.movieHasMore.set(page * this.moviePerPage < total);
+        this.movieLoading.set(false);
+      },
+      error: () => this.movieLoading.set(false),
+    });
+  }
+
+  loadMoreMovies(): void {
+    if (this.movieLoading() || !this.movieHasMore()) return;
+    this.moviePage.update(p => p + 1);
+    const sfId = this.currentSharedFolderId();
+    if (sfId) this.loadMovies(sfId);
   }
 
   private loadSfSubfolders(sfId: string): void {
@@ -599,6 +646,8 @@ export class FoldersTreeComponent implements OnInit {
 
   onMovieAdded(): void {
     this.showAddMovieDialog.set(false);
+    this.moviePage.set(1);
+    this.movieHasMore.set(false);
     const sfId = this.currentSharedFolderId();
     if (sfId) this.loadSharedFolderFiles(sfId);
   }

@@ -723,7 +723,7 @@
           Добавить фильм
         </button>
       </div>
-      <app-movie-view [files]="$any(files())" [canEdit]="canEditCurrentFolder()" (addClick)="showAddMovieDialog.set(true)" (fileClick)="openFileDetail($any($event))" (deleteClick)="confirmDeleteFile($any($event))" />
+      <app-movie-view [files]="$any(files())" [canEdit]="canEditCurrentFolder()" [hasMore]="movieHasMore()" [loading]="movieLoading()" (addClick)="showAddMovieDialog.set(true)" (fileClick)="openFileDetail($any($event))" (deleteClick)="confirmDeleteFile($any($event))" (loadMore)="loadMoreMovies()" />
     }
 
   </div><!-- /main -->
