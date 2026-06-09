@@ -1,6 +1,6 @@
 import {
   Component, input, output, ChangeDetectionStrategy, signal, computed, inject,
-  viewChild, ElementRef, afterNextRender, DestroyRef, effect,
+  viewChild, ElementRef, DestroyRef, effect,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { SharedFolderFileItem, MovieMetadata } from '../../../../shared/models/api.models';
@@ -154,15 +154,15 @@ export class MovieViewComponent {
 
   constructor() {
     this.destroyRef.onDestroy(() => this.observer?.disconnect());
-    afterNextRender(() => {
-      this.setupObserver();
-      effect(() => {
-        this.hasMore();
-        this.loading();
-        afterNextRender(() => this.setupObserver());
-      });
-    });
   }
+
+  private readonly scrollEffect = effect((onCleanup) => {
+    this.files();
+    this.hasMore();
+    this.loading();
+    const handle = requestAnimationFrame(() => this.setupObserver());
+    onCleanup(() => cancelAnimationFrame(handle));
+  });
 
   private setupObserver(): void {
     this.observer?.disconnect();
