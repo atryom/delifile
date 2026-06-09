@@ -459,6 +459,9 @@ class FileService
 
         if ($filter === 'mine') {
             $query->where('owner_id', $user->id);
+            if (!array_key_exists('folder_id', $options)) {
+                $query->whereNull('folder_id');
+            }
         } elseif ($filter === 'received') {
             $query->whereHas('accesses', fn ($q) =>
                 $q->where('user_id', $user->id)->whereIn('access_type', [AccessType::Shared->value, AccessType::Saved->value])
@@ -491,6 +494,10 @@ class FileService
                   ->where('file_tags.user_id', $userId)
                   ->where('file_tags.tag_id', $tagId);
             });
+        }
+
+        if (array_key_exists('folder_id', $options)) {
+            $query->where('folder_id', $options['folder_id']);
         }
 
         if (!empty($options['content_kind'])) {

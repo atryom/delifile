@@ -115,6 +115,7 @@ class MovieController extends Controller
                 'mime_type'         => null,
                 'status'            => FileStatus::Available,
                 'content_kind'      => 'movie_item',
+                'folder_id'         => $folder->id,
                 'link_url'          => $movie['kp_url'],
                 'link_image_url'    => $movie['poster_url'],
                 'custom_metadata'   => $movie,

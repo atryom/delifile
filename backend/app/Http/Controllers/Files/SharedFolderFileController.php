@@ -94,7 +94,7 @@ class SharedFolderFileController extends Controller
 
     /**
      * POST /api/v1/files/{id}/add-to-my-files
-     * No-op: shared_folder_only concept removed, files are always accessible.
+     * Move an owned file back to personal root (clear folder_id).
      */
     public function addToMyFiles(Request $request, string $fileId): JsonResponse
     {
@@ -106,6 +106,8 @@ class SharedFolderFileController extends Controller
         if (!$file->isOwnedBy($request->user())) {
             return $this->forbidden('You do not own this file');
         }
+
+        $file->update(['folder_id' => null]);
 
         return $this->success('File added to your files');
     }
@@ -224,6 +226,10 @@ class SharedFolderFileController extends Controller
             'file_id'          => $fileId,
         ], ['added_by' => $user->id]);
 
+        if ($request->boolean('move') && $file->isOwnedBy($user)) {
+            $file->update(['folder_id' => $folderId]);
+        }
+
         if ($sff->wasRecentlyCreated) {
             $this->notifyFolderMembers($folder, $user, 'file', $file->id);
         }
@@ -257,6 +263,10 @@ class SharedFolderFileController extends Controller
         SharedFolderFile::where('shared_folder_id', $folderId)
             ->where('file_id', $fileId)
             ->delete();
+
+        if ($file->folder_id === $folderId && $file->isOwnedBy($user)) {
+            $file->update(['folder_id' => null]);
+        }
 
         return $this->success('File removed from folder');
     }

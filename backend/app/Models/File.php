@@ -26,7 +26,6 @@ class File extends Model
         'checksum',
         'status',
         'folder_id',
-        'shared_folder_only',
         'has_versions',
         'is_editable',
         'editor_type',
@@ -58,7 +57,6 @@ class File extends Model
             'expires_at'         => 'datetime',
             'link_fetched_at'    => 'datetime',
             'size'               => 'integer',
-            'shared_folder_only' => 'boolean',
             'has_versions'       => 'boolean',
             'is_editable'        => 'boolean',
             'width'              => 'integer',
@@ -108,7 +106,7 @@ class File extends Model
 
     public function folder(): BelongsTo
     {
-        return $this->belongsTo(Folder::class);
+        return $this->belongsTo(SharedFolder::class);
     }
 
     public function accesses(): HasMany

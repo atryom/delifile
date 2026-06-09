@@ -698,6 +698,8 @@ class SharedFolderController extends Controller
 
             $fileId = $result['file']['id'];
 
+            File::where('id', $fileId)->update(['folder_id' => $folder->id]);
+
             SharedFolderFile::create([
                 'shared_folder_id' => $folder->id,
                 'file_id'          => $fileId,
@@ -776,6 +778,8 @@ class SharedFolderController extends Controller
             $result = $this->fileService->createUrlFile($user, $data['url'], $preview);
 
             $fileId = $result['file']['id'];
+
+            File::where('id', $fileId)->update(['folder_id' => $folder->id]);
 
             SharedFolderFile::firstOrCreate([
                 'shared_folder_id' => $folder->id,

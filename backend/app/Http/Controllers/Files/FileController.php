@@ -10,6 +10,7 @@ use App\Http\Requests\Files\CompleteUploadRequest;
 use App\Models\File;
 use App\Models\FileUserAccess;
 use App\Models\PendingReceivedFile;
+use App\Models\SharedFolder;
 use App\Services\FileService;
 use App\Services\ActivityService;
 use App\Services\S3UrlService;
@@ -52,6 +53,11 @@ class FileController extends Controller
 
         if ($request->has('is_task')) {
             $options['is_task'] = filter_var($request->get('is_task'), FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($request->has('folder_id')) {
+            $raw = $request->get('folder_id');
+            $options['folder_id'] = ($raw === '' || $raw === null) ? null : $raw;
         }
 
         $result = $this->fileService->listFiles(
@@ -430,6 +436,27 @@ class FileController extends Controller
         $this->fileService->setFavorite($file, $request->user(), false);
 
         return $this->success(__('messages.files.unfavorited'));
+    }
+
+    /**
+     * POST /api/v1/files/{fileId}/move-folder
+     * Move owned file to a shared folder (or back to root if folder_id is null).
+     */
+    public function moveFolder(Request $request, string $fileId): JsonResponse
+    {
+        $user = $request->user();
+        $request->validate([
+            'folder_id' => ['nullable', 'string', 'exists:shared_folders,id'],
+        ]);
+
+        $file = File::find($fileId);
+        if (!$file || !$file->isOwnedBy($user)) {
+            return $this->notFound('File not found');
+        }
+
+        $file->update(['folder_id' => $request->folder_id ?: null]);
+
+        return $this->success(__('messages.files.moved'));
     }
 
     /**
