@@ -1,5 +1,6 @@
 import { Component, inject, signal, computed, OnInit, OnDestroy, input, ChangeDetectionStrategy } from '@angular/core';
 import { forkJoin } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -510,20 +511,15 @@ export class FileDetailComponent implements OnInit, OnDestroy {
       this.showFeedback('Файл перемещён');
     };
 
-    if (oldFolderId) {
-      forkJoin([
-        this.sfApi.removeFile(oldFolderId, fileId),
-        this.sfApi.addFile(newFolderId, fileId),
-      ]).subscribe({
-        next: () => finish(),
-        error: () => this.folderPickerMoving.set(false),
-      });
-    } else {
-      this.sfApi.addFile(newFolderId, fileId, true).subscribe({
-        next: () => finish(),
-        error: () => this.folderPickerMoving.set(false),
-      });
-    }
+    // addFile(move=true) first sets folder_id = target, then removeFile won't clear it
+    const add$ = this.sfApi.addFile(newFolderId, fileId, true);
+    const op$ = oldFolderId
+      ? add$.pipe(switchMap(() => this.sfApi.removeFile(oldFolderId, fileId)))
+      : add$;
+    op$.subscribe({
+      next: () => finish(),
+      error: () => this.folderPickerMoving.set(false),
+    });
   }
 
   copyLink(url: string): void {

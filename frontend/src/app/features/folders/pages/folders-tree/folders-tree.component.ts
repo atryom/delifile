@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { DatePipe } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -186,7 +187,7 @@ export class FoldersTreeComponent implements OnInit {
   renameNameValue = '';
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  readonly deleteTarget         = signal<{ id: string; name: string; kind: 'shared-folder' | 'file' } | null>(null);
+  readonly deleteTarget         = signal<{ id: string; name: string; kind: 'shared-folder' | 'file'; isOwnerFile?: boolean } | null>(null);
   readonly deleteError          = signal<string | null>(null);
   readonly deleting             = signal(false);
   readonly folderHasFilesCount  = signal<number | null>(null);
@@ -682,7 +683,8 @@ export class FoldersTreeComponent implements OnInit {
   }
 
   confirmDeleteFile(file: AnyFile): void {
-    this.deleteTarget.set({ id: file.id, name: file.original_name, kind: 'file' });
+    const isOwnerFile = (file as SharedFolderFileItem).is_owner ?? true;
+    this.deleteTarget.set({ id: file.id, name: file.original_name, kind: 'file', isOwnerFile });
     this.deleteError.set(null);
     this.closeMenu();
   }
@@ -724,17 +726,14 @@ export class FoldersTreeComponent implements OnInit {
       });
     } else {
       const sfId = this.currentSharedFolderId();
-      if (sfId) {
-        this.sfApi.removeFile(sfId, target.id).subscribe({
-          next: () => { this.deleting.set(false); this.deleteTarget.set(null); this.loadFiles(); },
-          error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
-        });
-      } else {
-        this.filesApi.delete(target.id).subscribe({
-          next: () => { this.deleting.set(false); this.deleteTarget.set(null); this.loadFiles(); },
-          error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
-        });
-      }
+      // Inside a folder: own files are permanently deleted; received files are just removed from this folder
+      const del$ = sfId && !target.isOwnerFile
+        ? this.sfApi.removeFile(sfId, target.id)
+        : this.filesApi.delete(target.id);
+      del$.subscribe({
+        next: () => { this.deleting.set(false); this.deleteTarget.set(null); this.loadFiles(); },
+        error: (err) => { this.deleting.set(false); this.deleteError.set(err.message ?? 'Ошибка'); },
+      });
     }
   }
 
@@ -1125,10 +1124,12 @@ export class FoldersTreeComponent implements OnInit {
 
     this.movingFiles.set(true);
     if (sourceFolderId) {
-      const ops = ids.flatMap(id => [
-        this.sfApi.removeFile(sourceFolderId, id),
-        this.sfApi.addFile(targetFolderId, id),
-      ]);
+      // addFile(move=true) first to set folder_id = target, then removeFile so it doesn't clear folder_id
+      const ops = ids.map(id =>
+        this.sfApi.addFile(targetFolderId, id, true).pipe(
+          switchMap(() => this.sfApi.removeFile(sourceFolderId, id))
+        )
+      );
       forkJoin(ops).subscribe({
         next: () => {
           this.movingFiles.set(false);

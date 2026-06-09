@@ -926,14 +926,16 @@
   <div class="modal-backdrop" (click)="cancelDelete()" role="dialog" aria-modal="true" aria-labelledby="del-title">
     <div class="modal" (click)="$event.stopPropagation()">
       <h3 id="del-title">
-        @if (deleteTarget()!.kind === 'file' && currentSharedFolderId()) {
+        @if (deleteTarget()!.kind === 'file' && currentSharedFolderId() && !deleteTarget()!.isOwnerFile) {
           Убрать из папки?
         } @else {
           Удалить {{ deleteTarget()!.kind === 'file' ? 'файл' : 'папку' }}?
         }
       </h3>
-      @if (deleteTarget()!.kind === 'file' && currentSharedFolderId()) {
+      @if (deleteTarget()!.kind === 'file' && currentSharedFolderId() && !deleteTarget()!.isOwnerFile) {
         <p>«{{ deleteTarget()!.name }}» будет убран из этой общей папки. Сам файл не удалится.</p>
+      } @else if (deleteTarget()!.kind === 'file' && currentSharedFolderId() && deleteTarget()!.isOwnerFile) {
+        <p>«{{ deleteTarget()!.name }}» будет удалён безвозвратно.</p>
       } @else if (deleteTarget()!.kind === 'file') {
         <p>«{{ deleteTarget()!.name }}» будет удалён. Если файл ваш — удалится навсегда, если получен — уберётся из вашего списка.</p>
       } @else if (folderHasFilesCount() !== null) {
