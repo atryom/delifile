@@ -34,6 +34,7 @@ export class FilesApiService {
     search?: string,
     options?: {
       tag_id?: string;
+      folder_id?: string | null;
       content_kind?: string;
       file_type_group?: string;
       sort_by?: string;
@@ -48,6 +49,7 @@ export class FilesApiService {
     const params: Record<string, string | number> = { filter, page };
     if (search)                           params['search']         = search;
     if (options?.tag_id)                  params['tag_id']         = options.tag_id;
+    if (options?.folder_id !== undefined) params['folder_id']      = options.folder_id ?? '';
     if (options?.content_kind)            params['content_kind']   = options.content_kind;
     if (options?.file_type_group)         params['file_type_group'] = options.file_type_group;
     if (options?.sort_by)                 params['sort_by']        = options.sort_by;

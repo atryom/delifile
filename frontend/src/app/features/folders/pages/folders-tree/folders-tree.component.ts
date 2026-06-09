@@ -453,6 +453,7 @@ export class FoldersTreeComponent implements OnInit {
       this.searchQuery || undefined,
       {
         tag_id:                  this.activeTagId()      || undefined,
+        folder_id:               null,
         file_type_group:         this.activeTypeGroup()  || undefined,
         sort_by:                 this.sortBy(),
         sort_order:              this.sortOrder(),
