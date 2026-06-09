@@ -282,10 +282,26 @@ export default function SharedFolderScreen() {
 
   async function handleBulkMove(targetFolderId: string) {
     await Promise.allSettled(
-      selectedIds.map((fid) => sharedFoldersApi.addFile(targetFolderId, fid, true))
+      selectedIds.map(async (fid) => {
+        await sharedFoldersApi.removeFile(id, fid);
+        await sharedFoldersApi.addFile(targetFolderId, fid);
+      })
     );
     qc.invalidateQueries({ queryKey: ['shared-folders', id] });
     qc.invalidateQueries({ queryKey: ['shared-folders', targetFolderId] });
+    setShowMoveModal(false);
+    exitSelectMode();
+  }
+
+  async function handleBulkMoveToRoot() {
+    await Promise.allSettled(
+      selectedIds.map(async (fid) => {
+        await sharedFoldersApi.removeFile(id, fid);
+        await sharedFoldersApi.addToMyFiles(fid).catch(() => {});
+      })
+    );
+    qc.invalidateQueries({ queryKey: ['shared-folders', id] });
+    qc.invalidateQueries({ queryKey: ['files'] });
     setShowMoveModal(false);
     exitSelectMode();
   }
@@ -644,6 +660,7 @@ export default function SharedFolderScreen() {
         <MoveFolderModal
           currentFolderId={id}
           onMove={handleBulkMove}
+          onMoveToRoot={handleBulkMoveToRoot}
           onClose={() => setShowMoveModal(false)}
         />
       )}
@@ -721,13 +738,38 @@ function FileRow({
   );
 }
 
+function buildFolderHierarchy(folders: SharedFolder[]): { folder: SharedFolder; depth: number }[] {
+  const idSet = new Set(folders.map((f) => f.id));
+  const result: { folder: SharedFolder; depth: number }[] = [];
+  const added = new Set<string>();
+
+  function addChildren(parentId: string | null, depth: number) {
+    folders
+      .filter((f) => {
+        const effectiveParent = f.parent_id && idSet.has(f.parent_id) ? f.parent_id : null;
+        return effectiveParent === parentId && !added.has(f.id);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((f) => {
+        result.push({ folder: f, depth });
+        added.add(f.id);
+        addChildren(f.id, depth + 1);
+      });
+  }
+
+  addChildren(null, 0);
+  return result;
+}
+
 function MoveFolderModal({
   currentFolderId,
   onMove,
+  onMoveToRoot,
   onClose,
 }: {
   currentFolderId: string;
   onMove: (targetId: string) => void;
+  onMoveToRoot: () => void;
   onClose: () => void;
 }) {
   const { data: folders = [], isLoading } = useQuery({
@@ -735,7 +777,17 @@ function MoveFolderModal({
     queryFn: () => sharedFoldersApi.allFlat().then((r) => r.data.data.items),
     staleTime: 1000 * 60,
   });
-  const available = folders.filter((f) => f.id !== currentFolderId);
+  const filtered = folders.filter((f) => f.id !== currentFolderId && !f.is_personal_root);
+  const hierarchyItems = buildFolderHierarchy(filtered);
+
+  type ListRow =
+    | { kind: 'root' }
+    | { kind: 'folder'; folder: SharedFolder; depth: number };
+
+  const listData: ListRow[] = [
+    { kind: 'root' },
+    ...hierarchyItems.map((h) => ({ kind: 'folder' as const, folder: h.folder, depth: h.depth })),
+  ];
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -748,17 +800,34 @@ function MoveFolderModal({
         </View>
         {isLoading && <Spinner />}
         <FlatList
-          data={available}
-          keyExtractor={(f) => f.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} activeOpacity={0.7} onPress={() => onMove(item.id)}>
-              <Text style={styles.fileIcon}>{getFolderTypeIcon(item.folder_type)}</Text>
-              <View style={styles.rowInfo}>
-                <Text style={styles.fileName}>{item.name}</Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-          )}
+          data={listData}
+          keyExtractor={(item, i) => item.kind === 'root' ? 'root' : `f-${item.folder.id}-${i}`}
+          renderItem={({ item }) => {
+            if (item.kind === 'root') {
+              return (
+                <TouchableOpacity style={styles.row} activeOpacity={0.7} onPress={onMoveToRoot}>
+                  <Text style={styles.fileIcon}>🏠</Text>
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.fileName}>Мои файлы (корень)</Text>
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </TouchableOpacity>
+              );
+            }
+            return (
+              <TouchableOpacity
+                style={[styles.row, { paddingLeft: 16 + item.depth * 20 }]}
+                activeOpacity={0.7}
+                onPress={() => onMove(item.folder.id)}
+              >
+                <Text style={styles.fileIcon}>{getFolderTypeIcon(item.folder.folder_type)}</Text>
+                <View style={styles.rowInfo}>
+                  <Text style={styles.fileName}>{item.folder.name}</Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            );
+          }}
           ListEmptyComponent={
             !isLoading ? (
               <Text style={styles.emptyMembers}>Нет доступных папок</Text>

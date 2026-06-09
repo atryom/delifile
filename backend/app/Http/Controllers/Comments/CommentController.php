@@ -213,6 +213,13 @@ class CommentController extends Controller
         $comment->deleted_at = now();
         $comment->save();
 
+        if ($comment->thread) {
+            $comment->thread->decrement('comments_count');
+        }
+        if ($comment->parent_comment_id) {
+            Comment::where('id', $comment->parent_comment_id)->decrement('replies_count');
+        }
+
         $this->commentService->auditComment($comment, $request->user(), 'delete', ['body' => $comment->body], null);
 
         return $this->success('Comment deleted');

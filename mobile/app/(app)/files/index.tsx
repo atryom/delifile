@@ -144,6 +144,29 @@ function FileRow({
   );
 }
 
+function buildFolderHierarchy(folders: SharedFolder[]): { folder: SharedFolder; depth: number }[] {
+  const idSet = new Set(folders.map((f) => f.id));
+  const result: { folder: SharedFolder; depth: number }[] = [];
+  const added = new Set<string>();
+
+  function addChildren(parentId: string | null, depth: number) {
+    folders
+      .filter((f) => {
+        const effectiveParent = f.parent_id && idSet.has(f.parent_id) ? f.parent_id : null;
+        return effectiveParent === parentId && !added.has(f.id);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((f) => {
+        result.push({ folder: f, depth });
+        added.add(f.id);
+        addChildren(f.id, depth + 1);
+      });
+  }
+
+  addChildren(null, 0);
+  return result;
+}
+
 function FolderPickerModal({
   onMove,
   onClose,
@@ -157,6 +180,15 @@ function FolderPickerModal({
     staleTime: 1000 * 60,
   });
 
+  const filtered = folders.filter((f) => !f.is_personal_root);
+  const hierarchyItems = buildFolderHierarchy(filtered);
+
+  function getFolderTypeIcon(type?: string | null) {
+    if (type === 'gallery') return '🖼';
+    if (type === 'movies') return '🎬';
+    return '🗂';
+  }
+
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
@@ -168,14 +200,16 @@ function FolderPickerModal({
         </View>
         {isLoading && <Spinner />}
         <FlatList
-          data={folders}
-          keyExtractor={(f) => f.id}
+          data={hierarchyItems}
+          keyExtractor={(item) => item.folder.id}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.modalFolderRow} activeOpacity={0.7} onPress={() => onMove(item.id)}>
-              <Text style={styles.modalFolderIcon}>
-                {item.folder_type === 'gallery' ? '🖼' : item.folder_type === 'movies' ? '🎬' : '🗂'}
-              </Text>
-              <Text style={styles.modalFolderName}>{item.name}</Text>
+            <TouchableOpacity
+              style={[styles.modalFolderRow, { paddingLeft: 16 + item.depth * 20 }]}
+              activeOpacity={0.7}
+              onPress={() => onMove(item.folder.id)}
+            >
+              <Text style={styles.modalFolderIcon}>{getFolderTypeIcon(item.folder.folder_type)}</Text>
+              <Text style={styles.modalFolderName}>{item.folder.name}</Text>
               <Text style={styles.modalChevron}>›</Text>
             </TouchableOpacity>
           )}

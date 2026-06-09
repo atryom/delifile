@@ -6,12 +6,12 @@ import {
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '@/api/files';
 import { tariffsApi } from '@/api/tariffs';
+import { sharedFoldersApi } from '@/api/shared-folders';
 import { formatFileSize } from '@/utils/format';
 import { documentsApi } from '@/api/documents';
-import { useCreateFolder } from '@/hooks/useFolders';
 import { Button } from '@/components/ui/Button';
 import { getApiError } from '@/utils/error';
 
@@ -51,7 +51,11 @@ export default function AddScreen() {
     };
   }, []);
 
-  const createFolder = useCreateFolder();
+  const createFolder = useMutation({
+    mutationFn: ({ name, parent_id, folder_type }: { name: string; parent_id?: string | null; folder_type?: 'default' | 'gallery' | 'movies' }) =>
+      sharedFoldersApi.create(name, parent_id, folder_type),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shared-folders'] }),
+  });
 
   const [docName, setDocName] = useState('');
   const [docIsTask, setDocIsTask] = useState(false);
