@@ -660,9 +660,8 @@ function FileRow({
   const name = file.display_name || file.original_name;
 
   return (
-    <TouchableOpacity
-      style={[styles.row, isSelected && styles.rowSelected]}
-      activeOpacity={0.7}
+    <Pressable
+      style={({ pressed }) => [styles.row, isSelected && styles.rowSelected, pressed && { opacity: 0.7 }]}
       onPress={() => {
         if (isSelectMode) { onSelect?.(); return; }
         router.push({
@@ -671,6 +670,8 @@ function FileRow({
         });
       }}
       onLongPress={onLongPress}
+      delayLongPress={400}
+      android_ripple={{ color: 'rgba(0,0,0,0.08)' }}
     >
       {isSelectMode ? (
         <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
@@ -694,7 +695,7 @@ function FileRow({
           <Text style={styles.menuBtnText}>⋯</Text>
         </TouchableOpacity>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -771,7 +772,7 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: 14, color: '#94A3B8', textAlign: 'center' },
   moviesList: { paddingVertical: 8 },
   filterBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  filterChip: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, backgroundColor: '#F8FAFC', minHeight: 30, justifyContent: 'center' },
+  filterChip: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, paddingHorizontal: 14, backgroundColor: '#F8FAFC', height: 30, justifyContent: 'center', alignItems: 'center', alignSelf: 'center' },
   filterChipActive: { borderColor: '#6366F1', backgroundColor: '#EDE9FE' },
   filterChipText: { fontSize: 13, fontWeight: '500', color: '#64748B', lineHeight: 18 },
   filterChipTextActive: { color: '#6366F1' },

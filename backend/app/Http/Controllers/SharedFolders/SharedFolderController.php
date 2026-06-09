@@ -233,7 +233,7 @@ class SharedFolderController extends Controller
 
         $folders = SharedFolder::whereIn('id', $showIds)
             ->withCount([
-                    'sharedFiles as files_count',
+                    'sharedFiles as files_count' => fn($q) => $q->where('is_private', false)->whereHas('file', fn($fq) => $fq->where('status', 'available')),
                     'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
                     'children',
                     'accesses',
@@ -271,7 +271,7 @@ class SharedFolderController extends Controller
         // (e.g. deep-link / PWA restore into a folder) show correct counts instead
         // of 0 until a refresh routes through index().
         $countAggregates = [
-            'sharedFiles as files_count',
+            'sharedFiles as files_count' => fn($q) => $q->where('is_private', false)->whereHas('file', fn($fq) => $fq->where('status', 'available')),
             'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
             'children',
             'accesses',
@@ -380,7 +380,7 @@ class SharedFolderController extends Controller
         $children = SharedFolder::where('parent_id', $id)
             ->when(!$isOwner, fn ($q) => $q->where('is_private', false))
             ->withCount([
-                    'sharedFiles as files_count',
+                    'sharedFiles as files_count' => fn($q) => $q->where('is_private', false)->whereHas('file', fn($fq) => $fq->where('status', 'available')),
                     'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', function ($fq) use ($taskStatus, $dateFrom, $dateTo) {
                         $fq->where('is_task', true);
                         if ($taskStatus) {
@@ -437,7 +437,7 @@ class SharedFolderController extends Controller
         $folder->update(array_filter($data, fn ($v) => $v !== null) + ['name' => $data['name']]);
 
         $folder->loadCount([
-            'sharedFiles as files_count',
+            'sharedFiles as files_count' => fn($q) => $q->where('is_private', false)->whereHas('file', fn($fq) => $fq->where('status', 'available')),
             'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
             'children',
             'accesses',
@@ -1153,7 +1153,7 @@ class SharedFolderController extends Controller
         }
 
         $folder->loadCount([
-            'sharedFiles as files_count',
+            'sharedFiles as files_count' => fn($q) => $q->where('is_private', false)->whereHas('file', fn($fq) => $fq->where('status', 'available')),
             'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
             'children',
             'accesses',
@@ -1209,7 +1209,7 @@ class SharedFolderController extends Controller
         $folder->update(['is_private' => $data['is_private']]);
 
         $folder->loadCount([
-            'sharedFiles as files_count',
+            'sharedFiles as files_count' => fn($q) => $q->where('is_private', false)->whereHas('file', fn($fq) => $fq->where('status', 'available')),
             'sharedFiles as tasks_count' => fn ($q) => $q->whereHas('file', fn ($fq) => $fq->where('is_task', true)),
             'children',
             'accesses',

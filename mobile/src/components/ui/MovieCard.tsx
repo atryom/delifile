@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { FileListItem } from '@/types';
@@ -122,28 +122,38 @@ export function MovieCard({ item, onDelete, onWatchedToggle, onRatingChange }: P
           </View>
         )}
 
-        {/* Inline rating picker — 0-10 integer buttons */}
+        {/* Rating picker modal */}
         {showPicker && (
-          <View style={styles.pickerWrap}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickerScroll}>
-              {RATINGS.map((r) => (
-                <Pressable
-                  key={r}
-                  style={[styles.ratingBtn, personalRating === r && styles.ratingBtnActive]}
-                  onPress={() => selectRating(r)}
-                >
-                  <Text style={[styles.ratingBtnText, personalRating === r && styles.ratingBtnTextActive]}>
-                    {r}
-                  </Text>
-                </Pressable>
-              ))}
-              {personalRating !== null && personalRating !== undefined && (
-                <Pressable style={styles.ratingClearBtn} onPress={clearRating}>
-                  <Text style={styles.ratingClearText}>✕</Text>
-                </Pressable>
-              )}
-            </ScrollView>
-          </View>
+          <Modal transparent animationType="fade" onRequestClose={() => setShowPicker(false)}>
+            <Pressable style={styles.pickerBackdrop} onPress={() => setShowPicker(false)}>
+              <Pressable style={styles.pickerSheet} onPress={(e) => e.stopPropagation()}>
+                <Text style={styles.pickerTitle}>Оценить фильм</Text>
+                <View style={styles.pickerGrid}>
+                  {RATINGS.map((r) => (
+                    <Pressable
+                      key={r}
+                      style={[styles.ratingBtn, personalRating === r && styles.ratingBtnActive]}
+                      onPress={() => selectRating(r)}
+                    >
+                      <Text style={[styles.ratingBtnText, personalRating === r && styles.ratingBtnTextActive]}>
+                        {r}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={styles.pickerActions}>
+                  {personalRating !== null && personalRating !== undefined && (
+                    <Pressable style={styles.pickerClearBtn} onPress={clearRating}>
+                      <Text style={styles.pickerClearText}>Сбросить оценку</Text>
+                    </Pressable>
+                  )}
+                  <Pressable style={styles.pickerCancelBtn} onPress={() => setShowPicker(false)}>
+                    <Text style={styles.pickerCancelText}>Отмена</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            </Pressable>
+          </Modal>
         )}
       </View>
     </TouchableOpacity>
@@ -223,42 +233,66 @@ const styles = StyleSheet.create({
   actionBtnText: { fontSize: 11, color: '#64748B' },
   actionBtnTextActive: { color: '#6366F1' },
 
-  pickerWrap: {
-    marginTop: 4,
+  pickerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  pickerScroll: {
-    flexGrow: 0,
+  pickerSheet: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: 280,
+    gap: 16,
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    textAlign: 'center',
+  },
+  pickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
   },
   ratingBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 6,
   },
   ratingBtnActive: {
     borderColor: '#6366F1',
     backgroundColor: '#6366F1',
   },
   ratingBtnText: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '600',
     color: '#64748B',
   },
   ratingBtnTextActive: { color: '#fff' },
-  ratingClearBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  pickerActions: { gap: 8 },
+  pickerClearBtn: {
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#FCA5A5',
     backgroundColor: '#FFF5F5',
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  ratingClearText: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
+  pickerClearText: { fontSize: 14, color: '#EF4444', fontWeight: '600' },
+  pickerCancelBtn: {
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  pickerCancelText: { fontSize: 14, color: '#64748B', fontWeight: '500' },
 });

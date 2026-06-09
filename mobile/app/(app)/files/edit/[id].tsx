@@ -220,14 +220,9 @@ export default function EditDocumentScreen() {
       const msg = JSON.parse(event.nativeEvent.data);
 
       if (msg.type === 'scriptLoaded') {
-        // Send init command via document.dispatchEvent — window.postMessage from
-        // injectJavaScript is intercepted by react-native-webview's WKScriptMessageHandler
-        // on iOS and never reaches window.addEventListener('message') inside the HTML.
-        // document.dispatchEvent targets the document listener registered in the HTML.
         const content = docRef.current?.content ?? '';
-        const initMsg = JSON.stringify({ cmd: 'init', content, readOnly: false });
         webViewRef.current?.injectJavaScript(
-          `document.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(initMsg)}}));void 0;`,
+          `(function(){if(typeof window._editorInit==='function')window._editorInit(${JSON.stringify(content)},false);})();void 0;`,
         );
       } else if (msg.type === 'ready') {
         editorReadyRef.current = true;

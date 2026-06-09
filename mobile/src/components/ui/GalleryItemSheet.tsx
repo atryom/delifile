@@ -195,12 +195,11 @@ const styles = StyleSheet.create({
   mediaBox: {
     backgroundColor: '#000',
     width: W,
-    height: MEDIA_HEIGHT,
+    flex: 1,
     position: 'relative',
   },
   mediaBoxFull: {
     flex: 1,
-    height: undefined,
   },
   media: { width: '100%', height: '100%' },
 
