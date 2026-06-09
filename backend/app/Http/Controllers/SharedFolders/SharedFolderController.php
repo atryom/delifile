@@ -450,6 +450,11 @@ class SharedFolderController extends Controller
 
     /**
      * DELETE /api/v1/shared-folders/{id}
+     *
+     * If the folder (or any descendant) contains files owned by the user,
+     * requires force=true — otherwise returns 422 with file_count.
+     * On force delete, owned files are permanently deleted before the folder is removed.
+     * Files owned by other users that reference this folder will have folder_id set to NULL.
      */
     public function destroy(Request $request, string $id): JsonResponse
     {
@@ -458,13 +463,32 @@ class SharedFolderController extends Controller
             return $this->notFound('Shared folder not found');
         }
 
-        if ($folder->owner_id !== $request->user()->id) {
+        $user = $request->user();
+
+        if ($folder->owner_id !== $user->id) {
             return $this->forbidden('Only the owner can delete this folder');
         }
 
-        DB::transaction(function () use ($folder) {
-            $allIds = $this->collectDescendantIds($folder->id);
-            $allIds[] = $folder->id;
+        $allIds   = $this->collectDescendantIds($folder->id);
+        $allIds[] = $folder->id;
+
+        $ownedFiles = File::whereIn('folder_id', $allIds)
+            ->where('owner_id', $user->id)
+            ->get();
+
+        if ($ownedFiles->isNotEmpty() && !$request->boolean('force')) {
+            return $this->error(
+                'Папка содержит файлы, которые будут безвозвратно удалены',
+                'FOLDER_HAS_FILES',
+                ['file_count' => $ownedFiles->count()],
+                422
+            );
+        }
+
+        DB::transaction(function () use ($folder, $user, $allIds, $ownedFiles) {
+            foreach ($ownedFiles as $file) {
+                $this->fileService->deleteFile($file, $user);
+            }
 
             SharedFolderFile::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolderAccess::whereIn('shared_folder_id', $allIds)->delete();
