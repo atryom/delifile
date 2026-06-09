@@ -466,28 +466,12 @@ class SharedFolderController extends Controller
             $allIds = $this->collectDescendantIds($folder->id);
             $allIds[] = $folder->id;
 
-            // Find shared_folder_only files that will become orphans (not in any other SF)
-            $orphanFileIds = SharedFolderFile::whereIn('shared_folder_id', $allIds)
-                ->join('files', 'files.id', '=', 'shared_folder_files.file_id')
-                ->where('files.shared_folder_only', true)
-                ->whereNotIn('shared_folder_files.file_id', function ($q) use ($allIds) {
-                    $q->select('file_id')
-                      ->from('shared_folder_files')
-                      ->whereNotIn('shared_folder_id', $allIds);
-                })
-                ->pluck('shared_folder_files.file_id')
-                ->toArray();
-
             SharedFolderFile::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolderAccess::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolderLink::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolderCommentSettings::whereIn('shared_folder_id', $allIds)->delete();
             PendingReceivedSharedFolder::whereIn('shared_folder_id', $allIds)->delete();
             SharedFolder::whereIn('id', $allIds)->delete();
-
-            if (!empty($orphanFileIds)) {
-                \App\Models\File::whereIn('id', $orphanFileIds)->update(['shared_folder_only' => false]);
-            }
         });
 
         return $this->success('Shared folder deleted');
@@ -714,9 +698,6 @@ class SharedFolderController extends Controller
 
             $fileId = $result['file']['id'];
 
-            // Mark as shared_folder_only and link to this shared folder
-            File::where('id', $fileId)->update(['shared_folder_only' => true]);
-
             SharedFolderFile::create([
                 'shared_folder_id' => $folder->id,
                 'file_id'          => $fileId,
@@ -795,9 +776,6 @@ class SharedFolderController extends Controller
             $result = $this->fileService->createUrlFile($user, $data['url'], $preview);
 
             $fileId = $result['file']['id'];
-
-            // Mark as shared_folder_only
-            File::where('id', $fileId)->update(['shared_folder_only' => true]);
 
             SharedFolderFile::firstOrCreate([
                 'shared_folder_id' => $folder->id,

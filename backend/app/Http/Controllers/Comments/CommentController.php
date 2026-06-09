@@ -87,7 +87,7 @@ class CommentController extends Controller
             $policy = match ($type) {
                 CommentTargetType::File         => $this->commentService->fileEffectivePolicy($user, $thread->target_id, $ctxFolder),
                 CommentTargetType::SharedFolder => $this->commentService->sharedFolderEffectivePolicy($user, $thread->target_id),
-                CommentTargetType::LocalFolder  => ['shared_comments_allowed' => false, 'can_write_shared' => false],
+                default                         => ['shared_comments_allowed' => false, 'can_write_shared' => false],
             };
 
             if (!$policy['shared_comments_allowed']) {
@@ -236,9 +236,6 @@ class CommentController extends Controller
 
             CommentTargetType::SharedFolder =>
                 $base . '/folders?tab=shared&shared_folder_id=' . $thread->target_id,
-
-            CommentTargetType::LocalFolder =>
-                $base . '/folders',
 
             default => $base,
         };

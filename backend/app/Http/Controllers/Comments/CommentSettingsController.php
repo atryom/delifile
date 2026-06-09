@@ -5,8 +5,6 @@ namespace App\Http\Controllers\Comments;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\FileCommentSettings;
-use App\Models\Folder;
-use App\Models\LocalFolderCommentSettings;
 use App\Models\SharedFolder;
 use App\Enums\SharedFolderAccessType;
 use App\Models\SharedFolderAccess;
@@ -151,29 +149,6 @@ class CommentSettingsController extends Controller
         return $this->success('Settings loaded', ['settings' => $settings
             ? $this->formatFolderSettings($settings)
             : ['shared_comments_mode' => 'enabled', 'mentions_enabled' => true]]);
-    }
-
-    /**
-     * PATCH /api/v1/local-folders/{folderId}/comment-settings
-     */
-    public function updateLocalFolderSettings(Request $request, string $folderId): JsonResponse
-    {
-        $folder = Folder::find($folderId);
-        if (!$folder || $folder->user_id !== $request->user()->id) {
-            return $this->notFound('Folder not found');
-        }
-
-        $data     = $request->validate(['privateCommentsEnabled' => 'nullable|boolean']);
-        $settings = LocalFolderCommentSettings::firstOrNew(['local_folder_id' => $folderId]);
-
-        if (isset($data['privateCommentsEnabled'])) {
-            $settings->private_comments_enabled = $data['privateCommentsEnabled'];
-        }
-        $settings->updated_by = $request->user()->id;
-        $settings->updated_at = now();
-        $settings->save();
-
-        return $this->success('Settings updated', ['settings' => ['private_comments_enabled' => $settings->private_comments_enabled]]);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

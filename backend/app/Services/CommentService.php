@@ -13,7 +13,6 @@ use App\Models\CommentRead;
 use App\Models\CommentThread;
 use App\Models\File;
 use App\Models\FileCommentSettings;
-use App\Models\Folder;
 use App\Models\SharedFolder;
 use App\Enums\SharedFolderAccessType;
 use App\Models\SharedFolderAccess;
@@ -36,7 +35,6 @@ class CommentService
         return match ($type) {
             CommentTargetType::File         => $this->canAccessFile($user, $targetId),
             CommentTargetType::SharedFolder => $this->canAccessSharedFolder($user, $targetId),
-            CommentTargetType::LocalFolder  => $this->canAccessLocalFolder($user, $targetId),
         };
     }
 
@@ -120,22 +118,13 @@ class CommentService
         ];
     }
 
-    public function localFolderEffectivePolicy(User $user, string $folderId): array
-    {
-        return [
-            'shared_comments_allowed' => false,
-            'can_write_shared'        => false,
-            'can_write_private'       => true,
-        ];
-    }
-
     /** Check if user has write permission for shared comments on a given target. */
     public function userCanWriteSharedComment(User $user, CommentTargetType $type, string $targetId, ?string $contextSharedFolderId): bool
     {
         return match ($type) {
             CommentTargetType::File         => $this->fileUserCanWriteShared($user, $targetId, $contextSharedFolderId),
             CommentTargetType::SharedFolder => $this->sfUserCanWriteShared($user, $targetId),
-            CommentTargetType::LocalFolder  => false,
+            default                         => false,
         };
     }
 
@@ -461,11 +450,7 @@ class CommentService
             ->exists();
     }
 
-    private function canAccessLocalFolder(User $user, string $folderId): bool
-    {
-        $folder = Folder::find($folderId);
-        return $folder && $folder->user_id === $user->id;
-    }
+
 
     private function fileUserCanWriteShared(User $user, string $fileId, ?string $contextSharedFolderId): bool
     {

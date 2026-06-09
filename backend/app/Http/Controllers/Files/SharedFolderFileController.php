@@ -94,26 +94,18 @@ class SharedFolderFileController extends Controller
 
     /**
      * POST /api/v1/files/{id}/add-to-my-files
-     * Move a shared_folder_only file into the user's regular files.
+     * No-op: shared_folder_only concept removed, files are always accessible.
      */
     public function addToMyFiles(Request $request, string $fileId): JsonResponse
     {
-        $user = $request->user();
-
         $file = File::find($fileId);
         if (!$file) {
             return $this->notFound('File not found');
         }
 
-        if (!$file->isOwnedBy($user)) {
+        if (!$file->isOwnedBy($request->user())) {
             return $this->forbidden('You do not own this file');
         }
-
-        if (!$file->shared_folder_only) {
-            return $this->error('File is already in your files', 'ALREADY_IN_MY_FILES', [], 422);
-        }
-
-        $file->update(['shared_folder_only' => false]);
 
         return $this->success('File added to your files');
     }
@@ -134,8 +126,8 @@ class SharedFolderFileController extends Controller
         $hasAccess = $file->isOwnedBy($user)
             || $this->fileService->canAccess($user, $file);
 
-        if (!$hasAccess || $file->shared_folder_only) {
-            return $this->forbidden('File must be accessible and not shared_folder_only');
+        if (!$hasAccess) {
+            return $this->forbidden('File must be accessible');
         }
 
         $data = $request->validate([
@@ -232,11 +224,6 @@ class SharedFolderFileController extends Controller
             'file_id'          => $fileId,
         ], ['added_by' => $user->id]);
 
-        // When moving (not just adding), hide the file from the owner's root view
-        if ($request->boolean('move') && $file->owner_id === $user->id && !$file->shared_folder_only) {
-            $file->update(['shared_folder_only' => true]);
-        }
-
         if ($sff->wasRecentlyCreated) {
             $this->notifyFolderMembers($folder, $user, 'file', $file->id);
         }
@@ -270,24 +257,6 @@ class SharedFolderFileController extends Controller
         SharedFolderFile::where('shared_folder_id', $folderId)
             ->where('file_id', $fileId)
             ->delete();
-
-        // Resolve orphan: a shared_folder_only file lives ONLY inside shared folders.
-        if ($file->shared_folder_only) {
-            $remainingCount = SharedFolderFile::where('file_id', $fileId)->count();
-            if ($remainingCount === 0) {
-                if ($isFileOwner) {
-                    // The owner removed it from its last folder — delete it outright.
-                    // Previously we reset shared_folder_only=false, which leaked the
-                    // file back into the owner's root view; re-uploading the same file
-                    // then produced a visible duplicate (one in root + one in folder).
-                    $this->fileService->deleteFile($file, $user);
-                } else {
-                    // A non-owner editor orphaned it — keep it accessible to the owner
-                    // in their root rather than silently losing it.
-                    $file->update(['shared_folder_only' => false]);
-                }
-            }
-        }
 
         return $this->success('File removed from folder');
     }

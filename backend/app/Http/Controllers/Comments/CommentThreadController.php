@@ -42,12 +42,12 @@ class CommentThreadController extends Controller
         $policy = match ($type) {
             CommentTargetType::File         => $this->commentService->fileEffectivePolicy($user, $targetId, $ctxFolder),
             CommentTargetType::SharedFolder => $this->commentService->sharedFolderEffectivePolicy($user, $targetId),
-            CommentTargetType::LocalFolder  => $this->commentService->localFolderEffectivePolicy($user, $targetId),
+            default                         => ['shared_comments_allowed' => false, 'can_write_shared' => false, 'can_write_private' => false],
         };
 
         $result = ['policy' => $policy, 'threads' => []];
 
-        if (in_array($scope, [CommentScope::Shared->value, 'all']) && $policy['shared_comments_allowed'] && $type !== CommentTargetType::LocalFolder) {
+        if (in_array($scope, [CommentScope::Shared->value, 'all']) && $policy['shared_comments_allowed']) {
             $sharedThread = CommentThread::where('target_type', $type->value)
                 ->where('target_id', $targetId)
                 ->where('scope', CommentScope::Shared->value)

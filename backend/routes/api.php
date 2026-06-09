@@ -126,7 +126,6 @@ Route::prefix('v1')->group(function () {
         Route::post('files/{id}/unfavorite',       [FileController::class, 'unfavorite']);
         Route::post('files/{id}/like',             [FileLikeController::class, 'store']);
         Route::delete('files/{id}/like',           [FileLikeController::class, 'destroy']);
-        Route::post('files/{id}/move-folder',      [FileController::class, 'moveFolder']);
         Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
         Route::patch('files/{id}/movie-meta',       [MovieController::class, 'updateMeta']);
         Route::patch('files/{id}/description',     [FileController::class, 'updateDescription']);
@@ -145,7 +144,6 @@ Route::prefix('v1')->group(function () {
         // Files — new tag/folder actions
         Route::post('files/{id}/attach-tags',  [OrganizationController::class, 'attachTags']);
         Route::post('files/{id}/detach-tags',  [OrganizationController::class, 'detachTags']);
-        Route::post('files/{id}/clear-folder', [OrganizationController::class, 'clearFolder']);
 
         // URL Files
         Route::post('links-preview',  [UrlFileController::class, 'preview']);
@@ -181,17 +179,6 @@ Route::prefix('v1')->group(function () {
         Route::get('contacts/{id}',                [ContactController::class, 'show']);
         Route::get('contacts/{id}/history',        [ContactController::class, 'history']);
         Route::delete('contacts/{id}',             [ContactController::class, 'destroy']);
-
-        // Organization — Folders
-        Route::get('folders/tree',    [OrganizationController::class, 'folderTree']);
-        Route::get('folders',         [OrganizationController::class, 'listFolders']);
-        Route::post('folders',        [OrganizationController::class, 'createFolder']);
-        Route::patch('folders/{id}',  [OrganizationController::class, 'updateFolder']);
-        Route::delete('folders/{id}', [OrganizationController::class, 'deleteFolder']);
-
-        // Movie folders
-        Route::post('folders/{folder}/movies/search', [MovieController::class, 'search']);
-        Route::post('folders/{folder}/movies',        [MovieController::class, 'store']);
 
         // Organization — Tags
         Route::get('tags',            [OrganizationController::class, 'listTags']);
@@ -307,8 +294,6 @@ Route::prefix('v1')->group(function () {
         Route::patch('files/{fileId}/comment-settings',         [CommentSettingsController::class, 'updateFileSettings']);
         Route::get('shared-folders/{folderId}/comment-settings',    [CommentSettingsController::class, 'getSharedFolderSettings']);
         Route::patch('shared-folders/{folderId}/comment-settings',  [CommentSettingsController::class, 'updateSharedFolderSettings']);
-        Route::patch('local-folders/{folderId}/comment-settings',   [CommentSettingsController::class, 'updateLocalFolderSettings']);
-
         // File shared folder operations
         Route::post('files/{id}/add-to-my-files',  [SharedFolderFileController::class, 'addToMyFiles']);
         Route::post('files/{id}/shared-folders',   [SharedFolderFileController::class, 'updateSharedFolders']);
