@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 
 type SettingsItem = {
   title: string;
@@ -18,6 +19,8 @@ const ITEMS: SettingsItem[] = [
 ];
 
 export default function SettingsScreen() {
+  const version = Constants.expoConfig?.version ?? '—';
+
   return (
     <ScrollView style={styles.container}>
       <Stack.Screen options={{ title: 'Настройки' }} />
@@ -40,6 +43,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         ))}
       </View>
+      <Text style={styles.versionText}>Версия {version}</Text>
     </ScrollView>
   );
 }
@@ -52,4 +56,5 @@ const styles = StyleSheet.create({
   itemText: { flex: 1 },
   itemTitle: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
   itemSub: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
+  versionText: { textAlign: 'center', fontSize: 12, color: '#CBD5E1', marginTop: 24, marginBottom: 8 },
 });
