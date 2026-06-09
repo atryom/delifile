@@ -43,8 +43,6 @@ class FileCardBuilder
             'is_favorite'        => $access?->is_favorite ?? false,
             'is_pinned'          => $access?->pinned_at !== null,
             'description'        => $access?->description,
-            'folder_id'          => $access?->folder_id,
-            'shared_folder_only' => (bool) $file->shared_folder_only,
             'tags'               => $file->tags()
                 ->wherePivot('user_id', $user->id)
                 ->get(['tags.id', 'tags.name'])
@@ -130,9 +128,8 @@ class FileCardBuilder
         $item['comments_count'] = (int) ($file->getAttribute('comments_count_cached') ?? 0);
 
         if ($inSharedFolderContext) {
-            $item['added_by']           = $addedBy;
-            $item['shared_folder_only'] = (bool) $file->shared_folder_only;
-            $item['view_url']           = null;
+            $item['added_by'] = $addedBy;
+            $item['view_url'] = null;
         }
 
         if ($file->content_kind === 'movie_item') {

@@ -9,7 +9,6 @@ use App\Http\Requests\Files\InitUploadRequest;
 use App\Http\Requests\Files\CompleteUploadRequest;
 use App\Models\File;
 use App\Models\FileUserAccess;
-use App\Models\Folder;
 use App\Models\PendingReceivedFile;
 use App\Services\FileService;
 use App\Services\ActivityService;
@@ -53,13 +52,6 @@ class FileController extends Controller
 
         if ($request->has('is_task')) {
             $options['is_task'] = filter_var($request->get('is_task'), FILTER_VALIDATE_BOOLEAN);
-        }
-
-        // folder_id can be explicitly null (no-folder filter)
-        // empty string sent from client means "root only" → treat as null
-        if ($request->has('folder_id')) {
-            $raw = $request->get('folder_id');
-            $options['folder_id'] = ($raw === '' || $raw === null) ? null : $raw;
         }
 
         $result = $this->fileService->listFiles(
@@ -438,45 +430,6 @@ class FileController extends Controller
         $this->fileService->setFavorite($file, $request->user(), false);
 
         return $this->success(__('messages.files.unfavorited'));
-    }
-
-    /**
-     * POST /api/v1/files/{fileId}/move-folder
-     */
-    public function moveFolder(Request $request, string $fileId): JsonResponse
-    {
-        $userId = $request->user()->id;
-        $request->validate([
-            'folder_id' => ['nullable', 'string', 'exists:folders,id,user_id,' . $userId],
-        ]);
-
-        $file = File::find($fileId);
-        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
-            return $this->notFound('File not found');
-        }
-
-        $targetFolderId = $request->folder_id;
-        if ($targetFolderId) {
-            $folder = Folder::where('id', $targetFolderId)
-                ->where('user_id', $userId)
-                ->first();
-
-            if ($folder && $folder->folder_type === 'gallery') {
-                $mime = $file->mime_type ?? '';
-                if (!str_starts_with($mime, 'image/') && !str_starts_with($mime, 'video/')) {
-                    return $this->error(
-                        'В мультимедиа-папку можно добавлять только фото и видео',
-                        'GALLERY_TYPE_MISMATCH',
-                        [],
-                        422
-                    );
-                }
-            }
-        }
-
-        $this->fileService->moveToFolder($file, $request->user(), $targetFolderId);
-
-        return $this->success(__('messages.files.moved'));
     }
 
     /**

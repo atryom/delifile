@@ -349,20 +349,6 @@ class FileService
     }
 
     /**
-     * Move file to a folder (per-user: stored on file_user_access record).
-     */
-    public function moveToFolder(File $file, User $user, ?string $folderId): void
-    {
-        FileUserAccess::where('file_id', $file->id)
-            ->where('user_id', $user->id)
-            ->update(['folder_id' => $folderId]);
-
-        $this->activityService->log($file, $user, ActivityType::MovedToFolder, [
-            'folder_id' => $folderId,
-        ]);
-    }
-
-    /**
      * Sync tags for a file (per-user: stored with user_id in file_tags).
      */
     public function setTags(File $file, User $user, array $tagIds): void
@@ -472,7 +458,7 @@ class FileService
         $query = File::query()->whereNull('deleted_at')->where('status', FileStatus::Available);
 
         if ($filter === 'mine') {
-            $query->where('owner_id', $user->id)->where('shared_folder_only', false);
+            $query->where('owner_id', $user->id);
         } elseif ($filter === 'received') {
             $query->whereHas('accesses', fn ($q) =>
                 $q->where('user_id', $user->id)->whereIn('access_type', [AccessType::Shared->value, AccessType::Saved->value])
@@ -483,13 +469,13 @@ class FileService
             );
         } elseif ($filter === 'all') {
             $query->where(function ($q) use ($user) {
-                $q->where(fn ($q2) => $q2->where('owner_id', $user->id)->where('shared_folder_only', false))
+                $q->where('owner_id', $user->id)
                   ->orWhereHas('accesses', fn ($q2) =>
                       $q2->where('user_id', $user->id)->whereIn('access_type', [AccessType::Shared->value, AccessType::Saved->value])
                   );
             });
         } else {
-            $query->where('owner_id', $user->id)->where('shared_folder_only', false);
+            $query->where('owner_id', $user->id);
         }
 
         if ($search) {
@@ -505,26 +491,6 @@ class FileService
                   ->where('file_tags.user_id', $userId)
                   ->where('file_tags.tag_id', $tagId);
             });
-        }
-
-        if (array_key_exists('folder_id', $options)) {
-            $userId = $user->id;
-            if ($options['folder_id'] === null) {
-                $query->whereExists(function ($q) use ($userId) {
-                    $q->from('file_user_access')
-                      ->whereColumn('file_user_access.file_id', 'files.id')
-                      ->where('file_user_access.user_id', $userId)
-                      ->whereNull('file_user_access.folder_id');
-                });
-            } else {
-                $folderId = $options['folder_id'];
-                $query->whereExists(function ($q) use ($userId, $folderId) {
-                    $q->from('file_user_access')
-                      ->whereColumn('file_user_access.file_id', 'files.id')
-                      ->where('file_user_access.user_id', $userId)
-                      ->where('file_user_access.folder_id', $folderId);
-                });
-            }
         }
 
         if (!empty($options['content_kind'])) {
