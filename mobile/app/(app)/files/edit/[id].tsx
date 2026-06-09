@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert, BackHandler, Platform, StyleSheet, Text, TouchableOpacity, View,
+  Alert, BackHandler, StyleSheet, Text, TouchableOpacity, View,
   Keyboard,
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -14,14 +14,11 @@ import { getApiError } from '@/utils/error';
 import { isAxiosError } from 'axios';
 
 async function resolveEditorUri(): Promise<string> {
-  if (Platform.OS === 'android') {
-    return 'file:///android_asset/editor.html';
-  }
-  // iOS: editor-inline.html has the TipTap bundle inlined — no separate .js asset needed
-  const [asset] = await Asset.loadAsync([
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require('../../../../assets/editor/editor-inline.html'),
-  ]);
+  // editor-inline.html has the TipTap bundle inlined — works on both iOS and Android
+  // (Android's file:///android_asset/editor.html loads editor-bundle.js as external file
+  //  which is not bundled by Expo EAS, causing the editor to hang on "Загрузка редактора...")
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const [asset] = await Asset.loadAsync([require('../../../../assets/editor/editor-inline.html')]);
   return asset.localUri!;
 }
 

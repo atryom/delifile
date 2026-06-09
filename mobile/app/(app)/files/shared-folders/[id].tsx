@@ -445,24 +445,26 @@ export default function SharedFolderScreen() {
       {folderType === 'movies' && (
         <View style={styles.flex}>
           {/* Filter chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBar}>
-            {([
-              { val: 'all' as MovieFilter, label: 'Все' },
-              { val: 'watched' as MovieFilter, label: 'Смотрел' },
-              { val: 'unwatched' as MovieFilter, label: 'Не смотрел' },
-            ]).map((chip) => (
-              <Pressable
-                key={chip.val}
-                style={[styles.filterChip, movieFilter === chip.val && styles.filterChipActive]}
-                onPress={() => setMovieFilter(chip.val)}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.filterChipText, movieFilter === chip.val && styles.filterChipTextActive]}>
-                  {chip.label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <View style={styles.filterBarWrap}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBarContent}>
+              {([
+                { val: 'all' as MovieFilter, label: 'Все' },
+                { val: 'watched' as MovieFilter, label: 'Смотрел' },
+                { val: 'unwatched' as MovieFilter, label: 'Не смотрел' },
+              ]).map((chip) => (
+                <Pressable
+                  key={chip.val}
+                  style={[styles.filterChip, movieFilter === chip.val && styles.filterChipActive]}
+                  onPress={() => setMovieFilter(chip.val)}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.filterChipText, movieFilter === chip.val && styles.filterChipTextActive]}>
+                    {chip.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
           <FlatList
             data={files.filter((f) => {
               if (movieFilter === 'all') return true;
@@ -658,6 +660,21 @@ function FileRow({
   const isUrl = file.content_kind === 'url_file';
   const icon = file.is_private ? '🔒' : isUrl ? '🔗' : getFileIcon(file.mime_type);
   const name = file.display_name || file.original_name;
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handlePressIn() {
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      onLongPress?.();
+    }, 400);
+  }
+
+  function handlePressOut() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
 
   return (
     <Pressable
@@ -669,8 +686,8 @@ function FileRow({
           params: { id: file.id, ctx_folder_id: folderId },
         });
       }}
-      onLongPress={onLongPress}
-      delayLongPress={400}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       android_ripple={{ color: 'rgba(0,0,0,0.08)' }}
     >
       {isSelectMode ? (
@@ -771,8 +788,9 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
   emptySub: { fontSize: 14, color: '#94A3B8', textAlign: 'center' },
   moviesList: { paddingVertical: 8 },
-  filterBar: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  filterChip: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, paddingHorizontal: 14, backgroundColor: '#F8FAFC', height: 30, justifyContent: 'center', alignItems: 'center', alignSelf: 'center' },
+  filterBarWrap: { height: 50, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', justifyContent: 'center' },
+  filterBarContent: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, alignItems: 'center' },
+  filterChip: { borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, paddingHorizontal: 14, backgroundColor: '#F8FAFC', height: 30, justifyContent: 'center', alignItems: 'center' },
   filterChipActive: { borderColor: '#6366F1', backgroundColor: '#EDE9FE' },
   filterChipText: { fontSize: 13, fontWeight: '500', color: '#64748B', lineHeight: 18 },
   filterChipTextActive: { color: '#6366F1' },

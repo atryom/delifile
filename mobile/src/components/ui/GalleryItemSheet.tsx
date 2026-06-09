@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import {
-  Dimensions, Modal, SafeAreaView, StyleSheet, Text, TouchableOpacity, View,
+  Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { ResizeMode, Video } from 'expo-av';
 import { router } from 'expo-router';
@@ -27,6 +28,7 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
   const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
   const [likesMap, setLikesMap] = useState<Record<string, number>>({});
   const lastTapRef = useRef<number>(0);
+  const insets = useSafeAreaInsets();
 
   const file = files[index];
   if (!file) return null;
@@ -75,10 +77,10 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose} presentationStyle="pageSheet">
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         {/* Header — hidden in fullscreen */}
         {!fullscreen && (
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
             <Text style={styles.counter}>{index + 1} / {files.length}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Text style={styles.closeBtn}>✕</Text>
@@ -121,7 +123,10 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
 
           {/* Fullscreen close hint */}
           {fullscreen && (
-            <TouchableOpacity style={styles.fullscreenClose} onPress={() => setFullscreen(false)}>
+            <TouchableOpacity
+              style={[styles.fullscreenClose, { top: insets.top + 8 }]}
+              onPress={() => setFullscreen(false)}
+            >
               <Text style={styles.fullscreenCloseText}>✕</Text>
             </TouchableOpacity>
           )}
@@ -129,7 +134,7 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
 
         {/* Info panel — compact two-row layout, hidden in fullscreen */}
         {!fullscreen && (
-          <View style={styles.info}>
+          <View style={[styles.info, { paddingBottom: Math.max(insets.bottom, 10) }]}>
             {/* Row 1: name + date + like */}
             <View style={styles.infoRow}>
               <View style={styles.infoTexts}>
@@ -151,9 +156,7 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
             {/* Row 2: action buttons */}
             <View style={styles.actionsRow}>
               <TouchableOpacity style={styles.actionBtn} onPress={goComments} activeOpacity={0.8}>
-                <Text style={styles.actionBtnText}>
-                  💬{(file.comments_count ?? 0) > 0 ? ` ${file.comments_count}` : ' Комментарии'}
-                </Text>
+                <Text style={styles.actionBtnText}>💬 {file.comments_count ?? 0}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.actionBtn} onPress={goDetails} activeOpacity={0.8}>
@@ -172,20 +175,21 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
             </View>
           </View>
         )}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#000' },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingBottom: 8,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
@@ -220,7 +224,6 @@ const styles = StyleSheet.create({
 
   fullscreenClose: {
     position: 'absolute',
-    top: 16,
     right: 16,
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 18,
@@ -233,8 +236,9 @@ const styles = StyleSheet.create({
 
   info: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingTop: 10,
     gap: 8,
+    backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
