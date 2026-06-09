@@ -4,6 +4,7 @@ import {
   TouchableOpacity, View, Animated,
 } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { commentsApi } from '@/api/comments';
 import type {
   Comment, CommentScope, CommentTargetType,
@@ -42,6 +43,7 @@ export default function CommentsScreen() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const qc = useQueryClient();
   const flatListRef = useRef<FlatList>(null);
   const kbOffset = useRef(new Animated.Value(0)).current;
 
@@ -136,6 +138,9 @@ export default function CommentsScreen() {
       const freshInfo = infoRes.data.data;
       setThreadsInfo(freshInfo);
       await loadThread(activeTabRef.current, freshInfo);
+      if (contextSharedFolderId) {
+        qc.invalidateQueries({ queryKey: ['shared-folders', contextSharedFolderId] });
+      }
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e) {
       Alert.alert('Ошибка', getApiError(e, 'Не удалось отправить комментарий'));
@@ -175,6 +180,9 @@ export default function CommentsScreen() {
             })),
         };
       });
+      if (contextSharedFolderId) {
+        qc.invalidateQueries({ queryKey: ['shared-folders', contextSharedFolderId] });
+      }
     } catch (e) {
       setDeleteError(getApiError(e, 'Не удалось удалить комментарий'));
     } finally {

@@ -10,6 +10,8 @@ const GAP = 2;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CELL_SIZE = (SCREEN_WIDTH - GAP * (COLUMNS + 1)) / COLUMNS;
 
+export type LikesMap = Record<string, { liked: boolean; count: number }>;
+
 interface Props {
   files: FileListItem[];
   folderId?: string;
@@ -18,11 +20,17 @@ interface Props {
 
 export function GalleryGrid({ files, folderId, onRemoved }: Props) {
   const [sheetIndex, setSheetIndex] = useState<number | null>(null);
+  // Persists like state across sheet open/close within this gallery session
+  const [localLikes, setLocalLikes] = useState<LikesMap>({});
 
   const media = files.filter(
     (f) => f.content_kind === 'binary_file' && f.mime_type &&
            (f.mime_type.startsWith('image/') || f.mime_type.startsWith('video/'))
   );
+
+  function onLikeChange(fileId: string, liked: boolean, count: number) {
+    setLocalLikes((prev) => ({ ...prev, [fileId]: { liked, count } }));
+  }
 
   function handleLongPress(file: FileListItem) {
     const name = file.display_name ?? file.original_name;
@@ -52,44 +60,53 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
         keyExtractor={(item) => item.id}
         numColumns={COLUMNS}
         contentContainerStyle={styles.grid}
-        renderItem={({ item, index }) => (
-          <Pressable
-            style={styles.cell}
-            onPress={() => setSheetIndex(index)}
-            onLongPress={() => handleLongPress(item)}
-            delayLongPress={500}
-            android_ripple={{ color: 'rgba(0,0,0,0.2)', borderless: false }}
-          >
-            <Image
-              source={{ uri: item.preview_url ?? undefined }}
-              style={styles.thumbnail}
-              contentFit="cover"
-              transition={150}
-              placeholderContentFit="cover"
-            />
+        renderItem={({ item, index }) => {
+          const likeCount = localLikes[item.id]?.count ?? item.likes_count ?? 0;
+          const commentCount = item.comments_count ?? 0;
+          const showOverlay = likeCount > 0 || commentCount > 0;
 
-            {/* Video badge */}
-            {item.mime_type?.startsWith('video/') && (
-              <View style={styles.videoBadge}>
-                <View style={styles.playTriangle} />
-              </View>
-            )}
+          return (
+            <Pressable
+              style={styles.cell}
+              onPress={() => setSheetIndex(index)}
+              onLongPress={() => handleLongPress(item)}
+              delayLongPress={500}
+              android_ripple={{ color: 'rgba(0,0,0,0.2)', borderless: false }}
+            >
+              <Image
+                source={{ uri: item.preview_url ?? undefined }}
+                style={styles.thumbnail}
+                contentFit="cover"
+                transition={0}
+                recyclingKey={item.id}
+                placeholderContentFit="cover"
+              />
 
-            {/* Stats overlay: likes + comments */}
-            {((item.likes_count ?? 0) > 0 || (item.comments_count ?? 0) > 0) && (
-              <View style={styles.statsOverlay}>
-                <View style={styles.stat}>
-                  <Text style={styles.statText}>♥ {item.likes_count ?? 0}</Text>
+              {/* Video badge */}
+              {item.mime_type?.startsWith('video/') && (
+                <View style={styles.videoBadge}>
+                  <View style={styles.playTriangle} />
                 </View>
-                {(item.comments_count ?? 0) > 0 && (
-                  <View style={styles.stat}>
-                    <Text style={styles.statText}>💬 {item.comments_count ?? 0}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </Pressable>
-        )}
+              )}
+
+              {/* Stats overlay: only shown when there's something to display */}
+              {showOverlay && (
+                <View style={styles.statsOverlay}>
+                  {likeCount > 0 && (
+                    <View style={styles.stat}>
+                      <Text style={styles.statText}>♥ {likeCount}</Text>
+                    </View>
+                  )}
+                  {commentCount > 0 && (
+                    <View style={styles.stat}>
+                      <Text style={styles.statText}>💬 {commentCount}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Pressable>
+          );
+        }}
       />
 
       {sheetIndex !== null && (
@@ -99,6 +116,8 @@ export function GalleryGrid({ files, folderId, onRemoved }: Props) {
           onClose={() => setSheetIndex(null)}
           folderId={folderId}
           onRemoved={onRemoved}
+          localLikes={localLikes}
+          onLikeChange={onLikeChange}
         />
       )}
     </View>

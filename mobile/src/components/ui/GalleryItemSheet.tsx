@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
@@ -8,11 +8,11 @@ import { Image } from 'expo-image';
 import { ResizeMode, Video } from 'expo-av';
 import { router } from 'expo-router';
 import type { FileListItem } from '@/types';
+import type { LikesMap } from './GalleryGrid';
 import { filesApi } from '@/api/files';
 import { formatDateTime } from '@/utils/format';
 
 const { width: W } = Dimensions.get('window');
-const MEDIA_HEIGHT = Math.min(Math.round(Dimensions.get('window').height * 0.52), W);
 const DOUBLE_TAP_DELAY = 300;
 
 interface Props {
@@ -21,13 +21,13 @@ interface Props {
   onClose: () => void;
   folderId?: string;
   onRemoved?: (fileId: string) => void;
+  localLikes: LikesMap;
+  onLikeChange: (fileId: string, liked: boolean, count: number) => void;
 }
 
-export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRemoved }: Props) {
+export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRemoved, localLikes, onLikeChange }: Props) {
   const [index, setIndex] = useState(initialIndex);
   const [fullscreen, setFullscreen] = useState(false);
-  const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
-  const [likesMap, setLikesMap] = useState<Record<string, number>>({});
   const lastTapRef = useRef<number>(0);
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -35,29 +35,30 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
   const file = files[index];
   if (!file) return null;
 
+  // Like state comes from parent (persists across sheet open/close)
+  const isLiked = localLikes[file.id]?.liked ?? file.is_liked ?? false;
+  const likesCount = localLikes[file.id]?.count ?? file.likes_count ?? 0;
+
   const isVideo = file.mime_type?.startsWith('video/');
-  const isLiked = likedMap[file.id] ?? file.is_liked ?? false;
-  const likesCount = likesMap[file.id] ?? file.likes_count ?? 0;
 
   async function toggleLike() {
     const newLiked = !isLiked;
-    const newCount = likesCount + (newLiked ? 1 : -1);
-    setLikedMap((m) => ({ ...m, [file.id]: newLiked }));
-    setLikesMap((m) => ({ ...m, [file.id]: newCount }));
+    const newCount = Math.max(0, likesCount + (newLiked ? 1 : -1));
+    // Optimistic update via parent callback
+    onLikeChange(file.id, newLiked, newCount);
     try {
       if (newLiked) await filesApi.like(file.id);
       else await filesApi.unlike(file.id);
       if (folderId) qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
     } catch {
-      setLikedMap((m) => ({ ...m, [file.id]: isLiked }));
-      setLikesMap((m) => ({ ...m, [file.id]: likesCount }));
+      // Rollback
+      onLikeChange(file.id, isLiked, likesCount);
     }
   }
 
   function handleMediaTap() {
     const now = Date.now();
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      // double tap — toggle fullscreen
       setFullscreen((f) => !f);
       lastTapRef.current = 0;
     } else {
@@ -69,7 +70,12 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
     onClose();
     router.push({
       pathname: '/(app)/files/comments',
-      params: { targetType: 'file', targetId: file.id, targetName: file.display_name ?? file.original_name },
+      params: {
+        targetType: 'file',
+        targetId: file.id,
+        targetName: file.display_name ?? file.original_name,
+        contextSharedFolderId: folderId ?? '',
+      },
     } as any);
   }
 
@@ -108,8 +114,9 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
             <Image
               source={{ uri: file.view_url ?? file.preview_url ?? undefined }}
               style={styles.media}
-              contentFit={fullscreen ? 'contain' : 'contain'}
-              transition={100}
+              contentFit="contain"
+              transition={0}
+              recyclingKey={file.id}
             />
           )}
 

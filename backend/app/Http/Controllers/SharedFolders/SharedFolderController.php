@@ -611,11 +611,13 @@ class SharedFolderController extends Controller
                 ->flip()
                 ->all();
             $commentCounts = DB::table('comment_threads')
-                ->where('target_type', 'file')
-                ->whereIn('target_id', $fileIds)
-                ->where('scope', 'shared')
-                ->select('target_id', DB::raw('SUM(comments_count) as cnt'))
-                ->groupBy('target_id')
+                ->join('comments', 'comments.thread_id', '=', 'comment_threads.id')
+                ->where('comment_threads.target_type', 'file')
+                ->whereIn('comment_threads.target_id', $fileIds)
+                ->where('comment_threads.scope', 'shared')
+                ->whereNull('comments.deleted_at')
+                ->select('comment_threads.target_id', DB::raw('COUNT(comments.id) as cnt'))
+                ->groupBy('comment_threads.target_id')
                 ->pluck('cnt', 'target_id')
                 ->all();
 
