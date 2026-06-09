@@ -8,6 +8,10 @@ on:
       - 'mobile/**'
       - '.github/workflows/ios-build.yml'
 
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
 jobs:
   ios:
     name: Build & Submit iOS
