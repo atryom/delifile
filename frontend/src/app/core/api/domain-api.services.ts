@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
-import { ApiResponse, Contact, ActivityLog, Folder, Tag, PaginatedData } from '../../shared/models/api.models';
+import { ApiResponse, Contact, ActivityLog, Tag, PaginatedData } from '../../shared/models/api.models';
 
 // ─── Contacts API ─────────────────────────────────────────────────────────────
 
@@ -56,23 +56,6 @@ export class ActivityApiService {
 @Injectable({ providedIn: 'root' })
 export class OrganizationApiService {
   private readonly api = inject(ApiService);
-
-  // Folders
-  listFolders(): Observable<ApiResponse<{ items: Folder[] }>> {
-    return this.api.get('/folders');
-  }
-
-  createFolder(name: string): Observable<ApiResponse<{ folder: Folder }>> {
-    return this.api.post('/folders', { name });
-  }
-
-  updateFolder(id: string, name: string): Observable<ApiResponse<{ folder: Folder }>> {
-    return this.api.patch(`/folders/${id}`, { name });
-  }
-
-  deleteFolder(id: string): Observable<ApiResponse<Record<string, never>>> {
-    return this.api.delete(`/folders/${id}`);
-  }
 
   // Tags
   listTags(): Observable<ApiResponse<{ items: Tag[] }>> {

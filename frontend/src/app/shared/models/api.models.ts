@@ -93,7 +93,6 @@ export interface FileCard extends FileListItem {
   is_favorite: boolean;
   is_pinned: boolean;
   folder_id: string | null;
-  shared_folder_only?: boolean;
   tags: Tag[];
   owner: UserRef;
   view_url?: string | null;
@@ -262,24 +261,6 @@ export interface ActivityLog {
 
 // ─── Organization Models ─────────────────────────────────────────────────────
 
-export interface Folder {
-  id: string;
-  name: string;
-  parent_id: string | null;
-  sort_order: number | null;
-  files_count: number;
-  created_at: string | null;
-  children?: FolderTreeNode[];
-}
-
-export interface FolderTreeNode {
-  id: string;
-  name: string;
-  sort_order: number | null;
-  files_count: number;
-  children: FolderTreeNode[];
-}
-
 export interface Tag {
   id: string;
   name: string;
@@ -362,7 +343,6 @@ export interface SharedFolderFileItem {
   link_site_name: string | null;
   is_owner?: boolean;
   added_by?: number;
-  shared_folder_only?: boolean;
   is_private?: boolean;
   is_task?: boolean;
   task_status?: TaskStatus | null;

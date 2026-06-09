@@ -34,7 +34,6 @@ export class FilesApiService {
     search?: string,
     options?: {
       tag_id?: string;
-      folder_id?: string | null;
       content_kind?: string;
       file_type_group?: string;
       sort_by?: string;
@@ -49,7 +48,6 @@ export class FilesApiService {
     const params: Record<string, string | number> = { filter, page };
     if (search)                           params['search']         = search;
     if (options?.tag_id)                  params['tag_id']         = options.tag_id;
-    if (options?.folder_id !== undefined) params['folder_id']      = options.folder_id ?? '';
     if (options?.content_kind)            params['content_kind']   = options.content_kind;
     if (options?.file_type_group)         params['file_type_group'] = options.file_type_group;
     if (options?.sort_by)                 params['sort_by']        = options.sort_by;
@@ -119,10 +117,6 @@ export class FilesApiService {
 
   unlikeFile(id: string): Observable<ApiResponse<{ likes_count: number; is_liked: boolean }>> {
     return this.api.delete(`/files/${id}/like`);
-  }
-
-  moveFolder(id: string, folderId: string | null): Observable<ApiResponse<Record<string, never>>> {
-    return this.api.post(`/files/${id}/move-folder`, { folder_id: folderId });
   }
 
   setTags(id: string, tagIds: string[]): Observable<ApiResponse<Record<string, never>>> {

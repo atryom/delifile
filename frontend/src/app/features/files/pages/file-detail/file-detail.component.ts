@@ -9,10 +9,9 @@ import { DocumentsApiService } from '../../../../core/api/documents-api.service'
 import { OrganizationApiService } from '../../../../core/api/organization-api.service';
 import { SharedFoldersApiService } from '../../../../core/api/shared-folders-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
-import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, FolderTreeNode, SharedFolder, TaskStatus } from '../../../../shared/models/api.models';
+import { FileCard, FileVersion, ShareLink, FileAccess, ActivityLog, Tag, SharedFolder, TaskStatus } from '../../../../shared/models/api.models';
 import { formatSize } from '../../../../shared/utils/format';
 import { canViewInBrowser, isPlainTextFile } from '../../../../shared/utils/file';
-import { flattenTree } from '../../../../shared/utils/tree';
 import { ShareContactDialogComponent } from '../../dialogs/share-contact/share-contact-dialog.component';
 import { CreateLinkDialogComponent } from '../../dialogs/create-link/create-link-dialog.component';
 import { AddToSharedFolderDialogComponent } from '../../dialogs/add-to-shared-folder/add-to-shared-folder-dialog.component';
@@ -90,12 +89,6 @@ export class FileDetailComponent implements OnInit, OnDestroy {
   readonly filteredTags    = signal<Tag[]>([]);
   readonly creatingTag     = signal(false);
   private tagPickerHovered = false;
-
-  readonly allFolders    = signal<FolderTreeNode[]>([]);
-  readonly flatFolders   = signal<{ id: string; name: string; indent: string }[]>([]);
-  readonly pendingFolderId = signal<string | null>(null);
-
-  readonly currentFolderName = signal<string | null>(null);
 
   // ─── Comments state ───────────────────────────────────────────────────────────
 
@@ -211,9 +204,6 @@ export class FileDetailComponent implements OnInit, OnDestroy {
         },
         error: () => {},
       });
-    } else if (fromParam === 'local-folder' && folderIdParam) {
-      this.backFolderId = folderIdParam;
-      this.backLink.set({ commands: ['/folders'], queryParams: { folder_id: folderIdParam } });
     }
 
     const editorParam = this.route.snapshot.queryParamMap.get('editor');
@@ -225,10 +215,6 @@ export class FileDetailComponent implements OnInit, OnDestroy {
     this.loadFile();
     this._startAccessPolling();
     this.orgApi.getTags().subscribe((r) => this.allTags.set(r.data.items));
-    this.orgApi.getFolderTree().subscribe((r) => {
-      this.allFolders.set(r.data.items);
-      this.flatFolders.set(this.toFlatFolders(r.data.items));
-    });
   }
 
   loadFile(): void {
@@ -240,7 +226,6 @@ export class FileDetailComponent implements OnInit, OnDestroy {
         this.descriptionEditorOpen.set(!!(res.data.file.description));
         this.taskStartDraft = res.data.file.task_start_date ? this.toDatetimeLocal(res.data.file.task_start_date) : '';
         this.taskDueDraft   = res.data.file.task_due_date   ? this.toDatetimeLocal(res.data.file.task_due_date)   : '';
-        this.pendingFolderId.set(res.data.file.folder_id ?? null);
         this.displayNameDraft = res.data.file.display_name ?? '';
         this.loading.set(false);
         if (res.data.file.mime_type === 'text/markdown') {
@@ -248,10 +233,24 @@ export class FileDetailComponent implements OnInit, OnDestroy {
         } else if (isPlainTextFile(res.data.file.mime_type, res.data.file.original_name, res.data.file.content_kind)) {
           this.loadTextContent();
         }
-        // Direct link: set back to local folder if file belongs to one
+        // When file lives in a shared folder and we didn't arrive from that folder via URL param,
+        // set the back link and context so the folder picker knows the current location.
         const fromParam = this.route.snapshot.queryParamMap.get('from');
         if (!fromParam && res.data.file.folder_id) {
-          this.backLink.set({ commands: ['/folders'], queryParams: { folder_id: res.data.file.folder_id } });
+          const folderId = res.data.file.folder_id;
+          this.backLink.set({ commands: ['/folders'], queryParams: { tab: 'shared', shared_folder_id: folderId } });
+          if (!this.contextSharedFolderId()) {
+            this.contextSharedFolderId.set(folderId);
+          }
+          if (!this.resolvedFolderName()) {
+            this.sfApi.listAll().subscribe({
+              next: r => {
+                const found = r.data.items.find(f => f.id === folderId);
+                if (found) this.resolvedFolderName.set(found.name);
+              },
+              error: () => {},
+            });
+          }
         }
         // Select last active version by default; fall back to first inactive if none active
         const versions = res.data.file.versions ?? [];
@@ -265,7 +264,6 @@ export class FileDetailComponent implements OnInit, OnDestroy {
           this.selectedVersionId.set(null);
         }
         this.loadSidePanels();
-        this.updateFolderName(res.data.file.folder_id);
       },
       error: () => this.loading.set(false),
     });
@@ -275,24 +273,6 @@ export class FileDetailComponent implements OnInit, OnDestroy {
     this.filesApi.listLinks(this.id()).subscribe((r) => this.links.set(r.data.items));
     this.filesApi.accesses(this.id()).subscribe((r) => this.accesses.set(r.data.items));
     this.filesApi.activity(this.id()).subscribe((r) => this.activity.set(r.data.items));
-  }
-
-  private updateFolderName(folderId: string | null): void {
-    if (!folderId) { this.currentFolderName.set(null); return; }
-    const found = this.flatFolders().find((f) => f.id === folderId);
-    if (found) { this.currentFolderName.set(found.name); return; }
-    this.orgApi.getFolderTree().subscribe((r) => {
-      this.allFolders.set(r.data.items);
-      const flat = this.toFlatFolders(r.data.items);
-      this.flatFolders.set(flat);
-      this.currentFolderName.set(flat.find((f) => f.id === folderId)?.name ?? null);
-    });
-  }
-
-  private toFlatFolders(nodes: FolderTreeNode[]): { id: string; name: string; indent: string }[] {
-    return flattenTree(nodes).map(({ node, depth }) => ({
-      id: node.id, name: node.name, indent: '  '.repeat(depth),
-    }));
   }
 
   download(): void {
@@ -463,34 +443,6 @@ export class FileDetailComponent implements OnInit, OnDestroy {
         this.file.update((f) => f ? { ...f, tags: f.tags.filter((t) => t.id !== tag.id) } : f);
       },
       error: () => {},
-    });
-  }
-
-  onFolderSelect(e: Event): void {
-    const folderId = (e.target as HTMLSelectElement).value || null;
-    this.pendingFolderId.set(folderId);
-    this.saveFolderSelection();
-  }
-
-  saveFolderSelection(): void {
-    if (this.savingFolder()) return;
-    const folderId = this.pendingFolderId();
-    this.savingFolder.set(true);
-    this.filesApi.moveFolder(this.id(), folderId).subscribe({
-      next: () => {
-        this.file.update((f) => f ? { ...f, folder_id: folderId } : f);
-        this.currentFolderName.set(
-          folderId ? (this.flatFolders().find((f) => f.id === folderId)?.name ?? null) : null
-        );
-        this.savingFolder.set(false);
-        this.showFeedback(this.translate.instant('files.detail.folder_saved'));
-        if (folderId) {
-          this.backLink.set({ commands: ['/folders'], queryParams: { folder_id: folderId } });
-        } else {
-          this.backLink.set({ commands: ['/folders'] });
-        }
-      },
-      error: () => this.savingFolder.set(false),
     });
   }
 
@@ -754,10 +706,6 @@ export class FileDetailComponent implements OnInit, OnDestroy {
     return '📎';
   }
 
-  isSharedFolderOnly(): boolean {
-    return !!(this.file()?.is_owner && this.file()?.shared_folder_only);
-  }
-
   canAddVersion(): boolean {
     const f = this.file();
     return !!(f?.is_owner && f?.content_kind !== 'url_file');
@@ -933,7 +881,7 @@ export class FileDetailComponent implements OnInit, OnDestroy {
     this.sfApi.addFileToMyFiles(this.id()).subscribe({
       next: () => {
         this.addToMyFilesLoading.set(false);
-        this.file.update(f => f ? { ...f, shared_folder_only: false } as typeof f : f);
+        this.file.update(f => f ? { ...f, folder_id: null } : f);
         this.showFeedback(this.translate.instant('shared_folders.add_to_my_files_done'));
       },
       error: () => this.addToMyFilesLoading.set(false),
