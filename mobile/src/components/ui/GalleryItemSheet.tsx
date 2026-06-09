@@ -3,6 +3,7 @@ import {
   Dimensions, Modal, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { ResizeMode, Video } from 'expo-av';
 import { router } from 'expo-router';
@@ -29,6 +30,7 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
   const [likesMap, setLikesMap] = useState<Record<string, number>>({});
   const lastTapRef = useRef<number>(0);
   const insets = useSafeAreaInsets();
+  const qc = useQueryClient();
 
   const file = files[index];
   if (!file) return null;
@@ -45,6 +47,7 @@ export function GalleryItemSheet({ files, initialIndex, onClose, folderId, onRem
     try {
       if (newLiked) await filesApi.like(file.id);
       else await filesApi.unlike(file.id);
+      if (folderId) qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
     } catch {
       setLikedMap((m) => ({ ...m, [file.id]: isLiked }));
       setLikesMap((m) => ({ ...m, [file.id]: likesCount }));

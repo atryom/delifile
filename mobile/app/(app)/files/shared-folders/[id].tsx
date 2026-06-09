@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from 'react';
 import { Alert, FlatList, Keyboard, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sharedFoldersApi } from '@/api/shared-folders';
 import { filesApi } from '@/api/files';
@@ -34,11 +34,12 @@ export default function SharedFolderScreen() {
   // folder_name from nav params; fall back to cache from shared folders list
   const paramName = Array.isArray(folder_name) ? folder_name[0] : folder_name;
   const cachedFolders = qc.getQueryData<SharedFolder[]>(['shared-folders']);
-  const cachedFolder = cachedFolders?.find((f) => f.id === id);
+  const cachedFoldersFlat = qc.getQueryData<SharedFolder[]>(['shared-folders', 'all-flat']);
+  const cachedFolder = cachedFolders?.find((f) => f.id === id) ?? cachedFoldersFlat?.find((f) => f.id === id);
   const folderTitle = paramName || cachedFolder?.name || 'Общая папка';
   const resolvedParamType = Array.isArray(paramFolderType) ? paramFolderType[0] : paramFolderType;
   const folderType = (cachedFolder?.folder_type ?? resolvedParamType ?? 'default') as 'default' | 'gallery' | 'movies';
-  const canEdit = cachedFolder ? (cachedFolder.is_owner || cachedFolder.my_access_type === 'edit') : false;
+  const canEdit = cachedFolder ? (cachedFolder.is_owner || cachedFolder.my_access_type === 'edit') : true;
   const [showAddMovie, setShowAddMovie] = useState(false);
 
   // Multi-select state (default view only)
@@ -80,6 +81,10 @@ export default function SharedFolderScreen() {
     },
     staleTime: 0,
   });
+
+  useFocusEffect(useCallback(() => {
+    refetch();
+  }, [refetch]));
 
   const renameSubfolder = useMutation({
     mutationFn: ({ subfolderId, name }: { subfolderId: string; name: string }) =>

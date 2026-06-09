@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFileList } from '@/hooks/useFiles';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useEnsurePersonalRoot } from '@/hooks/useSharedFolders';
 import { sharedFoldersApi } from '@/api/shared-folders';
+import { filesApi } from '@/api/files';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatFileSize, pluralFiles } from '@/utils/format';
 import type { FileListItem, FileFilter } from '@/types';
@@ -92,13 +93,46 @@ function FolderRow({ folder, onMenu, isRenaming, renameText, onRenameChange, onR
   );
 }
 
-function FileRow({ item }: { item: FileListItem }) {
+function FileRow({
+  item, isSelectMode, isSelected, onSelect, onLongPress,
+}: {
+  item: FileListItem;
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  onLongPress?: () => void;
+}) {
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handlePressIn() {
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      onLongPress?.();
+    }, 400);
+  }
+
+  function handlePressOut() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
   return (
-    <TouchableOpacity
-      style={styles.fileRow}
-      onPress={() => router.push(`/(app)/files/${item.id}`)}
-      activeOpacity={0.7}
+    <Pressable
+      style={({ pressed }) => [styles.fileRow, isSelected && styles.fileRowSelected, pressed && { opacity: 0.7 }]}
+      onPress={() => {
+        if (isSelectMode) { onSelect?.(); return; }
+        router.push(`/(app)/files/${item.id}`);
+      }}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
     >
+      {isSelectMode && (
+        <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+        </View>
+      )}
       <View style={styles.rowMain}>
         <Text style={styles.fileName} numberOfLines={1}>{item.display_name ?? item.original_name}</Text>
         <Text style={styles.fileMeta}>
@@ -106,7 +140,49 @@ function FileRow({ item }: { item: FileListItem }) {
           {item.uploaded_at ? ` · ${formatDate(item.uploaded_at)}` : ''}
         </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
+  );
+}
+
+function FolderPickerModal({
+  onMove,
+  onClose,
+}: {
+  onMove: (targetId: string) => void;
+  onClose: () => void;
+}) {
+  const { data: folders = [], isLoading } = useQuery({
+    queryKey: ['shared-folders-all-flat'],
+    queryFn: () => sharedFoldersApi.allFlat().then((r) => r.data.data.items),
+    staleTime: 1000 * 60,
+  });
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Переместить в папку</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.modalClose}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        {isLoading && <Spinner />}
+        <FlatList
+          data={folders}
+          keyExtractor={(f) => f.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.modalFolderRow} activeOpacity={0.7} onPress={() => onMove(item.id)}>
+              <Text style={styles.modalFolderIcon}>
+                {item.folder_type === 'gallery' ? '🖼' : item.folder_type === 'movies' ? '🎬' : '🗂'}
+              </Text>
+              <Text style={styles.modalFolderName}>{item.name}</Text>
+              <Text style={styles.modalChevron}>›</Text>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={!isLoading ? <Text style={styles.modalEmpty}>Нет доступных папок</Text> : null}
+        />
+      </View>
+    </Modal>
   );
 }
 
@@ -119,6 +195,48 @@ export default function FilesScreen() {
   // Rename state
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
+
+  // Multi-select state
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+
+  function enterSelectMode(fileId: string) {
+    setIsSelectMode(true);
+    setSelectedIds([fileId]);
+  }
+
+  function exitSelectMode() {
+    setIsSelectMode(false);
+    setSelectedIds([]);
+  }
+
+  function toggleSelect(fileId: string) {
+    setSelectedIds((ids) => ids.includes(fileId) ? ids.filter((x) => x !== fileId) : [...ids, fileId]);
+  }
+
+  async function handleBulkDelete() {
+    Alert.alert(`Удалить ${selectedIds.length} файл(а)?`, 'Файлы будут удалены безвозвратно.', [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Удалить',
+        style: 'destructive',
+        onPress: async () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          await Promise.allSettled(selectedIds.map((fid) => filesApi.delete(fid)));
+          qc.invalidateQueries({ queryKey: ['files'] });
+          exitSelectMode();
+        },
+      },
+    ]);
+  }
+
+  async function handleBulkMove(targetFolderId: string) {
+    await Promise.allSettled(selectedIds.map((fid) => sharedFoldersApi.addFile(targetFolderId, fid, true)));
+    qc.invalidateQueries({ queryKey: ['files'] });
+    setShowMoveModal(false);
+    exitSelectMode();
+  }
 
   const ensureRoot = useEnsurePersonalRoot();
   useEffect(() => {
@@ -303,9 +421,45 @@ export default function FilesScreen() {
                 />
               );
             }
-            return <FileRow item={item.data} />;
+            return (
+              <FileRow
+                item={item.data}
+                isSelectMode={isSelectMode}
+                isSelected={selectedIds.includes(item.data.id)}
+                onSelect={() => toggleSelect(item.data.id)}
+                onLongPress={() => enterSelectMode(item.data.id)}
+              />
+            );
           }}
         />
+      )}
+
+      {/* Select mode info bar */}
+      {isSelectMode && (
+        <View style={styles.selectModeBar}>
+          <Text style={styles.selectModeCount}>{selectedIds.length} выбрано</Text>
+          <TouchableOpacity onPress={exitSelectMode} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.selectModeCancel}>Отмена</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Bulk action bar */}
+      {isSelectMode && selectedIds.length > 0 && (
+        <View style={styles.selectBar}>
+          <TouchableOpacity style={styles.selectBarBtn} onPress={() => setShowMoveModal(true)}>
+            <Text style={styles.selectBarIcon}>📁</Text>
+            <Text style={styles.selectBarText}>В папку</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.selectBarBtn, styles.selectBarBtnDanger]} onPress={handleBulkDelete}>
+            <Text style={styles.selectBarIcon}>🗑</Text>
+            <Text style={[styles.selectBarText, styles.selectBarTextDanger]}>Удалить</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {showMoveModal && (
+        <FolderPickerModal onMove={handleBulkMove} onClose={() => setShowMoveModal(false)} />
       )}
 
     </View>
@@ -334,7 +488,11 @@ const styles = StyleSheet.create({
   menuBtnText: { fontSize: 18, color: '#94A3B8' },
   renameInput: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, color: '#1E293B', borderWidth: 1, borderColor: '#2563EB' },
   renameConfirm: { fontSize: 18, color: '#2563EB', fontWeight: '700' },
-  fileRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  fileRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 10 },
+  fileRowSelected: { backgroundColor: '#EFF6FF' },
+  checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
+  checkboxActive: { borderColor: '#6366F1', backgroundColor: '#6366F1' },
+  checkmark: { color: '#fff', fontSize: 13, fontWeight: '700' },
   rowMain: { flex: 1 },
   fileName: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
   fileMeta: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
@@ -346,4 +504,24 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 16, fontWeight: '600', color: '#EF4444' },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#2563EB', borderRadius: 8 },
   retryText: { color: '#fff', fontWeight: '600' },
+
+  selectModeBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#EFF6FF', borderTopWidth: 1, borderTopColor: '#BFDBFE' },
+  selectModeCount: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  selectModeCancel: { fontSize: 14, color: '#2563EB', fontWeight: '500' },
+  selectBar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#fff' },
+  selectBarBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 4 },
+  selectBarBtnDanger: { borderLeftWidth: 1, borderLeftColor: '#E2E8F0' },
+  selectBarIcon: { fontSize: 20 },
+  selectBarText: { fontSize: 12, color: '#475569', fontWeight: '500' },
+  selectBarTextDanger: { color: '#EF4444' },
+
+  modalContainer: { flex: 1, backgroundColor: '#fff' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
+  modalClose: { fontSize: 18, color: '#64748B', paddingHorizontal: 4 },
+  modalFolderRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12 },
+  modalFolderIcon: { fontSize: 20 },
+  modalFolderName: { flex: 1, fontSize: 15, color: '#1E293B' },
+  modalChevron: { fontSize: 18, color: '#94A3B8' },
+  modalEmpty: { textAlign: 'center', color: '#94A3B8', fontSize: 14, padding: 32 },
 });
