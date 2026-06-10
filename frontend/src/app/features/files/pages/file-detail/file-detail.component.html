@@ -192,7 +192,16 @@
               <div class="file-header-card">
                 <div class="file-card-left">
                   @if (displayPreviewUrl()) {
-                    <img [src]="displayPreviewUrl()!" alt="" class="file-preview-thumb" loading="lazy" />
+                    @if (canViewInBrowser()) {
+                      <button type="button" class="file-preview-thumb-btn" (click)="openInBrowser()" [attr.aria-label]="'Открыть файл'">
+                        <img [src]="displayPreviewUrl()!" alt="" class="file-preview-thumb" loading="lazy" />
+                        @if (file()!.mime_type?.includes('pdf')) {
+                          <span class="file-preview-pdf-hint">Открыть PDF</span>
+                        }
+                      </button>
+                    } @else {
+                      <img [src]="displayPreviewUrl()!" alt="" class="file-preview-thumb" loading="lazy" />
+                    }
                   } @else {
                     <div class="file-big-icon" aria-hidden="true">{{ mimeIcon(file()!.mime_type ?? '') }}</div>
                   }

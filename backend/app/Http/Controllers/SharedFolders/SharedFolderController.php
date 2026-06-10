@@ -660,11 +660,22 @@ class SharedFolderController extends Controller
                 ->pluck('cnt', 'target_id')
                 ->all();
 
+            $unreadComments = DB::table('comment_reads')
+                ->join('comment_threads', 'comment_threads.id', '=', 'comment_reads.thread_id')
+                ->where('comment_reads.user_id', $user->id)
+                ->where('comment_threads.target_type', 'file')
+                ->whereIn('comment_threads.target_id', $fileIds)
+                ->select('comment_threads.target_id', DB::raw('SUM(comment_reads.unread_count_cache) as unread'))
+                ->groupBy('comment_threads.target_id')
+                ->pluck('unread', 'target_id')
+                ->all();
+
             foreach ($sharedFiles as $sf) {
                 if ($sf->file) {
-                    $sf->file->setAttribute('likes_count_cached',    $likeCounts[$sf->file->id] ?? 0);
-                    $sf->file->setAttribute('is_liked_cached',       isset($likedSet[$sf->file->id]));
-                    $sf->file->setAttribute('comments_count_cached', $commentCounts[$sf->file->id] ?? 0);
+                    $sf->file->setAttribute('likes_count_cached',       $likeCounts[$sf->file->id] ?? 0);
+                    $sf->file->setAttribute('is_liked_cached',          isset($likedSet[$sf->file->id]));
+                    $sf->file->setAttribute('comments_count_cached',    $commentCounts[$sf->file->id] ?? 0);
+                    $sf->file->setAttribute('unread_comments_cached',   (int) ($unreadComments[$sf->file->id] ?? 0));
                 }
             }
         }

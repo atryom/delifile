@@ -5,6 +5,7 @@ import { FilesApiService } from '../../../core/api/files-api.service';
 import { SharedFoldersApiService } from '../../../core/api/shared-folders-api.service';
 import { AuthStateService } from '../../../core/auth/auth-state.service';
 import { VideoThumbnailService, GeneratedThumbnail } from './video-thumbnail.service';
+import { PdfThumbnailService } from './pdf-thumbnail.service';
 import { InitUploadRequest, InitUploadResponse } from '../../../shared/models/api.models';
 import { PLAN_FILE_LIMITS } from '../../../shared/constants/limits';
 
@@ -26,6 +27,7 @@ export class FileUploadService {
   private readonly http             = inject(HttpClient);
   private readonly authState        = inject(AuthStateService);
   private readonly thumbnailService = inject(VideoThumbnailService);
+  private readonly pdfThumbService  = inject(PdfThumbnailService);
 
   private readonly _state = signal<UploadState>({
     phase: 'idle', progress: 0, fileId: null, error: null,
@@ -46,9 +48,12 @@ export class FileUploadService {
 
     const sfId = options?.sharedFolderId;
     const isVideo = file.type.startsWith('video/');
+    const isPdf   = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     const prep$: Observable<GeneratedThumbnail | null> = isVideo
       ? from(this.thumbnailService.generateFromFile(file).catch(() => null))
-      : of(null);
+      : isPdf
+        ? from(this.pdfThumbService.generateFromFile(file).catch(() => null))
+        : of(null);
 
     return prep$.pipe(
       switchMap((thumb: GeneratedThumbnail | null) => {

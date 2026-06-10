@@ -1,15 +1,28 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Alert, Keyboard, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { useContacts, useContactRequests, useCreateContact, useAcceptContactRequest, useRejectContactRequest } from '@/hooks/useContacts';
 import { useInboxCount, useInboxFiles, useInboxSharedFolders, useAcceptInboxFile, useRejectInboxFile, useAcceptInboxFolder, useRejectInboxFolder } from '@/hooks/useInbox';
+import { useNotifications, useNotificationCount, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks/useNotifications';
 import { Spinner } from '@/components/ui/Spinner';
 import { isValidEmail } from '@/utils/format';
 import type { Contact } from '@/types';
 import { getApiError } from '@/utils/error';
 
-type Tab = 'contacts' | 'requests';
+function formatRelative(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'только что';
+  if (mins < 60) return `${mins} мин. назад`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ч. назад`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} д. назад`;
+  return new Date(isoString).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
+
+type Tab = 'contacts' | 'requests' | 'notifications';
 
 function ContactItem({ contact }: { contact: Contact }) {
   const name = contact.name || contact.resolved_user?.name || '—';
@@ -247,13 +260,81 @@ function RequestsTab() {
   );
 }
 
+function NotificationTypeIcon({ type }: { type: string }) {
+  const iconMap: Record<string, string> = {
+    comment_created: '💬',
+    note_changed: '📝',
+    shared_folder_content_added: '📁',
+    file_shared: '📤',
+    mention: '👤',
+  };
+  return <Text style={styles.notifIcon}>{iconMap[type] ?? '🔔'}</Text>;
+}
+
+function NotificationsTab() {
+  const { data, isLoading, refetch } = useNotifications();
+  const { data: countData } = useNotificationCount();
+  const markRead = useMarkNotificationRead();
+  const markAll = useMarkAllNotificationsRead();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
+
+  const unread = countData?.unread ?? 0;
+
+  if (isLoading && !refreshing) return <Spinner />;
+
+  const items = data?.items ?? [];
+
+  return (
+    <View style={styles.flex}>
+      {unread > 0 && (
+        <TouchableOpacity style={styles.markAllRow} onPress={() => markAll.mutate()}>
+          <Text style={styles.markAllText}>Отметить все как прочитанные</Text>
+        </TouchableOpacity>
+      )}
+      <ScrollView
+        style={styles.flex}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
+        {items.length === 0 ? (
+          <Text style={styles.empty}>Нет уведомлений</Text>
+        ) : (
+          items.map((n) => (
+            <TouchableOpacity
+              key={n.id}
+              style={[styles.notifItem, !n.is_read && styles.notifItemUnread]}
+              onPress={() => { if (!n.is_read) markRead.mutate(n.id); }}
+              activeOpacity={0.7}
+            >
+              <NotificationTypeIcon type={n.type} />
+              <View style={styles.notifContent}>
+                <Text style={[styles.notifTitle, !n.is_read && styles.notifTitleUnread]}>{n.title}</Text>
+                <Text style={styles.notifBody} numberOfLines={2}>{n.body}</Text>
+                <Text style={styles.notifTime}>{formatRelative(n.created_at)}</Text>
+              </View>
+              {!n.is_read && <View style={styles.unreadDot} />}
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
 export default function ConnectionsScreen() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('contacts');
   const { data: inboxCount } = useInboxCount();
   const { data: contactReqs } = useContactRequests();
+  const { data: notifCount } = useNotificationCount();
   const requestsBadge =
     (inboxCount?.total ?? 0) + (contactReqs?.filter((r) => r.status === 'pending').length ?? 0);
+  const notifBadge = notifCount?.unread ?? 0;
 
   return (
     <View style={styles.flex}>
@@ -283,9 +364,22 @@ export default function ConnectionsScreen() {
             )}
           </View>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.segBtn, tab === 'notifications' && styles.segBtnActive]}
+          onPress={() => setTab('notifications')}
+        >
+          <View style={styles.segBtnInner}>
+            <Text style={[styles.segText, tab === 'notifications' && styles.segTextActive]}>Уведомления</Text>
+            {notifBadge > 0 && (
+              <View style={styles.segBadge}>
+                <Text style={styles.segBadgeText}>{notifBadge > 99 ? '99+' : notifBadge}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
       </View>
 
-      {tab === 'contacts' ? <ContactsTab /> : <RequestsTab />}
+      {tab === 'contacts' ? <ContactsTab /> : tab === 'requests' ? <RequestsTab /> : <NotificationsTab />}
     </View>
   );
 }
@@ -331,4 +425,16 @@ const styles = StyleSheet.create({
   saveBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' },
   saveBtnDisabled: { opacity: 0.6 },
   saveText: { fontSize: 15, color: '#fff', fontWeight: '600' },
+  // Notifications
+  markAllRow: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#EFF6FF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', alignItems: 'flex-end' },
+  markAllText: { fontSize: 13, color: '#2563EB', fontWeight: '500' },
+  notifItem: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12 },
+  notifItemUnread: { backgroundColor: '#F0F7FF' },
+  notifIcon: { fontSize: 22, lineHeight: 28, marginTop: 2 },
+  notifContent: { flex: 1 },
+  notifTitle: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  notifTitleUnread: { fontWeight: '700' },
+  notifBody: { fontSize: 13, color: '#64748B', marginTop: 2, lineHeight: 18 },
+  notifTime: { fontSize: 11, color: '#94A3B8', marginTop: 4 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#2563EB', marginTop: 8 },
 });

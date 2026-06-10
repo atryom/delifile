@@ -84,7 +84,15 @@
 }
 .file-card-left { flex-shrink: 0; align-self: flex-start; }
 .file-big-icon { font-size: 3rem; flex-shrink: 0; }
-.file-preview-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
+.file-preview-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 10px; flex-shrink: 0; display: block; }
+.file-preview-thumb-btn {
+  position: relative; display: block; border: none; background: none; padding: 0; cursor: pointer; border-radius: 10px; overflow: hidden;
+  &:hover .file-preview-pdf-hint { opacity: 1; }
+}
+.file-preview-pdf-hint {
+  position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.55); color: #fff;
+  font-size: 0.6rem; text-align: center; padding: 3px 2px; opacity: 0; transition: opacity 0.15s; pointer-events: none;
+}
 .file-header-info { flex: 1; min-width: 0; }
 .file-title {
   font-size: 1.3rem;

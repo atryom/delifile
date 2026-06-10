@@ -222,8 +222,13 @@
                 }
               </div>
               <div class="recent-info">
-                <span class="recent-name" [title]="file.content_kind === 'url_file' ? (file.display_name ?? file.link_title ?? file.original_name) : (file.display_name ?? file.original_name)">
-                  {{ file.content_kind === 'url_file' ? (file.display_name ?? file.link_title ?? file.original_name) : (file.display_name ?? file.original_name) }}
+                <span class="recent-name-row">
+                  <span class="recent-name" [title]="file.content_kind === 'url_file' ? (file.display_name ?? file.link_title ?? file.original_name) : (file.display_name ?? file.original_name)">
+                    {{ file.content_kind === 'url_file' ? (file.display_name ?? file.link_title ?? file.original_name) : (file.display_name ?? file.original_name) }}
+                  </span>
+                  @if ((file.unread_comments ?? 0) > 0) {
+                    <span class="comment-unread-badge" [attr.aria-label]="(file.unread_comments) + ' непрочитанных комментариев'">{{ file.unread_comments }}</span>
+                  }
                 </span>
                 <span class="recent-meta">
                   @if (file.content_kind !== 'url_file') {

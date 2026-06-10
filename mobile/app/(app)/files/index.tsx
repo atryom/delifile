@@ -139,7 +139,14 @@ function FileRow({
         </View>
       )}
       <View style={styles.rowMain}>
-        <Text style={styles.fileName} numberOfLines={1}>{item.display_name ?? item.original_name}</Text>
+        <View style={styles.fileNameRow}>
+          <Text style={styles.fileName} numberOfLines={1}>{item.display_name ?? item.original_name}</Text>
+          {(item.unread_comments ?? 0) > 0 && (
+            <View style={styles.commentBadge}>
+              <Text style={styles.commentBadgeText}>{(item.unread_comments ?? 0) > 99 ? '99+' : item.unread_comments}</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.fileMeta}>
           {item.content_kind === 'url_file' ? 'Ссылка' : formatFileSize(item.size)}
           {item.uploaded_at ? ` · ${formatDate(item.uploaded_at)}` : ''}
@@ -542,8 +549,11 @@ const styles = StyleSheet.create({
   checkboxActive: { borderColor: '#6366F1', backgroundColor: '#6366F1' },
   checkmark: { color: '#fff', fontSize: 13, fontWeight: '700' },
   rowMain: { flex: 1 },
-  fileName: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
+  fileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  fileName: { fontSize: 15, color: '#1E293B', fontWeight: '500', flex: 1 },
   fileMeta: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
+  commentBadge: { backgroundColor: '#EF4444', borderRadius: 8, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  commentBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   addBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   addBtnText: { fontSize: 24, color: '#2563EB', lineHeight: 28 },
   empty: { textAlign: 'center', color: '#94A3B8', fontSize: 15 },

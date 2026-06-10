@@ -53,6 +53,7 @@ export interface FileListItem {
   likes_count?: number;
   is_liked?: boolean;
   comments_count?: number;
+  unread_comments?: number;
 }
 
 // Карточка файла — расширенная версия

@@ -127,6 +127,11 @@ class FileService
 
             $this->activityService->log($file, $user, ActivityType::Uploaded);
 
+            // Queue PDF thumbnail generation for mobile uploads (no thumbnail provided)
+            if (!$thumbnailKey && str_contains($file->mime_type ?? '', 'pdf')) {
+                \App\Jobs\GeneratePdfPreview::dispatch($file->id)->onQueue('default');
+            }
+
             return [
                 'file' => [
                     'id'     => $file->id,
@@ -558,6 +563,23 @@ class FileService
         $total = $query->count();
         $items = $query->with(['accesses' => fn ($q) => $q->where('user_id', $user->id)])
                        ->offset(($page - 1) * $perPage)->limit($perPage)->get();
+
+        // Batch-load unread comment counts for the current user
+        $fileIds = $items->pluck('id')->all();
+        if (!empty($fileIds)) {
+            $unreadMap = DB::table('comment_reads')
+                ->join('comment_threads', 'comment_threads.id', '=', 'comment_reads.thread_id')
+                ->where('comment_reads.user_id', $user->id)
+                ->where('comment_threads.target_type', 'file')
+                ->whereIn('comment_threads.target_id', $fileIds)
+                ->select('comment_threads.target_id', DB::raw('SUM(comment_reads.unread_count_cache) as unread'))
+                ->groupBy('comment_threads.target_id')
+                ->pluck('unread', 'target_id')
+                ->all();
+            foreach ($items as $f) {
+                $f->setAttribute('unread_comments_cached', (int) ($unreadMap[$f->id] ?? 0));
+            }
+        }
 
         return [
             'items'      => $items->map(fn ($f) => $this->buildListItem($f, $user)),

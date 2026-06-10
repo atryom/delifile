@@ -634,16 +634,38 @@ export default function FileDetailScreen() {
                   </View>
                 </TouchableOpacity>
               )}
-              {/* PDF — open in in-app WebView */}
+              {/* PDF — thumbnail preview + open in in-app WebView */}
               {file.mime_type === 'application/pdf' ? (
-                <Button
-                  title="📄 Открыть PDF"
-                  onPress={() => router.push({
-                    pathname: '/(app)/files/pdf-viewer' as any,
-                    params: { id: file.id, name: file.display_name ?? file.original_name },
-                  })}
-                  style={styles.btn}
-                />
+                <>
+                  {file.preview_url ? (
+                    <TouchableOpacity
+                      style={styles.previewContainer}
+                      onPress={() => router.push({
+                        pathname: '/(app)/files/pdf-viewer' as any,
+                        params: { id: file.id, name: file.display_name ?? file.original_name },
+                      })}
+                      activeOpacity={0.85}
+                    >
+                      <Image
+                        source={{ uri: file.preview_url }}
+                        style={styles.previewImage}
+                        contentFit="cover"
+                      />
+                      <View style={styles.previewOverlay}>
+                        <Text style={styles.previewOverlayText}>📄 Открыть PDF</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ) : (
+                    <Button
+                      title="📄 Открыть PDF"
+                      onPress={() => router.push({
+                        pathname: '/(app)/files/pdf-viewer' as any,
+                        params: { id: file.id, name: file.display_name ?? file.original_name },
+                      })}
+                      style={styles.btn}
+                    />
+                  )}
+                </>
               ) : (
                 <Button
                   title={downloading ? 'Скачивание...' : 'Скачать'}

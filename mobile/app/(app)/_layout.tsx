@@ -4,6 +4,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { useInboxCount } from '@/hooks/useInbox';
 import { useContactRequests } from '@/hooks/useContacts';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useNotificationCount } from '@/hooks/useNotifications';
 import { View, Text, StyleSheet } from 'react-native';
 
 function TabBarIcon({ name, color, size }: { name: any; color: string; size: number }) {
@@ -13,7 +14,8 @@ function TabBarIcon({ name, color, size }: { name: any; color: string; size: num
 function useConnectionsBadge() {
   const { data: inbox } = useInboxCount();
   const { data: requests } = useContactRequests();
-  return (inbox?.total ?? 0) + (requests?.filter((r) => r.status === 'pending').length ?? 0);
+  const { data: notifCount } = useNotificationCount();
+  return (inbox?.total ?? 0) + (requests?.filter((r) => r.status === 'pending').length ?? 0) + (notifCount?.unread ?? 0);
 }
 
 function ConnectionsTabIcon({ color, size }: { color: string; size: number }) {

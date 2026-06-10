@@ -742,7 +742,14 @@ function FileRow({
         <Text style={styles.fileIcon}>{icon}</Text>
       )}
       <View style={styles.rowInfo}>
-        <Text style={styles.fileName} numberOfLines={1}>{name}</Text>
+        <View style={styles.fileNameRow}>
+          <Text style={styles.fileName} numberOfLines={1}>{name}</Text>
+          {(file.unread_comments ?? 0) > 0 && (
+            <View style={styles.commentBadge}>
+              <Text style={styles.commentBadgeText}>{(file.unread_comments ?? 0) > 99 ? '99+' : file.unread_comments}</Text>
+            </View>
+          )}
+        </View>
         {!isUrl && <Text style={styles.fileMeta}>{formatFileSize(file.size)}</Text>}
         {isUrl && file.link_title && (
           <Text style={styles.fileMeta} numberOfLines={1}>{file.link_title}</Text>
@@ -898,8 +905,11 @@ const styles = StyleSheet.create({
   },
   fileIcon: { fontSize: 22 },
   rowInfo: { flex: 1, gap: 2 },
-  fileName: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
+  fileNameRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6 },
+  fileName: { fontSize: 15, fontWeight: '500', color: '#1E293B', flex: 1 },
   fileMeta: { fontSize: 13, color: '#64748B' },
+  commentBadge: { backgroundColor: '#EF4444', borderRadius: 8, minWidth: 18, height: 18, alignItems: 'center' as const, justifyContent: 'center' as const, paddingHorizontal: 4 },
+  commentBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' as const },
   fileDate: { fontSize: 11, color: '#94A3B8' },
   chevron: { fontSize: 20, color: '#CBD5E1' },
   menuBtn: { paddingHorizontal: 8, paddingVertical: 4 },

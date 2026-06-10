@@ -83,7 +83,12 @@ class S3UrlService
                 $previewUrl = $this->tryTemporaryUrl($file->thumbnail_key, self::TTL_PREVIEW);
             }
             $viewUrl = $this->tryTemporaryUrl($file->storage_key, self::TTL_VIEW);
-        } elseif (str_starts_with($mime, 'audio/') || str_contains($mime, 'pdf')) {
+        } elseif (str_contains($mime, 'pdf')) {
+            if ($file->thumbnail_key) {
+                $previewUrl = $this->tryTemporaryUrl($file->thumbnail_key, self::TTL_PREVIEW);
+            }
+            $viewUrl = $this->tryTemporaryUrl($file->storage_key, self::TTL_VIEW);
+        } elseif (str_starts_with($mime, 'audio/')) {
             $viewUrl = $this->tryTemporaryUrl($file->storage_key, self::TTL_VIEW);
         }
 
@@ -99,7 +104,7 @@ class S3UrlService
         if (str_starts_with($mime, 'image/') && $file->storage_key) {
             return $this->tryTemporaryUrl($file->storage_key, self::TTL_PREVIEW);
         }
-        if (str_starts_with($mime, 'video/') && $file->thumbnail_key) {
+        if ((str_starts_with($mime, 'video/') || str_contains($mime, 'pdf')) && $file->thumbnail_key) {
             return $this->tryTemporaryUrl($file->thumbnail_key, self::TTL_PREVIEW);
         }
         return null;
@@ -114,7 +119,7 @@ class S3UrlService
         if (str_starts_with($mime, 'image/') && $version->storage_key) {
             return $this->tryTemporaryUrl($version->storage_key, self::TTL_PREVIEW);
         }
-        if (str_starts_with($mime, 'video/') && $version->thumbnail_key) {
+        if ((str_starts_with($mime, 'video/') || str_contains($mime, 'pdf')) && $version->thumbnail_key) {
             return $this->tryTemporaryUrl($version->thumbnail_key, self::TTL_PREVIEW);
         }
         return null;

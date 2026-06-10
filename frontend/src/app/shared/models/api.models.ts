@@ -351,6 +351,7 @@ export interface SharedFolderFileItem {
   likes_count?: number;
   is_liked?: boolean;
   comments_count?: number;
+  unread_comments?: number;
 }
 
 // ─── Invitation Models ───────────────────────────────────────────────────────

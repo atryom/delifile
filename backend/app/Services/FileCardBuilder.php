@@ -62,6 +62,13 @@ class FileCardBuilder
             'task_assigned_user' => $this->formatTaskAssignee($file),
         ];
 
+        // Unread comment count for this user
+        $base['unread_comments'] = (int) \App\Models\CommentRead::join('comment_threads', 'comment_threads.id', '=', 'comment_reads.thread_id')
+            ->where('comment_reads.user_id', $user->id)
+            ->where('comment_threads.target_type', 'file')
+            ->where('comment_threads.target_id', $file->id)
+            ->sum('comment_reads.unread_count_cache');
+
         if ($file->content_kind === 'movie_item') {
             $base['custom_metadata'] = $file->custom_metadata;
             $base['link_url']        = $file->link_url;
@@ -123,10 +130,11 @@ class FileCardBuilder
         ];
 
         $owner = $file->relationLoaded('owner') ? $file->owner : null;
-        $item['owner']          = $owner ? ['id' => $owner->id, 'name' => $owner->name, 'email' => $owner->email] : null;
-        $item['likes_count']    = (int) ($file->getAttribute('likes_count_cached') ?? FileLike::where('file_id', $file->id)->count());
-        $item['is_liked']       = (bool) ($file->getAttribute('is_liked_cached') ?? ($user ? FileLike::where('file_id', $file->id)->where('user_id', $user->id)->exists() : false));
-        $item['comments_count'] = (int) ($file->getAttribute('comments_count_cached') ?? 0);
+        $item['owner']             = $owner ? ['id' => $owner->id, 'name' => $owner->name, 'email' => $owner->email] : null;
+        $item['likes_count']       = (int) ($file->getAttribute('likes_count_cached') ?? FileLike::where('file_id', $file->id)->count());
+        $item['is_liked']          = (bool) ($file->getAttribute('is_liked_cached') ?? ($user ? FileLike::where('file_id', $file->id)->where('user_id', $user->id)->exists() : false));
+        $item['comments_count']    = (int) ($file->getAttribute('comments_count_cached') ?? 0);
+        $item['unread_comments']   = (int) ($file->getAttribute('unread_comments_cached') ?? 0);
 
         if ($inSharedFolderContext) {
             $item['added_by'] = $addedBy;

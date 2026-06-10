@@ -353,8 +353,10 @@
   color: var(--accent);
 }
 .recent-info { flex: 1; min-width: 0; }
-.recent-name { display: block; font-size: 0.86rem; font-weight: 500; color: var(--text); @include v.truncate; }
+.recent-name-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.recent-name { font-size: 0.86rem; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .recent-meta { display: block; font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+.comment-unread-badge { flex-shrink: 0; background: #ef4444; color: #fff; font-size: 0.6rem; font-weight: 700; border-radius: 8px; min-width: 16px; height: 16px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 
 // ─── Shared buttons ───────────────────────────────────────────────────────
 .btn-primary-sm {
