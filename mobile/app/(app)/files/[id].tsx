@@ -11,7 +11,7 @@ import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import {
   useFile, useDownloadUrl, useToggleFavorite,
-  useSetTags, useMoveFolder, useShareToContact, useCreateLink, useDeleteFile,
+  useSetTags, useShareToContact, useCreateLink, useDeleteFile,
   useVersionDownload, useActivateVersion,
   useFileLinks, useDisableFileLink, useFileAccesses, useRevokeAccess, useUpdateAccess,
   useUpdateTask,
@@ -56,7 +56,6 @@ export default function FileDetailScreen() {
   const downloadUrl = useDownloadUrl(id);
   const toggleFavorite = useToggleFavorite();
   const setTags = useSetTags(id);
-  const moveFolder = useMoveFolder(id);
   const shareToContact = useShareToContact(id);
   const createLink = useCreateLink(id);
   const deleteFile = useDeleteFile();

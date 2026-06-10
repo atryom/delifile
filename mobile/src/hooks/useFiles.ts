@@ -59,17 +59,6 @@ export function useSetTags(id: string) {
   });
 }
 
-export function useMoveFolder(id: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (folder_id: string | null) => filesApi.moveFolder(id, folder_id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['file', id] });
-      qc.invalidateQueries({ queryKey: ['files'] });
-    },
-  });
-}
-
 export function useShareToContact(id: string) {
   const qc = useQueryClient();
   return useMutation({

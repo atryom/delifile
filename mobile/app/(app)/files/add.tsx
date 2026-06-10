@@ -102,7 +102,7 @@ export default function AddScreen() {
       const res = await filesApi.createUrlFile(url);
       const fileId = res.data.data.file.id;
       if (folderId) {
-        await filesApi.moveFolder(fileId, folderId).catch(() => {});
+        await sharedFoldersApi.addFile(folderId, fileId, true).catch(() => {});
       }
       qc.invalidateQueries({ queryKey: ['files'] });
       router.back();
@@ -193,7 +193,7 @@ export default function AddScreen() {
       }
 
       if (folderId) {
-        await filesApi.moveFolder(fileId, folderId).catch(() => {});
+        await sharedFoldersApi.addFile(folderId, fileId, true).catch(() => {});
       }
 
       pendingFileIdRef.current = null;

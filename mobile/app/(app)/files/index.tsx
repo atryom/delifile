@@ -285,7 +285,6 @@ export default function FilesScreen() {
   });
 
   const { data: filesData, isLoading: filesLoading, isError, refetch: refetchFiles } = useFileList({
-    folder_id: '',
     search: debouncedSearch || undefined,
     filter,
   });

@@ -61,7 +61,6 @@ export interface FileCard extends FileListItem {
   access_type: AccessType | null;
   is_favorite: boolean;
   is_pinned: boolean;
-  shared_folder_only?: boolean;
   tags: FileTag[];
   owner: UserRef;
   view_url?: string | null;
@@ -109,7 +108,6 @@ export interface FileVersion {
 
 export interface FileListParams {
   filter?: FileFilter;
-  folder_id?: string | null;
   tag_id?: string;
   search?: string;
   page?: number;

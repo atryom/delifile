@@ -49,9 +49,6 @@ export const filesApi = {
   cancelUpload: (file_id: string) =>
     apiClient.post<ApiResponse<Record<string, never>>>(`/files/${file_id}/cancel-upload`),
 
-  moveFolder: (file_id: string, folder_id: string | null) =>
-    apiClient.post<ApiResponse<Record<string, never>>>(`/files/${file_id}/move-folder`, { folder_id }),
-
   createUrlFile: (url: string) =>
     apiClient.post<ApiResponse<{ file: FileCard }>>('/url-files', { url }),
 
