@@ -397,7 +397,12 @@
             <!-- Comments -->
             <div class="section">
               <div class="section-header-row">
-                <h3 class="section-title">{{ 'comments.section_title' | translate }}</h3>
+                <h3 class="section-title">
+                  {{ 'comments.section_title' | translate }}
+                  @if (commentUnreadCount() > 0) {
+                    <span class="comment-unread-badge" [attr.aria-label]="commentUnreadCount() + ' непрочитанных'">{{ commentUnreadCount() }}</span>
+                  }
+                </h3>
                 <button class="btn-section-action" (click)="showComments.set(!showComments())">
                   {{ showComments() ? ('common.hide' | translate) : ('common.show' | translate) }}
                 </button>
@@ -409,6 +414,7 @@
                     [targetId]="id()"
                     [isOwner]="file()!.is_owner"
                     [contextSharedFolderId]="contextSharedFolderId()"
+                    (totalUnread)="commentUnreadCount.set($event)"
                   />
                 </div>
               }

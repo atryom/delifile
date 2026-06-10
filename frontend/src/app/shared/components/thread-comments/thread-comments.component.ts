@@ -26,6 +26,7 @@ export class ThreadCommentsComponent implements OnInit {
   readonly contextSharedFolderId = input<string | null>(null);
 
   readonly policyChanged = output<CommentPolicy>();
+  readonly totalUnread   = output<number>();
 
   private readonly commentsApi = inject(CommentsApiService);
   private readonly authState   = inject(AuthStateService);
@@ -83,6 +84,9 @@ export class ThreadCommentsComponent implements OnInit {
         this.sharedSummary.set(data.threads.shared ?? null);
         this.privateSummary.set(data.threads.private ?? null);
         this.policyChanged.emit(data.policy);
+        this.totalUnread.emit(
+          (data.threads.shared?.unread_count ?? 0) + (data.threads.private?.unread_count ?? 0),
+        );
 
         if (this.targetType() === 'local_folder') {
           this.activeTab.set('private');
@@ -130,7 +134,17 @@ export class ThreadCommentsComponent implements OnInit {
       } else {
         this.privateThread.set(res.data.thread);
       }
-      this.commentsApi.markRead(summary.id).subscribe();
+      this.commentsApi.markRead(summary.id).subscribe(() => {
+        // clear unread on the summary so parent badge resets
+        if (scope === 'shared') {
+          this.sharedSummary.update(s => s ? { ...s, unread_count: 0 } : s);
+        } else {
+          this.privateSummary.update(s => s ? { ...s, unread_count: 0 } : s);
+        }
+        this.totalUnread.emit(
+          (this.sharedSummary()?.unread_count ?? 0) + (this.privateSummary()?.unread_count ?? 0),
+        );
+      });
     });
   }
 

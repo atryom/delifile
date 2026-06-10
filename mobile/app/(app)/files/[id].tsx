@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -18,6 +18,7 @@ import {
 } from '@/hooks/useFiles';
 import { useTags } from '@/hooks/useTags';
 import { useSharedFolderAllFlat } from '@/hooks/useSharedFolders';
+import { commentsApi } from '@/api/comments';
 import { sharedFoldersApi } from '@/api/shared-folders';
 import type { SharedFolder, TaskStatus } from '@/types';
 import { useContacts } from '@/hooks/useContacts';
@@ -62,6 +63,15 @@ export default function FileDetailScreen() {
   const versionDownload = useVersionDownload(id);
   const activateVersion = useActivateVersion(id);
   const isOnline = useNetworkStore((s) => s.isOnline);
+
+  const { data: commentThreads } = useQuery({
+    queryKey: ['comment-threads', id],
+    queryFn: () => commentsApi.getThreads('file', id, contextFolderId ?? undefined).then((r) => r.data.data),
+    enabled: !!id,
+    staleTime: 1000 * 60,
+  });
+  const commentUnread = (commentThreads?.threads.shared?.unread_count ?? 0) +
+    (commentThreads?.threads.private?.unread_count ?? 0);
   const fileLinks = useFileLinks(id);
   const disableFileLink = useDisableFileLink(id);
   const fileAccesses = useFileAccesses(id);
@@ -660,6 +670,7 @@ export default function FileDetailScreen() {
             <ActionItem
               icon="💬"
               label="Комментарии"
+              badge={commentUnread > 0 ? commentUnread : undefined}
               onPress={() => router.push({
                 pathname: '/(app)/files/comments',
                 params: { targetType: 'file', targetId: file.id, targetName: name },
@@ -1163,11 +1174,16 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActionItem({ icon, label, onPress, last = false }: { icon: string; label: string; onPress: () => void; last?: boolean }) {
+function ActionItem({ icon, label, badge, onPress, last = false }: { icon: string; label: string; badge?: number; onPress: () => void; last?: boolean }) {
   return (
     <TouchableOpacity style={[styles.actionItem, !last && styles.actionItemBorder]} onPress={onPress} activeOpacity={0.7}>
       <Text style={styles.actionItemIcon}>{icon}</Text>
       <Text style={styles.actionItemLabel}>{label}</Text>
+      {badge != null && badge > 0 && (
+        <View style={styles.unreadBadge}>
+          <Text style={styles.unreadBadgeText}>{badge > 99 ? '99+' : badge}</Text>
+        </View>
+      )}
       <Text style={styles.actionItemChevron}>›</Text>
     </TouchableOpacity>
   );
@@ -1203,6 +1219,11 @@ const styles = StyleSheet.create({
   actionItemIcon: { fontSize: 18, width: 24, textAlign: 'center' },
   actionItemLabel: { flex: 1, fontSize: 15, color: '#1E293B' },
   actionItemChevron: { fontSize: 20, color: '#CBD5E1' },
+  unreadBadge: {
+    minWidth: 20, height: 20, borderRadius: 10, backgroundColor: '#EF4444',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5,
+  },
+  unreadBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
 
   // Panels
   panel: { backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12 },

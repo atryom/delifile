@@ -105,6 +105,34 @@ class NotificationService
         );
     }
 
+    public function notifyCommentCreated(User $recipient, string $authorName, string $fileName, string $fileId, string $threadId): void
+    {
+        if (!($recipient->notify_comments ?? true)) {
+            return;
+        }
+        $this->create(
+            $recipient->id,
+            NotificationType::CommentCreated,
+            'Новый комментарий',
+            "{$authorName} оставил комментарий к «{$fileName}»",
+            ['file_id' => $fileId, 'thread_id' => $threadId],
+        );
+    }
+
+    public function notifyNoteChanged(User $recipient, string $authorName, string $folderName, string $folderId, string $threadId): void
+    {
+        if (!($recipient->notify_comments ?? true)) {
+            return;
+        }
+        $this->create(
+            $recipient->id,
+            NotificationType::NoteChanged,
+            'Изменена заметка',
+            "{$authorName} изменил заметку в папке «{$folderName}»",
+            ['folder_id' => $folderId, 'thread_id' => $threadId],
+        );
+    }
+
     public function notifyAdmin(string $recipientUserId, string $title, ?string $body = null): void
     {
         $this->create($recipientUserId, NotificationType::AdminMessage, $title, $body);

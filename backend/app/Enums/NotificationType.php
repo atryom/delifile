@@ -10,6 +10,8 @@ enum NotificationType: string
     case ContactRequest            = 'contact_request';
     case SharedFolderContentAdded  = 'shared_folder_content_added';
     case TaskAssigned              = 'task_assigned';
+    case CommentCreated            = 'comment_created';
+    case NoteChanged               = 'note_changed';
 
     public function group(): string
     {
@@ -20,6 +22,8 @@ enum NotificationType: string
             self::SharedFolderContentAdded,
             self::TaskAssigned              => 'access',
             self::ContactRequest            => 'contacts',
+            self::CommentCreated,
+            self::NoteChanged               => 'comments',
         };
     }
 
@@ -32,6 +36,8 @@ enum NotificationType: string
             self::ContactRequest           => 'Contact request',
             self::SharedFolderContentAdded => 'Content added to shared folder',
             self::TaskAssigned             => 'Task assigned',
+            self::CommentCreated           => 'New comment',
+            self::NoteChanged              => 'Note changed',
         };
     }
 }

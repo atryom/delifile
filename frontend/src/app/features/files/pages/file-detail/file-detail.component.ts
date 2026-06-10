@@ -94,6 +94,7 @@ export class FileDetailComponent implements OnInit, OnDestroy {
   // ─── Comments state ───────────────────────────────────────────────────────────
 
   readonly showComments           = signal(true);
+  readonly commentUnreadCount     = signal(0);
   readonly showActivity           = signal(false);
   readonly showVersions           = signal(false);
   readonly contextSharedFolderId  = signal<string | null>(null);

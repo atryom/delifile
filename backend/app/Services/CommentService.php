@@ -384,26 +384,74 @@ class CommentService
 
     /**
      * Notify thread participants (except author) about a new comment.
+     * Also notifies the file owner if they haven't commented yet.
      */
     public function notifyNewComment(Comment $comment, CommentThread $thread, string $targetUrl): void
     {
-        $author = $comment->author;
-        $title  = 'Новый комментарий';
-        $body   = ($author?->name ?? 'Пользователь') . ' оставил комментарий';
+        $author     = $comment->author;
+        $authorName = $author?->name ?? 'Пользователь';
+        $title      = 'Новый комментарий';
+        $body       = $authorName . ' оставил комментарий';
 
-        // Notify users who previously commented in the thread (except author)
+        $file     = ($thread->target_type === CommentTargetType::File) ? File::find($thread->target_id) : null;
+        $fileName = $file ? ($file->display_name ?? $file->original_name ?? 'файл') : 'файл';
+
+        // Participants who commented before + file owner
         $participantIds = Comment::where('thread_id', $thread->id)
             ->where('author_user_id', '!=', $comment->author_user_id)
             ->whereNull('deleted_at')
             ->distinct()
             ->pluck('author_user_id')
-            ->all();
+            ->toArray();
+
+        if ($file && $file->owner_id !== $comment->author_user_id) {
+            $participantIds = array_unique([...$participantIds, $file->owner_id]);
+        }
 
         $users = User::whereIn('id', $participantIds)->get()->keyBy('id');
         foreach ($participantIds as $uid) {
             $user = $users[$uid] ?? null;
-            if ($user && ($user->notify_comments ?? true)) {
+            if (!$user || !($user->notify_comments ?? true)) continue;
+
+            $this->notificationService->notifyCommentCreated($user, $authorName, $fileName, $thread->target_id, $thread->id);
+            if ($user->notifications_enabled ?? true) {
                 $this->pushService->sendToUser($user, $title, $body, $targetUrl);
+            }
+        }
+    }
+
+    /**
+     * Notify all shared folder members when a shared note is edited.
+     */
+    public function notifyNoteEdited(Comment $comment, CommentThread $thread, string $targetUrl): void
+    {
+        $folder = SharedFolder::find($thread->target_id);
+        if (!$folder) return;
+
+        $memberIds = array_unique(array_merge(
+            [$folder->owner_id],
+            SharedFolderAccess::where('shared_folder_id', $folder->id)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')
+                ->toArray()
+        ));
+
+        $author     = $comment->author;
+        $authorName = $author?->name ?? 'Пользователь';
+
+        foreach ($memberIds as $memberId) {
+            if ($memberId === $comment->author_user_id) continue;
+            $member = User::find($memberId);
+            if (!$member || !($member->notify_comments ?? true)) continue;
+
+            $this->notificationService->notifyNoteChanged($member, $authorName, $folder->name, $folder->id, $thread->id);
+            if ($member->notifications_enabled ?? true) {
+                $this->pushService->sendToUser(
+                    $member,
+                    'Заметка изменена',
+                    "{$authorName} изменил заметку в папке «{$folder->name}»",
+                    $targetUrl,
+                );
             }
         }
     }

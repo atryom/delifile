@@ -189,6 +189,12 @@ class CommentController extends Controller
             ['body' => $data['body']],
         );
 
+        $thread = $comment->thread;
+        if ($thread && $thread->target_type === CommentTargetType::SharedFolder && $thread->scope === CommentScope::Shared) {
+            $targetUrl = $this->buildDeepLinkUrl($thread, null);
+            $this->commentService->notifyNoteEdited($comment, $thread, $targetUrl);
+        }
+
         $comment->load('author');
 
         return $this->success('Comment updated', [
