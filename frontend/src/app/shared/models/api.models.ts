@@ -84,6 +84,9 @@ export interface FileListItem {
   // task fields
   is_task?: boolean;
   task_status?: TaskStatus | null;
+  // comment counts
+  comments_count?: number;
+  unread_comments?: number;
 }
 
 export interface FileCard extends FileListItem {
