@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sharedFoldersApi } from '@/api/shared-folders';
 import { Spinner } from '@/components/ui/Spinner';
 import { pluralFiles } from '@/utils/format';
+import { getFolderHasFilesCount } from '@/utils/error';
 import type { SharedFolder } from '@/types';
 
 function getFolderTypeIcon(type?: string | null): string {
@@ -61,9 +62,23 @@ export default function SharedFoldersScreen() {
   });
 
   const deleteFolder = useMutation({
-    mutationFn: (id: string) => sharedFoldersApi.delete(id),
+    mutationFn: ({ id, force = false }: { id: string; force?: boolean }) => sharedFoldersApi.delete(id, force),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shared-folders'] }),
-    onError: () => Alert.alert('Ошибка', 'Не удалось удалить папку'),
+    onError: (e, vars) => {
+      const count = getFolderHasFilesCount(e);
+      if (count !== null) {
+        Alert.alert(
+          'В папке есть файлы',
+          `${count} ${count === 1 ? 'файл будет удалён' : 'файлов будут удалены'} безвозвратно.`,
+          [
+            { text: 'Отмена', style: 'cancel' },
+            { text: 'Удалить с файлами', style: 'destructive', onPress: () => deleteFolder.mutate({ id: vars.id, force: true }) },
+          ]
+        );
+      } else {
+        Alert.alert('Ошибка', 'Не удалось удалить папку');
+      }
+    },
   });
 
   const leaveFolder = useMutation({
@@ -118,7 +133,7 @@ export default function SharedFoldersScreen() {
           onPress: () =>
             Alert.alert('Удалить папку?', `Папка «${folder.name}» и всё её содержимое будут удалены.`, [
               { text: 'Отмена', style: 'cancel' },
-              { text: 'Удалить', style: 'destructive', onPress: () => deleteFolder.mutate(folder.id) },
+              { text: 'Удалить', style: 'destructive', onPress: () => deleteFolder.mutate({ id: folder.id }) },
             ]),
         },
         { text: 'Отмена', style: 'cancel' },

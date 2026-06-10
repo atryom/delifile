@@ -566,36 +566,67 @@ class SharedFolderController extends Controller
         $perPage = (int) $request->get('per_page', 20);
         $isOwner = $folder->owner_id === $user->id;
 
+        $search        = $request->get('search');
+        $sortBy        = $request->get('sort_by', 'date');
+        $sortOrder     = strtolower($request->get('sort_order', 'desc'));
+        if (!in_array($sortOrder, ['asc', 'desc'])) { $sortOrder = 'desc'; }
+        $fileTypeGroup = $request->get('file_type_group');
+        $contentKind   = $request->get('content_kind');
+        $tagId         = $request->get('tag_id');
+
         $isTaskFilter = $request->has('is_task')
             ? filter_var($request->get('is_task'), FILTER_VALIDATE_BOOLEAN)
             : null;
 
-        $baseQuery = SharedFolderFile::where('shared_folder_id', $id)
-            ->whereHas('file', function ($q) use ($isTaskFilter) {
-                if ($isTaskFilter !== null) {
-                    $q->where('is_task', $isTaskFilter);
-                }
-            })
-            ->when(!$isOwner, fn ($q) => $q->where('is_private', false));
+        $baseQuery = SharedFolderFile::query()
+            ->select('shared_folder_files.*')
+            ->join('files', 'files.id', '=', 'shared_folder_files.file_id')
+            ->where('shared_folder_files.shared_folder_id', $id)
+            ->when(!$isOwner, fn ($q) => $q->where('shared_folder_files.is_private', false));
 
+        if ($isTaskFilter !== null) {
+            $baseQuery->where('files.is_task', $isTaskFilter);
+        }
         if ($request->get('task_status')) {
-            $baseQuery->whereHas('file', fn ($q) => $q->where('task_status', $request->get('task_status')));
+            $baseQuery->where('files.task_status', $request->get('task_status'));
         }
         if ($request->get('task_assigned_user_id')) {
-            $baseQuery->whereHas('file', fn ($q) => $q->where('task_assigned_user_id', $request->get('task_assigned_user_id')));
+            $baseQuery->where('files.task_assigned_user_id', $request->get('task_assigned_user_id'));
         }
         $dateFrom = $request->get('task_date_from') ?: null;
         $dateTo   = $request->get('task_date_to')   ?: null;
         if ($dateFrom !== null || $dateTo !== null) {
-            $baseQuery->whereHas('file', function ($q) use ($dateFrom, $dateTo) {
-                $q->where(fn ($q2) => $q2->whereNotNull('task_start_date')->orWhereNotNull('task_due_date'));
-                if ($dateTo !== null) {
-                    $q->where(fn ($q2) => $q2->whereNull('task_start_date')->orWhere('task_start_date', '<=', $dateTo));
-                }
-                if ($dateFrom !== null) {
-                    $q->where(fn ($q2) => $q2->whereNull('task_due_date')->orWhere('task_due_date', '>=', $dateFrom));
-                }
-            });
+            $baseQuery->where(fn ($q) => $q->whereNotNull('files.task_start_date')->orWhereNotNull('files.task_due_date'));
+            if ($dateTo !== null) {
+                $baseQuery->where(fn ($q) => $q->whereNull('files.task_start_date')->orWhere('files.task_start_date', '<=', $dateTo));
+            }
+            if ($dateFrom !== null) {
+                $baseQuery->where(fn ($q) => $q->whereNull('files.task_due_date')->orWhere('files.task_due_date', '>=', $dateFrom));
+            }
+        }
+
+        if ($search) {
+            $baseQuery->where(fn ($q) =>
+                $q->where('files.display_name', 'like', "%{$search}%")
+                  ->orWhere('files.original_name', 'like', "%{$search}%")
+            );
+        }
+        if ($fileTypeGroup) {
+            $baseQuery->whereHas('file', fn ($q) => $this->mime->buildSqlTypeGroupFilter($q, $fileTypeGroup));
+        }
+        if ($contentKind) {
+            $baseQuery->where('files.content_kind', $contentKind);
+        }
+        if ($tagId) {
+            $baseQuery->whereHas('file.tags', fn ($q) => $q->where('tags.id', $tagId));
+        }
+
+        if ($sortBy === 'size') {
+            $baseQuery->orderBy('files.size', $sortOrder);
+        } elseif ($sortBy === 'name') {
+            $baseQuery->orderByRaw("COALESCE(files.display_name, files.original_name) {$sortOrder}");
+        } else {
+            $baseQuery->orderBy('files.created_at', $sortOrder);
         }
 
         $total = $baseQuery->count();

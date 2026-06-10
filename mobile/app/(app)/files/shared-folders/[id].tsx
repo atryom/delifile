@@ -13,7 +13,7 @@ import { MovieCard } from '@/components/ui/MovieCard';
 import { AddMovieModal } from '@/components/ui/AddMovieModal';
 import { formatDateTime, formatFileSize } from '@/utils/format';
 import type { FileListItem, SharedFolder } from '@/types';
-import { getApiError } from '@/utils/error';
+import { getApiError, getFolderHasFilesCount } from '@/utils/error';
 
 interface FileListItemWithPrivacy extends FileListItem {
   is_private?: boolean;
@@ -97,9 +97,23 @@ export default function SharedFolderScreen() {
   });
 
   const deleteSubfolder = useMutation({
-    mutationFn: (subfolderId: string) => sharedFoldersApi.delete(subfolderId),
+    mutationFn: ({ subfolderId, force = false }: { subfolderId: string; force?: boolean }) => sharedFoldersApi.delete(subfolderId, force),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shared-folders', id] }),
-    onError: () => Alert.alert('Ошибка', 'Не удалось удалить папку'),
+    onError: (e, vars) => {
+      const count = getFolderHasFilesCount(e);
+      if (count !== null) {
+        Alert.alert(
+          'В папке есть файлы',
+          `${count} ${count === 1 ? 'файл будет удалён' : 'файлов будут удалены'} безвозвратно.`,
+          [
+            { text: 'Отмена', style: 'cancel' },
+            { text: 'Удалить с файлами', style: 'destructive', onPress: () => deleteSubfolder.mutate({ subfolderId: vars.subfolderId, force: true }) },
+          ]
+        );
+      } else {
+        Alert.alert('Ошибка', 'Не удалось удалить папку');
+      }
+    },
   });
 
   const leaveSubfolder = useMutation({
@@ -191,7 +205,7 @@ export default function SharedFolderScreen() {
           onPress: () =>
             Alert.alert('Удалить подпапку?', `«${subfolder.name}» и всё её содержимое будут удалены.`, [
               { text: 'Отмена', style: 'cancel' },
-              { text: 'Удалить', style: 'destructive', onPress: () => deleteSubfolder.mutate(subfolder.id) },
+              { text: 'Удалить', style: 'destructive', onPress: () => deleteSubfolder.mutate({ subfolderId: subfolder.id }) },
             ]),
         },
         { text: 'Отмена', style: 'cancel' },

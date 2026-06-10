@@ -10,6 +10,7 @@ import { sharedFoldersApi } from '@/api/shared-folders';
 import { filesApi } from '@/api/files';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatFileSize, pluralFiles } from '@/utils/format';
+import { getFolderHasFilesCount } from '@/utils/error';
 import type { FileListItem, FileFilter } from '@/types';
 import type { SharedFolder } from '@/types';
 
@@ -299,9 +300,23 @@ export default function FilesScreen() {
   });
 
   const deleteFolder = useMutation({
-    mutationFn: (id: string) => sharedFoldersApi.delete(id),
+    mutationFn: ({ id, force = false }: { id: string; force?: boolean }) => sharedFoldersApi.delete(id, force),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shared-folders'] }),
-    onError: () => Alert.alert('Ошибка', 'Не удалось удалить папку'),
+    onError: (e, vars) => {
+      const count = getFolderHasFilesCount(e);
+      if (count !== null) {
+        Alert.alert(
+          'В папке есть файлы',
+          `${count} ${count === 1 ? 'файл будет удалён' : 'файлов будут удалены'} безвозвратно.`,
+          [
+            { text: 'Отмена', style: 'cancel' },
+            { text: 'Удалить с файлами', style: 'destructive', onPress: () => deleteFolder.mutate({ id: vars.id, force: true }) },
+          ]
+        );
+      } else {
+        Alert.alert('Ошибка', 'Не удалось удалить папку');
+      }
+    },
   });
 
   const leaveFolder = useMutation({
@@ -320,7 +335,7 @@ export default function FilesScreen() {
           onPress: () =>
             Alert.alert('Удалить папку?', `Папка «${folder.name}» и её содержимое будут удалены.`, [
               { text: 'Отмена', style: 'cancel' },
-              { text: 'Удалить', style: 'destructive', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); deleteFolder.mutate(folder.id); } },
+              { text: 'Удалить', style: 'destructive', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); deleteFolder.mutate({ id: folder.id }); } },
             ]),
         },
         { text: 'Отмена', style: 'cancel' },

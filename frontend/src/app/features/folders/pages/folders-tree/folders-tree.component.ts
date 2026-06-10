@@ -503,12 +503,19 @@ export class FoldersTreeComponent implements OnInit {
     }
     const isTasksMode = this.viewMode() === 'tasks';
     this.filesLoading.set(true);
-    this.sfApi.listFiles(sfId, this.page(), 20, isTasksMode ? {
-      is_task:              true,
-      task_status:          this.taskFilterStatus()   || undefined,
-      task_date_from:       this.taskFilterDateFrom() || undefined,
-      task_date_to:         this.taskFilterDateTo()   || undefined,
-    } : undefined).subscribe({
+    this.sfApi.listFiles(sfId, this.page(), 20, {
+      search:          this.searchQuery || undefined,
+      sort_by:         this.sortBy(),
+      sort_order:      this.sortOrder(),
+      file_type_group: this.activeTypeGroup() || undefined,
+      tag_id:          this.activeTagId()     || undefined,
+      ...(isTasksMode ? {
+        is_task:        true,
+        task_status:    this.taskFilterStatus()   || undefined,
+        task_date_from: this.taskFilterDateFrom() || undefined,
+        task_date_to:   this.taskFilterDateTo()   || undefined,
+      } : {}),
+    }).subscribe({
       next: (res) => {
         this.rawFiles.set(res.data.items);
         const p = res.data.pagination;

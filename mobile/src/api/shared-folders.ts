@@ -39,8 +39,8 @@ export const sharedFoldersApi = {
   rename: (id: string, name: string) =>
     apiClient.patch<ApiResponse<{ folder: SharedFolder }>>(`/shared-folders/${id}`, { name }),
 
-  delete: (id: string) =>
-    apiClient.delete<ApiResponse<Record<string, never>>>(`/shared-folders/${id}`),
+  delete: (id: string, force = false) =>
+    apiClient.delete<ApiResponse<Record<string, never>>>(`/shared-folders/${id}`, { params: force ? { force: 1 } : undefined }),
 
   leave: (id: string) =>
     apiClient.delete<ApiResponse<Record<string, never>>>(`/shared-folders/${id}/leave`),

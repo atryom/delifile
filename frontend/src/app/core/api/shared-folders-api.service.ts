@@ -44,6 +44,12 @@ export class SharedFoldersApiService {
   // ── Files ─────────────────────────────────────────────────────────────────
 
   listFiles(id: string, page = 1, perPage = 20, options?: {
+    search?: string;
+    sort_by?: string;
+    sort_order?: string;
+    file_type_group?: string;
+    content_kind?: string;
+    tag_id?: string;
     is_task?: boolean;
     task_status?: string;
     task_assigned_user_id?: number;
@@ -51,6 +57,12 @@ export class SharedFoldersApiService {
     task_date_to?: string;
   }): Observable<ApiResponse<PaginatedData<SharedFolderFileItem>>> {
     const params: Record<string, string | number> = { page, per_page: perPage };
+    if (options?.search)                  params['search']                = options.search;
+    if (options?.sort_by)                 params['sort_by']               = options.sort_by;
+    if (options?.sort_order)              params['sort_order']            = options.sort_order;
+    if (options?.file_type_group)         params['file_type_group']       = options.file_type_group;
+    if (options?.content_kind)            params['content_kind']          = options.content_kind;
+    if (options?.tag_id)                  params['tag_id']                = options.tag_id;
     if (options?.is_task !== undefined)   params['is_task']               = options.is_task ? 1 : 0;
     if (options?.task_status)             params['task_status']           = options.task_status;
     if (options?.task_assigned_user_id)   params['task_assigned_user_id'] = options.task_assigned_user_id;
