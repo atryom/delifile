@@ -19,6 +19,7 @@ export default function FilesLayout() {
       <Stack.Screen name="view/[id]" />
       <Stack.Screen name="edit/[id]" />
       <Stack.Screen name="comments" />
+      <Stack.Screen name="pdf-viewer" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

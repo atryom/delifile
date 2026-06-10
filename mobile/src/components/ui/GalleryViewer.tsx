@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { ResizeMode, Video } from 'expo-av';
+import { Audio, ResizeMode, Video } from 'expo-av';
 import type { FileListItem } from '@/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -24,6 +24,12 @@ interface Props {
 
 // Only renders the video when this slide is active — avoids multiple players competing
 function VideoSlide({ uri, isActive }: { uri: string; isActive: boolean }) {
+  useEffect(() => {
+    if (isActive && uri) {
+      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});
+    }
+  }, [isActive, uri]);
+
   if (!uri || !isActive) {
     return <View style={styles.media} />;
   }

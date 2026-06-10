@@ -624,15 +624,14 @@ export default function FileDetailScreen() {
                   </View>
                 </TouchableOpacity>
               )}
-              {/* PDF — open in system viewer via presigned URL */}
+              {/* PDF — open in in-app WebView */}
               {file.mime_type === 'application/pdf' ? (
                 <Button
-                  title={downloadUrl.isPending ? 'Открываем...' : '📄 Открыть PDF'}
-                  onPress={async () => {
-                    const url = await downloadUrl.mutateAsync();
-                    Linking.openURL(url);
-                  }}
-                  loading={downloadUrl.isPending}
+                  title="📄 Открыть PDF"
+                  onPress={() => router.push({
+                    pathname: '/(app)/files/pdf-viewer' as any,
+                    params: { id: file.id, name: file.display_name ?? file.original_name },
+                  })}
                   style={styles.btn}
                 />
               ) : (

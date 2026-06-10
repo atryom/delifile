@@ -56,6 +56,7 @@ export default function SharedFolderAddScreen() {
       const docId = res.data.data.document.id;
       await sharedFoldersApi.addFile(folderId, docId).catch(() => {});
       qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
       router.back();
       setTimeout(() => router.push(`/(app)/files/edit/${docId}` as any), 300);
     } catch (e) {
@@ -70,6 +71,7 @@ export default function SharedFolderAddScreen() {
     try {
       await sharedFoldersApi.createSubfolder(folderId, subfolderName.trim(), subfolderType);
       qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
       router.back();
     } catch {
       Alert.alert('Ошибка', 'Не удалось создать подпапку');
@@ -85,6 +87,7 @@ export default function SharedFolderAddScreen() {
     try {
       await sharedFoldersApi.addUrlFile(folderId, url);
       qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
       router.back();
     } catch (e) {
       Alert.alert('Ошибка', getApiError(e, 'Не удалось добавить ссылку'));
@@ -181,6 +184,7 @@ export default function SharedFolderAddScreen() {
 
       pendingFileIdRef.current = null;
       qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
       router.back();
     } catch {
       setUploadError('Произошла ошибка. Попробуйте снова.');

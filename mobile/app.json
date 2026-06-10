@@ -2,7 +2,7 @@
   "expo": {
     "name": "DeliFile",
     "slug": "delifile",
-    "version": "1.1.29",
+    "version": "1.1.30",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -32,7 +32,7 @@
         },
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "3"
+      "buildNumber": "4"
     },
     "android": {
       "adaptiveIcon": {

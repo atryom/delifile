@@ -269,6 +269,7 @@ export default function SharedFolderScreen() {
           onPress: async () => {
             await Promise.allSettled(selectedIds.map((fid) => sharedFoldersApi.removeFile(id, fid)));
             qc.invalidateQueries({ queryKey: ['shared-folders', id] });
+            qc.invalidateQueries({ queryKey: ['shared-folders'] });
             exitSelectMode();
           },
         },
@@ -291,6 +292,7 @@ export default function SharedFolderScreen() {
       selectedIds.map((fid) => sharedFoldersApi.setFilePrivacy(id, fid, false))
     );
     qc.invalidateQueries({ queryKey: ['shared-folders', id] });
+    qc.invalidateQueries({ queryKey: ['shared-folders'] });
     exitSelectMode();
   }
 
@@ -303,6 +305,7 @@ export default function SharedFolderScreen() {
     );
     qc.invalidateQueries({ queryKey: ['shared-folders', id] });
     qc.invalidateQueries({ queryKey: ['shared-folders', targetFolderId] });
+    qc.invalidateQueries({ queryKey: ['shared-folders'] });
     setShowMoveModal(false);
     exitSelectMode();
   }
@@ -315,6 +318,7 @@ export default function SharedFolderScreen() {
       })
     );
     qc.invalidateQueries({ queryKey: ['shared-folders', id] });
+    qc.invalidateQueries({ queryKey: ['shared-folders'] });
     qc.invalidateQueries({ queryKey: ['files'] });
     setShowMoveModal(false);
     exitSelectMode();
