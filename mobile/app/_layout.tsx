@@ -1,6 +1,7 @@
 import { Component, useEffect, useRef } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import { AppState, Linking, NativeModules, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ShareIntentModule from '@/native/shareIntent';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient } from '@tanstack/react-query';
@@ -80,15 +81,16 @@ function RootLayoutInner() {
   // Opens /share modal on launch and on each foreground resume
   const sharePendingRef = useRef(false);
   useEffect(() => {
-    const mod = NativeModules.ShareIntent;
+    const mod = ShareIntentModule;
     if (!mod) return;
+    const safeMod = mod;
 
     let retryCount = 0;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let linkSubscription: { remove: () => void } | null = null;
 
     function checkIntent() {
-      mod.getSharedData().then((data: unknown) => {
+      safeMod.getSharedData().then((data: unknown) => {
         if (data) {
           // Guard against opening /share twice: checkIntent runs on mount and on
           // every AppState→active, but the shared payload persists until /share

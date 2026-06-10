@@ -3,7 +3,7 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useQueryClient } from '@tanstack/react-query';
-import { NativeModules } from 'react-native';
+import ShareIntentModule from '@/native/shareIntent';
 import { filesApi } from '@/api/files';
 import { Spinner } from '@/components/ui/Spinner';
 import { getApiError } from '@/utils/error';
@@ -22,7 +22,7 @@ export default function ShareScreen() {
   const pendingFileId = useRef<string | null>(null);
 
   useEffect(() => {
-    const mod = NativeModules.ShareIntent;
+    const mod = ShareIntentModule;
     if (!mod) { setPhase({ kind: 'error', message: 'Share Intent недоступен' }); return; }
 
     mod.getSharedData().then(async (data: any) => {
@@ -94,13 +94,13 @@ export default function ShareScreen() {
       await FileSystem.copyAsync({ from: uri, to: cacheUri });
       localUri = cacheUri;
     } catch {
-      NativeModules.ShareIntent?.clearSharedData?.().catch(() => {});
+      ShareIntentModule?.clearSharedData?.().catch(() => {});
       setPhase({ kind: 'error', message: 'Не удалось прочитать файл. Возможно, приложение не имеет к нему доступа.' });
       return;
     }
 
     // Local copy secured — now safe to clear the shared payload / App Group file.
-    NativeModules.ShareIntent?.clearSharedData?.().catch(() => {});
+    ShareIntentModule?.clearSharedData?.().catch(() => {});
 
     let size = 0;
     try {

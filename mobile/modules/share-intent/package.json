@@ -1,0 +1,7 @@
+{
+  "name": "share-intent",
+  "version": "1.0.0",
+  "description": "Android share intent Expo Module",
+  "main": "src/index.ts",
+  "files": ["android", "src", "expo-module.config.json"]
+}
