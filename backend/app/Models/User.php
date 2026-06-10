@@ -102,11 +102,6 @@ class User extends Authenticatable
         return $this->hasMany(ActivityLog::class);
     }
 
-    public function folders(): HasMany
-    {
-        return $this->hasMany(Folder::class);
-    }
-
     public function tags(): HasMany
     {
         return $this->hasMany(Tag::class);

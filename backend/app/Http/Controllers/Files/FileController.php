@@ -439,27 +439,6 @@ class FileController extends Controller
     }
 
     /**
-     * POST /api/v1/files/{fileId}/move-folder
-     * Move owned file to a shared folder (or back to root if folder_id is null).
-     */
-    public function moveFolder(Request $request, string $fileId): JsonResponse
-    {
-        $user = $request->user();
-        $request->validate([
-            'folder_id' => ['nullable', 'string', 'exists:shared_folders,id'],
-        ]);
-
-        $file = File::find($fileId);
-        if (!$file || !$file->isOwnedBy($user)) {
-            return $this->notFound('File not found');
-        }
-
-        $file->update(['folder_id' => $request->folder_id ?: null]);
-
-        return $this->success(__('messages.files.moved'));
-    }
-
-    /**
      * POST /api/v1/files/{fileId}/set-tags
      */
     public function setTags(Request $request, string $fileId): JsonResponse

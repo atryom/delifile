@@ -6,5 +6,4 @@ enum CommentTargetType: string
 {
     case File         = 'file';
     case SharedFolder = 'shared_folder';
-    case LocalFolder  = 'local_folder';
 }
