@@ -2,7 +2,7 @@
   "expo": {
     "name": "DeliFile",
     "slug": "delifile",
-    "version": "1.1.30",
+    "version": "1.1.31",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -45,18 +45,37 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "delifile" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "delifile"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         },
         {
           "action": "SEND",
-          "data": [{ "mimeType": "text/plain" }],
-          "category": ["DEFAULT"]
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
         },
         {
           "action": "SEND",
-          "data": [{ "mimeType": "*/*" }],
-          "category": ["DEFAULT"]
+          "data": [
+            {
+              "mimeType": "*/*"
+            }
+          ],
+          "category": [
+            "DEFAULT"
+          ]
         }
       ]
     },
