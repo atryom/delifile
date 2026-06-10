@@ -408,6 +408,16 @@ class CommentService
             $participantIds = array_unique([...$participantIds, $file->owner_id]);
         }
 
+        // Ensure CommentRead records exist for all recipients so unread badges appear
+        // even if they never opened the thread before. incrementUnread() (called before
+        // this method) only updates existing records — this covers the first-comment case.
+        foreach ($participantIds as $uid) {
+            CommentRead::firstOrCreate(
+                ['thread_id' => $thread->id, 'user_id' => $uid],
+                ['unread_count_cache' => 1],
+            );
+        }
+
         $users = User::whereIn('id', $participantIds)->get()->keyBy('id');
         foreach ($participantIds as $uid) {
             $user = $users[$uid] ?? null;

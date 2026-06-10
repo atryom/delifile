@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 
@@ -66,6 +67,7 @@ class PushNotificationService
     {
         $tokens = $user->devicePushTokens()->pluck('token')->all();
         if (empty($tokens)) {
+            Log::debug('FCM: no device tokens for user', ['user_id' => $user->id]);
             return;
         }
 
@@ -89,6 +91,13 @@ class PushNotificationService
                                     'sound'      => 'default',
                                 ],
                             ],
+                            'apns'         => [
+                                'payload' => [
+                                    'aps' => [
+                                        'sound' => 'default',
+                                    ],
+                                ],
+                            ],
                         ],
                     ]);
 
@@ -96,6 +105,12 @@ class PushNotificationService
                     $errorCode = $response->json('error.details.0.errorCode')
                         ?? $response->json('error.status')
                         ?? '';
+                    Log::warning('FCM send failed', [
+                        'user_id'    => $user->id,
+                        'error_code' => $errorCode,
+                        'status'     => $response->status(),
+                        'body'       => $response->body(),
+                    ]);
                     if (in_array($errorCode, ['UNREGISTERED', 'INVALID_ARGUMENT'])) {
                         $invalidTokens[] = $token;
                     }
@@ -105,8 +120,8 @@ class PushNotificationService
             if ($invalidTokens) {
                 $user->devicePushTokens()->whereIn('token', $invalidTokens)->delete();
             }
-        } catch (\Throwable) {
-            // Non-critical
+        } catch (\Throwable $e) {
+            Log::error('FCM exception', ['user_id' => $user->id, 'error' => $e->getMessage()]);
         }
     }
 
