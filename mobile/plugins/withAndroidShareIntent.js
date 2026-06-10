@@ -6,7 +6,7 @@ const fs = require('fs');
 module.exports = function withAndroidShareIntent(config) {
   config = copyKotlinSources(config);
   config = patchMainApplication(config);
-  config = patchMainActivity(config);
+  config = ensureOnNewIntent(config);
   return config;
 };
 
@@ -34,63 +34,73 @@ function copyKotlinSources(config) {
 function patchMainApplication(config) {
   return withMainApplication(config, (c) => {
     let content = c.modResults.contents;
-    const MARKER = '// [withAndroidShareIntent] package registered';
+    const MARKER = '// [withAndroidShareIntent]';
     if (content.includes(MARKER)) return c;
 
-    // Add import
+    // Add import after package declaration
     if (!content.includes('import com.delifile.app.ShareIntentPackage')) {
       content = content.replace(
-        /^(package com\.delifile\.app)/m,
-        '$1\n\nimport com.delifile.app.ShareIntentPackage'
+        /^(package com\.delifile\.app\n)/m,
+        `$1\nimport com.delifile.app.ShareIntentPackage ${ MARKER }\n`
       );
     }
 
-    // Inject package into getPackages()
-    content = content.replace(
-      /(val packages = PackageList\(this\)\.packages)/,
-      `$1\n          packages.add(ShareIntentPackage()) ${ MARKER }`
-    );
+    // Works whether getPackages() returns directly or uses a val
+    if (!content.includes('ShareIntentPackage')) {
+      // Style 1: PackageList(this).packages.apply { ... }
+      content = content.replace(
+        /(PackageList\(this\)\.packages\.apply\s*\{)/,
+        `$1\n              add(ShareIntentPackage()) ${ MARKER }`
+      );
+      // Style 2: val packages = PackageList(this).packages; return packages
+      if (!content.includes('ShareIntentPackage')) {
+        content = content.replace(
+          /(val packages = PackageList\(this\)\.packages)/,
+          `$1\n          packages.add(ShareIntentPackage()) ${ MARKER }`
+        );
+      }
+    }
 
     c.modResults.contents = content;
     return c;
   });
 }
 
-// Patch MainActivity.kt — call extractFromIntent on create and new intent
-function patchMainActivity(config) {
+// Ensure onNewIntent calls setIntent() so currentActivity.intent is always fresh.
+// getSharedData() reads intent directly — no extractFromIntent needed.
+function ensureOnNewIntent(config) {
   return withMainActivity(config, (c) => {
     let content = c.modResults.contents;
-    const MARKER = '// [withAndroidShareIntent] extract';
+    const MARKER = '// [withAndroidShareIntent-onNewIntent]';
     if (content.includes(MARKER)) return c;
 
-    // Add imports
-    const importBlock = [
-      'import android.content.Intent',
-      'import com.delifile.app.ShareIntentModule',
-    ];
-    for (const imp of importBlock) {
-      if (!content.includes(imp)) {
-        content = content.replace(
-          /^(import com\.facebook\.react\.ReactActivity)/m,
-          `${imp}\n$1`
-        );
-      }
+    // If onNewIntent already exists and already calls setIntent, we're good
+    if (content.includes('onNewIntent') && content.includes('setIntent')) return c;
+
+    // Remove stale ShareIntentModule import (leftover from old approach)
+    content = content.replace(/\nimport com\.delifile\.app\.ShareIntentModule\n?/g, '\n');
+
+    // If onNewIntent exists but doesn't call setIntent, add it
+    if (content.includes('onNewIntent') && !content.includes('setIntent')) {
+      content = content.replace(
+        /(override fun onNewIntent\(intent: Intent\?\)\s*\{[^}]*super\.onNewIntent\(intent\))/,
+        `$1\n    setIntent(intent) ${ MARKER }`
+      );
+      c.modResults.contents = content;
+      return c;
     }
 
-    // Add onNewIntent override before onCreate
-    if (!content.includes('onNewIntent')) {
+    // No onNewIntent at all — add one before onCreate
+    if (!content.includes('import android.content.Intent')) {
       content = content.replace(
-        /(override fun onCreate\()/,
-        `override fun onNewIntent(intent: Intent?) {\n    super.onNewIntent(intent)\n    ShareIntentModule.extractFromIntent(intent, applicationContext) ${MARKER}\n  }\n\n  $1`
+        /^(import com\.facebook\.react\.ReactActivity)/m,
+        `import android.content.Intent\n$1`
       );
     }
-
-    // Patch onCreate — add extractFromIntent after super.onCreate
     content = content.replace(
-      /(super\.onCreate\(savedInstanceState\))/,
-      `$1\n    ShareIntentModule.extractFromIntent(intent, applicationContext) ${MARKER}`
+      /(override fun onCreate\()/,
+      `override fun onNewIntent(intent: Intent?) {\n    super.onNewIntent(intent)\n    setIntent(intent) ${ MARKER }\n  }\n\n  $1`
     );
-
     c.modResults.contents = content;
     return c;
   });
