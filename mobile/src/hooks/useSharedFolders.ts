@@ -15,8 +15,9 @@ export function useSharedFolderAllFlat() {
   return useQuery({
     queryKey: ['shared-folders', 'all-flat'],
     queryFn: () => sharedFoldersApi.allFlat().then((r) => r.data.data.items),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 2,
     gcTime: 1000 * 60 * 60 * 24,
+    refetchOnMount: true,
   });
 }
 

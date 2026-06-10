@@ -5,7 +5,7 @@ import { router, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFileList } from '@/hooks/useFiles';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useEnsurePersonalRoot } from '@/hooks/useSharedFolders';
+import { useEnsurePersonalRoot, useSharedFolderAllFlat } from '@/hooks/useSharedFolders';
 import { sharedFoldersApi } from '@/api/shared-folders';
 import { filesApi } from '@/api/files';
 import { Spinner } from '@/components/ui/Spinner';
@@ -104,10 +104,13 @@ function FileRow({
   onLongPress?: () => void;
 }) {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressActivated = useRef(false);
 
   function handlePressIn() {
+    longPressActivated.current = false;
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
+      longPressActivated.current = true;
       onLongPress?.();
     }, 400);
   }
@@ -123,6 +126,7 @@ function FileRow({
     <Pressable
       style={({ pressed }) => [styles.fileRow, isSelected && styles.fileRowSelected, pressed && { opacity: 0.7 }]}
       onPress={() => {
+        if (longPressActivated.current) { longPressActivated.current = false; return; }
         if (isSelectMode) { onSelect?.(); return; }
         router.push(`/(app)/files/${item.id}`);
       }}
@@ -175,12 +179,7 @@ function FolderPickerModal({
   onMove: (targetId: string) => void;
   onClose: () => void;
 }) {
-  const { data: folders = [], isLoading } = useQuery({
-    queryKey: ['shared-folders-all-flat'],
-    queryFn: () => sharedFoldersApi.allFlat().then((r) => r.data.data.items),
-    staleTime: 1000 * 60,
-  });
-
+  const { data: folders = [], isLoading } = useSharedFolderAllFlat();
   const filtered = folders.filter((f) => !f.is_personal_root);
   const hierarchyItems = buildFolderHierarchy(filtered);
 
@@ -286,6 +285,7 @@ export default function FilesScreen() {
   });
 
   const { data: filesData, isLoading: filesLoading, isError, refetch: refetchFiles } = useFileList({
+    folder_id: '',
     search: debouncedSearch || undefined,
     filter,
   });

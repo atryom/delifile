@@ -4,7 +4,7 @@ import { Stack, router, useLocalSearchParams, useFocusEffect } from 'expo-router
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sharedFoldersApi } from '@/api/shared-folders';
 import { filesApi } from '@/api/files';
-import { useSharedFolderAccesses, useAddFolderMember, useRemoveFolderMember } from '@/hooks/useSharedFolders';
+import { useSharedFolderAccesses, useAddFolderMember, useRemoveFolderMember, useSharedFolderAllFlat } from '@/hooks/useSharedFolders';
 import { useContacts } from '@/hooks/useContacts';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
@@ -697,10 +697,13 @@ function FileRow({
   const icon = file.is_private ? '🔒' : isUrl ? '🔗' : getFileIcon(file.mime_type);
   const name = file.display_name || file.original_name;
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressActivated = useRef(false);
 
   function handlePressIn() {
+    longPressActivated.current = false;
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
+      longPressActivated.current = true;
       onLongPress?.();
     }, 400);
   }
@@ -716,6 +719,7 @@ function FileRow({
     <Pressable
       style={({ pressed }) => [styles.row, isSelected && styles.rowSelected, pressed && { opacity: 0.7 }]}
       onPress={() => {
+        if (longPressActivated.current) { longPressActivated.current = false; return; }
         if (isSelectMode) { onSelect?.(); return; }
         router.push({
           pathname: '/(app)/files/[id]' as any,
@@ -786,11 +790,7 @@ function MoveFolderModal({
   onMoveToRoot: () => void;
   onClose: () => void;
 }) {
-  const { data: folders = [], isLoading } = useQuery({
-    queryKey: ['shared-folders-all-flat'],
-    queryFn: () => sharedFoldersApi.allFlat().then((r) => r.data.data.items),
-    staleTime: 1000 * 60,
-  });
+  const { data: folders = [], isLoading } = useSharedFolderAllFlat();
   const filtered = folders.filter((f) => f.id !== currentFolderId && !f.is_personal_root);
   const hierarchyItems = buildFolderHierarchy(filtered);
 

@@ -108,6 +108,7 @@ export interface FileVersion {
 
 export interface FileListParams {
   filter?: FileFilter;
+  folder_id?: string | null;
   tag_id?: string;
   search?: string;
   page?: number;
