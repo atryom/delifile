@@ -9,9 +9,11 @@ module.exports = function withAndroidShareIntent(config) {
   return withMainActivity(config, (c) => {
     let content = c.modResults.contents;
     const MARKER = '// [withAndroidShareIntent]';
+
+    // Already processed (MARKER inside function body means it's been patched)
     if (content.includes(MARKER)) return c;
 
-    // Remove stale ShareIntentModule/Package imports from previous approach
+    // Remove stale imports left from legacy approach
     content = content.replace(/\nimport com\.delifile\.app\.ShareIntent(?:Module|Package)\n?/g, '\n');
 
     // Ensure android.content.Intent is imported
@@ -22,21 +24,23 @@ module.exports = function withAndroidShareIntent(config) {
       );
     }
 
-    if (content.includes('onNewIntent') && content.includes('setIntent')) {
-      // Already correct — just mark as processed
+    if (content.includes('setIntent(intent)')) {
+      // Already has setIntent — just insert MARKER at end of that line
       content = content.replace(
-        /(override fun onNewIntent\(intent: Intent\?\))/,
-        `$1 ${ MARKER }`
+        /(setIntent\(intent\))/,
+        `$1 ${MARKER}`
       );
-    } else if (content.includes('onNewIntent') && !content.includes('setIntent')) {
+    } else if (content.includes('onNewIntent')) {
+      // Has onNewIntent but no setIntent — inject it after super call
       content = content.replace(
-        /(override fun onNewIntent\(intent: Intent\?\)\s*\{\s*super\.onNewIntent\(intent\))/,
-        `$1\n    setIntent(intent) ${ MARKER }`
+        /(super\.onNewIntent\(intent\))/,
+        `$1\n    setIntent(intent) ${MARKER}`
       );
     } else {
+      // No onNewIntent at all — add before onCreate
       content = content.replace(
-        /(override fun onCreate\()/,
-        `override fun onNewIntent(intent: Intent?) ${ MARKER } {\n    super.onNewIntent(intent)\n    setIntent(intent)\n  }\n\n  $1`
+        /(  override fun onCreate\()/,
+        `  override fun onNewIntent(intent: Intent?) {\n    super.onNewIntent(intent)\n    setIntent(intent) ${MARKER}\n  }\n\n  $1`
       );
     }
 
