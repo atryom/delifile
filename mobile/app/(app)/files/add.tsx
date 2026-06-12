@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch,
+  Alert, KeyboardAvoidingView, Platform, ScrollView, Share, StyleSheet, Switch,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
@@ -14,8 +14,9 @@ import { formatFileSize } from '@/utils/format';
 import { documentsApi } from '@/api/documents';
 import { Button } from '@/components/ui/Button';
 import { getApiError } from '@/utils/error';
+import { useCreateFileRequest } from '@/hooks/useFileRequests';
 
-type Mode = 'menu' | 'link' | 'folder' | 'uploading' | 'document';
+type Mode = 'menu' | 'link' | 'folder' | 'uploading' | 'document' | 'file-request';
 
 export default function AddScreen() {
   const params = useLocalSearchParams<{ folder_id?: string; folder_name?: string }>();
@@ -60,6 +61,23 @@ export default function AddScreen() {
   const [docName, setDocName] = useState('');
   const [docIsTask, setDocIsTask] = useState(false);
   const [creatingDoc, setCreatingDoc] = useState(false);
+
+  // File request state
+  const [frDescription, setFrDescription] = useState('');
+  const [frTtlHours, setFrTtlHours] = useState(168);
+  const [frLink, setFrLink] = useState<string | null>(null);
+  const createFileRequest = useCreateFileRequest();
+
+  async function handleCreateFileRequest() {
+    const desc = frDescription.trim();
+    if (!desc) return;
+    try {
+      const req = await createFileRequest.mutateAsync({ description: desc, ttlHours: frTtlHours, folderId });
+      setFrLink(req.url);
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось создать запрос'));
+    }
+  }
 
   async function handleCreateDocument() {
     const name = docName.trim() || 'Новый документ';
@@ -252,6 +270,14 @@ export default function AddScreen() {
                 <Text style={styles.menuSub}>Markdown-документ для записей</Text>
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setFrDescription(''); setFrLink(null); setMode('file-request'); }}>
+              <Text style={styles.menuIcon}>📨</Text>
+              <View>
+                <Text style={styles.menuTitle}>Запросить файл</Text>
+                <Text style={styles.menuSub}>Одноразовая ссылка для загрузки</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -342,6 +368,58 @@ export default function AddScreen() {
           </View>
         )}
 
+        {mode === 'file-request' && (
+          <View style={styles.form}>
+            <TouchableOpacity onPress={() => setMode('menu')} style={styles.back}>
+              <Text style={styles.backText}>← Назад</Text>
+            </TouchableOpacity>
+            <Text style={styles.formTitle}>Запросить файл</Text>
+
+            {frLink ? (
+              <View style={styles.frLinkBox}>
+                <Text style={styles.frLinkLabel}>Ссылка для отправки:</Text>
+                <Text style={styles.frLinkText} selectable>{frLink}</Text>
+                <Button title="Поделиться ссылкой" onPress={() => Share.share({ message: frLink, url: frLink })} />
+                <Button title="Готово" onPress={() => router.back()} />
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  style={[styles.input, { height: 100, textAlignVertical: 'top', paddingTop: 12 }]}
+                  placeholder="Что вы хотите получить? (описание)"
+                  value={frDescription}
+                  onChangeText={setFrDescription}
+                  multiline
+                  autoFocus
+                  maxLength={1000}
+                />
+                <Text style={styles.typeLabel}>Срок действия ссылки</Text>
+                <View style={styles.typeRow}>
+                  {([
+                    { val: 24,  label: '1 день' },
+                    { val: 72,  label: '3 дня' },
+                    { val: 168, label: '7 дней' },
+                    { val: 720, label: '30 дней' },
+                  ]).map((t) => (
+                    <TouchableOpacity
+                      key={t.val}
+                      style={[styles.typeBtn, frTtlHours === t.val && styles.typeBtnActive]}
+                      onPress={() => setFrTtlHours(t.val)}
+                    >
+                      <Text style={[styles.typeBtnText, frTtlHours === t.val && styles.typeBtnTextActive]}>{t.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Button
+                  title="Создать ссылку"
+                  onPress={handleCreateFileRequest}
+                  loading={createFileRequest.isPending}
+                />
+              </>
+            )}
+          </View>
+        )}
+
         {mode === 'document' && (
           <View style={styles.form}>
             <TouchableOpacity onPress={() => setMode('menu')} style={styles.back}>
@@ -411,4 +489,7 @@ const styles = StyleSheet.create({
   typeBtnIcon: { fontSize: 22 },
   typeBtnText: { fontSize: 12, color: '#64748B' },
   typeBtnTextActive: { color: '#6366F1', fontWeight: '600' },
+  frLinkBox: { gap: 12, backgroundColor: '#F0FDF4', borderRadius: 12, padding: 16 },
+  frLinkLabel: { fontSize: 13, color: '#64748B', fontWeight: '600' },
+  frLinkText: { fontSize: 13, color: '#1E293B', lineHeight: 20 },
 });

@@ -72,6 +72,8 @@ function handleNotificationTap(response: Notifications.NotificationResponse): vo
     if (path.startsWith('/files/')) {
       const id = path.split('/files/')[1]?.split('/')[0];
       if (id) router.push(`/(app)/files/${id}` as any);
+    } else if (path.includes('communication/received')) {
+      router.push('/(app)/connections' as any);
     } else if (path.includes('shared-folder')) {
       router.push('/(app)/files/shared-folders' as any);
     } else if (path.includes('support')) {

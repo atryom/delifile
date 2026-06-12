@@ -1,5 +1,6 @@
 export * from './auth';
 export * from './file';
+export * from './file-request';
 export * from './tag';
 export * from './inbox';
 export * from './tariff';
