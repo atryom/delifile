@@ -84,6 +84,8 @@ export class NotificationsComponent implements OnInit {
         return '/communication/contacts';
       case 'admin_message':
         return '/settings/support';
+      case 'file_request_fulfilled':
+        return '/communication/received';
       case 'file_expired':
       default:
         return '/files';

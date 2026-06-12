@@ -12,6 +12,7 @@ enum NotificationType: string
     case TaskAssigned              = 'task_assigned';
     case CommentCreated            = 'comment_created';
     case NoteChanged               = 'note_changed';
+    case FileRequestFulfilled      = 'file_request_fulfilled';
 
     public function group(): string
     {
@@ -20,7 +21,8 @@ enum NotificationType: string
             self::FileShared,
             self::FolderShared,
             self::SharedFolderContentAdded,
-            self::TaskAssigned              => 'access',
+            self::TaskAssigned,
+            self::FileRequestFulfilled      => 'access',
             self::ContactRequest            => 'contacts',
             self::CommentCreated,
             self::NoteChanged               => 'comments',
@@ -38,6 +40,7 @@ enum NotificationType: string
             self::TaskAssigned             => 'Task assigned',
             self::CommentCreated           => 'New comment',
             self::NoteChanged              => 'Note changed',
+            self::FileRequestFulfilled     => 'File request fulfilled',
         };
     }
 }

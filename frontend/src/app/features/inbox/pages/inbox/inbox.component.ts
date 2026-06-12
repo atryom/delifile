@@ -1,11 +1,13 @@
 import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { InboxApiService } from '../../../../core/api/inbox-api.service';
-import { InboxFile, InboxSharedFolder } from '../../../../shared/models/api.models';
+import { FileRequestsApiService } from '../../../../core/api/file-requests-api.service';
+import { InboxFile, InboxSharedFolder, FileRequestItem } from '../../../../shared/models/api.models';
 import { formatSize } from '../../../../shared/utils/format';
 
-type ActiveTab = 'files' | 'folders';
+type ActiveTab = 'files' | 'folders' | 'requests';
 
 @Component({
   selector: 'app-inbox',
@@ -15,11 +17,14 @@ type ActiveTab = 'files' | 'folders';
   styleUrl: './inbox.component.scss',
 })
 export class InboxComponent implements OnInit {
-  private readonly inboxApi = inject(InboxApiService);
+  private readonly inboxApi    = inject(InboxApiService);
+  private readonly requestsApi = inject(FileRequestsApiService);
+  private readonly router      = inject(Router);
 
   readonly activeTab    = signal<ActiveTab>('files');
   readonly files        = signal<InboxFile[]>([]);
   readonly folders      = signal<InboxSharedFolder[]>([]);
+  readonly requests     = signal<FileRequestItem[]>([]);
   readonly loading      = signal(false);
   readonly selectedFileIds   = signal<Set<string>>(new Set());
   readonly selectedFolderIds = signal<Set<string>>(new Set());
@@ -34,10 +39,15 @@ export class InboxComponent implements OnInit {
     this.folders().length > 0 && this.selectedFolderIds().size === this.folders().length
   );
 
+  readonly fulfilledRequests = computed(() =>
+    this.requests().filter(r => r.status === 'fulfilled')
+  );
+
   ngOnInit(): void {
     this.inboxApi.dismissBadge();
     this.loadFiles();
     this.loadFolders();
+    this.loadRequests();
   }
 
   setTab(tab: ActiveTab): void {
@@ -57,6 +67,13 @@ export class InboxComponent implements OnInit {
   private loadFolders(): void {
     this.inboxApi.getSharedFolders().subscribe({
       next: res => this.folders.set(res.data.items),
+    });
+  }
+
+  private loadRequests(): void {
+    this.requestsApi.list().subscribe({
+      next: res => this.requests.set(res.data.items),
+      error: () => {},
     });
   }
 
@@ -158,6 +175,38 @@ export class InboxComponent implements OnInit {
 
   clearFolderSelection(): void {
     this.selectedFolderIds.set(new Set());
+  }
+
+  acceptRequest(id: string): void {
+    if (this.actionPending()) return;
+    this.actionPending.set(true);
+    this.requestsApi.accept(id).subscribe({
+      next: res => {
+        const fileId = res.data.file_id;
+        this.requests.update(list =>
+          list.map(r => r.id === id ? { ...r, status: 'accepted' as const } : r)
+        );
+        this.actionPending.set(false);
+        if (fileId) {
+          this.router.navigate(['/files', fileId]);
+        }
+      },
+      error: () => this.actionPending.set(false),
+    });
+  }
+
+  rejectRequest(id: string): void {
+    if (this.actionPending()) return;
+    this.actionPending.set(true);
+    this.requestsApi.reject(id).subscribe({
+      next: () => {
+        this.requests.update(list =>
+          list.map(r => r.id === id ? { ...r, status: 'rejected' as const } : r)
+        );
+        this.actionPending.set(false);
+      },
+      error: () => this.actionPending.set(false),
+    });
   }
 
   readonly formatSize = formatSize;

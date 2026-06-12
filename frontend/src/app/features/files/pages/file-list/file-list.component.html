@@ -26,6 +26,21 @@
       </button>
 
 
+      <!-- Request file button -->
+      <button
+        type="button"
+        class="request-file-btn"
+        (click)="showFileRequestDialog.set(true)"
+      >
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Запросить файл
+      </button>
+
       <!-- Upload zone -->
       <label
         class="upload-zone"
@@ -264,4 +279,10 @@
       </div>
     </div>
   </div>
+}
+
+@if (showFileRequestDialog()) {
+  <app-create-file-request-dialog
+    (closed)="showFileRequestDialog.set(false)"
+  ></app-create-file-request-dialog>
 }

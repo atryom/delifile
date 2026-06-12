@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\SuggestionAdminController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Files\FileController;
 use App\Http\Controllers\Files\FileLikeController;
+use App\Http\Controllers\Files\FileRequestController;
 use App\Http\Controllers\Files\FileVersionController;
 use App\Http\Controllers\Files\MovieController;
 use App\Http\Controllers\Files\SharingController;
@@ -93,6 +94,13 @@ Route::prefix('v1')->group(function () {
     // ─── Public Shared Folder Link Flow ───────────────────────────────────────
     Route::post('shared-links/{token}/resolve', [SharedFolderController::class, 'resolveSharedLink']);
     Route::get('shared-links/{token}/files',    [SharedFolderController::class, 'publicFiles']);
+
+    // ─── Public File Request Flow ─────────────────────────────────────────────
+    Route::prefix('file-requests')->group(function () {
+        Route::get('{token}/resolve',           [FileRequestController::class, 'resolve']);
+        Route::post('{token}/init-upload',      [FileRequestController::class, 'initUpload']);
+        Route::post('{token}/complete-upload',  [FileRequestController::class, 'completeUpload']);
+    });
 
     // ─── Save via link (requires auth) ────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {
@@ -215,6 +223,15 @@ Route::prefix('v1')->group(function () {
             Route::get('count',       [NotificationController::class, 'count']);
             Route::post('read-all',   [NotificationController::class, 'markAllRead']);
             Route::post('{id}/read',  [NotificationController::class, 'markRead']);
+        });
+
+        // File Requests
+        Route::prefix('file-requests')->group(function () {
+            Route::get('',           [FileRequestController::class, 'index']);
+            Route::post('',          [FileRequestController::class, 'store']);
+            Route::post('{id}/cancel', [FileRequestController::class, 'cancel']);
+            Route::post('{id}/accept', [FileRequestController::class, 'accept']);
+            Route::post('{id}/reject', [FileRequestController::class, 'reject']);
         });
 
         // Inbox (received files & shared folders pending acceptance)

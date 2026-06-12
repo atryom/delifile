@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\NotificationType;
 use App\Models\File;
+use App\Models\FileRequest;
 use App\Models\User;
 use App\Models\UserNotification;
 
@@ -130,6 +131,19 @@ class NotificationService
             'Изменена заметка',
             "{$authorName} изменил заметку в папке «{$folderName}»",
             ['folder_id' => $folderId, 'thread_id' => $threadId],
+        );
+    }
+
+    public function notifyFileRequestFulfilled(User $requester, FileRequest $req): void
+    {
+        $short = mb_substr($req->description, 0, 60);
+        $ellipsis = mb_strlen($req->description) > 60 ? '…' : '';
+        $this->create(
+            $requester->id,
+            NotificationType::FileRequestFulfilled,
+            'Файл получен по запросу',
+            "Кто-то отправил файл по вашему запросу: «{$short}{$ellipsis}»",
+            ['file_request_id' => $req->id],
         );
     }
 

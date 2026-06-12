@@ -1,0 +1,79 @@
+<div class="dialog-overlay" (click)="closed.emit()">
+  <div class="dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Запрос файла">
+
+    <div class="dialog-header">
+      <h2>Запросить файл</h2>
+      <button class="dialog-close" (click)="closed.emit()" aria-label="Закрыть">✕</button>
+    </div>
+
+    @if (!createdRequest()) {
+      <div class="dialog-body">
+        <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+
+          <div class="field">
+            <label for="description" class="field-label">Что вам нужно?</label>
+            <textarea
+              id="description"
+              formControlName="description"
+              class="textarea-input"
+              rows="4"
+              placeholder="Опишите, какой файл вы ожидаете получить..."
+              maxlength="1000"
+            ></textarea>
+            <span class="char-count">{{ form.get('description')!.value?.length ?? 0 }}/1000</span>
+          </div>
+
+          <div class="field">
+            <label for="ttl" class="field-label">Срок действия ссылки</label>
+            <select id="ttl" formControlName="ttl_hours" class="select-input">
+              <option [ngValue]="24">1 день</option>
+              <option [ngValue]="72">3 дня</option>
+              <option [ngValue]="168">7 дней (по умолчанию)</option>
+              <option [ngValue]="336">14 дней</option>
+              <option [ngValue]="720">30 дней</option>
+            </select>
+          </div>
+
+          <div class="info-box">
+            После того как кто-то загрузит файл по ссылке, она перестанет быть доступной. Вам придёт уведомление.
+          </div>
+
+          @if (error()) {
+            <div class="error-msg" role="alert">{{ error() }}</div>
+          }
+        </form>
+      </div>
+    }
+
+    @if (createdRequest()) {
+      <div class="dialog-body success-state">
+        <div class="success-icon" aria-hidden="true">✅</div>
+        <p class="success-title">Ссылка создана</p>
+
+        <div class="link-display">
+          <input type="text" [value]="createdRequest()!.url" readonly class="link-input" aria-label="Ссылка для запроса" />
+          <button class="btn-copy" type="button" (click)="copyLink()">
+            {{ copied() ? 'Скопировано!' : 'Копировать' }}
+          </button>
+        </div>
+
+        <p class="link-expires">
+          Действует до: {{ formatExpiry(createdRequest()!.expires_at) }}
+        </p>
+      </div>
+    }
+
+    <div class="dialog-footer">
+      @if (!createdRequest()) {
+        <button type="button" class="btn-secondary" (click)="closed.emit()">Отмена</button>
+        <button type="button" class="btn-primary" (click)="submit()" [disabled]="form.invalid || submitting()">
+          {{ submitting() ? 'Создаём...' : 'Создать ссылку' }}
+        </button>
+      }
+      @if (createdRequest()) {
+        <button type="button" class="btn-primary" (click)="closed.emit()">Готово</button>
+      }
+    </div>
+
+  </div>
+</div>

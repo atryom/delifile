@@ -1,0 +1,121 @@
+<div class="fr-page">
+  <div class="fr-card">
+    <div class="fr-logo">
+      <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+
+    <!-- Loading -->
+    @if (state() === 'loading') {
+      <p class="fr-hint">Загрузка...</p>
+    }
+
+    <!-- Invalid / expired / already done -->
+    @if (state() === 'invalid') {
+      <div class="fr-invalid">
+        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <h2 class="fr-invalid-title">Ссылка недействительна</h2>
+        <p class="fr-invalid-body">Запрос уже выполнен, отменён или срок действия ссылки истёк.</p>
+      </div>
+    }
+
+    <!-- Active form -->
+    @if (state() === 'active') {
+      <h1 class="fr-title">Запрос файла</h1>
+      <p class="fr-desc">{{ description() }}</p>
+
+      @if (expiresAt()) {
+        <p class="fr-expiry">Действует до: {{ formatExpiry(expiresAt()) }}</p>
+      }
+
+      <!-- Drop zone -->
+      <label
+        class="fr-dropzone"
+        [class.drag-over]="isDragOver()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave()"
+        (drop)="onDrop($event)"
+      >
+        <input type="file" (change)="onFileSelected($event)" class="visually-hidden" />
+        @if (selectedFile()) {
+          <div class="fr-selected">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+              <polyline points="13 2 13 9 20 9"/>
+            </svg>
+            <span class="fr-selected-name">{{ selectedFile()!.name }}</span>
+            <span class="fr-selected-size">{{ formatSize(selectedFile()!.size) }}</span>
+          </div>
+        } @else {
+          <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="16 16 12 12 8 16"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+          <p class="fr-dropzone-text">Нажмите или перетащите файл сюда</p>
+        }
+      </label>
+
+      <!-- Optional sender info -->
+      <div class="fr-sender">
+        <input
+          type="text"
+          class="fr-input"
+          placeholder="Ваше имя (необязательно)"
+          [value]="senderName()"
+          (input)="senderName.set($any($event.target).value)"
+        />
+        <input
+          type="email"
+          class="fr-input"
+          placeholder="Ваш email (необязательно)"
+          [value]="senderEmail()"
+          (input)="senderEmail.set($any($event.target).value)"
+        />
+      </div>
+
+      @if (error()) {
+        <p class="fr-error" role="alert">{{ error() }}</p>
+      }
+
+      <button
+        type="button"
+        class="fr-btn"
+        [disabled]="!selectedFile()"
+        (click)="send()"
+      >
+        Отправить
+      </button>
+    }
+
+    <!-- Uploading -->
+    @if (state() === 'uploading') {
+      <h1 class="fr-title">Загружаем файл...</h1>
+      <div class="fr-progress-wrap">
+        <div class="fr-progress-bar">
+          <div class="fr-progress-fill" [style.width]="progress() + '%'"></div>
+        </div>
+        <span class="fr-progress-label">{{ progress() }}%</span>
+      </div>
+    }
+
+    <!-- Success -->
+    @if (state() === 'success') {
+      <div class="fr-success">
+        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <h2 class="fr-success-title">Файл отправлен!</h2>
+        <p class="fr-success-body">Спасибо. Получатель был уведомлён и скоро примет файл.</p>
+      </div>
+    }
+  </div>
+</div>

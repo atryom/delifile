@@ -13,11 +13,12 @@ import { UrlFilesApiService } from '../../../../core/api/url-files-api.service';
 import { FileTypeIconComponent } from '../../../../shared/components/file-type-icon/file-type-icon.component';
 import { FileListItem, FileCard, LinkPreview } from '../../../../shared/models/api.models';
 import { FileUpdatesService } from '../../../../core/services/file-updates.service';
+import { CreateFileRequestDialogComponent } from '../../../file-requests/dialogs/create-file-request/create-file-request-dialog.component';
 
 @Component({
   selector: 'app-file-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, FormsModule, ReactiveFormsModule, TranslateModule, FileTypeIconComponent],
+  imports: [DatePipe, RouterLink, FormsModule, ReactiveFormsModule, TranslateModule, FileTypeIconComponent, CreateFileRequestDialogComponent],
   templateUrl: './file-list.component.html',
   styleUrl: './file-list.component.scss',
 })
@@ -51,8 +52,9 @@ export class FileListComponent implements OnInit {
   readonly newlyAddedFile = signal<FileCard | null>(null);
   newFileDescription      = '';
 
-  readonly isDragOver  = signal(false);
-  readonly uploadState = this.uploadService.state;
+  readonly isDragOver           = signal(false);
+  readonly uploadState          = this.uploadService.state;
+  readonly showFileRequestDialog = signal(false);
 
   readonly previewing        = signal(false);
   readonly savingLink        = signal(false);

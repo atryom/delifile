@@ -25,6 +25,17 @@
         <span class="tab-count">{{ folders().length }}</span>
       }
     </button>
+    <button
+      class="tab-btn"
+      [class.tab-btn--active]="activeTab() === 'requests'"
+      role="tab"
+      [attr.aria-selected]="activeTab() === 'requests'"
+      (click)="setTab('requests')">
+      Запросы
+      @if (fulfilledRequests().length) {
+        <span class="tab-count">{{ fulfilledRequests().length }}</span>
+      }
+    </button>
   </div>
 
   <!-- ─── Files tab ─────────────────────────────────────────────────────── -->
@@ -166,6 +177,54 @@
               </button>
               <button class="btn-reject-sm" (click)="rejectFolders([item.id])" [disabled]="actionPending()">
                 {{ 'inbox.reject' | translate }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  <!-- ─── Requests tab ──────────────────────────────────────────────────── -->
+  @if (activeTab() === 'requests') {
+    @if (fulfilledRequests().length === 0) {
+      <div class="empty-state">
+        <p>Нет файлов, ожидающих принятия по запросу.</p>
+      </div>
+    } @else {
+      <div class="items-list">
+        @for (req of fulfilledRequests(); track req.id) {
+          <div class="item-row request-row">
+            <div class="item-icon">
+              @if (req.file?.preview_url) {
+                <img [src]="req.file!.preview_url" alt="" class="item-thumb" />
+              } @else {
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              }
+            </div>
+
+            <div class="item-info request-info">
+              <span class="item-name">{{ req.file?.original_name ?? 'Файл' }}</span>
+              <span class="request-desc">Запрос: {{ req.description }}</span>
+              @if (req.sender_name || req.sender_email) {
+                <span class="item-desc">От: {{ req.sender_name ?? req.sender_email }}</span>
+              }
+            </div>
+
+            <div class="item-size">{{ formatSize(req.file?.size ?? null) }}</div>
+
+            <div class="item-date">{{ req.fulfilled_at | date:'d MMM, HH:mm' }}</div>
+
+            <div class="item-actions">
+              <button class="btn-accept-sm" (click)="acceptRequest(req.id)" [disabled]="actionPending()">
+                Принять
+              </button>
+              <button class="btn-reject-sm" (click)="rejectRequest(req.id)" [disabled]="actionPending()">
+                Отклонить
               </button>
             </div>
           </div>

@@ -206,6 +206,15 @@ export const routes: Routes = [
       ),
   },
 
+  // ─── Public file request flow ─────────────────────────────────────────────
+  {
+    path: 'file-request/:token',
+    loadComponent: () =>
+      import('./features/file-requests/pages/file-request-public/file-request-public.component').then(
+        m => m.FileRequestPublicComponent
+      ),
+  },
+
   // ─── Public shared folder link ───────────────────────────────────────────
   {
     path: 'shared-link/:token',
