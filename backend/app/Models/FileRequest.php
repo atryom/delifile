@@ -17,6 +17,7 @@ class FileRequest extends Model
         'description',
         'status',
         'file_id',
+        'folder_id',
         'sender_name',
         'sender_email',
         'ttl_hours',
