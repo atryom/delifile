@@ -9,6 +9,7 @@ use App\Jobs\CleanOrphanedS3ObjectJob;
 use App\Models\File;
 use App\Models\FileRequest;
 use App\Models\FileUserAccess;
+use App\Models\SharedFolderFile;
 use App\Services\FileService;
 use App\Services\NotificationService;
 use App\Services\PushNotificationService;
@@ -35,6 +36,7 @@ class FileRequestController extends Controller
         $data = $request->validate([
             'description' => ['required', 'string', 'max:1000'],
             'ttl_hours'   => ['nullable', 'integer', 'min:1', 'max:720'],
+            'folder_id'   => ['nullable', 'string', 'exists:shared_folders,id'],
         ]);
 
         $ttlHours = $data['ttl_hours'] ?? 168;
@@ -45,6 +47,7 @@ class FileRequestController extends Controller
             'ttl_hours'   => $ttlHours,
             'expires_at'  => now()->addHours($ttlHours),
             'status'      => 'pending',
+            'folder_id'   => $data['folder_id'] ?? null,
         ]);
 
         return $this->success('Запрос создан', [
@@ -276,6 +279,16 @@ class FileRequestController extends Controller
                 'user_id'     => $request->user()->id,
                 'access_type' => AccessType::Owner,
             ]);
+
+            if ($req->folder_id) {
+                File::where('id', $req->file_id)->update(['folder_id' => $req->folder_id]);
+                SharedFolderFile::firstOrCreate([
+                    'shared_folder_id' => $req->folder_id,
+                    'file_id'          => $req->file_id,
+                ], [
+                    'added_by' => $request->user()->id,
+                ]);
+            }
 
             $req->update(['status' => 'accepted']);
         });

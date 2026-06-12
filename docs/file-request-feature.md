@@ -38,7 +38,8 @@
 | `features/file-requests/pages/file-request-public/` | Публичная страница `/file-request/:token` |
 | `features/file-requests/dialogs/create-file-request/` | Диалог создания запроса |
 | `features/inbox/pages/inbox/inbox.component` | Обновлён — вкладка «Запросы» |
-| `features/files/pages/file-list/file-list.component` | Добавлена кнопка «Запросить файл» |
+| `features/files/pages/file-list/file-list.component` | Кнопка «Запросить файл» |
+| `features/folders/pages/folders-tree/folders-tree.component` | Кнопка «Запросить файл» + передаёт `currentSharedFolderId` |
 | `app/app.routes.ts` | Добавлен маршрут `/file-request/:token` |
 
 ## Особенности реализации
@@ -49,3 +50,5 @@
 - Ссылка становится недоступной (статус `fulfilled`) сразу после загрузки
 - Уведомления: in-app (DB) + Web Push + FCM для мобильных
 - Тип уведомления: `file_request_fulfilled`, группа `access`
+- Если запрос создан внутри папки, `folder_id` сохраняется в `file_requests`; при принятии файл попадает в эту папку (`file.folder_id` + `SharedFolderFile`)
+- Публичная страница отображает логотип Delifile со ссылкой на сайт и футер «Присоединяйтесь к Delifile»

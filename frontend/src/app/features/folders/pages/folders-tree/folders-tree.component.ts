@@ -20,6 +20,7 @@ import {
 } from '../../../../shared/models/api.models';
 import { SharedFolderAccessDialogComponent } from '../../../shared-folders/dialogs/access/shared-folder-access-dialog.component';
 import { ThreadCommentsComponent } from '../../../../shared/components/thread-comments/thread-comments.component';
+import { CreateFileRequestDialogComponent } from '../../../file-requests/dialogs/create-file-request/create-file-request-dialog.component';
 import { GalleryViewComponent } from '../../components/gallery-view/gallery-view.component';
 import { MovieViewComponent } from '../../components/movie-view/movie-view.component';
 import { AddMovieDialogComponent } from '../../components/add-movie-dialog/add-movie-dialog.component';
@@ -57,7 +58,7 @@ type AnyFile = FileListItem | SharedFolderFileItem;
 @Component({
   selector: 'app-folders-tree',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, FormsModule, ReactiveFormsModule, TranslateModule, SharedFolderAccessDialogComponent, ThreadCommentsComponent, GalleryViewComponent, MovieViewComponent, AddMovieDialogComponent],
+  imports: [DatePipe, FormsModule, ReactiveFormsModule, TranslateModule, SharedFolderAccessDialogComponent, ThreadCommentsComponent, GalleryViewComponent, MovieViewComponent, AddMovieDialogComponent, CreateFileRequestDialogComponent],
   templateUrl: './folders-tree.component.html',
   styleUrl: './folders-tree.component.scss',
   host: {},
@@ -186,6 +187,9 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── Add movie dialog ───────────────────────────────────────────────────────
   readonly showAddMovieDialog = signal(false);
+
+  // ── File request dialog ────────────────────────────────────────────────────
+  readonly showFileRequestDialog = signal(false);
 
   // ── Rename ────────────────────────────────────────────────────────────────
   readonly renamingId   = signal<string | null>(null);

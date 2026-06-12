@@ -1,4 +1,4 @@
-import { Component, inject, signal, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { FileRequestsApiService } from '../../../../core/api/file-requests-api.service';
 import { FileRequestItem } from '../../../../shared/models/api.models';
@@ -11,7 +11,8 @@ import { FileRequestItem } from '../../../../shared/models/api.models';
   styleUrl: './create-file-request-dialog.component.scss',
 })
 export class CreateFileRequestDialogComponent {
-  readonly closed = output<void>();
+  readonly folderId = input<string | null>(null);
+  readonly closed   = output<void>();
 
   private readonly api = inject(FileRequestsApiService);
   private readonly fb  = inject(FormBuilder);
@@ -33,7 +34,7 @@ export class CreateFileRequestDialogComponent {
 
     const { description, ttl_hours } = this.form.getRawValue();
 
-    this.api.create(description!, ttl_hours!).subscribe({
+    this.api.create(description!, ttl_hours!, this.folderId()).subscribe({
       next: res => {
         this.createdRequest.set(res.data.request);
         this.submitting.set(false);

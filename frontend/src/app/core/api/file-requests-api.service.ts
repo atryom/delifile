@@ -17,8 +17,10 @@ export class FileRequestsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
-  create(description: string, ttlHours: number): Observable<ApiResponse<{ request: FileRequestItem }>> {
-    return this.api.post('/file-requests', { description, ttl_hours: ttlHours });
+  create(description: string, ttlHours: number, folderId?: string | null): Observable<ApiResponse<{ request: FileRequestItem }>> {
+    const body: Record<string, unknown> = { description, ttl_hours: ttlHours };
+    if (folderId) body['folder_id'] = folderId;
+    return this.api.post('/file-requests', body);
   }
 
   list(): Observable<ApiResponse<{ items: FileRequestItem[] }>> {

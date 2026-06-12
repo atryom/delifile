@@ -1,6 +1,7 @@
 import {
   Component, inject, signal, input, OnInit, ChangeDetectionStrategy,
 } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpEventType } from '@angular/common/http';
 import { FileRequestsApiService } from '../../../../core/api/file-requests-api.service';
@@ -11,7 +12,7 @@ type PageState = 'loading' | 'active' | 'uploading' | 'success' | 'invalid';
 @Component({
   selector: 'app-file-request-public',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [NgOptimizedImage, FormsModule],
   templateUrl: './file-request-public.component.html',
   styleUrl: './file-request-public.component.scss',
 })
