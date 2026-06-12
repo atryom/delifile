@@ -320,6 +320,20 @@
   &:hover { color: var(--text); border-color: var(--text-dim); }
 }
 
+// ─── Requests tab ─────────────────────────────────────────────────────────────
+
+.request-row {
+  grid-template-columns: 28px 1fr 80px 100px 160px;
+}
+
+.request-desc {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 // ─── Responsive ───────────────────────────────────────────────────────────────
 
 @media (max-width: 768px) {

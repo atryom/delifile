@@ -3,6 +3,7 @@ import { forkJoin } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { FilesApiService } from '../../../../core/api/files-api.service';
@@ -54,6 +55,7 @@ export class FileDetailComponent implements OnInit, OnDestroy {
 
   private readonly filesApi  = inject(FilesApiService);
   private readonly docsApi   = inject(DocumentsApiService);
+  private readonly http      = inject(HttpClient);
   private readonly orgApi    = inject(OrganizationApiService);
   private readonly sfApi     = inject(SharedFoldersApiService);
   private readonly router    = inject(Router);
@@ -309,8 +311,18 @@ export class FileDetailComponent implements OnInit, OnDestroy {
   }
 
   openInBrowser(): void {
-    const url = this.file()?.view_url;
-    if (url) window.open(url, '_blank');
+    const f = this.file();
+    if (!f?.view_url) return;
+    // Fetch as blob to avoid Chrome Safe Browsing warning on S3 domain
+    this.http.get(f.view_url, { responseType: 'blob', withCredentials: false }).subscribe({
+      next: (blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open(blobUrl, '_blank');
+        // Revoke after tab has had time to load
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        if (!win) URL.revokeObjectURL(blobUrl);
+      },
+    });
   }
 
   canViewInBrowser(): boolean {
