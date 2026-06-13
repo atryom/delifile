@@ -85,6 +85,9 @@
     },
     "plugins": [
       "expo-router",
+      ["expo-image-picker", {
+        "photosPermission": "Доступ к медиатеке для загрузки файлов"
+      }],
       "expo-secure-store",
       "expo-asset",
       "./plugins/withShareExtension",

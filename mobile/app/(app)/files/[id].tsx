@@ -6,9 +6,9 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { pickFileAsset } from '@/utils/pickFileAsset';
 import {
   useFile, useDownloadUrl, useToggleFavorite,
   useSetTags, useShareToContact, useCreateLink, useDeleteFile,
@@ -177,7 +177,10 @@ export default function FileDetailScreen() {
 
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(localUri, { dialogTitle: 'Сохранить файл' });
+        await Sharing.shareAsync(localUri, {
+          dialogTitle: fileName,
+          mimeType: file?.mime_type ?? 'application/octet-stream',
+        });
       } else {
         Alert.alert('Готово', 'Файл загружен во временную папку');
       }
@@ -280,9 +283,8 @@ export default function FileDetailScreen() {
 
   async function handleVersionUpload() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
-      if (result.canceled || !result.assets?.length) return;
-      const asset = result.assets[0];
+      const asset = await pickFileAsset();
+      if (!asset) return;
 
       setVersionUpload({ phase: 'uploading', name: asset.name, progress: 0 });
 
@@ -292,8 +294,8 @@ export default function FileDetailScreen() {
       try {
         const initRes = await filesApi.initVersionUpload(id, {
           original_name: asset.name,
-          size: asset.size ?? 0,
-          mime_type: asset.mimeType ?? 'application/octet-stream',
+          size: asset.size,
+          mime_type: asset.mimeType,
         });
         versionId = initRes.data.data.version.id;
         putUrl = initRes.data.data.upload.url;
@@ -634,16 +636,13 @@ export default function FileDetailScreen() {
                   </View>
                 </TouchableOpacity>
               )}
-              {/* PDF — thumbnail preview + open in in-app WebView */}
+              {/* PDF — превью + открытие в нативном приложении */}
               {file.mime_type === 'application/pdf' ? (
                 <>
-                  {file.preview_url ? (
+                  {file.preview_url && (
                     <TouchableOpacity
                       style={styles.previewContainer}
-                      onPress={() => router.push({
-                        pathname: '/(app)/files/pdf-viewer' as any,
-                        params: { id: file.id, name: file.display_name ?? file.original_name },
-                      })}
+                      onPress={handleDownload}
                       activeOpacity={0.85}
                     >
                       <Image
@@ -655,16 +654,13 @@ export default function FileDetailScreen() {
                         <Text style={styles.previewOverlayText}>📄 Открыть PDF</Text>
                       </View>
                     </TouchableOpacity>
-                  ) : (
-                    <Button
-                      title="📄 Открыть PDF"
-                      onPress={() => router.push({
-                        pathname: '/(app)/files/pdf-viewer' as any,
-                        params: { id: file.id, name: file.display_name ?? file.original_name },
-                      })}
-                      style={styles.btn}
-                    />
                   )}
+                  <Button
+                    title={downloading ? 'Скачивание...' : '📄 Открыть PDF'}
+                    onPress={handleDownload}
+                    loading={downloading || downloadUrl.isPending}
+                    style={styles.btn}
+                  />
                 </>
               ) : (
                 <Button

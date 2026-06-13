@@ -4,8 +4,8 @@ import {
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
-import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { pickFileAsset } from '@/utils/pickFileAsset';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '@/api/files';
 import { tariffsApi } from '@/api/tariffs';
@@ -134,14 +134,10 @@ export default function AddScreen() {
 
   async function handlePickFile() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
-      if (result.canceled || !result.assets?.length) return;
+      const asset = await pickFileAsset();
+      if (!asset) return;
 
-      const asset = result.assets[0];
-      const uri = asset.uri;
-      const name = asset.name;
-      const size = asset.size ?? 0;
-      const mimeType = asset.mimeType ?? 'application/octet-stream';
+      const { uri, name, size, mimeType } = asset;
 
       const limitBytes = tariffUsage?.file_size_limit_bytes;
       if (limitBytes && size > limitBytes) {

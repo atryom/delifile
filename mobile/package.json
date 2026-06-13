@@ -14,7 +14,6 @@
     "build:editor": "node scripts/build-editor-inline.mjs"
   },
   "dependencies": {
-    "share-intent": "file:./modules/share-intent",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
@@ -35,6 +34,7 @@
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
+    "expo-image-picker": "~17.0.11",
     "expo-linking": "~8.0.12",
     "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.24",
@@ -48,6 +48,7 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-webview": "^13.16.1",
+    "share-intent": "file:./modules/share-intent",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
@@ -58,7 +59,9 @@
   "private": true,
   "expo": {
     "install": {
-      "exclude": ["react-native-webview"]
+      "exclude": [
+        "react-native-webview"
+      ]
     }
   }
 }
