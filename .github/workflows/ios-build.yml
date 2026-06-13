@@ -17,6 +17,7 @@ jobs:
     name: Build & Submit iOS
     # Метка macOS разводит iOS-сборку с web-деплоем (тот идёт на runner Linux).
     runs-on: [self-hosted, macOS]
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -34,6 +35,17 @@ jobs:
       - name: Unlock login keychain
         run: security unlock-keychain -p "${{ secrets.MAC_KEYCHAIN_PASSWORD }}" "$HOME/Library/Keychains/login.keychain-db"
 
+      - name: Grant keychain access to code signing tools (macOS 14 fix)
+        # Устраняет зависание "security find-identity -v -s" на macOS 14+:
+        # без set-key-partition-list macOS запрашивает разрешение на доступ к каждому ключу —
+        # в неинтерактивной среде это зависание на десятки минут.
+        run: |
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "${{ secrets.MAC_KEYCHAIN_PASSWORD }}" \
+            "$HOME/Library/Keychains/login.keychain-db"
+
       - name: Install Apple WWDR certificates
         run: |
           for CERT in AppleWWDRCAG4.cer AppleWWDRCAG5.cer AppleWWDRCAG6.cer; do
@@ -41,18 +53,6 @@ jobs:
               security import /tmp/$CERT -k ~/Library/Keychains/login.keychain-db 2>&1 | grep -v "already exists" || true
             rm -f /tmp/$CERT
           done
-
-      - name: Patch EAS keychain.js для macOS 14
-        run: |
-          COUNT=0
-          while IFS= read -r KEYCHAIN_JS; do
-            sed -i '' "s/'find-identity', '-v', '-s'/'find-identity', '-s'/g" "$KEYCHAIN_JS" \
-              && echo "OK: $KEYCHAIN_JS" \
-              || echo "WARN: $KEYCHAIN_JS"
-            COUNT=$((COUNT+1))
-          done < <(find ~/.npm/_npx -name "keychain.js" -path "*/ios/credentials/keychain.js" 2>/dev/null)
-          echo "Patched $COUNT file(s)"
-          [ "$COUNT" -eq 0 ] && echo "No keychain.js in cache yet" || true
 
       - name: Set iOS build number
         working-directory: mobile
