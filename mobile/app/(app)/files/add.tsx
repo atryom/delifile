@@ -65,6 +65,7 @@ export default function AddScreen() {
   // File request state
   const [frDescription, setFrDescription] = useState('');
   const [frTtlHours, setFrTtlHours] = useState(168);
+  const [frAllowMultiple, setFrAllowMultiple] = useState(false);
   const [frLink, setFrLink] = useState<string | null>(null);
   const createFileRequest = useCreateFileRequest();
 
@@ -72,7 +73,7 @@ export default function AddScreen() {
     const desc = frDescription.trim();
     if (!desc) return;
     try {
-      const req = await createFileRequest.mutateAsync({ description: desc, ttlHours: frTtlHours, folderId });
+      const req = await createFileRequest.mutateAsync({ description: desc, ttlHours: frTtlHours, folderId, allowMultiple: frAllowMultiple });
       setFrLink(req.url);
     } catch (e) {
       Alert.alert('Ошибка', getApiError(e, 'Не удалось создать запрос'));
@@ -410,6 +411,18 @@ export default function AddScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+                <View style={styles.toggleRow}>
+                  <View style={styles.toggleInfo}>
+                    <Text style={styles.toggleLabel}>Несколько файлов</Text>
+                    <Text style={styles.toggleSub}>Ссылка останется активной</Text>
+                  </View>
+                  <Switch
+                    value={frAllowMultiple}
+                    onValueChange={setFrAllowMultiple}
+                    trackColor={{ false: '#E2E8F0', true: '#6366f1' }}
+                    thumbColor="#fff"
+                  />
+                </View>
                 <Button
                   title="Создать ссылку"
                   onPress={handleCreateFileRequest}
@@ -492,4 +505,8 @@ const styles = StyleSheet.create({
   frLinkBox: { gap: 12, backgroundColor: '#F0FDF4', borderRadius: 12, padding: 16 },
   frLinkLabel: { fontSize: 13, color: '#64748B', fontWeight: '600' },
   frLinkText: { fontSize: 13, color: '#1E293B', lineHeight: 20 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', marginBottom: 4 },
+  toggleInfo: { flex: 1, marginRight: 12 },
+  toggleLabel: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  toggleSub: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
 });
