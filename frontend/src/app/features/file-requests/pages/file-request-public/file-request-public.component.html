@@ -26,7 +26,7 @@
     }
 
     <!-- Active form -->
-    @if (state() === 'active') {
+    @if (state() === 'active' || state() === 'uploading') {
       <h1 class="fr-title">Запрос файла</h1>
       <p class="fr-desc">{{ description() }}</p>
 
@@ -34,78 +34,137 @@
         <p class="fr-expiry">Действует до: {{ formatExpiry(expiresAt()) }}</p>
       }
 
-      <!-- Drop zone -->
-      <label
-        class="fr-dropzone"
-        [class.drag-over]="isDragOver()"
-        (dragover)="onDragOver($event)"
-        (dragleave)="onDragLeave()"
-        (drop)="onDrop($event)"
-      >
-        <input type="file" (change)="onFileSelected($event)" class="visually-hidden" />
-        @if (selectedFile()) {
-          <div class="fr-selected">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
-              <polyline points="13 2 13 9 20 9"/>
-            </svg>
-            <span class="fr-selected-name">{{ selectedFile()!.name }}</span>
-            <span class="fr-selected-size">{{ formatSize(selectedFile()!.size) }}</span>
-          </div>
-        } @else {
-          <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-            <polyline points="16 16 12 12 8 16"/>
-            <line x1="12" y1="12" x2="12" y2="21"/>
-            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
-          </svg>
-          <p class="fr-dropzone-text">Нажмите или перетащите файл сюда</p>
-        }
-      </label>
+      <!-- ── Multi-file queue ───────────────────────────────────────────── -->
+      @if (allowMultiple() && fileQueue().length > 0) {
+        <ul class="fr-queue" aria-label="Очередь файлов">
+          @for (item of fileQueue(); track item.file.name; let i = $index) {
+            <li class="fr-queue-item" [class.fr-queue-item--done]="item.status === 'done'" [class.fr-queue-item--error]="item.status === 'error'" [class.fr-queue-item--uploading]="item.status === 'uploading'">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                <polyline points="13 2 13 9 20 9"/>
+              </svg>
+              <span class="fr-queue-name">{{ item.file.name }}</span>
+              <span class="fr-queue-size">{{ formatSize(item.file.size) }}</span>
+              @if (item.status === 'uploading') {
+                <span class="fr-queue-status fr-queue-status--uploading">{{ progress() }}%</span>
+              } @else if (item.status === 'done') {
+                <span class="fr-queue-status fr-queue-status--done" aria-label="Отправлен">✓</span>
+              } @else if (item.status === 'error') {
+                <span class="fr-queue-status fr-queue-status--error" [title]="item.errorMsg ?? ''">✗</span>
+              } @else {
+                <button type="button" class="fr-queue-remove" (click)="removeFromQueue(i)" aria-label="Убрать из очереди" [disabled]="state() === 'uploading'">✕</button>
+              }
+            </li>
+          }
+        </ul>
+      }
 
-      <!-- Optional sender info -->
-      <div class="fr-sender">
-        <input
-          type="text"
-          class="fr-input"
-          placeholder="Ваше имя (необязательно)"
-          [value]="senderName()"
-          (input)="senderName.set($any($event.target).value)"
-        />
-        <input
-          type="email"
-          class="fr-input"
-          placeholder="Ваш email (необязательно)"
-          [value]="senderEmail()"
-          (input)="senderEmail.set($any($event.target).value)"
-        />
-      </div>
+      <!-- ── Drop zone (single file preview or dropzone) ───────────────── -->
+      @if (!allowMultiple() || state() !== 'uploading') {
+        <label
+          class="fr-dropzone"
+          [class.drag-over]="isDragOver()"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave()"
+          (drop)="onDrop($event)"
+        >
+          <input
+            type="file"
+            [attr.multiple]="allowMultiple() ? true : null"
+            (change)="onFileSelected($event)"
+            class="visually-hidden"
+            [disabled]="state() === 'uploading'"
+          />
+
+          @if (!allowMultiple() && selectedFile()) {
+            <div class="fr-selected">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                <polyline points="13 2 13 9 20 9"/>
+              </svg>
+              <span class="fr-selected-name">{{ selectedFile()!.name }}</span>
+              <span class="fr-selected-size">{{ formatSize(selectedFile()!.size) }}</span>
+            </div>
+          } @else {
+            <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="16 16 12 12 8 16"/>
+              <line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+            <p class="fr-dropzone-text">
+              {{ allowMultiple() ? 'Нажмите или перетащите файлы сюда' : 'Нажмите или перетащите файл сюда' }}
+            </p>
+          }
+        </label>
+      }
+
+      <!-- ── Sender info ────────────────────────────────────────────────── -->
+      @if (state() === 'active') {
+        <div class="fr-sender">
+          <input
+            type="text"
+            class="fr-input"
+            placeholder="Ваше имя (необязательно)"
+            [value]="senderName()"
+            (input)="senderName.set($any($event.target).value)"
+          />
+          <input
+            type="email"
+            class="fr-input"
+            placeholder="Ваш email (необязательно)"
+            [value]="senderEmail()"
+            (input)="senderEmail.set($any($event.target).value)"
+          />
+        </div>
+      }
 
       @if (error()) {
         <p class="fr-error" role="alert">{{ error() }}</p>
       }
 
-      <button
-        type="button"
-        class="fr-btn"
-        [disabled]="!selectedFile()"
-        (click)="send()"
-      >
-        Отправить
-      </button>
-    }
-
-    <!-- Uploading -->
-    @if (state() === 'uploading') {
-      <h1 class="fr-title">Загружаем файл...</h1>
-      <div class="fr-progress-wrap">
-        <div class="fr-progress-bar">
-          <div class="fr-progress-fill" [style.width]="progress() + '%'"></div>
+      <!-- ── Upload progress (single or current queue item) ───────────── -->
+      @if (state() === 'uploading') {
+        <div class="fr-progress-wrap">
+          <div class="fr-progress-bar">
+            <div class="fr-progress-fill" [style.width]="progress() + '%'"></div>
+          </div>
+          <span class="fr-progress-label">{{ progress() }}%</span>
         </div>
-        <span class="fr-progress-label">{{ progress() }}%</span>
-      </div>
+      }
+
+      <!-- ── Action buttons ────────────────────────────────────────────── -->
+      @if (state() === 'active') {
+        @if (allowMultiple()) {
+          @if (allDone() && fileQueue().length > 0) {
+            <p class="fr-sent-note">
+              Отправлено файлов: {{ doneCount() }}. Можете добавить ещё.
+            </p>
+            <button type="button" class="fr-btn fr-btn--secondary" (click)="clearDone()">
+              Очистить готовые
+            </button>
+          }
+          <button
+            type="button"
+            class="fr-btn"
+            [disabled]="!hasQueuedItems()"
+            (click)="send()"
+          >
+            Отправить ({{ fileQueue().length }} файл(ов))
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="fr-btn"
+            [disabled]="!selectedFile()"
+            (click)="send()"
+          >
+            Отправить
+          </button>
+        }
+      }
     }
 
-    <!-- Success -->
+    <!-- Success (single-file only — multi returns to active state) -->
     @if (state() === 'success') {
       <div class="fr-success">
         <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">

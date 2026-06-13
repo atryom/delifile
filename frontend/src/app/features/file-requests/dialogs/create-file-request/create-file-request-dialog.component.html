@@ -34,8 +34,25 @@
             </select>
           </div>
 
+          <label class="field-toggle" for="allow_multiple">
+            <input
+              id="allow_multiple"
+              type="checkbox"
+              formControlName="allow_multiple"
+              class="toggle-checkbox"
+              role="switch"
+              [attr.aria-checked]="form.get('allow_multiple')!.value"
+            />
+            <span class="toggle-slider" aria-hidden="true"></span>
+            <span class="toggle-label-text">Разрешить загрузку нескольких файлов</span>
+          </label>
+
           <div class="info-box">
-            После того как кто-то загрузит файл по ссылке, она перестанет быть доступной. Вам придёт уведомление.
+            @if (form.get('allow_multiple')!.value) {
+              Ссылка остаётся активной до истечения срока — отправитель может загрузить несколько файлов.
+            } @else {
+              После того как кто-то загрузит файл по ссылке, она перестанет быть доступной. Вам придёт уведомление.
+            }
           </div>
 
           @if (error()) {

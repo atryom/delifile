@@ -15,6 +15,61 @@
 .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 14px; font-size: 0.83rem; color: #1e40af; }
 .error-msg { color: #dc2626; font-size: 0.85rem; margin-top: 12px; }
 
+.field-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-bottom: 14px;
+  user-select: none;
+}
+
+.toggle-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+
+  &:checked + .toggle-slider {
+    background: #6366f1;
+    &::after { transform: translateX(18px); }
+  }
+
+  &:focus-visible + .toggle-slider {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+  }
+}
+
+.toggle-slider {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  background: #d1d5db;
+  border-radius: 10px;
+  flex-shrink: 0;
+  transition: background 0.2s;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+}
+
+.toggle-label-text {
+  font-size: 0.88rem;
+  color: #374151;
+  font-weight: 500;
+}
+
 .success-state { text-align: center; }
 .success-icon { font-size: 2.5rem; margin-bottom: 10px; }
 .success-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }

@@ -232,6 +232,9 @@ Route::prefix('v1')->group(function () {
             Route::post('{id}/cancel', [FileRequestController::class, 'cancel']);
             Route::post('{id}/accept', [FileRequestController::class, 'accept']);
             Route::post('{id}/reject', [FileRequestController::class, 'reject']);
+            // multi-file per-entry accept/reject
+            Route::post('{id}/files/{fileId}/accept', [FileRequestController::class, 'acceptFile']);
+            Route::post('{id}/files/{fileId}/reject', [FileRequestController::class, 'rejectFile']);
         });
 
         // Inbox (received files & shared folders pending acceptance)

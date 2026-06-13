@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { InboxApiService } from '../../../../core/api/inbox-api.service';
 import { FileRequestsApiService } from '../../../../core/api/file-requests-api.service';
-import { InboxFile, InboxSharedFolder, FileRequestItem } from '../../../../shared/models/api.models';
+import { InboxFile, InboxSharedFolder, FileRequestItem, FileRequestFileItem } from '../../../../shared/models/api.models';
 import { formatSize } from '../../../../shared/utils/format';
 
 type ActiveTab = 'files' | 'folders' | 'requests';
@@ -39,9 +39,19 @@ export class InboxComponent implements OnInit {
     this.folders().length > 0 && this.selectedFolderIds().size === this.folders().length
   );
 
-  readonly fulfilledRequests = computed(() =>
-    this.requests().filter(r => r.status === 'fulfilled')
-  );
+  readonly pendingRequests = computed(() => {
+    const result: Array<{ request: FileRequestItem; file: FileRequestFileItem | null }> = [];
+    for (const r of this.requests()) {
+      if (r.allow_multiple) {
+        for (const f of r.files ?? []) {
+          if (f.status === 'pending') result.push({ request: r, file: f });
+        }
+      } else if (r.status === 'fulfilled') {
+        result.push({ request: r, file: null });
+      }
+    }
+    return result;
+  });
 
   ngOnInit(): void {
     this.inboxApi.dismissBadge();
@@ -202,6 +212,44 @@ export class InboxComponent implements OnInit {
       next: () => {
         this.requests.update(list =>
           list.map(r => r.id === id ? { ...r, status: 'rejected' as const } : r)
+        );
+        this.actionPending.set(false);
+      },
+      error: () => this.actionPending.set(false),
+    });
+  }
+
+  acceptRequestFile(requestId: string, fileItemId: string): void {
+    if (this.actionPending()) return;
+    this.actionPending.set(true);
+    this.requestsApi.acceptFile(requestId, fileItemId).subscribe({
+      next: res => {
+        const fileId = res.data.file_id;
+        this.requests.update(list =>
+          list.map(r => r.id === requestId ? {
+            ...r,
+            files: r.files.map(f => f.id === fileItemId ? { ...f, status: 'accepted' as const } : f),
+          } : r)
+        );
+        this.actionPending.set(false);
+        if (fileId) {
+          this.router.navigate(['/files', fileId]);
+        }
+      },
+      error: () => this.actionPending.set(false),
+    });
+  }
+
+  rejectRequestFile(requestId: string, fileItemId: string): void {
+    if (this.actionPending()) return;
+    this.actionPending.set(true);
+    this.requestsApi.rejectFile(requestId, fileItemId).subscribe({
+      next: () => {
+        this.requests.update(list =>
+          list.map(r => r.id === requestId ? {
+            ...r,
+            files: r.files.map(f => f.id === fileItemId ? { ...f, status: 'rejected' as const } : f),
+          } : r)
         );
         this.actionPending.set(false);
       },

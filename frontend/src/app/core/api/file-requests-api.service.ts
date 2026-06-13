@@ -17,9 +17,10 @@ export class FileRequestsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiUrl;
 
-  create(description: string, ttlHours: number, folderId?: string | null): Observable<ApiResponse<{ request: FileRequestItem }>> {
+  create(description: string, ttlHours: number, folderId?: string | null, allowMultiple?: boolean): Observable<ApiResponse<{ request: FileRequestItem }>> {
     const body: Record<string, unknown> = { description, ttl_hours: ttlHours };
     if (folderId) body['folder_id'] = folderId;
+    if (allowMultiple) body['allow_multiple'] = true;
     return this.api.post('/file-requests', body);
   }
 
@@ -39,6 +40,14 @@ export class FileRequestsApiService {
     return this.api.post(`/file-requests/${id}/reject`);
   }
 
+  acceptFile(requestId: string, fileId: string): Observable<ApiResponse<{ file_id: string }>> {
+    return this.api.post(`/file-requests/${requestId}/files/${fileId}/accept`);
+  }
+
+  rejectFile(requestId: string, fileId: string): Observable<ApiResponse> {
+    return this.api.post(`/file-requests/${requestId}/files/${fileId}/reject`);
+  }
+
   resolve(token: string): Observable<ApiResponse<FileRequestResolve>> {
     return this.api.get(`/file-requests/${token}/resolve`);
   }
@@ -50,10 +59,10 @@ export class FileRequestsApiService {
     );
   }
 
-  completeUpload(token: string, thumbnailKey?: string): Observable<ApiResponse> {
+  completeUpload(token: string, fileId: string | null, thumbnailKey?: string): Observable<ApiResponse> {
     return this.http.post<ApiResponse>(
       `${this.base}/file-requests/${token}/complete-upload`,
-      { thumbnail_key: thumbnailKey ?? null },
+      { file_id: fileId ?? null, thumbnail_key: thumbnailKey ?? null },
     );
   }
 

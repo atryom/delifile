@@ -32,8 +32,8 @@
       [attr.aria-selected]="activeTab() === 'requests'"
       (click)="setTab('requests')">
       Запросы
-      @if (fulfilledRequests().length) {
-        <span class="tab-count">{{ fulfilledRequests().length }}</span>
+      @if (pendingRequests().length) {
+        <span class="tab-count">{{ pendingRequests().length }}</span>
       }
     </button>
   </div>
@@ -187,17 +187,19 @@
 
   <!-- ─── Requests tab ──────────────────────────────────────────────────── -->
   @if (activeTab() === 'requests') {
-    @if (fulfilledRequests().length === 0) {
+    @if (pendingRequests().length === 0) {
       <div class="empty-state">
         <p>Нет файлов, ожидающих принятия по запросу.</p>
       </div>
     } @else {
       <div class="items-list">
-        @for (req of fulfilledRequests(); track req.id) {
+        @for (entry of pendingRequests(); track (entry.file ? entry.file.id : entry.request.id)) {
+          @let req = entry.request;
+          @let frf = entry.file;
           <div class="item-row request-row">
             <div class="item-icon">
-              @if (req.file?.preview_url) {
-                <img [src]="req.file!.preview_url" alt="" class="item-thumb" />
+              @if (frf ? frf.file?.preview_url : req.file?.preview_url; as thumb) {
+                <img [src]="thumb" alt="" class="item-thumb" />
               } @else {
                 <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -208,24 +210,35 @@
             </div>
 
             <div class="item-info request-info">
-              <span class="item-name">{{ req.file?.original_name ?? 'Файл' }}</span>
+              <span class="item-name">{{ (frf ? frf.file?.original_name : req.file?.original_name) ?? 'Файл' }}</span>
               <span class="request-desc">Запрос: {{ req.description }}</span>
-              @if (req.sender_name || req.sender_email) {
-                <span class="item-desc">От: {{ req.sender_name ?? req.sender_email }}</span>
+              @let senderName = frf ? frf.sender_name : req.sender_name;
+              @let senderEmail = frf ? frf.sender_email : req.sender_email;
+              @if (senderName || senderEmail) {
+                <span class="item-desc">От: {{ senderName ?? senderEmail }}</span>
               }
             </div>
 
-            <div class="item-size">{{ formatSize(req.file?.size ?? null) }}</div>
+            <div class="item-size">{{ formatSize((frf ? frf.file?.size : req.file?.size) ?? null) }}</div>
 
-            <div class="item-date">{{ req.fulfilled_at | date:'d MMM, HH:mm' }}</div>
+            <div class="item-date">{{ (frf ? frf.created_at : req.fulfilled_at) | date:'d MMM, HH:mm' }}</div>
 
             <div class="item-actions">
-              <button class="btn-accept-sm" (click)="acceptRequest(req.id)" [disabled]="actionPending()">
-                Принять
-              </button>
-              <button class="btn-reject-sm" (click)="rejectRequest(req.id)" [disabled]="actionPending()">
-                Отклонить
-              </button>
+              @if (frf) {
+                <button class="btn-accept-sm" (click)="acceptRequestFile(req.id, frf.id)" [disabled]="actionPending()">
+                  Принять
+                </button>
+                <button class="btn-reject-sm" (click)="rejectRequestFile(req.id, frf.id)" [disabled]="actionPending()">
+                  Отклонить
+                </button>
+              } @else {
+                <button class="btn-accept-sm" (click)="acceptRequest(req.id)" [disabled]="actionPending()">
+                  Принять
+                </button>
+                <button class="btn-reject-sm" (click)="rejectRequest(req.id)" [disabled]="actionPending()">
+                  Отклонить
+                </button>
+              }
             </div>
           </div>
         }

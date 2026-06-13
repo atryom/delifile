@@ -666,12 +666,30 @@ export interface SharedFolderCommentSettings {
 // ─── File Request Models ─────────────────────────────────────────────────────
 
 export type FileRequestStatus = 'pending' | 'fulfilled' | 'accepted' | 'rejected' | 'cancelled' | 'expired';
+export type FileRequestFileStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface FileRequestFileItem {
+  id: string;
+  file_id: string | null;
+  status: FileRequestFileStatus;
+  sender_name: string | null;
+  sender_email: string | null;
+  created_at: string | null;
+  file: {
+    id: string;
+    original_name: string;
+    size: number;
+    mime_type: string | null;
+    preview_url: string | null;
+  } | null;
+}
 
 export interface FileRequestItem {
   id: string;
   url: string;
   description: string;
   status: FileRequestStatus;
+  allow_multiple: boolean;
   ttl_hours: number;
   expires_at: string | null;
   fulfilled_at: string | null;
@@ -685,12 +703,17 @@ export interface FileRequestItem {
     mime_type: string | null;
     preview_url: string | null;
   } | null;
+  files: FileRequestFileItem[];
 }
 
 export interface FileRequestResolve {
   status: FileRequestStatus;
   description?: string;
   expires_at?: string | null;
+  allow_multiple?: boolean;
+  limits?: {
+    max_file_size_bytes: number;
+  };
 }
 
 export interface FileRequestInitUpload {

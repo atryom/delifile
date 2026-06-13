@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { useContacts, useContactRequests, useCreateContact, useAcceptContactRequest, useRejectContactRequest } from '@/hooks/useContacts';
 import { useInboxCount, useInboxFiles, useInboxSharedFolders, useAcceptInboxFile, useRejectInboxFile, useAcceptInboxFolder, useRejectInboxFolder } from '@/hooks/useInbox';
-import { useFulfilledFileRequests, useAcceptFileRequest, useRejectFileRequest } from '@/hooks/useFileRequests';
+import { usePendingFileRequests, useAcceptFileRequest, useRejectFileRequest, useAcceptFileRequestFile, useRejectFileRequestFile } from '@/hooks/useFileRequests';
+import type { FileRequestItem, FileRequestFileItem } from '@/types';
 import { useNotifications, useNotificationCount, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks/useNotifications';
 import { Spinner } from '@/components/ui/Spinner';
 import { isValidEmail } from '@/utils/format';
@@ -172,11 +173,29 @@ function ContactsTab() {
   );
 }
 
+type FREntry =
+  | { kind: 'single'; req: FileRequestItem }
+  | { kind: 'multi'; req: FileRequestItem; frf: FileRequestFileItem };
+
+function buildFREntries(reqs: FileRequestItem[]): FREntry[] {
+  const entries: FREntry[] = [];
+  for (const req of reqs) {
+    if (req.allow_multiple) {
+      for (const frf of req.files ?? []) {
+        if (frf.status === 'pending') entries.push({ kind: 'multi', req, frf });
+      }
+    } else if (req.status === 'fulfilled') {
+      entries.push({ kind: 'single', req });
+    }
+  }
+  return entries;
+}
+
 function RequestsTab() {
   const { data: contactRequests, isLoading: crLoading, refetch: refetchCR } = useContactRequests();
   const { data: inboxFiles, isLoading: ifLoading, refetch: refetchFiles } = useInboxFiles();
   const { data: inboxFolders, isLoading: sfLoading, refetch: refetchFolders } = useInboxSharedFolders();
-  const { data: fulfilledRequests, isLoading: frLoading, refetch: refetchFR } = useFulfilledFileRequests();
+  const { data: allRequests, isLoading: frLoading, refetch: refetchFR } = usePendingFileRequests();
 
   const acceptCR = useAcceptContactRequest();
   const rejectCR = useRejectContactRequest();
@@ -186,8 +205,11 @@ function RequestsTab() {
   const rejectFolder = useRejectInboxFolder();
   const acceptFR = useAcceptFileRequest();
   const rejectFR = useRejectFileRequest();
+  const acceptFRFile = useAcceptFileRequestFile();
+  const rejectFRFile = useRejectFileRequestFile();
 
   const pending = contactRequests?.filter((r) => r.status === 'pending') ?? [];
+  const frEntries = buildFREntries(allRequests);
   const isLoading = crLoading || ifLoading || sfLoading || frLoading;
   const [refreshing, setRefreshing] = useState(false);
 
@@ -199,7 +221,7 @@ function RequestsTab() {
 
   if (isLoading && !refreshing) return <Spinner />;
 
-  const hasAnything = pending.length > 0 || (inboxFiles?.length ?? 0) > 0 || (inboxFolders?.length ?? 0) > 0 || fulfilledRequests.length > 0;
+  const hasAnything = pending.length > 0 || (inboxFiles?.length ?? 0) > 0 || (inboxFolders?.length ?? 0) > 0 || frEntries.length > 0;
 
   return (
     <ScrollView style={styles.flex} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
@@ -261,27 +283,44 @@ function RequestsTab() {
         </View>
       )}
 
-      {fulfilledRequests.length > 0 && (
+      {frEntries.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Полученные файлы по запросу</Text>
-          {fulfilledRequests.map((req) => (
-            <View key={req.id} style={styles.requestItem}>
-              <View style={styles.itemMain}>
-                <Text style={styles.itemTitle} numberOfLines={1}>
-                  {req.file?.original_name ?? 'Файл'}
-                </Text>
-                <Text style={styles.itemSub} numberOfLines={1}>Запрос: {req.description}</Text>
-                {(req.sender_name || req.sender_email) && (
-                  <Text style={styles.itemSub}>От: {req.sender_name ?? req.sender_email}</Text>
-                )}
+          {frEntries.map((entry) => {
+            const fileName = entry.kind === 'multi'
+              ? entry.frf.file?.original_name
+              : entry.req.file?.original_name;
+            const sender = entry.kind === 'multi'
+              ? (entry.frf.sender_name ?? entry.frf.sender_email)
+              : (entry.req.sender_name ?? entry.req.sender_email);
+            const key = entry.kind === 'multi' ? entry.frf.id : entry.req.id;
+            return (
+              <View key={key} style={styles.requestItem}>
+                <View style={styles.itemMain}>
+                  <Text style={styles.itemTitle} numberOfLines={1}>{fileName ?? 'Файл'}</Text>
+                  <Text style={styles.itemSub} numberOfLines={1}>Запрос: {entry.req.description}</Text>
+                  {sender ? <Text style={styles.itemSub}>От: {sender}</Text> : null}
+                </View>
+                <RequestActions
+                  onAccept={() => {
+                    if (entry.kind === 'multi') {
+                      acceptFRFile.mutate({ requestId: entry.req.id, fileItemId: entry.frf.id });
+                    } else {
+                      acceptFR.mutate(entry.req.id);
+                    }
+                  }}
+                  onReject={() => {
+                    if (entry.kind === 'multi') {
+                      rejectFRFile.mutate({ requestId: entry.req.id, fileItemId: entry.frf.id });
+                    } else {
+                      rejectFR.mutate(entry.req.id);
+                    }
+                  }}
+                  loading={acceptFR.isPending || rejectFR.isPending || acceptFRFile.isPending || rejectFRFile.isPending}
+                />
               </View>
-              <RequestActions
-                onAccept={() => acceptFR.mutate(req.id)}
-                onReject={() => rejectFR.mutate(req.id)}
-                loading={acceptFR.isPending || rejectFR.isPending}
-              />
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
     </ScrollView>

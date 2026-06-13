@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class FileRequest extends Model
@@ -18,6 +19,7 @@ class FileRequest extends Model
         'status',
         'file_id',
         'folder_id',
+        'allow_multiple',
         'sender_name',
         'sender_email',
         'ttl_hours',
@@ -28,9 +30,10 @@ class FileRequest extends Model
     protected function casts(): array
     {
         return [
-            'expires_at'   => 'datetime',
-            'fulfilled_at' => 'datetime',
-            'ttl_hours'    => 'integer',
+            'expires_at'     => 'datetime',
+            'fulfilled_at'   => 'datetime',
+            'ttl_hours'      => 'integer',
+            'allow_multiple' => 'boolean',
         ];
     }
 
@@ -52,6 +55,11 @@ class FileRequest extends Model
     public function file(): BelongsTo
     {
         return $this->belongsTo(File::class);
+    }
+
+    public function files(): HasMany
+    {
+        return $this->hasMany(FileRequestFile::class);
     }
 
     public function isPending(): bool

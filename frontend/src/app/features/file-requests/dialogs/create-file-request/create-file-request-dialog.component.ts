@@ -23,8 +23,9 @@ export class CreateFileRequestDialogComponent {
   readonly copied         = signal(false);
 
   readonly form = this.fb.group({
-    description: ['', [Validators.required, Validators.maxLength(1000)]],
-    ttl_hours:   [168, [Validators.required, Validators.min(1)]],
+    description:    ['', [Validators.required, Validators.maxLength(1000)]],
+    ttl_hours:      [168, [Validators.required, Validators.min(1)]],
+    allow_multiple: [false],
   });
 
   submit(): void {
@@ -32,9 +33,9 @@ export class CreateFileRequestDialogComponent {
     this.submitting.set(true);
     this.error.set(null);
 
-    const { description, ttl_hours } = this.form.getRawValue();
+    const { description, ttl_hours, allow_multiple } = this.form.getRawValue();
 
-    this.api.create(description!, ttl_hours!, this.folderId()).subscribe({
+    this.api.create(description!, ttl_hours!, this.folderId(), allow_multiple ?? false).subscribe({
       next: res => {
         this.createdRequest.set(res.data.request);
         this.submitting.set(false);
