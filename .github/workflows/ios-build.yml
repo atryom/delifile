@@ -72,15 +72,21 @@ jobs:
         id: build
         working-directory: mobile
         run: |
-          set -o pipefail
           touch /tmp/build-start-marker
+          # || true: EAS может вернуть non-zero из-за cleanup (ENOTEMPTY rmdir .git),
+          # хотя IPA уже создан — проверяем наличие файла, а не exit code.
           eas build \
             --platform ios \
             --profile production \
             --local \
             --non-interactive \
-            2>&1 | tee /tmp/ios-build.log
+            2>&1 | tee /tmp/ios-build.log || true
           IPA=$(find . -name "*.ipa" -newer /tmp/build-start-marker | head -1)
+          if [ -z "$IPA" ]; then
+            echo "::error::Build failed: IPA not produced"
+            exit 1
+          fi
+          echo "IPA built: ${IPA}"
           echo "ipa_path=${IPA}" >> "$GITHUB_OUTPUT"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
