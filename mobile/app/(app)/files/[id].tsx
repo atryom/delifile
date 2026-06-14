@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, BackHandler, Linking, ScrollView, Share, StyleSheet, Switch,
+  Alert, BackHandler, Linking, Platform, ScrollView, Share, StyleSheet, Switch,
   Text, TouchableOpacity, View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import { pickFileAsset } from '@/utils/pickFileAsset';
 import {
   useFile, useDownloadUrl, useToggleFavorite,
@@ -160,32 +159,15 @@ export default function FileDetailScreen() {
 
   async function handleDownload() {
     if (!isOnline) {
-      Alert.alert('Нет подключения', 'Для скачивания необходимо подключение к сети.');
+      Alert.alert('Нет подключения', 'Для открытия необходимо подключение к сети.');
       return;
     }
     setDownloading(true);
     try {
       const presignedUrl = await downloadUrl.mutateAsync();
-      const fileName = file?.display_name ?? file?.original_name ?? 'file';
-      const localUri = FileSystemLegacy.cacheDirectory + encodeURIComponent(fileName);
-
-      const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
-      if (status !== 200) {
-        Alert.alert('Ошибка', 'Не удалось скачать файл');
-        return;
-      }
-
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(localUri, {
-          dialogTitle: fileName,
-          mimeType: file?.mime_type ?? 'application/octet-stream',
-        });
-      } else {
-        Alert.alert('Готово', 'Файл загружен во временную папку');
-      }
+      await Linking.openURL(presignedUrl);
     } catch {
-      Alert.alert('Ошибка', 'Не удалось скачать файл');
+      Alert.alert('Ошибка', 'Не удалось открыть файл');
     } finally {
       setDownloading(false);
     }
@@ -259,17 +241,13 @@ export default function FileDetailScreen() {
     }
   }
 
-  async function handleVersionDownload(versionId: string, name: string) {
+  async function handleVersionDownload(versionId: string, _name: string) {
     if (!isOnline) { Alert.alert('Нет подключения', 'Для скачивания нужна сеть.'); return; }
     try {
       const url = await versionDownload.mutateAsync(versionId);
-      const localUri = FileSystemLegacy.cacheDirectory + encodeURIComponent(name);
-      const { status } = await FileSystemLegacy.downloadAsync(url, localUri);
-      if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать версию'); return; }
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) await Sharing.shareAsync(localUri, { dialogTitle: 'Сохранить файл' });
+      await Linking.openURL(url);
     } catch {
-      Alert.alert('Ошибка', 'Не удалось скачать версию');
+      Alert.alert('Ошибка', 'Не удалось открыть версию');
     }
   }
 
@@ -656,19 +634,32 @@ export default function FileDetailScreen() {
                     </TouchableOpacity>
                   )}
                   <Button
-                    title={downloading ? 'Скачивание...' : '📄 Открыть PDF'}
+                    title={downloading ? 'Загрузка...' : '📄 Открыть PDF'}
                     onPress={handleDownload}
                     loading={downloading || downloadUrl.isPending}
                     style={styles.btn}
                   />
                 </>
               ) : (
-                <Button
-                  title={downloading ? 'Скачивание...' : 'Скачать'}
-                  onPress={handleDownload}
-                  loading={downloading || downloadUrl.isPending}
-                  style={styles.btn}
-                />
+                <>
+                  {Platform.OS === 'android' &&
+                    (file.mime_type === 'application/vnd.android.package-archive' ||
+                      (file.original_name ?? '').toLowerCase().endsWith('.apk')) ? (
+                    <Button
+                      title={downloading ? 'Загрузка...' : '📦 Установить APK'}
+                      onPress={handleDownload}
+                      loading={downloading || downloadUrl.isPending}
+                      style={styles.btn}
+                    />
+                  ) : (
+                    <Button
+                      title={downloading ? 'Загрузка...' : 'Открыть'}
+                      onPress={handleDownload}
+                      loading={downloading || downloadUrl.isPending}
+                      style={styles.btn}
+                    />
+                  )}
+                </>
               )}
               {/* Gallery viewer modal */}
               {mediaViewerOpen && (
