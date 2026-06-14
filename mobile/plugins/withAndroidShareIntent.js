@@ -37,10 +37,11 @@ module.exports = function withAndroidShareIntent(config) {
         `$1\n    setIntent(intent) ${MARKER}`
       );
     } else {
-      // No onNewIntent at all — add before onCreate
+      // No onNewIntent at all — add before onCreate.
+      // RN 0.79+ changed the signature from Intent? to Intent (non-nullable).
       content = content.replace(
         /(  override fun onCreate\()/,
-        `  override fun onNewIntent(intent: Intent?) {\n    super.onNewIntent(intent)\n    setIntent(intent) ${MARKER}\n  }\n\n  $1`
+        `  override fun onNewIntent(intent: Intent) {\n    super.onNewIntent(intent)\n    setIntent(intent) ${MARKER}\n  }\n\n  $1`
       );
     }
 
