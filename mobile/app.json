@@ -2,7 +2,7 @@
   "expo": {
     "name": "DeliFile",
     "slug": "delifile",
-    "version": "1.1.32",
+    "version": "1.1.33",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -85,9 +85,12 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-image-picker", {
-        "photosPermission": "Доступ к медиатеке для загрузки файлов"
-      }],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Доступ к медиатеке для загрузки файлов"
+        }
+      ],
       "expo-secure-store",
       "expo-asset",
       "./plugins/withShareExtension",
