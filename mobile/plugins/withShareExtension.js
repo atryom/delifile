@@ -48,6 +48,22 @@ function fixResourceBundleSigning(config) {
         end
       end
     end
+    # Remove the CocoaPods-injected [CP-User] "Generate Specs" (AppIntentsSSUTraining) build
+    # phase from the ShareExtension target in the main Xcode project. ShareExtension does not
+    # use App Intents; the phase fails on macOS 14 CI runners and can cascade into a signing failure.
+    begin
+      installer.user_project_integrator.user_projects.each do |proj|
+        proj.targets.select { |t| t.name == "ShareExtension" }.each do |target|
+          phases = target.build_phases.select do |phase|
+            phase.respond_to?(:name) && phase.name.to_s.include?("Generate Specs")
+          end
+          phases.each { |ph| target.build_phases.delete(ph) }
+        end
+        proj.save
+      end
+    rescue => e
+      puts "[withShareExtension] AppIntents phase cleanup skipped: \#{e.message}"
+    end
 `;
       podfile = podfile.slice(0, insertIdx) + fix + podfile.slice(insertIdx);
       fs.writeFileSync(podfilePath, podfile);

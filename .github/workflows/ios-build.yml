@@ -45,6 +45,9 @@ jobs:
             -s \
             -k "${{ secrets.MAC_KEYCHAIN_PASSWORD }}" \
             "$HOME/Library/Keychains/login.keychain-db"
+          # Снимаем авто-блокировку login.keychain на время сборки (до 8 часов),
+          # чтобы keychain не заблокировался во время долгого pod install + xcodebuild archive.
+          security set-keychain-settings -lut 28800 "$HOME/Library/Keychains/login.keychain-db"
 
       - name: Install Apple WWDR certificates
         run: |
@@ -93,6 +96,11 @@ jobs:
           EAS_BUILD_NO_EXPO_GO_WARNING: true
           # Fastlane: вместо set-key-partition-list использовать -A флаг (fix для macOS 14)
           FL_IMPORT_CERTIFICATE_ALLOW_ANY_APP: 'true'
+          # Указываем Fastlane (gym) использовать login.keychain, на котором уже выставлен
+          # set-key-partition-list. Без этого EAS создаёт временный keychain без ACL,
+          # что приводит к errSecInternalComponent при подписании ShareExtension на macOS 14.
+          MATCH_KEYCHAIN_NAME: login.keychain-db
+          MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
 
       - name: Submit to TestFlight
         if: success()
