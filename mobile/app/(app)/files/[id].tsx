@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { pickFileAsset } from '@/utils/pickFileAsset';
 import {
   useFile, useDownloadUrl, useToggleFavorite,
@@ -165,7 +166,23 @@ export default function FileDetailScreen() {
     setDownloading(true);
     try {
       const presignedUrl = await downloadUrl.mutateAsync();
-      await Linking.openURL(presignedUrl);
+      if (Platform.OS === 'android') {
+        // Download to cache then open with native app via ACTION_VIEW
+        const fileName = (file?.display_name ?? file?.original_name ?? 'file')
+          .replace(/[/\\?%*:|"<>]/g, '_');
+        const localUri = FileSystemLegacy.cacheDirectory + fileName;
+        const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
+        if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
+        const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+          type: file?.mime_type ?? 'application/octet-stream',
+        });
+      } else {
+        // iOS: open in Safari which handles PDF natively
+        await Linking.openURL(presignedUrl);
+      }
     } catch {
       Alert.alert('Ошибка', 'Не удалось открыть файл');
     } finally {
@@ -241,11 +258,25 @@ export default function FileDetailScreen() {
     }
   }
 
-  async function handleVersionDownload(versionId: string, _name: string) {
+  async function handleVersionDownload(versionId: string, name: string) {
     if (!isOnline) { Alert.alert('Нет подключения', 'Для скачивания нужна сеть.'); return; }
     try {
       const url = await versionDownload.mutateAsync(versionId);
-      await Linking.openURL(url);
+      if (Platform.OS === 'android') {
+        const safeFileName = name.replace(/[/\\?%*:|"<>]/g, '_');
+        const localUri = FileSystemLegacy.cacheDirectory + safeFileName;
+        const { status } = await FileSystemLegacy.downloadAsync(url, localUri);
+        if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать версию'); return; }
+        const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
+        const mimeType = file?.mime_type ?? 'application/octet-stream';
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          flags: 1,
+          type: mimeType,
+        });
+      } else {
+        await Linking.openURL(url);
+      }
     } catch {
       Alert.alert('Ошибка', 'Не удалось открыть версию');
     }

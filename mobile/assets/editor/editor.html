@@ -165,9 +165,24 @@ html,body{height:100%;background:#fff;color:#1e293b;font-family:-apple-system,Bl
   // which is required on iOS where the bridge is unavailable on file:// origins.
   window._editorInit=function(content,readOnly){initEditor(content,readOnly||false);};
 
-  // With adjustResize the OS already shrinks the viewport when keyboard opens.
-  // Toolbar stays at bottom:0; just ensure content scrolls above it.
-  // No dynamic bottom adjustment needed.
+  // iOS does NOT resize the WebView when the keyboard appears — the keyboard overlays
+  // the bottom of the page. Use the Visual Viewport API to push the toolbar above it.
+  (function() {
+    var tb = document.getElementById('toolbar');
+    function onVpResize() {
+      if (!window.visualViewport) return;
+      var offsetFromBottom = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+      var kbHeight = Math.max(0, offsetFromBottom);
+      tb.style.bottom = kbHeight + 'px';
+      // Keep editor-wrap paddingBottom in sync so content isn't hidden under toolbar+keyboard
+      var tbH = tb.offsetHeight || 44;
+      document.getElementById('editor-wrap').style.paddingBottom = (tbH + kbHeight + 20) + 'px';
+    }
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', onVpResize);
+      window.visualViewport.addEventListener('scroll', onVpResize);
+    }
+  })();
 
   function handleMsg(event){
     try{

@@ -1,4 +1,4 @@
-import { Platform, ActionSheetIOS } from 'react-native';
+import { Platform, ActionSheetIOS, Alert } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -22,6 +22,15 @@ async function fromDocumentPicker(): Promise<FileAsset | null> {
 }
 
 async function fromImageLibrary(): Promise<FileAsset | null> {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert(
+      'Нет доступа к медиатеке',
+      'Разрешите доступ к Фото в Настройках → Конфиденциальность → Фото',
+      [{ text: 'OK' }],
+    );
+    return null;
+  }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.All,
     allowsMultipleSelection: false,

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert, BackHandler, StyleSheet, Text, TouchableOpacity, View,
-  Keyboard,
 } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import WebView, { WebViewMessageEvent } from 'react-native-webview';
-import { Animated } from 'react-native';
 import { Asset } from 'expo-asset';
 import { documentsApi } from '@/api/documents';
 import type { MarkdownDocument } from '@/types/document';
@@ -45,24 +43,11 @@ export default function EditDocumentScreen() {
   const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const docRef = useRef<MarkdownDocument | null>(null);
 
-  // Keyboard offset for back button area (not toolbar — toolbar is inside WebView)
-  const kbOffset = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     resolveEditorUri().then(setEditorUri).catch(() => {
       setPhase('error');
       setErrorMsg('Не удалось загрузить редактор');
     });
-  }, []);
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', (e) => {
-      kbOffset.setValue(e.endCoordinates.height);
-    });
-    const hide = Keyboard.addListener('keyboardDidHide', () => {
-      kbOffset.setValue(0);
-    });
-    return () => { show.remove(); hide.remove(); };
   }, []);
 
   // Load document and acquire lock
