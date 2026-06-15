@@ -17,7 +17,7 @@ jobs:
     name: Build & Submit iOS
     # Метка macOS разводит iOS-сборку с web-деплоем (тот идёт на runner Linux).
     runs-on: [self-hosted, macOS]
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
