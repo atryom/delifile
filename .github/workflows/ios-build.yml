@@ -70,6 +70,30 @@ jobs:
           print('Build number set to: ${{ github.run_number }}')
           "
 
+      # EAS создаёт временный keychain eas-build-<uuid>.keychain-db во время PREPARE_CREDENTIALS.
+      # Keychain разблокируется EAS, но за время pod install + компиляции (~15 мин) он
+      # автоматически блокируется. Когда xcodebuild archive доходит до codesign, macOS
+      # показывает интерактивный диалог "Введите пароль связки ключей" — CI зависает.
+      # Фикс: запускаем фоновый скрипт, который следит за появлением eas-build-*.keychain-db
+      # и немедленно устанавливает таймаут блокировки в 24 часа (set-keychain-settings
+      # не требует пароля keychain и работает на уже разблокированном keychain).
+      - name: Start EAS keychain auto-lock prevention
+        run: |
+          (
+            while true; do
+              for kc in "$HOME/Library/Keychains/eas-build-"*.keychain-db \
+                        "$HOME/Library/Keychains/eas-build-"*.keychain; do
+                if [ -f "$kc" ]; then
+                  security set-keychain-settings -t 86400 "$kc" 2>/dev/null && \
+                    echo "[keychain-watcher] Extended lock timeout for: $kc" || true
+                fi
+              done
+              sleep 2
+            done
+          ) &
+          echo $! > /tmp/eas-keychain-watcher.pid
+          echo "[keychain-watcher] Started (PID: $(cat /tmp/eas-keychain-watcher.pid))"
+
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
         id: build
@@ -143,6 +167,13 @@ jobs:
           ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+
+      - name: Stop EAS keychain watcher
+        if: always()
+        run: |
+          if [ -f /tmp/eas-keychain-watcher.pid ]; then
+            kill "$(cat /tmp/eas-keychain-watcher.pid)" 2>/dev/null || true
+          fi
 
       # Загружает лог в Delifile всегда — и при успехе, и при ошибке.
       # Имя файла содержит статус и временную метку: ios-build-success-20260605-143022.log
