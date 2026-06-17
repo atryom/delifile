@@ -70,29 +70,54 @@ jobs:
           print('Build number set to: ${{ github.run_number }}')
           "
 
-      # EAS создаёт временный keychain eas-build-<uuid>.keychain-db во время PREPARE_CREDENTIALS.
-      # Keychain разблокируется EAS, но за время pod install + компиляции (~15 мин) он
-      # автоматически блокируется. Когда xcodebuild archive доходит до codesign, macOS
-      # показывает интерактивный диалог "Введите пароль связки ключей" — CI зависает.
-      # Фикс: запускаем фоновый скрипт, который следит за появлением eas-build-*.keychain-db
-      # и немедленно устанавливает таймаут блокировки в 24 часа (set-keychain-settings
-      # не требует пароля keychain и работает на уже разблокированном keychain).
+      # EAS создаёт временный keychain eas-build-<uuid>.keychain в /var/folders/
+      # (не в ~/Library/Keychains/, как раньше предполагалось!).
+      # Проблема: EAS не запускает security set-key-partition-list после импорта сертификата,
+      # поэтому codesign не может получить доступ к private key → errSecInternalComponent.
+      # Фикс: фоновый watcher ищет EAS-keychain в /var/folders/ и ~/Library/Keychains/,
+      # затем:
+      #   1. Устанавливает таймаут блокировки 24 часа (не требует пароля)
+      #   2. Вызывает set-key-partition-list -k "" (EAS создаёт keychain с пустым паролем)
+      #      — даёт codesign/apple-tool доступ к private key без диалога авторизации.
       - name: Start EAS keychain auto-lock prevention
         run: |
           (
+            declare -A SEEN
             while true; do
-              for kc in "$HOME/Library/Keychains/eas-build-"*.keychain-db \
-                        "$HOME/Library/Keychains/eas-build-"*.keychain; do
-                if [ -f "$kc" ]; then
-                  security set-keychain-settings -t 86400 "$kc" 2>/dev/null && \
-                    echo "[keychain-watcher] Extended lock timeout for: $kc" || true
+              # EAS в новых версиях хранит keychain в /var/folders/<x>/<hash>/T/
+              # а в старых — в ~/Library/Keychains/. Ищем в обоих местах.
+              while IFS= read -r kc; do
+                [ -z "$kc" ] && continue
+                [ "${SEEN[$kc]+_}" ] && continue
+                SEEN[$kc]=1
+
+                # 1. Продлить таймаут автоблокировки (не требует пароля)
+                security set-keychain-settings -t 86400 "$kc" 2>/dev/null && \
+                  echo "[kc-watcher] Extended lock timeout: $kc" || true
+
+                # 2. Разблокировать (EAS CI-keychains имеют пустой пароль)
+                security unlock-keychain -p "" "$kc" 2>/dev/null || true
+
+                # 3. Установить partition list — дать codesign доступ к private key.
+                #    Это главный фикс errSecInternalComponent на macOS 26.
+                if security set-key-partition-list \
+                    -S "apple-tool:,apple:,codesign:" \
+                    -s -k "" "$kc" 2>/dev/null; then
+                  echo "[kc-watcher] Partition list set OK: $kc"
+                else
+                  echo "[kc-watcher] WARN: set-key-partition-list failed (non-empty password?): $kc"
                 fi
-              done
+              done < <(
+                find "$HOME/Library/Keychains" /var/folders \
+                  -maxdepth 6 \
+                  \( -name "eas-build-*.keychain" -o -name "eas-build-*.keychain-db" \) \
+                  2>/dev/null
+              )
               sleep 2
             done
           ) &
           echo $! > /tmp/eas-keychain-watcher.pid
-          echo "[keychain-watcher] Started (PID: $(cat /tmp/eas-keychain-watcher.pid))"
+          echo "[kc-watcher] Started (PID: $(cat /tmp/eas-keychain-watcher.pid))"
 
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
@@ -118,13 +143,6 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_BUILD_NO_EXPO_GO_WARNING: true
-          # Fastlane: вместо set-key-partition-list использовать -A флаг (fix для macOS 14)
-          FL_IMPORT_CERTIFICATE_ALLOW_ANY_APP: 'true'
-          # Указываем Fastlane (gym) использовать login.keychain, на котором уже выставлен
-          # set-key-partition-list. Без этого EAS создаёт временный keychain без ACL,
-          # что приводит к errSecInternalComponent при подписании ShareExtension на macOS 14.
-          MATCH_KEYCHAIN_NAME: login.keychain-db
-          MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
 
       - name: Submit to TestFlight
         if: success()
