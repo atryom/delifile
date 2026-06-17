@@ -91,65 +91,37 @@ jobs:
           LOG=/tmp/kc-watcher.log
           > "$LOG"
           (
-            SEEN_FILE=$(mktemp)
-            PARTITION_DONE=0
+            # SEEN_FILE используется только для подавления повторного логирования,
+            # но НЕ для прекращения вызовов set-key-partition-list.
+            # Вызываем каждые 2 секунды, чтобы покрыть ключи, импортированные
+            # ПОСЛЕ нашего первого вызова (EAS импортирует cert для DeliFile и
+            # ShareExtension последовательно, второй может прийти позже первого вызова).
+            LOGGED_FILE=$(mktemp)
 
             log() { echo "[$(date +%H:%M:%S)] $*" >> "$LOG"; }
-
             log "Watcher started (PID=$$)"
 
             while true; do
-              # ── Method 1: interceptor pass-file ──────────────────────────────────
               find "$HOME/Library/Keychains" /var/folders \
                 -maxdepth 6 \
                 \( -name "eas-build-*.keychain" -o -name "eas-build-*.keychain-db" \) \
                 2>/dev/null | while IFS= read -r kc; do
                 [ -z "$kc" ] && continue
-                grep -qF "$kc" "$SEEN_FILE" 2>/dev/null && continue
                 PASS_FILE="/tmp/eas-kc-pass-${kc##*/}.txt"
                 [ ! -f "$PASS_FILE" ] && continue
-                echo "$kc" >> "$SEEN_FILE"
                 KC_PASS=$(cat "$PASS_FILE")
-                /usr/bin/security set-keychain-settings -t 86400 "$kc" 2>/dev/null || true
-                /usr/bin/security unlock-keychain -p "$KC_PASS" "$kc" 2>/dev/null || true
+                # Вызываем каждую итерацию (каждые 2с) — не пропускаем повторно.
+                # Результат только логируем первый раз или при смене статуса.
                 if /usr/bin/security set-key-partition-list \
                     -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$kc" 2>/dev/null; then
-                  log "Partition OK (interceptor): $kc"
+                  grep -qF "OK:$kc" "$LOGGED_FILE" 2>/dev/null || {
+                    log "Partition OK: $kc"
+                    echo "OK:$kc" >> "$LOGGED_FILE"
+                  }
                 else
-                  log "WARN: partition failed (interceptor): $kc"
+                  log "WARN: partition failed: $kc"
                 fi
               done
-
-              # ── Method 2: read MATCH_KEYCHAIN_* from Fastlane subprocess env ────
-              if [ "$PARTITION_DONE" = "0" ]; then
-                FL_PID=$(pgrep -f "fastlane" 2>/dev/null | head -1)
-                if [ -n "$FL_PID" ]; then
-                  FL_ENV=$(ps ewww -p "$FL_PID" 2>/dev/null)
-                  KC_PASS=$(printf '%s' "$FL_ENV" | grep -oE 'MATCH_KEYCHAIN_PASSWORD=[^[:space:]]+' | cut -d= -f2-)
-                  KC_NAME=$(printf '%s' "$FL_ENV" | grep -oE 'MATCH_KEYCHAIN_NAME=[^[:space:]]+' | cut -d= -f2-)
-                  if [ -n "$KC_PASS" ] && [ -n "$KC_NAME" ]; then
-                    log "Got creds from fastlane PID=$FL_PID: $KC_NAME"
-                    /usr/bin/security set-keychain-settings -t 86400 "$KC_NAME" 2>/dev/null || true
-                    /usr/bin/security unlock-keychain -p "$KC_PASS" "$KC_NAME" 2>/dev/null || true
-                    if /usr/bin/security set-key-partition-list \
-                        -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$KC_NAME" 2>/dev/null; then
-                      log "Partition OK (fastlane env): $KC_NAME"
-                      PARTITION_DONE=1
-                    else
-                      log "WARN: partition failed (fastlane env): $KC_NAME"
-                    fi
-                  else
-                    # Диагностика: какие KEYCHAIN-переменные реально есть у процесса
-                    KC_VARS=$(printf '%s' "$FL_ENV" | grep -oE '[A-Z_]*KEYCHAIN[A-Z_]*=[^[:space:]]+' | sed 's/=.*/=<val>/')
-                    if [ -n "$KC_VARS" ]; then
-                      log "FL-PID=$FL_PID KEYCHAIN vars: $KC_VARS"
-                    else
-                      log "FL-PID=$FL_PID found, no KEYCHAIN vars in env (ps ewww returned ${#FL_ENV} chars)"
-                    fi
-                  fi
-                fi
-              fi
-
               sleep 2
             done
           ) >> "$LOG" 2>&1 &
