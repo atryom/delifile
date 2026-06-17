@@ -33,7 +33,7 @@ function fixResourceBundleSigning(config) {
       const podfilePath = path.join(c.modRequest.platformProjectRoot, 'Podfile');
       if (!fs.existsSync(podfilePath)) return c;
       let podfile = fs.readFileSync(podfilePath, 'utf8');
-      const MARKER = '# [withShareExtension] Xcode26';
+      const MARKER = '# [withShareExtension] Xcode26v2';
       if (podfile.includes(MARKER)) return c;
       // Insert before the closing 'end' of the react_native_post_install call block.
       // The template always ends the post_install block with exactly this pattern.
@@ -41,6 +41,31 @@ function fixResourceBundleSigning(config) {
       const insertIdx = podfile.lastIndexOf(insertBefore);
       if (insertIdx === -1) return c;
       const fix = `    ${MARKER}
+    # Fix errSecInternalComponent on ShareExtension signing (macOS 14+ CI).
+    # EAS (PREPARE_CREDENTIALS) imports the distribution cert into a temp keychain
+    # WITHOUT calling security set-key-partition-list → codesign fails with
+    # errSecInternalComponent because the private key denies codesign access.
+    # post_install runs AFTER all certs are imported and BEFORE xcodebuild archive,
+    # so this is the correct place to set the partition list — no race conditions.
+    # The pass file is created by .github/scripts/security-interceptor.sh which
+    # intercepts `security create-keychain -p <pass> ...` calls in CI.
+    begin
+      Dir.glob("/tmp/eas-kc-pass-eas-build-*.keychain.txt").each do |pf|
+        kc_pass = File.read(pf).strip
+        next if kc_pass.empty?
+        kc_name = File.basename(pf, ".txt").sub("eas-kc-pass-", "")
+        [kc_name, "\#{kc_name}-db"].each do |name|
+          Dir.glob("/var/folders/??/*/T/\#{name}").each do |kc_path|
+            ok = system("/usr/bin/security", "set-key-partition-list",
+                        "-S", "apple-tool:,apple:,codesign:",
+                        "-s", "-k", kc_pass, kc_path)
+            puts "[withShareExtension] set-key-partition-list \#{ok ? 'OK' : 'FAILED'}: \#{kc_path}"
+          end
+        end
+      end
+    rescue => e
+      puts "[withShareExtension] Partition list setup skipped: \#{e.message}"
+    end
     # Disable code signing for ALL pod targets.
     # [CP] Copy XCFrameworks reads CODE_SIGNING_ALLOWED to decide whether to
     # codesign the copied prebuilt frameworks. On Xcode 26 this step fails for
