@@ -91,11 +91,6 @@ jobs:
           LOG=/tmp/kc-watcher.log
           > "$LOG"
           (
-            # SEEN_FILE используется только для подавления повторного логирования,
-            # но НЕ для прекращения вызовов set-key-partition-list.
-            # Вызываем каждые 2 секунды, чтобы покрыть ключи, импортированные
-            # ПОСЛЕ нашего первого вызова (EAS импортирует cert для DeliFile и
-            # ShareExtension последовательно, второй может прийти позже первого вызова).
             LOGGED_FILE=$(mktemp)
 
             log() { echo "[$(date +%H:%M:%S)] $*" >> "$LOG"; }
@@ -110,8 +105,21 @@ jobs:
                 PASS_FILE="/tmp/eas-kc-pass-${kc##*/}.txt"
                 [ ! -f "$PASS_FILE" ] && continue
                 KC_PASS=$(cat "$PASS_FILE")
-                # Вызываем каждую итерацию (каждые 2с) — не пропускаем повторно.
-                # Результат только логируем первый раз или при смене статуса.
+
+                # 1. Разблокируем keychain перед каждой итерацией —
+                #    EAS keychain имеет дефолтный timeout авто-блокировки (~5 мин),
+                #    за время компиляции он мог заблокироваться.
+                /usr/bin/security unlock-keychain -p "$KC_PASS" "$kc" 2>/dev/null
+
+                # 2. Отключаем авто-блокировку EAS keychain на 8 часов,
+                #    аналогично login.keychain-db (шаг 6).
+                /usr/bin/security set-keychain-settings -lut 28800 "$kc" 2>/dev/null
+
+                # 3. Добавляем EAS keychain в список поиска keychain,
+                #    чтобы codesign мог найти сертификаты.
+                /usr/bin/security list-keychains -d user -s "$kc" $(/usr/bin/security list-keychains -d user 2>/dev/null | tr -d '"' | tr '\n' ' ') 2>/dev/null || true
+
+                # 4. set-key-partition-list — основная операция.
                 if /usr/bin/security set-key-partition-list \
                     -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$kc" 2>/dev/null; then
                   grep -qF "OK:$kc" "$LOGGED_FILE" 2>/dev/null || {
@@ -127,6 +135,25 @@ jobs:
           ) >> "$LOG" 2>&1 &
           echo $! > /tmp/eas-keychain-watcher.pid
           echo "[kc-watcher] Started (PID: $(cat /tmp/eas-keychain-watcher.pid)), log: $LOG"
+
+      # EAS keychain может заблокироваться между шагами:
+      # разблокируем и снимаем автоблокировку ещё раз прямо перед xcodebuild.
+      - name: Pre-build keychain unlock
+        run: |
+          for PASS_FILE in /tmp/eas-kc-pass-*.txt; do
+            [ -f "$PASS_FILE" ] || continue
+            KC_PASS=$(cat "$PASS_FILE")
+            KC_NAME="${PASS_FILE#/tmp/eas-kc-pass-}"
+            KC_NAME="${KC_NAME%.txt}"
+            # Ищем keychain по имени (с суффиксом -db или без)
+            KC_PATH=$(find "$HOME/Library/Keychains" /var/folders -maxdepth 6 -name "$KC_NAME*" 2>/dev/null | head -1)
+            [ -z "$KC_PATH" ] && continue
+            /usr/bin/security unlock-keychain -p "$KC_PASS" "$KC_PATH" 2>/dev/null || true
+            /usr/bin/security set-keychain-settings -lut 28800 "$KC_PATH" 2>/dev/null || true
+            /usr/bin/security list-keychains -d user -s "$KC_PATH" $(/usr/bin/security list-keychains -d user 2>/dev/null | tr -d '"' | tr '\n' ' ') 2>/dev/null || true
+            /usr/bin/security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$KC_PATH" 2>/dev/null || true
+            echo "Pre-build unlock OK: $KC_PATH"
+          done
 
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
