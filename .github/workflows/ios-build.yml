@@ -70,14 +70,14 @@ jobs:
           print('Build number set to: ${{ github.run_number }}')
           "
 
-      # EAS создаёт временный keychain с СЛУЧАЙНЫМ паролем → мы не можем вызвать
-      # security set-key-partition-list без него → codesign получает errSecInternalComponent.
+      # EAS создаёт временный keychain с СЛУЧАЙНЫМ паролем и не вызывает
+      # security set-key-partition-list → codesign получает errSecInternalComponent.
       #
-      # Решение: устанавливаем обёртку /usr/local/bin/security (перехватчик),
-      # которая перехватывает вызов `security create-keychain -p <pass> <path>`,
-      # сохраняет пароль в /tmp/eas-kc-pass-<keychain-name>.txt, а затем передаёт
-      # вызов реальному /usr/bin/security без изменений.
-      # Фоновый watcher читает этот файл и вызывает set-key-partition-list с верным паролем.
+      # Метод 1 (fallback): перехватчик в PATH сохраняет пароль в pass-файл.
+      #   Не работает если EAS вызывает /usr/bin/security напрямую (по абсолютному пути).
+      # Метод 2 (основной): EAS передаёт MATCH_KEYCHAIN_NAME/MATCH_KEYCHAIN_PASSWORD
+      #   в env Fastlane-процесса. Читаем их через `ps eww -p <pid>` и вызываем
+      #   set-key-partition-list с правильным паролем.
       - name: Install security interceptor for EAS keychain password
         run: |
           mkdir -p /tmp/eas-sec-wrap
@@ -86,44 +86,62 @@ jobs:
           echo "/tmp/eas-sec-wrap" >> "$GITHUB_PATH"
           echo "Security interceptor installed; prepended /tmp/eas-sec-wrap to PATH"
 
-      - name: Start EAS keychain auto-lock prevention
+      - name: Start EAS keychain partition-list watcher
         run: |
           (
             SEEN_FILE=$(mktemp)
+            PARTITION_DONE=0
+
             while true; do
+              # ── Method 1: interceptor pass-file ──────────────────────────────────
               find "$HOME/Library/Keychains" /var/folders \
                 -maxdepth 6 \
                 \( -name "eas-build-*.keychain" -o -name "eas-build-*.keychain-db" \) \
                 2>/dev/null | while IFS= read -r kc; do
                 [ -z "$kc" ] && continue
                 grep -qF "$kc" "$SEEN_FILE" 2>/dev/null && continue
-
-                KC_NAME="${kc##*/}"
-                PASS_FILE="/tmp/eas-kc-pass-${KC_NAME}.txt"
-
-                # Если файл с паролем ещё не появился — EAS ещё не создал keychain.
-                # Не помечаем как обработанный, проверим в следующей итерации.
+                PASS_FILE="/tmp/eas-kc-pass-${kc##*/}.txt"
                 [ ! -f "$PASS_FILE" ] && continue
-
                 echo "$kc" >> "$SEEN_FILE"
                 KC_PASS=$(cat "$PASS_FILE")
-
-                # 1. Продлить таймаут автоблокировки
-                /usr/bin/security set-keychain-settings -t 86400 "$kc" 2>/dev/null && \
-                  echo "[kc-watcher] Extended lock timeout: $kc" || true
-
-                # 2. Разблокировать с перехваченным паролем
+                /usr/bin/security set-keychain-settings -t 86400 "$kc" 2>/dev/null || true
                 /usr/bin/security unlock-keychain -p "$KC_PASS" "$kc" 2>/dev/null || true
-
-                # 3. Установить partition list — главный фикс errSecInternalComponent
                 if /usr/bin/security set-key-partition-list \
-                    -S "apple-tool:,apple:,codesign:" \
-                    -s -k "$KC_PASS" "$kc" 2>/dev/null; then
-                  echo "[kc-watcher] Partition list set OK: $kc"
+                    -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$kc" 2>/dev/null; then
+                  echo "[kc-watcher] Partition OK (interceptor): $kc"
                 else
-                  echo "[kc-watcher] WARN: set-key-partition-list failed: $kc"
+                  echo "[kc-watcher] WARN: partition failed (interceptor): $kc"
                 fi
               done
+
+              # ── Method 2: read MATCH_KEYCHAIN_* from Fastlane subprocess env ────
+              if [ "$PARTITION_DONE" = "0" ]; then
+                FL_PID=$(pgrep -f "fastlane" 2>/dev/null | head -1)
+                if [ -n "$FL_PID" ]; then
+                  FL_ENV=$(ps eww -p "$FL_PID" 2>/dev/null)
+                  KC_PASS=$(printf '%s' "$FL_ENV" | grep -oE 'MATCH_KEYCHAIN_PASSWORD=[^[:space:]]+' | cut -d= -f2-)
+                  KC_NAME=$(printf '%s' "$FL_ENV" | grep -oE 'MATCH_KEYCHAIN_NAME=[^[:space:]]+' | cut -d= -f2-)
+                  if [ -n "$KC_PASS" ] && [ -n "$KC_NAME" ]; then
+                    echo "[kc-watcher] Got creds from fastlane PID=$FL_PID: $KC_NAME"
+                    /usr/bin/security set-keychain-settings -t 86400 "$KC_NAME" 2>/dev/null || true
+                    /usr/bin/security unlock-keychain -p "$KC_PASS" "$KC_NAME" 2>/dev/null || true
+                    if /usr/bin/security set-key-partition-list \
+                        -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$KC_NAME" 2>/dev/null; then
+                      echo "[kc-watcher] Partition OK (fastlane env): $KC_NAME"
+                      PARTITION_DONE=1
+                    else
+                      echo "[kc-watcher] WARN: partition failed (fastlane env): $KC_NAME"
+                    fi
+                  elif [ -n "$FL_PID" ]; then
+                    # Диагностика: показываем все KEYCHAIN-переменные из env Fastlane
+                    printf '%s' "$FL_ENV" | grep -oE '[A-Z_]*KEYCHAIN[A-Z_]*=[^[:space:]]+' | \
+                      sed 's/=.*/=<value>/' | while IFS= read -r kv; do
+                      echo "[kc-watcher] FL-PID=$FL_PID env: $kv"
+                    done
+                  fi
+                fi
+              fi
+
               sleep 2
             done
           ) &
