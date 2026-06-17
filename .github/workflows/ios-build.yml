@@ -80,9 +80,11 @@ jobs:
       # Фоновый watcher читает этот файл и вызывает set-key-partition-list с верным паролем.
       - name: Install security interceptor for EAS keychain password
         run: |
-          cp .github/scripts/security-interceptor.sh /usr/local/bin/security
-          chmod +x /usr/local/bin/security
-          echo "Security interceptor installed at /usr/local/bin/security"
+          mkdir -p /tmp/eas-sec-wrap
+          cp .github/scripts/security-interceptor.sh /tmp/eas-sec-wrap/security
+          chmod +x /tmp/eas-sec-wrap/security
+          echo "/tmp/eas-sec-wrap" >> "$GITHUB_PATH"
+          echo "Security interceptor installed; prepended /tmp/eas-sec-wrap to PATH"
 
       - name: Start EAS keychain auto-lock prevention
         run: |
@@ -201,7 +203,7 @@ jobs:
           if [ -f /tmp/eas-keychain-watcher.pid ]; then
             kill "$(cat /tmp/eas-keychain-watcher.pid)" 2>/dev/null || true
           fi
-          rm -f /usr/local/bin/security
+          rm -f /tmp/eas-sec-wrap/security
           rm -f /tmp/eas-kc-pass-*.txt
 
       # Загружает лог в Delifile всегда — и при успехе, и при ошибке.
