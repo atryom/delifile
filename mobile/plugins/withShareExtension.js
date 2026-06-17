@@ -48,15 +48,15 @@ function fixResourceBundleSigning(config) {
         end
       end
     end
-    # Remove the CocoaPods-injected [CP-User] "Generate Specs" (AppIntentsSSUTraining) build
-    # phase from ALL projects: both the Pods project (ReactCodegen target) and the main
-    # user Xcode project (DeliFile, ShareExtension). The phase fails on macOS 14 CI runners.
-    # Uses aggregate_targets API (CocoaPods 1.11+); old user_project_integrator was removed.
+    # Remove [CP-User] script phases that are known to fail on Xcode 26 / macOS 14 CI runners.
+    # Affected phases (all are optional validation/metadata steps, not needed for the build):
+    #   - "Generate Specs"     — AppIntentsSSUTraining (AppIntents metadata, we don't use AppIntents)
+    #   - "[RN]Check"          — React Native codegen consistency check (React-RCTFBReactNativeSpec)
+    # Cleans both the Pods project and the user project (aggregate_targets API, CocoaPods 1.11+).
     begin
+      broken_patterns = ["Generate Specs", "[RN]Check"]
       projects_to_clean = []
-      # 1. Pods project (contains ReactCodegen which has the failing Generate Specs phase)
       projects_to_clean << installer.pods_project if installer.respond_to?(:pods_project) && installer.pods_project
-      # 2. User project (main .xcodeproj with DeliFile and ShareExtension targets)
       if installer.respond_to?(:aggregate_targets)
         installer.aggregate_targets.map(&:user_project).compact.each { |p| projects_to_clean << p }
       end
@@ -64,18 +64,21 @@ function fixResourceBundleSigning(config) {
         changed = false
         proj.targets.each do |target|
           phases = target.build_phases.select do |phase|
-            phase.respond_to?(:name) && phase.name.to_s.include?("Generate Specs")
+            phase.respond_to?(:name) &&
+              broken_patterns.any? { |pat| phase.name.to_s.include?(pat) }
           end
           unless phases.empty?
-            puts "[withShareExtension] Removing Generate Specs from \#{proj.path.basename}/\#{target.name}"
-            phases.each { |ph| target.build_phases.delete(ph) }
+            phases.each do |ph|
+              puts "[withShareExtension] Removing '[CP-User] \#{ph.name}' from \#{proj.path.basename}/\#{target.name}"
+              target.build_phases.delete(ph)
+            end
             changed = true
           end
         end
         proj.save if changed
       end
     rescue => e
-      puts "[withShareExtension] AppIntents phase cleanup skipped: \#{e.message}"
+      puts "[withShareExtension] CI script phase cleanup skipped: \#{e.message}"
     end
 `;
       podfile = podfile.slice(0, insertIdx) + fix + podfile.slice(insertIdx);
