@@ -8,7 +8,6 @@ import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import * as IntentLauncher from 'expo-intent-launcher';
 import { pickFileAsset } from '@/utils/pickFileAsset';
 import {
   useFile, useDownloadUrl, useToggleFavorite,
@@ -173,19 +172,10 @@ export default function FileDetailScreen() {
       const localUri = FileSystemLegacy.cacheDirectory + fileName;
       const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
       if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
-      if (Platform.OS === 'android') {
-        const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: contentUri,
-          type: file?.mime_type ?? 'application/octet-stream',
-          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-        });
-      } else {
-        await Sharing.shareAsync(localUri, {
-          mimeType: file?.mime_type ?? 'application/octet-stream',
-          dialogTitle: 'Открыть файл',
-        });
-      }
+      await Sharing.shareAsync(localUri, {
+        mimeType: file?.mime_type ?? 'application/octet-stream',
+        dialogTitle: 'Открыть файл',
+      });
     } catch {
       Alert.alert('Ошибка', 'Не удалось открыть файл');
     } finally {
@@ -270,16 +260,7 @@ export default function FileDetailScreen() {
       const { status } = await FileSystemLegacy.downloadAsync(url, localUri);
       if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать версию'); return; }
       const mimeType = file?.mime_type ?? 'application/octet-stream';
-      if (Platform.OS === 'android') {
-        const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: contentUri,
-          type: mimeType,
-          flags: 1,
-        });
-      } else {
-        await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть версию файла' });
-      }
+      await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть версию файла' });
     } catch {
       Alert.alert('Ошибка', 'Не удалось открыть версию');
     }

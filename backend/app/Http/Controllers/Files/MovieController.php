@@ -30,16 +30,28 @@ class MovieController extends Controller
             'personal_rating' => 'nullable|numeric|min:0|max:10',
         ]);
 
-        $file = File::where('id', $fileId)
-            ->where('owner_id', $request->user()->id)
-            ->where('content_kind', 'movie_item')
-            ->first();
+        $user = $request->user();
+        $file = File::find($fileId);
 
         if (!$file) {
             return $this->notFound('Файл не найден');
         }
 
-        $meta = $file->custom_metadata ?? [];
+        // Allow if user owns the file or has access to a shared folder containing it
+        if ($file->owner_id !== $user->id) {
+            $hasAccess = SharedFolderFile::where('file_id', $fileId)
+                ->whereHas('sharedFolder', function ($q) use ($user) {
+                    $q->where('owner_id', $user->id)
+                      ->orWhereHas('accesses', fn ($q2) => $q2->where('user_id', $user->id));
+                })
+                ->exists();
+
+            if (!$hasAccess) {
+                return $this->notFound('Файл не найден');
+            }
+        }
+
+        $meta = (array) ($file->custom_metadata ?? []);
         if (array_key_exists('watched', $data)) {
             $meta['watched'] = $data['watched'];
         }

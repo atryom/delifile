@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
+import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-settings-page',
@@ -32,6 +33,7 @@ import { TranslateModule } from '@ngx-translate/core';
         </a>
       </div>
       <router-outlet />
+      <div class="version-badge">v{{ version }}</div>
     </div>
   `,
   styles: [`
@@ -80,6 +82,18 @@ import { TranslateModule } from '@ngx-translate/core';
       .tabs { padding: 0 8px; gap: 0; }
       .tab-btn { padding: 10px 10px; font-size: 0.78rem; }
     }
+
+    .version-badge {
+      position: fixed;
+      bottom: 8px;
+      right: 12px;
+      font-size: 0.72rem;
+      color: var(--text-muted, #94a3b8);
+      pointer-events: none;
+      z-index: 1;
+    }
   `],
 })
-export class SettingsPageComponent {}
+export class SettingsPageComponent {
+  readonly version = environment.version;
+}

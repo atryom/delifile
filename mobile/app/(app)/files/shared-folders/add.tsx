@@ -62,7 +62,7 @@ export default function SharedFolderAddScreen() {
     try {
       const res = await documentsApi.create(name);
       const docId = res.data.data.document.id;
-      await sharedFoldersApi.addFile(folderId, docId).catch(() => {});
+      await sharedFoldersApi.addFile(folderId, docId, true).catch(() => {});
       qc.invalidateQueries({ queryKey: ['shared-folders', folderId] });
       qc.invalidateQueries({ queryKey: ['shared-folders'] });
       router.back();
