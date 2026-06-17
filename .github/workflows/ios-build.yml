@@ -88,9 +88,15 @@ jobs:
 
       - name: Start EAS keychain partition-list watcher
         run: |
+          LOG=/tmp/kc-watcher.log
+          > "$LOG"
           (
             SEEN_FILE=$(mktemp)
             PARTITION_DONE=0
+
+            log() { echo "[$(date +%H:%M:%S)] $*" >> "$LOG"; }
+
+            log "Watcher started (PID=$$)"
 
             while true; do
               # ── Method 1: interceptor pass-file ──────────────────────────────────
@@ -108,9 +114,9 @@ jobs:
                 /usr/bin/security unlock-keychain -p "$KC_PASS" "$kc" 2>/dev/null || true
                 if /usr/bin/security set-key-partition-list \
                     -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$kc" 2>/dev/null; then
-                  echo "[kc-watcher] Partition OK (interceptor): $kc"
+                  log "Partition OK (interceptor): $kc"
                 else
-                  echo "[kc-watcher] WARN: partition failed (interceptor): $kc"
+                  log "WARN: partition failed (interceptor): $kc"
                 fi
               done
 
@@ -118,35 +124,37 @@ jobs:
               if [ "$PARTITION_DONE" = "0" ]; then
                 FL_PID=$(pgrep -f "fastlane" 2>/dev/null | head -1)
                 if [ -n "$FL_PID" ]; then
-                  FL_ENV=$(ps eww -p "$FL_PID" 2>/dev/null)
+                  FL_ENV=$(ps ewww -p "$FL_PID" 2>/dev/null)
                   KC_PASS=$(printf '%s' "$FL_ENV" | grep -oE 'MATCH_KEYCHAIN_PASSWORD=[^[:space:]]+' | cut -d= -f2-)
                   KC_NAME=$(printf '%s' "$FL_ENV" | grep -oE 'MATCH_KEYCHAIN_NAME=[^[:space:]]+' | cut -d= -f2-)
                   if [ -n "$KC_PASS" ] && [ -n "$KC_NAME" ]; then
-                    echo "[kc-watcher] Got creds from fastlane PID=$FL_PID: $KC_NAME"
+                    log "Got creds from fastlane PID=$FL_PID: $KC_NAME"
                     /usr/bin/security set-keychain-settings -t 86400 "$KC_NAME" 2>/dev/null || true
                     /usr/bin/security unlock-keychain -p "$KC_PASS" "$KC_NAME" 2>/dev/null || true
                     if /usr/bin/security set-key-partition-list \
                         -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$KC_NAME" 2>/dev/null; then
-                      echo "[kc-watcher] Partition OK (fastlane env): $KC_NAME"
+                      log "Partition OK (fastlane env): $KC_NAME"
                       PARTITION_DONE=1
                     else
-                      echo "[kc-watcher] WARN: partition failed (fastlane env): $KC_NAME"
+                      log "WARN: partition failed (fastlane env): $KC_NAME"
                     fi
-                  elif [ -n "$FL_PID" ]; then
-                    # Диагностика: показываем все KEYCHAIN-переменные из env Fastlane
-                    printf '%s' "$FL_ENV" | grep -oE '[A-Z_]*KEYCHAIN[A-Z_]*=[^[:space:]]+' | \
-                      sed 's/=.*/=<value>/' | while IFS= read -r kv; do
-                      echo "[kc-watcher] FL-PID=$FL_PID env: $kv"
-                    done
+                  else
+                    # Диагностика: какие KEYCHAIN-переменные реально есть у процесса
+                    KC_VARS=$(printf '%s' "$FL_ENV" | grep -oE '[A-Z_]*KEYCHAIN[A-Z_]*=[^[:space:]]+' | sed 's/=.*/=<val>/')
+                    if [ -n "$KC_VARS" ]; then
+                      log "FL-PID=$FL_PID KEYCHAIN vars: $KC_VARS"
+                    else
+                      log "FL-PID=$FL_PID found, no KEYCHAIN vars in env (ps ewww returned ${#FL_ENV} chars)"
+                    fi
                   fi
                 fi
               fi
 
               sleep 2
             done
-          ) &
+          ) >> "$LOG" 2>&1 &
           echo $! > /tmp/eas-keychain-watcher.pid
-          echo "[kc-watcher] Started (PID: $(cat /tmp/eas-keychain-watcher.pid))"
+          echo "[kc-watcher] Started (PID: $(cat /tmp/eas-keychain-watcher.pid)), log: $LOG"
 
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
@@ -221,8 +229,12 @@ jobs:
           if [ -f /tmp/eas-keychain-watcher.pid ]; then
             kill "$(cat /tmp/eas-keychain-watcher.pid)" 2>/dev/null || true
           fi
+          echo "=== kc-watcher log ==="
+          cat /tmp/kc-watcher.log 2>/dev/null || echo "(no log)"
+          echo "======================"
           rm -f /tmp/eas-sec-wrap/security
           rm -f /tmp/eas-kc-pass-*.txt
+          rm -f /tmp/kc-watcher.log
 
       # Загружает лог в Delifile всегда — и при успехе, и при ошибке.
       # Имя файла содержит статус и временную метку: ios-build-success-20260605-143022.log
