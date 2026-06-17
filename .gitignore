@@ -64,3 +64,6 @@
 
 # APK builds
 *.apk
+
+# Local build secrets (DELIFILE_TOKEN, KEYSTORE_PASS)
+/secrets/
