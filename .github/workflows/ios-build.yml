@@ -80,32 +80,9 @@ jobs:
       # Фоновый watcher читает этот файл и вызывает set-key-partition-list с верным паролем.
       - name: Install security interceptor for EAS keychain password
         run: |
-          python3 - << 'PYEOF'
-import os, stat
-script = r"""#!/bin/bash
-# Intercept 'security create-keychain' to capture the random password EAS uses.
-# This allows our keychain watcher to call set-key-partition-list correctly.
-if [ "$1" = "create-keychain" ]; then
-    prev=""
-    kc_pass=""
-    kc_path=""
-    for arg in "$@"; do
-        if [ "$prev" = "-p" ]; then kc_pass="$arg"; fi
-        case "$arg" in *eas-build-*.keychain*) kc_path="$arg";; esac
-        prev="$arg"
-    done
-    if [ -n "$kc_path" ] && [ -n "$kc_pass" ]; then
-        printf '%s' "$kc_pass" > "/tmp/eas-kc-pass-${kc_path##*/}.txt"
-    fi
-fi
-exec /usr/bin/security "$@"
-"""
-path = "/usr/local/bin/security"
-with open(path, "w") as f:
-    f.write(script)
-os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-print("Security interceptor installed at " + path)
-PYEOF
+          cp .github/scripts/security-interceptor.sh /usr/local/bin/security
+          chmod +x /usr/local/bin/security
+          echo "Security interceptor installed at /usr/local/bin/security"
 
       - name: Start EAS keychain auto-lock prevention
         run: |
