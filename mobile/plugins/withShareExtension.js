@@ -33,7 +33,7 @@ function fixResourceBundleSigning(config) {
       const podfilePath = path.join(c.modRequest.platformProjectRoot, 'Podfile');
       if (!fs.existsSync(podfilePath)) return c;
       let podfile = fs.readFileSync(podfilePath, 'utf8');
-      const MARKER = '# [withShareExtension] CODE_SIGNING_ALLOWED';
+      const MARKER = '# [withShareExtension] Xcode26';
       if (podfile.includes(MARKER)) return c;
       // Insert before the closing 'end' of the react_native_post_install call block.
       // The template always ends the post_install block with exactly this pattern.
@@ -41,12 +41,21 @@ function fixResourceBundleSigning(config) {
       const insertIdx = podfile.lastIndexOf(insertBefore);
       if (insertIdx === -1) return c;
       const fix = `    ${MARKER}
+    # Disable code signing for ALL pod targets.
+    # [CP] Copy XCFrameworks reads CODE_SIGNING_ALLOWED to decide whether to
+    # codesign the copied prebuilt frameworks. On Xcode 26 this step fails for
+    # React-Core-prebuilt / hermes-engine / ReactNativeDependencies because the
+    # prebuilt XCFrameworks were compiled against an older iOS SDK.
+    # Setting NO prevents re-signing at the pod level; the main app target
+    # re-signs all embedded frameworks with the correct distribution cert.
     installer.pods_project.targets.each do |target|
-      if target.respond_to?(:product_type) && target.product_type == "com.apple.product-type.bundle"
-        target.build_configurations.each do |cfg|
-          cfg.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-        end
+      target.build_configurations.each do |cfg|
+        cfg.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        cfg.build_settings['CODE_SIGN_IDENTITY']   = ''
       end
+    end
+    installer.pods_project.build_configurations.each do |cfg|
+      cfg.build_settings['VALIDATE_WORKSPACE'] = 'NO'
     end
     # Remove [CP-User] script phases that are known to fail on Xcode 26 / macOS 14 CI runners.
     # Affected phases (all are optional validation/metadata steps, not needed for the build):
