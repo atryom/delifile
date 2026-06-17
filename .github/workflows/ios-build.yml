@@ -82,14 +82,19 @@ jobs:
       - name: Start EAS keychain auto-lock prevention
         run: |
           (
-            declare -A SEEN
+            # Используем tempfile для трекинга обработанных keychains.
+            # declare -A недоступен в macOS bash 3.2 (поставляется с macOS по умолчанию).
+            SEEN_FILE=$(mktemp)
             while true; do
-              # EAS в новых версиях хранит keychain в /var/folders/<x>/<hash>/T/
-              # а в старых — в ~/Library/Keychains/. Ищем в обоих местах.
-              while IFS= read -r kc; do
+              # EAS хранит keychain в /var/folders/<x>/<hash>/T/ (не в ~/Library/Keychains/).
+              find "$HOME/Library/Keychains" /var/folders \
+                -maxdepth 6 \
+                \( -name "eas-build-*.keychain" -o -name "eas-build-*.keychain-db" \) \
+                2>/dev/null | while IFS= read -r kc; do
                 [ -z "$kc" ] && continue
-                [ "${SEEN[$kc]+_}" ] && continue
-                SEEN[$kc]=1
+                # Пропустить уже обработанные
+                grep -qF "$kc" "$SEEN_FILE" 2>/dev/null && continue
+                echo "$kc" >> "$SEEN_FILE"
 
                 # 1. Продлить таймаут автоблокировки (не требует пароля)
                 security set-keychain-settings -t 86400 "$kc" 2>/dev/null && \
@@ -105,14 +110,9 @@ jobs:
                     -s -k "" "$kc" 2>/dev/null; then
                   echo "[kc-watcher] Partition list set OK: $kc"
                 else
-                  echo "[kc-watcher] WARN: set-key-partition-list failed (non-empty password?): $kc"
+                  echo "[kc-watcher] WARN: set-key-partition-list failed: $kc"
                 fi
-              done < <(
-                find "$HOME/Library/Keychains" /var/folders \
-                  -maxdepth 6 \
-                  \( -name "eas-build-*.keychain" -o -name "eas-build-*.keychain-db" \) \
-                  2>/dev/null
-              )
+              done
               sleep 2
             done
           ) &
