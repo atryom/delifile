@@ -47,8 +47,8 @@ function fixResourceBundleSigning(config) {
     # errSecInternalComponent because the private key denies codesign access.
     # post_install runs AFTER all certs are imported and BEFORE xcodebuild archive,
     # so this is the correct place to set the partition list — no race conditions.
-    # The pass file is created by .github/scripts/security-interceptor.sh which
-    # intercepts `security create-keychain -p <pass> ...` calls in CI.
+    # The pass file is written by .github/scripts/security-interceptor.sh which
+    # wraps the security create-keychain call to capture the random keychain password.
     begin
       Dir.glob("/tmp/eas-kc-pass-eas-build-*.keychain.txt").each do |pf|
         kc_pass = File.read(pf).strip
