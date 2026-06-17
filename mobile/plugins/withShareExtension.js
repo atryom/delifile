@@ -49,18 +49,25 @@ function fixResourceBundleSigning(config) {
       end
     end
     # Remove the CocoaPods-injected [CP-User] "Generate Specs" (AppIntentsSSUTraining) build
-    # phase from all targets in the main Xcode project. The phase fails on macOS 14 CI runners.
+    # phase from ALL projects: both the Pods project (ReactCodegen target) and the main
+    # user Xcode project (DeliFile, ShareExtension). The phase fails on macOS 14 CI runners.
     # Uses aggregate_targets API (CocoaPods 1.11+); old user_project_integrator was removed.
     begin
-      user_projects = installer.aggregate_targets.map(&:user_project).compact.uniq
-      user_projects.each do |proj|
+      projects_to_clean = []
+      # 1. Pods project (contains ReactCodegen which has the failing Generate Specs phase)
+      projects_to_clean << installer.pods_project if installer.respond_to?(:pods_project) && installer.pods_project
+      # 2. User project (main .xcodeproj with DeliFile and ShareExtension targets)
+      if installer.respond_to?(:aggregate_targets)
+        installer.aggregate_targets.map(&:user_project).compact.each { |p| projects_to_clean << p }
+      end
+      projects_to_clean.uniq.each do |proj|
         changed = false
         proj.targets.each do |target|
           phases = target.build_phases.select do |phase|
             phase.respond_to?(:name) && phase.name.to_s.include?("Generate Specs")
           end
           unless phases.empty?
-            puts "[withShareExtension] Removing Generate Specs phase from \#{target.name}"
+            puts "[withShareExtension] Removing Generate Specs from \#{proj.path.basename}/\#{target.name}"
             phases.each { |ph| target.build_phases.delete(ph) }
             changed = true
           end
