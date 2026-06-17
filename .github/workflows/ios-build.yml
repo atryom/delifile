@@ -70,44 +70,76 @@ jobs:
           print('Build number set to: ${{ github.run_number }}')
           "
 
-      # EAS создаёт временный keychain eas-build-<uuid>.keychain в /var/folders/
-      # (не в ~/Library/Keychains/, как раньше предполагалось!).
-      # Проблема: EAS не запускает security set-key-partition-list после импорта сертификата,
-      # поэтому codesign не может получить доступ к private key → errSecInternalComponent.
-      # Фикс: фоновый watcher ищет EAS-keychain в /var/folders/ и ~/Library/Keychains/,
-      # затем:
-      #   1. Устанавливает таймаут блокировки 24 часа (не требует пароля)
-      #   2. Вызывает set-key-partition-list -k "" (EAS создаёт keychain с пустым паролем)
-      #      — даёт codesign/apple-tool доступ к private key без диалога авторизации.
+      # EAS создаёт временный keychain с СЛУЧАЙНЫМ паролем → мы не можем вызвать
+      # security set-key-partition-list без него → codesign получает errSecInternalComponent.
+      #
+      # Решение: устанавливаем обёртку /usr/local/bin/security (перехватчик),
+      # которая перехватывает вызов `security create-keychain -p <pass> <path>`,
+      # сохраняет пароль в /tmp/eas-kc-pass-<keychain-name>.txt, а затем передаёт
+      # вызов реальному /usr/bin/security без изменений.
+      # Фоновый watcher читает этот файл и вызывает set-key-partition-list с верным паролем.
+      - name: Install security interceptor for EAS keychain password
+        run: |
+          python3 - << 'PYEOF'
+import os, stat
+script = r"""#!/bin/bash
+# Intercept 'security create-keychain' to capture the random password EAS uses.
+# This allows our keychain watcher to call set-key-partition-list correctly.
+if [ "$1" = "create-keychain" ]; then
+    prev=""
+    kc_pass=""
+    kc_path=""
+    for arg in "$@"; do
+        if [ "$prev" = "-p" ]; then kc_pass="$arg"; fi
+        case "$arg" in *eas-build-*.keychain*) kc_path="$arg";; esac
+        prev="$arg"
+    done
+    if [ -n "$kc_path" ] && [ -n "$kc_pass" ]; then
+        printf '%s' "$kc_pass" > "/tmp/eas-kc-pass-${kc_path##*/}.txt"
+    fi
+fi
+exec /usr/bin/security "$@"
+"""
+path = "/usr/local/bin/security"
+with open(path, "w") as f:
+    f.write(script)
+os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+print("Security interceptor installed at " + path)
+PYEOF
+
       - name: Start EAS keychain auto-lock prevention
         run: |
           (
-            # Используем tempfile для трекинга обработанных keychains.
-            # declare -A недоступен в macOS bash 3.2 (поставляется с macOS по умолчанию).
             SEEN_FILE=$(mktemp)
             while true; do
-              # EAS хранит keychain в /var/folders/<x>/<hash>/T/ (не в ~/Library/Keychains/).
               find "$HOME/Library/Keychains" /var/folders \
                 -maxdepth 6 \
                 \( -name "eas-build-*.keychain" -o -name "eas-build-*.keychain-db" \) \
                 2>/dev/null | while IFS= read -r kc; do
                 [ -z "$kc" ] && continue
-                # Пропустить уже обработанные
                 grep -qF "$kc" "$SEEN_FILE" 2>/dev/null && continue
-                echo "$kc" >> "$SEEN_FILE"
 
-                # 1. Продлить таймаут автоблокировки (не требует пароля)
-                security set-keychain-settings -t 86400 "$kc" 2>/dev/null && \
+                KC_NAME="${kc##*/}"
+                PASS_FILE="/tmp/eas-kc-pass-${KC_NAME}.txt"
+
+                # Если файл с паролем ещё не появился — EAS ещё не создал keychain.
+                # Не помечаем как обработанный, проверим в следующей итерации.
+                [ ! -f "$PASS_FILE" ] && continue
+
+                echo "$kc" >> "$SEEN_FILE"
+                KC_PASS=$(cat "$PASS_FILE")
+
+                # 1. Продлить таймаут автоблокировки
+                /usr/bin/security set-keychain-settings -t 86400 "$kc" 2>/dev/null && \
                   echo "[kc-watcher] Extended lock timeout: $kc" || true
 
-                # 2. Разблокировать (EAS CI-keychains имеют пустой пароль)
-                security unlock-keychain -p "" "$kc" 2>/dev/null || true
+                # 2. Разблокировать с перехваченным паролем
+                /usr/bin/security unlock-keychain -p "$KC_PASS" "$kc" 2>/dev/null || true
 
-                # 3. Установить partition list — дать codesign доступ к private key.
-                #    Это главный фикс errSecInternalComponent на macOS 26.
-                if security set-key-partition-list \
+                # 3. Установить partition list — главный фикс errSecInternalComponent
+                if /usr/bin/security set-key-partition-list \
                     -S "apple-tool:,apple:,codesign:" \
-                    -s -k "" "$kc" 2>/dev/null; then
+                    -s -k "$KC_PASS" "$kc" 2>/dev/null; then
                   echo "[kc-watcher] Partition list set OK: $kc"
                 else
                   echo "[kc-watcher] WARN: set-key-partition-list failed: $kc"
@@ -192,6 +224,8 @@ jobs:
           if [ -f /tmp/eas-keychain-watcher.pid ]; then
             kill "$(cat /tmp/eas-keychain-watcher.pid)" 2>/dev/null || true
           fi
+          rm -f /usr/local/bin/security
+          rm -f /tmp/eas-kc-pass-*.txt
 
       # Загружает лог в Delifile всегда — и при успехе, и при ошибке.
       # Имя файла содержит статус и временную метку: ios-build-success-20260605-143022.log
