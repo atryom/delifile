@@ -5,6 +5,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useQueryClient } from '@tanstack/react-query';
 import ShareIntentModule from '@/native/shareIntent';
 import { filesApi } from '@/api/files';
+import { documentsApi } from '@/api/documents';
 import { Spinner } from '@/components/ui/Spinner';
 import { getApiError } from '@/utils/error';
 
@@ -12,6 +13,7 @@ type Phase =
   | { kind: 'loading' }
   | { kind: 'uploading'; name: string; progress: number }
   | { kind: 'saving_url'; url: string }
+  | { kind: 'saving_note' }
   | { kind: 'error'; message: string }
   | { kind: 'done' };
 
@@ -41,7 +43,7 @@ export default function ShareScreen() {
           if (urlMatch) {
             await handleUrl(urlMatch[0]);
           } else {
-            setPhase({ kind: 'error', message: `Получен текст:\n"${text.slice(0, 120)}"\n\nDeliFile поддерживает только ссылки и файлы.` });
+            await handleTextNote(text);
           }
         }
       } else if (data.type === 'file') {
@@ -75,6 +77,21 @@ export default function ShareScreen() {
       setTimeout(() => router.back(), 1000);
     } catch (e) {
       setPhase({ kind: 'error', message: getApiError(e, 'Не удалось сохранить ссылку') });
+    }
+  }
+
+  async function handleTextNote(text: string) {
+    setPhase({ kind: 'saving_note' });
+    try {
+      const firstLine = text.split('\n')[0].trim().slice(0, 80) || 'Заметка';
+      const res = await documentsApi.create(firstLine);
+      const doc = res.data.data.document;
+      await documentsApi.update(doc.id, text, doc.etag);
+      qc.invalidateQueries({ queryKey: ['files'] });
+      setPhase({ kind: 'done' });
+      setTimeout(() => router.back(), 1000);
+    } catch (e) {
+      setPhase({ kind: 'error', message: getApiError(e, 'Не удалось создать заметку') });
     }
   }
 
@@ -190,6 +207,13 @@ export default function ShareScreen() {
             <Spinner />
             <Text style={styles.label}>Сохраняю ссылку...</Text>
             <Text style={styles.sub} numberOfLines={2}>{phase.url}</Text>
+          </>
+        )}
+
+        {phase.kind === 'saving_note' && (
+          <>
+            <Spinner />
+            <Text style={styles.label}>Создаю заметку...</Text>
           </>
         )}
 

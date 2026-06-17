@@ -20,6 +20,7 @@ interface FileListItemWithPrivacy extends FileListItem {
 }
 
 type MovieFilter = 'all' | 'watched' | 'unwatched';
+type MovieSort = 'default' | 'kp_rating' | 'personal_rating';
 
 function getFolderTypeIcon(type?: string | null): string {
   if (type === 'gallery') return '🖼';
@@ -47,8 +48,10 @@ export default function SharedFolderScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showMoveModal, setShowMoveModal] = useState(false);
 
-  // Movie filter state
+  // Movie filter / sort / search state
   const [movieFilter, setMovieFilter] = useState<MovieFilter>('all');
+  const [movieSort, setMovieSort] = useState<MovieSort>('default');
+  const [movieSearch, setMovieSearch] = useState('');
   // Optimistic meta overrides keyed by file id
   const [localMovieMeta, setLocalMovieMeta] = useState<Record<string, { watched?: boolean | null; personal_rating?: number | null }>>({});
 
@@ -483,7 +486,19 @@ export default function SharedFolderScreen() {
       {/* Movies view */}
       {folderType === 'movies' && (
         <View style={styles.flex}>
-          {/* Filter chips */}
+          {/* Search */}
+          <View style={styles.movieSearchWrap}>
+            <TextInput
+              style={styles.movieSearchInput}
+              placeholder="Поиск по названию..."
+              placeholderTextColor="#9CA3AF"
+              value={movieSearch}
+              onChangeText={setMovieSearch}
+              clearButtonMode="while-editing"
+              returnKeyType="search"
+            />
+          </View>
+          {/* Filter + Sort chips */}
           <View style={styles.filterBarWrap}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterBarContent}>
               {([
@@ -502,23 +517,61 @@ export default function SharedFolderScreen() {
                   </Text>
                 </Pressable>
               ))}
+              <View style={styles.filterChipSep} />
+              {([
+                { val: 'default' as MovieSort, label: 'По умолч.' },
+                { val: 'kp_rating' as MovieSort, label: '★ КП' },
+                { val: 'personal_rating' as MovieSort, label: '👤 Моя' },
+              ]).map((s) => (
+                <Pressable
+                  key={s.val}
+                  style={[styles.filterChip, movieSort === s.val && styles.filterChipActive]}
+                  onPress={() => setMovieSort(s.val)}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.filterChipText, movieSort === s.val && styles.filterChipTextActive]}>
+                    {s.label}
+                  </Text>
+                </Pressable>
+              ))}
             </ScrollView>
           </View>
           <FlatList
-            data={files.filter((f) => {
-              if (movieFilter === 'all') return true;
-              const localW = localMovieMeta[f.id]?.watched;
-              const watched = localW !== undefined ? localW : !!(f.custom_metadata as any)?.watched;
-              return movieFilter === 'watched' ? !!watched : !watched;
-            })}
+            data={(() => {
+              const q = movieSearch.trim().toLowerCase();
+              let result = files.filter((f) => {
+                if (q) {
+                  const title = ((f.custom_metadata as any)?.title ?? f.display_name ?? f.original_name ?? '').toLowerCase();
+                  if (!title.includes(q)) return false;
+                }
+                if (movieFilter === 'all') return true;
+                const localW = localMovieMeta[f.id]?.watched;
+                const watched = localW !== undefined ? localW : !!(f.custom_metadata as any)?.watched;
+                return movieFilter === 'watched' ? !!watched : !watched;
+              });
+              if (movieSort === 'kp_rating') {
+                result = [...result].sort((a, b) =>
+                  ((b.custom_metadata as any)?.rating_kp ?? 0) - ((a.custom_metadata as any)?.rating_kp ?? 0)
+                );
+              } else if (movieSort === 'personal_rating') {
+                result = [...result].sort((a, b) => {
+                  const ra = localMovieMeta[a.id]?.personal_rating ?? (a.custom_metadata as any)?.personal_rating ?? null;
+                  const rb = localMovieMeta[b.id]?.personal_rating ?? (b.custom_metadata as any)?.personal_rating ?? null;
+                  return (rb ?? -1) - (ra ?? -1);
+                });
+              }
+              return result;
+            })()}
             keyExtractor={(f) => f.id}
             onRefresh={refetch}
             refreshing={isLoading}
             contentContainerStyle={styles.moviesList}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyTitle}>{movieFilter === 'all' ? 'Фильмов нет' : 'Нет фильмов с таким фильтром'}</Text>
-                {movieFilter === 'all' && <Text style={styles.emptySub}>Нажмите «＋» чтобы добавить фильм</Text>}
+                <Text style={styles.emptyTitle}>
+                  {movieSearch.trim() ? 'Нет фильмов по запросу' : movieFilter === 'all' ? 'Фильмов нет' : 'Нет фильмов с таким фильтром'}
+                </Text>
+                {!movieSearch.trim() && movieFilter === 'all' && <Text style={styles.emptySub}>Нажмите «＋» чтобы добавить фильм</Text>}
               </View>
             }
             renderItem={({ item }) => {
@@ -893,6 +946,12 @@ const styles = StyleSheet.create({
   filterChipActive: { borderColor: '#6366F1', backgroundColor: '#EDE9FE' },
   filterChipText: { fontSize: 13, fontWeight: '500', color: '#64748B', lineHeight: 18 },
   filterChipTextActive: { color: '#6366F1' },
+  filterChipSep: { width: 1, height: 20, backgroundColor: '#E2E8F0', marginHorizontal: 4 },
+  movieSearchWrap: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  movieSearchInput: {
+    height: 36, backgroundColor: '#F1F5F9', borderRadius: 10,
+    paddingHorizontal: 12, fontSize: 14, color: '#1E293B',
+  },
 
   sectionHeader: {
     fontSize: 12, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase',

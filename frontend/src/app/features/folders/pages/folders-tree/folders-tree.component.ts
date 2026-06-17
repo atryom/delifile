@@ -534,7 +534,9 @@ export class FoldersTreeComponent implements OnInit {
   private loadMovies(sfId: string): void {
     const page = this.moviePage();
     this.movieLoading.set(true);
-    this.sfApi.listFiles(sfId, page, this.moviePerPage).subscribe({
+    this.sfApi.listFiles(sfId, page, this.moviePerPage, {
+      search: this.searchQuery || undefined,
+    }).subscribe({
       next: (res) => {
         if (page === 1) {
           this.rawFiles.set(res.data.items);
@@ -904,7 +906,15 @@ export class FoldersTreeComponent implements OnInit {
         };
         const doNavigate = () => {
           if (sfId) {
-            this.sfApi.addFile(sfId, docId, true).subscribe({ next: navigate, error: navigate });
+            this.sfApi.addFile(sfId, docId, true).subscribe({
+              next: navigate,
+              error: () => {
+                // addFile failed — note was created in personal root.
+                // Reload files so the user doesn't see a phantom root entry.
+                this.loadFiles();
+                navigate();
+              },
+            });
           } else {
             navigate();
           }

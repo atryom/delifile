@@ -404,7 +404,11 @@ class FileService
 
         return DB::transaction(function () use ($user, $url, $preview) {
             $hostname = $preview['hostname'] ?? parse_url($url, PHP_URL_HOST) ?? $url;
-            $title    = strip_tags(mb_substr($preview['title'] ?? $hostname, 0, 255));
+            $rawTitle = strip_tags($preview['title'] ?? $hostname ?? '');
+            // Remove characters invalid in filenames (including markdown **, iOS-problematic chars)
+            $title = preg_replace('/[\/\\\\\?%\*:|"<>\[\]\{\}#\^~]/', '', $rawTitle);
+            $title = trim((string) preg_replace('/\s+/', ' ', $title));
+            $title = mb_substr($title ?: $hostname, 0, 200);
 
             $file = File::create([
                 'owner_id'        => $user->id,

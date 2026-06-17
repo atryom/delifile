@@ -5,7 +5,7 @@
 
     <!-- ── TOPBAR: кнопки добавления + переключатель вида ───────────── -->
     <header class="topbar">
-      @if (currentFolderType() !== 'movies') {
+      @if (currentFolderType() !== 'movies' && (currentSharedFolderId() === null || canEditCurrentFolder())) {
         <button type="button" class="btn-action" (click)="openAddModal($event)" title="Добавить файл или ссылку">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -15,7 +15,7 @@
         </button>
       }
 
-      @if (currentFolderType() !== 'gallery' && currentFolderType() !== 'movies') {
+      @if (currentFolderType() !== 'gallery' && currentFolderType() !== 'movies' && (currentSharedFolderId() === null || canEditCurrentFolder())) {
       <button type="button" class="btn-action" (click)="startNoteCreate($event)"
               [disabled]="creatingDoc() || showNoteInput()" title="Создать заметку">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"

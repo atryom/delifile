@@ -187,13 +187,14 @@
   min-height: 0; // критично для flex + overflow на iOS
   overflow-y: auto;
   overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  // iOS Safari: когда тап фокусирует редактор, браузер делает scroll-into-view
-  // без scroll-padding курсор уходит за хедер/тулбар
+  // transform: translateZ(0) форсирует GPU-слой — убирает белый экран в Safari
+  // до первого тапа при -webkit-overflow-scrolling (устарело, убрано)
+  transform: translateZ(0);
   scroll-padding-top: 80px;
   padding: 32px;
   display: flex;
   justify-content: center;
+  position: relative; // нужно для z-index в Safari
 
   @media (max-width: 600px) {
     padding: 16px;
