@@ -101,6 +101,7 @@
       ],
       "expo-secure-store",
       "expo-asset",
+      "./plugins/withAppDelegateRCTBridgeFix",
       "./plugins/withShareExtension",
       "./plugins/withAndroidShareIntent",
       "./plugins/withAndroidEditorAsset",
