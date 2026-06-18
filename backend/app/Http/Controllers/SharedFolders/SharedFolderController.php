@@ -1271,6 +1271,57 @@ class SharedFolderController extends Controller
     }
 
     /**
+     * PATCH /api/v1/shared-folders/{id}/move
+     * Move a folder to a new parent (or to root if parent_id is null).
+     * Only the folder owner can move it.
+     */
+    public function move(Request $request, string $id): JsonResponse
+    {
+        $folder = SharedFolder::find($id);
+        if (!$folder || $folder->owner_id !== $request->user()->id) {
+            return $this->notFound('Folder not found');
+        }
+
+        $request->validate([
+            'parent_id' => 'nullable|string',
+        ]);
+
+        $newParentId = $request->input('parent_id');
+
+        if ($newParentId) {
+            if ($newParentId === $id) {
+                return $this->error('Нельзя переместить папку в саму себя', 'INVALID_MOVE', [], 422);
+            }
+            $descendantIds = $this->getDescendantIds($id);
+            if (in_array($newParentId, $descendantIds)) {
+                return $this->error('Нельзя переместить папку в её дочернюю папку', 'INVALID_MOVE', [], 422);
+            }
+            $parent = SharedFolder::find($newParentId);
+            if (!$parent) {
+                return $this->notFound('Target folder not found');
+            }
+        }
+
+        $folder->update(['parent_id' => $newParentId]);
+
+        return $this->success('Folder moved', [
+            'folder' => ['id' => $folder->id, 'parent_id' => $folder->parent_id],
+        ]);
+    }
+
+    private function getDescendantIds(string $folderId): array
+    {
+        $ids = [];
+        $toProcess = [$folderId];
+        while (!empty($toProcess)) {
+            $children = SharedFolder::whereIn('parent_id', $toProcess)->pluck('id')->toArray();
+            $ids = array_merge($ids, $children);
+            $toProcess = $children;
+        }
+        return $ids;
+    }
+
+    /**
      * POST /api/v1/shared-links/{token}/resolve  (PUBLIC)
      */
     public function resolveSharedLink(Request $request, string $token): JsonResponse

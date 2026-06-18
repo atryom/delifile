@@ -37,7 +37,8 @@ ok "Версия: $NEW_VERSION"
 if [ -f "$MOBILE_DIR/android/app/build.gradle" ]; then
   CURRENT_CODE=$(grep 'versionCode' "$MOBILE_DIR/android/app/build.gradle" | grep -o '[0-9]*' | head -1)
   NEW_CODE=$(( ${CURRENT_CODE:-1} + 1 ))
-  sed -i "s/versionCode $CURRENT_CODE/versionCode $NEW_CODE/" "$MOBILE_DIR/android/app/build.gradle" 2>/dev/null || true
+  sed -i "s/versionCode $CURRENT_CODE/versionCode $NEW_CODE/" "$MOBILE_DIR/android/app/build.gradle"
+  sed -i "s/versionName \"[^\"]*\"/versionName \"$NEW_VERSION\"/" "$MOBILE_DIR/android/app/build.gradle"
 fi
 
 APK_NAME="delifile_${NEW_VERSION}.apk"

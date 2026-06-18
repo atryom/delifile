@@ -24,6 +24,18 @@ export function useDownloadUrl(id: string) {
   });
 }
 
+export function useTogglePin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isPinned }: { id: string; isPinned: boolean }) =>
+      isPinned ? filesApi.unpin(id) : filesApi.pin(id),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ['files'] });
+      qc.invalidateQueries({ queryKey: ['file', id] });
+    },
+  });
+}
+
 export function useToggleFavorite() {
   const qc = useQueryClient();
   return useMutation({

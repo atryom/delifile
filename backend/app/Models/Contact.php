@@ -17,6 +17,7 @@ class Contact extends Model
         'email',
         'phone',
         'resolved_user_id',
+        'sort_order',
     ];
 
     protected function casts(): array

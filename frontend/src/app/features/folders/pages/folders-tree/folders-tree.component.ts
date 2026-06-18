@@ -263,6 +263,17 @@ export class FoldersTreeComponent implements OnInit {
   readonly sharedFoldersMoveList = signal<SharedFolder[]>([]);
   readonly sharedFoldersMoveTree = computed(() => buildSharedFolderMoveTree(this.sharedFoldersMoveList()));
 
+  // ── Move folder dialog ────────────────────────────────────────────────────
+  readonly moveFolderDialogOpen  = signal(false);
+  readonly moveFolderTarget      = signal<SharedFolder | null>(null);
+  readonly moveFolderParentId    = signal<string | null>(null);
+  readonly moveFolderSaving      = signal(false);
+  readonly moveFolderCandidates  = computed<SharedFolder[]>(() => {
+    const target = this.moveFolderTarget();
+    if (!target) return [];
+    return this.sharedFoldersMoveList().filter(f => f.id !== target.id && f.is_owner);
+  });
+
   // ── Bulk delete ───────────────────────────────────────────────────────────
   readonly bulkDeleteDialogOpen = signal(false);
   readonly deletingBulk         = signal(false);
@@ -283,9 +294,10 @@ export class FoldersTreeComponent implements OnInit {
 
   // ── Filter definitions ────────────────────────────────────────────────────
   private readonly sharedRootFilters: { key: FileFilter; label: string }[] = [
-    { key: 'all',      label: 'Все' },
-    { key: 'mine',     label: 'Мои' },
-    { key: 'received', label: 'Полученные' },
+    { key: 'all',       label: 'Все' },
+    { key: 'mine',      label: 'Мои' },
+    { key: 'received',  label: 'Полученные' },
+    { key: 'favorites', label: 'Избранное' },
   ];
 
   readonly currentFilters = computed(() => this.sharedRootFilters);
@@ -806,6 +818,38 @@ export class FoldersTreeComponent implements OnInit {
     this.closeMenu();
   }
 
+  startMoveFolder(folder: SharedFolder): void {
+    this.moveFolderTarget.set(folder);
+    this.moveFolderParentId.set(folder.parent_id ?? null);
+    this.closeMenu();
+    this.sfApi.listAll().subscribe({
+      next: res => this.sharedFoldersMoveList.set(res.data.items.filter(f => !f.is_personal_root)),
+      error: () => {},
+    });
+    this.moveFolderDialogOpen.set(true);
+  }
+
+  cancelMoveFolder(): void {
+    this.moveFolderDialogOpen.set(false);
+    this.moveFolderTarget.set(null);
+    this.moveFolderParentId.set(null);
+  }
+
+  executeMoveFolder(): void {
+    const folder = this.moveFolderTarget();
+    if (!folder || this.moveFolderSaving()) return;
+    this.moveFolderSaving.set(true);
+    const newParentId = this.moveFolderParentId();
+    this.sfApi.moveFolder(folder.id, newParentId).subscribe({
+      next: () => {
+        this.moveFolderSaving.set(false);
+        this.cancelMoveFolder();
+        this.loadShared();
+      },
+      error: () => this.moveFolderSaving.set(false),
+    });
+  }
+
   cancelLeave(): void { this.leaveTarget.set(null); this.leaveError.set(null); }
 
   executeLeave(): void {
@@ -1249,7 +1293,8 @@ export class FoldersTreeComponent implements OnInit {
 
   fileDisplayName(file: AnyFile): string {
     if (file.content_kind === 'url_file') return file.display_name || file.link_title || file.original_name;
-    return (file as { display_name?: string | null }).display_name || file.original_name;
+    const name = (file as { display_name?: string | null }).display_name || file.original_name;
+    return file.mime_type === 'text/markdown' ? name.replace(/\.md$/i, '') : name;
   }
 
   private restoreSharedFolderPath(allFolders: SharedFolder[], targetId: string): void {

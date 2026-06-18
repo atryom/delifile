@@ -249,6 +249,11 @@
                     <div class="file-meta-row">
                       <span class="owner-badge">{{ 'files.detail.owner' | translate }}</span>
                     </div>
+                  } @else {
+                    <div class="file-access-limit-banner" role="note">
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                      Ограниченный доступ — нельзя создать ссылку и удалить файл
+                    </div>
                   }
                   <div class="card-inline-btns">
                     @if (file()!.mime_type === 'text/markdown') {
@@ -307,6 +312,16 @@
                       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" x2="12" y1="11" y2="17"/><line x1="9" x2="15" y1="14" y2="14"/></svg>
                       <span class="btn-card-label">{{ 'shared_folders.add_to_shared_folder_btn' | translate }}</span>
                     </button>
+                    <button
+                      class="btn-card-icon"
+                      [class.btn-card-fav-active]="file()!.is_pinned"
+                      (click)="togglePin()"
+                      [disabled]="actionPending()"
+                      [attr.aria-label]="file()!.is_pinned ? 'Открепить' : 'Закрепить вверху'"
+                    >
+                      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+                      <span class="btn-card-label">{{ file()!.is_pinned ? 'Откреплено' : 'Закрепить' }}</span>
+                    </button>
                   </div>
                   <button
                     class="btn-card-icon btn-card-delete"
@@ -324,6 +339,18 @@
                     </span>
                   </button>
                 </div>
+              </div>
+            }
+
+            <!-- Access restrictions notice for non-owners -->
+            @if (!file()!.is_owner) {
+              <div class="access-notice" role="note">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                <span>Вы просматриваете этот файл как
+                  @if ($any(file()).can_edit) { <strong>редактор</strong> }
+                  @else { <strong>читатель</strong> }.
+                  Создание публичных ссылок и управление доступами доступны только владельцу.
+                </span>
               </div>
             }
 

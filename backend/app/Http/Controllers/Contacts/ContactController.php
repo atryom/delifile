@@ -164,6 +164,52 @@ class ContactController extends Controller
     }
 
     /**
+     * PATCH /api/v1/contacts/{contactId}
+     */
+    public function update(Request $request, string $contactId): JsonResponse
+    {
+        $contact = Contact::where('id', $contactId)
+            ->where('user_id', $request->user()->id)
+            ->first();
+
+        if (!$contact) {
+            return $this->notFound('Contact not found');
+        }
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $contact->update(['name' => $request->name]);
+
+        return $this->success('Contact updated', [
+            'contact' => $this->formatContact($contact),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/contacts/reorder
+     * Body: { "ids": ["id1", "id2", ...] } — ordered list of contact IDs
+     */
+    public function reorder(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'required|string',
+        ]);
+
+        $userId = $request->user()->id;
+
+        foreach ($request->ids as $position => $contactId) {
+            Contact::where('id', $contactId)
+                ->where('user_id', $userId)
+                ->update(['sort_order' => $position]);
+        }
+
+        return $this->success('Order saved');
+    }
+
+    /**
      * POST /api/v1/contacts/import
      */
     public function import(Request $request): JsonResponse

@@ -613,6 +613,7 @@ td { padding: 12px 20px; font-size: 13px; }
 
 .file-info { min-width: 0; flex: 1; }
 .file-name { font-weight: 450; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fav-star { color: #F59E0B; font-size: 0.8em; flex-shrink: 0; }
 .role-badge { font-size: 10px; color: var(--accent); margin-top: 2px; }
 .file-meta-mobile { display: none; font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 
@@ -849,6 +850,29 @@ td { padding: 12px 20px; font-size: 13px; }
 }
 
 .modal-actions { display: flex; gap: 10px; }
+
+.field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.move-folder-select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  margin: 8px 0 20px;
+  outline: none;
+  cursor: pointer;
+  &:focus { border-color: var(--accent); }
+}
 
 .modal-name-input {
   width: 100%;
@@ -1501,6 +1525,15 @@ tbody tr.row-selected:hover { background: var(--accent-dim); }
 }
 
 /* .add-folder-label: on mobile hidden via bp-mobile rule above */
+
+.fav-star {
+  display: inline;
+  color: #f59e0b;
+  font-size: 0.75rem;
+  margin-left: 3px;
+  vertical-align: middle;
+  line-height: 1;
+}
 
 .version-badge-v {
   display: inline-flex;

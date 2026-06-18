@@ -6,14 +6,17 @@ use App\Enums\AccessType;
 use App\Http\Controllers\Controller;
 use App\Models\File;
 use App\Models\FileUserAccess;
+use App\Models\User;
 use App\Services\DocumentService;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DocumentController extends Controller
 {
     public function __construct(
-        private readonly DocumentService $documentService
+        private readonly DocumentService        $documentService,
+        private readonly PushNotificationService $pushService,
     ) {}
 
     /**
@@ -112,6 +115,21 @@ class DocumentController extends Controller
                     'current' => $result['current'],
                 ],
             ], 409);
+        }
+
+        // Notify all other users with access about the document change
+        $accesses = FileUserAccess::where('file_id', $file->id)
+            ->where('user_id', '!=', $user->id)
+            ->get();
+        foreach ($accesses as $access) {
+            $notifiedUser = User::find($access->user_id);
+            if (!$notifiedUser) continue;
+            $this->pushService->sendToUser(
+                $notifiedUser,
+                'Заметка обновлена',
+                ($user->name ?? 'Пользователь') . ' обновил заметку «' . ($file->display_name ?? $file->original_name) . '»',
+                config('app.url') . '/files/' . $file->id,
+            );
         }
 
         return $this->success('Document saved', [

@@ -185,8 +185,10 @@ Route::prefix('v1')->group(function () {
         Route::post('contacts',                    [ContactController::class, 'store']);
         Route::post('contacts/import',             [ContactController::class, 'import']);
         Route::post('contacts/resolve',            [ContactController::class, 'resolve']);
+        Route::post('contacts/reorder',            [ContactController::class, 'reorder']);
         Route::get('contacts/{id}',                [ContactController::class, 'show']);
         Route::get('contacts/{id}/history',        [ContactController::class, 'history']);
+        Route::patch('contacts/{id}',              [ContactController::class, 'update']);
         Route::delete('contacts/{id}',             [ContactController::class, 'destroy']);
 
         // Organization — Tags
@@ -277,6 +279,7 @@ Route::prefix('v1')->group(function () {
             Route::post('ensure-root',                   [SharedFolderController::class, 'ensurePersonalRoot']);
             Route::post('',                              [SharedFolderController::class, 'store']);
             Route::patch('{id}',                         [SharedFolderController::class, 'update']);
+            Route::patch('{id}/move',                    [SharedFolderController::class, 'move']);
             Route::delete('{id}',                        [SharedFolderController::class, 'destroy']);
             Route::get('{id}/files',                     [SharedFolderController::class, 'files']);
             Route::post('{id}/init-upload',              [SharedFolderController::class, 'initUpload']);

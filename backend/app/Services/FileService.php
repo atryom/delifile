@@ -491,7 +491,10 @@ class FileService
         }
 
         if ($search) {
-            $query->where('original_name', 'like', "%{$search}%");
+            $query->where(fn ($q) =>
+                $q->where('original_name', 'like', "%{$search}%")
+                  ->orWhere('display_name', 'like', "%{$search}%")
+            );
         }
 
         if (!empty($options['tag_id'])) {

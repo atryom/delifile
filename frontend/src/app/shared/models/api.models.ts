@@ -87,6 +87,9 @@ export interface FileListItem {
   // comment counts
   comments_count?: number;
   unread_comments?: number;
+  // access metadata
+  is_favorite?: boolean;
+  is_pinned?: boolean;
 }
 
 export interface FileCard extends FileListItem {
@@ -353,6 +356,7 @@ export interface SharedFolderFileItem {
   owner?: { id: number; name: string | null; email: string } | null;
   likes_count?: number;
   is_liked?: boolean;
+  is_favorite?: boolean;
   comments_count?: number;
   unread_comments?: number;
 }

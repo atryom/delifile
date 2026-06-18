@@ -399,6 +399,7 @@
                           @if (folder.is_owner) {
                             <button type="button" role="menuitem" (click)="startRename(folder.id, 'shared', folder.name)">Переименовать</button>
                             <button type="button" role="menuitem" (click)="openAccessDialog(folder)">Управление доступом</button>
+                            <button type="button" role="menuitem" (click)="startMoveFolder(folder)">Переместить</button>
                             <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteSharedFolder(folder)">Удалить</button>
                           } @else {
                             <button type="button" role="menuitem" class="menu-danger" (click)="confirmLeaveSharedFolder(folder)">Покинуть папку</button>
@@ -472,6 +473,7 @@
                             <button type="button" role="menuitem" (click)="toggleFolderPrivacy(sub)">
                               {{ sub.is_private ? '🔓 Открыть гостям' : '🔒 Сделать личной' }}
                             </button>
+                            <button type="button" role="menuitem" (click)="startMoveFolder(sub)">Переместить</button>
                             <button type="button" role="menuitem" class="menu-danger" (click)="confirmDeleteSharedFolder(sub)">Удалить</button>
                           }
                         </div>
@@ -518,6 +520,9 @@
                         <div class="file-info">
                           <div class="file-name">
                             {{ fileDisplayName(file) }}
+                            @if ($any(file).is_favorite) {
+                              <span class="fav-star" title="В избранном" aria-label="Избранное">★</span>
+                            }
                             @if (file.has_versions) {
                               <span class="version-badge-v" title="Имеет версии">V</span>
                             }
@@ -926,6 +931,38 @@
         </div>
       }
 
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════ MOVE FOLDER MODAL -->
+
+@if (moveFolderDialogOpen()) {
+  <div class="modal-backdrop" (click)="cancelMoveFolder()" role="dialog" aria-modal="true" aria-labelledby="move-folder-title">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3 id="move-folder-title">Переместить папку «{{ moveFolderTarget()?.name }}»</h3>
+      <p>Выберите новое расположение:</p>
+      <div class="field">
+        <label for="move-folder-parent">Родительская папка</label>
+        <select
+          id="move-folder-parent"
+          class="move-folder-select"
+          [ngModel]="moveFolderParentId()"
+          (ngModelChange)="moveFolderParentId.set($event === '' ? null : $event)"
+          aria-label="Выбор родительской папки"
+        >
+          <option value="">В корень (без родителя)</option>
+          @for (f of moveFolderCandidates(); track f.id) {
+            <option [value]="f.id">{{ f.name }}</option>
+          }
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-primary" (click)="executeMoveFolder()" [disabled]="moveFolderSaving()">
+          {{ moveFolderSaving() ? 'Перемещение...' : 'Переместить' }}
+        </button>
+        <button type="button" class="btn-cancel" (click)="cancelMoveFolder()">Отмена</button>
+      </div>
     </div>
   </div>
 }

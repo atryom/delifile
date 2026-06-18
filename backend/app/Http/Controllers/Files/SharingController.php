@@ -295,8 +295,11 @@ class SharingController extends Controller
         ]);
 
         $file = File::find($fileId);
-        if (!$file || !$file->isOwnedBy($request->user())) {
+        if (!$file || !$this->fileService->canAccess($request->user(), $file)) {
             return $this->notFound('File not found');
+        }
+        if (!$file->isOwnedBy($request->user())) {
+            return $this->forbidden('Создание ссылки доступно только владельцу файла');
         }
 
         if (!$file->isAvailable()) {

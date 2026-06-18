@@ -140,7 +140,8 @@ function FileRow({
       )}
       <View style={styles.rowMain}>
         <View style={styles.fileNameRow}>
-          <Text style={styles.fileName} numberOfLines={1}>{item.display_name ?? item.original_name}</Text>
+          <Text style={styles.fileName} numberOfLines={1}>{(item.display_name ?? item.original_name).replace(/\.md$/i, '')}</Text>
+          {item.is_favorite && <Text style={styles.favStar}>★</Text>}
           {(item.unread_comments ?? 0) > 0 && (
             <View style={styles.commentBadge}>
               <Text style={styles.commentBadgeText}>{(item.unread_comments ?? 0) > 99 ? '99+' : item.unread_comments}</Text>
@@ -552,6 +553,7 @@ const styles = StyleSheet.create({
   fileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   fileName: { fontSize: 15, color: '#1E293B', fontWeight: '500', flex: 1 },
   fileMeta: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
+  favStar: { fontSize: 13, color: '#F59E0B' },
   commentBadge: { backgroundColor: '#EF4444', borderRadius: 8, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   commentBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   addBtn: { paddingHorizontal: 8, paddingVertical: 4 },

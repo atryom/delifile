@@ -72,8 +72,25 @@
             <div class="contact-card">
               <div class="contact-avatar" aria-hidden="true">{{ contact.name[0]?.toUpperCase() }}</div>
               <div class="contact-info">
-                <p class="contact-name">{{ contact.name }}</p>
-                <p class="contact-email">{{ contact.email ?? contact.phone ?? '—' }}</p>
+                @if (renamingId() === contact.id) {
+                  <input
+                    class="contact-rename-input"
+                    type="text"
+                    [(ngModel)]="renameDraft"
+                    (keydown.enter)="saveRename(contact.id)"
+                    (keydown.escape)="cancelRename()"
+                    [disabled]="savingRename()"
+                    aria-label="Новое имя контакта"
+                    autofocus
+                  />
+                  <div class="contact-rename-actions">
+                    <button type="button" class="btn-rename-save" (click)="saveRename(contact.id)" [disabled]="savingRename()">✓</button>
+                    <button type="button" class="btn-rename-cancel" (click)="cancelRename()">✕</button>
+                  </div>
+                } @else {
+                  <p class="contact-name" (click)="startRename(contact)" title="Нажмите, чтобы переименовать" style="cursor:pointer">{{ contact.name }}</p>
+                  <p class="contact-email">{{ contact.email ?? contact.phone ?? '—' }}</p>
+                }
               </div>
               <div class="contact-status">
                 <span class="reg-badge" [class.registered]="contact.is_registered">

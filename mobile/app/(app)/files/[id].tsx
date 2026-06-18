@@ -8,9 +8,10 @@ import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { pickFileAsset } from '@/utils/pickFileAsset';
 import {
-  useFile, useDownloadUrl, useToggleFavorite,
+  useFile, useDownloadUrl, useToggleFavorite, useTogglePin,
   useSetTags, useShareToContact, useCreateLink, useDeleteFile,
   useVersionDownload, useActivateVersion,
   useFileLinks, useDisableFileLink, useFileAccesses, useRevokeAccess, useUpdateAccess,
@@ -56,6 +57,7 @@ export default function FileDetailScreen() {
   const { data: file, isLoading, isError } = useFile(id);
   const downloadUrl = useDownloadUrl(id);
   const toggleFavorite = useToggleFavorite();
+  const togglePin = useTogglePin();
   const setTags = useSetTags(id);
   const shareToContact = useShareToContact(id);
   const createLink = useCreateLink(id);
@@ -172,10 +174,17 @@ export default function FileDetailScreen() {
       const localUri = FileSystemLegacy.cacheDirectory + fileName;
       const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
       if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
-      await Sharing.shareAsync(localUri, {
-        mimeType: file?.mime_type ?? 'application/octet-stream',
-        dialogTitle: 'Открыть файл',
-      });
+      const mimeType = file?.mime_type ?? 'application/octet-stream';
+      if (Platform.OS === 'android') {
+        const contentUri = await FileSystemLegacy.getContentURIAsync(localUri);
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: contentUri,
+          type: mimeType,
+          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+        });
+      } else {
+        await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
+      }
     } catch {
       Alert.alert('Ошибка', 'Не удалось открыть файл');
     } finally {
@@ -454,7 +463,8 @@ export default function FileDetailScreen() {
     );
   }
 
-  const name = file.display_name ?? file.original_name;
+  const rawName = file.display_name ?? file.original_name;
+  const name = file.mime_type === 'text/markdown' ? rawName.replace(/\.md$/i, '') : rawName;
   const isMovie = file.content_kind === 'movie_item';
   const movie = isMovie ? (file as any).custom_metadata : null;
 
@@ -520,12 +530,25 @@ export default function FileDetailScreen() {
           <Text style={styles.name}>{name}</Text>
           <View style={styles.actions}>
             <TouchableOpacity
+              onPress={() => togglePin.mutate({ id: file.id, isPinned: file.is_pinned ?? false })}
+              style={styles.iconBtn}
+            >
+              <Text style={(file.is_pinned) ? styles.starActive : styles.star}>📌</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={() => toggleFavorite.mutate({ id: file.id, isFavorite: file.is_favorite })}
               style={styles.iconBtn}
             >
               <Text style={file.is_favorite ? styles.starActive : styles.star}>★</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      )}
+
+      {/* Баннер ограниченного доступа для не-владельцев */}
+      {!isMovie && !file.is_owner && (
+        <View style={styles.accessLimitBanner}>
+          <Text style={styles.accessLimitText}>ℹ️ Ограниченный доступ — нельзя создать ссылку и удалить файл</Text>
         </View>
       )}
 
@@ -1222,6 +1245,8 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 8 },
   star: { fontSize: 22, color: '#CBD5E1' },
   starActive: { fontSize: 22, color: '#F59E0B' },
+  accessLimitBanner: { backgroundColor: '#F1F5F9', borderRadius: 10, padding: 10, marginBottom: 12 },
+  accessLimitText: { fontSize: 13, color: '#64748B' },
   meta: { backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   rowLabel: { fontSize: 14, color: '#94A3B8', flex: 1 },

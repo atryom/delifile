@@ -52,6 +52,8 @@ export interface FileListItem {
   custom_metadata?: MovieMetadata | null;
   likes_count?: number;
   is_liked?: boolean;
+  is_favorite?: boolean;
+  is_pinned?: boolean;
   comments_count?: number;
   unread_comments?: number;
 }

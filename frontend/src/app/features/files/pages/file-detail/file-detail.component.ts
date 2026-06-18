@@ -144,7 +144,9 @@ export class FileDetailComponent implements OnInit, OnDestroy {
     if (f.content_kind === 'url_file') {
       return f.display_name ?? f.link_title ?? f.original_name;
     }
-    return f.display_name ?? f.original_name;
+    const name = f.display_name ?? f.original_name;
+    if (f.mime_type === 'text/markdown') return name.replace(/\.md$/i, '');
+    return name;
   });
 
   readonly displaySize = computed<number>(() => {
@@ -351,6 +353,21 @@ export class FileDetailComponent implements OnInit, OnDestroy {
     navigator.clipboard.writeText(url).then(() =>
       this.showFeedback(this.translate.instant('files.detail.link_copied'))
     );
+  }
+
+  togglePin(): void {
+    if (!this.file()) return;
+    this.actionPending.set(true);
+    const isPinned = this.file()!.is_pinned;
+    const req = isPinned ? this.filesApi.unpin(this.id()) : this.filesApi.pin(this.id());
+    req.subscribe({
+      next: () => {
+        this.file.update((f) => f ? { ...f, is_pinned: !isPinned } : f);
+        this.showFeedback(isPinned ? 'Откреплено' : 'Закреплено вверху списка');
+        this.actionPending.set(false);
+      },
+      error: () => this.actionPending.set(false),
+    });
   }
 
   toggleFavorite(): void {

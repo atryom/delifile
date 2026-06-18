@@ -31,7 +31,8 @@ module.exports = function withAndroidShareIntent(config) {
         `$1 ${MARKER}`
       );
     } else if (content.includes('onNewIntent')) {
-      // Has onNewIntent but no setIntent — inject it after super call
+      // Has onNewIntent but no setIntent — fix signature (Intent? → Intent) and inject setIntent
+      content = content.replace(/onNewIntent\(intent: Intent\?\)/, 'onNewIntent(intent: Intent)');
       content = content.replace(
         /(super\.onNewIntent\(intent\))/,
         `$1\n    setIntent(intent) ${MARKER}`

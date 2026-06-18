@@ -192,4 +192,8 @@ export class SharedFoldersApiService {
   addFile(folderId: string, fileId: string, move = false): Observable<ApiResponse<Record<string, never>>> {
     return this.api.post(`/shared-folders/${folderId}/files/${fileId}`, move ? { move: true } : {});
   }
+
+  moveFolder(folderId: string, parentId: string | null): Observable<ApiResponse<{ folder: { id: string; parent_id: string | null } }>> {
+    return this.api.patch(`/shared-folders/${folderId}/move`, { parent_id: parentId });
+  }
 }

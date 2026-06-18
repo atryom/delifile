@@ -31,6 +31,14 @@ export class ContactsApiService {
     return this.api.post('/contacts/resolve');
   }
 
+  update(id: string, name: string): Observable<ApiResponse<{ contact: Contact }>> {
+    return this.api.patch(`/contacts/${id}`, { name });
+  }
+
+  reorder(ids: string[]): Observable<ApiResponse<Record<string, never>>> {
+    return this.api.post('/contacts/reorder', { ids });
+  }
+
   delete(id: string): Observable<ApiResponse<Record<string, never>>> {
     return this.api.delete(`/contacts/${id}`);
   }

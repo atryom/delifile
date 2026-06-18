@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ContactsApiService } from '../../../../core/api/domain-api.services';
 import { Contact } from '../../../../shared/models/api.models';
@@ -8,7 +8,7 @@ import { Contact } from '../../../../shared/models/api.models';
   selector: 'app-contacts',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, TranslateModule],
+  imports: [ReactiveFormsModule, FormsModule, TranslateModule],
   templateUrl: './contacts.component.html',
   styleUrl: './contacts.component.scss',
 })
@@ -17,14 +17,17 @@ export class ContactsComponent implements OnInit {
   private readonly fb          = inject(FormBuilder);
   private readonly translate   = inject(TranslateService);
 
-  readonly contacts    = signal<Contact[]>([]);
-  readonly loading     = signal(false);
-  readonly adding      = signal(false);
-  readonly resolving   = signal(false);
-  readonly deletingId  = signal<string | null>(null);
-  readonly showAddForm = signal(false);
-  readonly addError    = signal<string | null>(null);
-  readonly feedback    = signal<string | null>(null);
+  readonly contacts     = signal<Contact[]>([]);
+  readonly loading      = signal(false);
+  readonly adding       = signal(false);
+  readonly resolving    = signal(false);
+  readonly deletingId   = signal<string | null>(null);
+  readonly showAddForm  = signal(false);
+  readonly addError     = signal<string | null>(null);
+  readonly feedback     = signal<string | null>(null);
+  readonly renamingId   = signal<string | null>(null);
+  readonly savingRename = signal(false);
+  renameDraft           = '';
   private searchTimer?: ReturnType<typeof setTimeout>;
 
   readonly addForm = this.fb.group({
@@ -99,6 +102,34 @@ export class ContactsComponent implements OnInit {
         this.loadContacts();
       },
       error: () => this.resolving.set(false),
+    });
+  }
+
+  startRename(contact: Contact): void {
+    this.renameDraft = contact.name;
+    this.renamingId.set(contact.id);
+  }
+
+  cancelRename(): void {
+    this.renamingId.set(null);
+    this.renameDraft = '';
+  }
+
+  saveRename(contactId: string): void {
+    const name = this.renameDraft.trim();
+    if (!name || this.savingRename()) return;
+    this.savingRename.set(true);
+    this.contactsApi.update(contactId, name).subscribe({
+      next: (res) => {
+        this.contacts.update(list => list.map(c => c.id === contactId ? res.data.contact : c));
+        this.cancelRename();
+        this.savingRename.set(false);
+        this.showFeedback('Имя обновлено');
+      },
+      error: () => {
+        this.savingRename.set(false);
+        this.showFeedback('Ошибка при сохранении');
+      },
     });
   }
 
