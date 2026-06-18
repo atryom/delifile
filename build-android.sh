@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 
-MOBILE_DIR="$(cd "$(dirname "$0")/mobile" && pwd)"
-SECRETS="$(dirname "$0")/secrets/build.env"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MOBILE_DIR="$PROJECT_ROOT/mobile"
+SECRETS="$PROJECT_ROOT/secrets/build.env"
 KEYSTORE_DIR="$HOME/android-keystore"
 KEYSTORE="$KEYSTORE_DIR/delifile-release.keystore"
 KEY_ALIAS="delifile"
@@ -115,7 +116,7 @@ ok "Готово! Загружен: $APK_NAME"
 ok "Папка: https://delifile.ru/folders?shared_folder_id=${DELIFILE_FOLDER}"
 
 # Коммитим обновлённый app.json с новой версией
-cd "$(dirname "$0")"
+cd "$PROJECT_ROOT"
 git add mobile/app.json
 git commit -m "chore(mobile): bump version to $NEW_VERSION" 2>/dev/null && \
   ok "app.json закоммичен (версия $NEW_VERSION)" || true
