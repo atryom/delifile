@@ -51,6 +51,7 @@ function buildSharedFolderMoveTree(folders: SharedFolder[]): SharedFolderMoveIte
 interface Breadcrumb {
   label: string;
   sharedFolderId: string | null;
+  folder?: SharedFolder;
 }
 
 type AnyFile = FileListItem | SharedFolderFileItem;
@@ -167,10 +168,12 @@ export class FoldersTreeComponent implements OnInit {
   readonly currentFolder = computed<SharedFolder | null>(() => {
     const sfId = this.currentSharedFolderId();
     if (!sfId) return null;
+    const crumbs = this.breadcrumbs();
+    const lastCrumb = crumbs[crumbs.length - 1];
     return (
       this.sharedFolders().find(f => f.id === sfId) ??
       this.sfSubfolders().find(f => f.id === sfId) ??
-      null
+      (lastCrumb?.sharedFolderId === sfId ? (lastCrumb.folder ?? null) : null)
     );
   });
   readonly currentFolderType = computed<FolderType>(() => this.currentFolder()?.folder_type ?? 'default');
@@ -417,7 +420,7 @@ export class FoldersTreeComponent implements OnInit {
   navigateIntoSharedFolder(folder: SharedFolder): void {
     this.currentSharedFolderId.set(folder.id);
     this.folderNotesOpen.set(false);
-    this.breadcrumbs.update(c => [...c, { label: folder.name, sharedFolderId: folder.id }]);
+    this.breadcrumbs.update(c => [...c, { label: folder.name, sharedFolderId: folder.id, folder }]);
     this.closeMenu();
     this.resetFiltersKeepTag();
     this.moviePage.set(1);
@@ -1303,7 +1306,7 @@ export class FoldersTreeComponent implements OnInit {
 
     const crumbs: Breadcrumb[] = [{ label: 'Папки', sharedFolderId: null }];
     for (const folder of path) {
-      crumbs.push({ label: folder.name, sharedFolderId: folder.id });
+      crumbs.push({ label: folder.name, sharedFolderId: folder.id, folder });
     }
     this.breadcrumbs.set(crumbs);
 
