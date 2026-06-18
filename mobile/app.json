@@ -2,7 +2,7 @@
   "expo": {
     "name": "DeliFile",
     "slug": "delifile",
-    "version": "1.1.36",
+    "version": "1.1.37",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -30,7 +30,8 @@
             }
           }
         },
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryAddUsageDescription": "Для сохранения файлов в галерею"
       },
       "buildNumber": "5"
     },
@@ -89,6 +90,13 @@
         "expo-image-picker",
         {
           "photosPermission": "Доступ к медиатеке для загрузки файлов"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Доступ к медиатеке для сохранения файлов",
+          "savePhotosPermission": "Сохранение фото и видео в галерею"
         }
       ],
       "expo-secure-store",

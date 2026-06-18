@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 import { router, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFileList } from '@/hooks/useFiles';
@@ -280,6 +283,42 @@ export default function FilesScreen() {
     exitSelectMode();
   }
 
+  async function handleBulkDownload() {
+    if (selectedIds.length === 0) return;
+    const filesToDownload = files.filter((f) => selectedIds.includes(f.id));
+    const errors: string[] = [];
+
+    for (const file of filesToDownload) {
+      try {
+        const res = await filesApi.download(file.id);
+        const presignedUrl = res.data.data.url;
+        const fileName = (file.display_name ?? file.original_name).replace(/[/\\?%*:|"<>]/g, '_');
+        const localUri = (FileSystemLegacy.cacheDirectory ?? '') + fileName;
+        const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
+        if (status !== 200) { errors.push(file.original_name); continue; }
+
+        const isMedia = file.mime_type?.startsWith('image/') || file.mime_type?.startsWith('video/');
+        if (isMedia) {
+          const { status: permStatus } = await MediaLibrary.requestPermissionsAsync();
+          if (permStatus === 'granted') {
+            await MediaLibrary.saveToLibraryAsync(localUri);
+          } else {
+            await Sharing.shareAsync(localUri, { mimeType: file.mime_type ?? 'application/octet-stream' });
+          }
+        } else {
+          await Sharing.shareAsync(localUri, { mimeType: file.mime_type ?? 'application/octet-stream', dialogTitle: 'Сохранить файл' });
+        }
+      } catch {
+        errors.push(file.original_name);
+      }
+    }
+
+    exitSelectMode();
+    if (errors.length > 0) {
+      Alert.alert('Ошибка', `Не удалось скачать: ${errors.join(', ')}`);
+    }
+  }
+
   const ensureRoot = useEnsurePersonalRoot();
   useEffect(() => {
     ensureRoot.mutate();
@@ -507,6 +546,10 @@ export default function FilesScreen() {
             <Text style={styles.selectBarIcon}>📁</Text>
             <Text style={styles.selectBarText}>В папку</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={[styles.selectBarBtn, styles.selectBarBtnMiddle]} onPress={handleBulkDownload}>
+            <Text style={styles.selectBarIcon}>⬇</Text>
+            <Text style={styles.selectBarText}>Скачать</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.selectBarBtn, styles.selectBarBtnDanger]} onPress={handleBulkDelete}>
             <Text style={styles.selectBarIcon}>🗑</Text>
             <Text style={[styles.selectBarText, styles.selectBarTextDanger]}>Удалить</Text>
@@ -570,6 +613,7 @@ const styles = StyleSheet.create({
   selectModeCancel: { fontSize: 14, color: '#2563EB', fontWeight: '500' },
   selectBar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#fff' },
   selectBarBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 4 },
+  selectBarBtnMiddle: { borderLeftWidth: 1, borderLeftColor: '#E2E8F0' },
   selectBarBtnDanger: { borderLeftWidth: 1, borderLeftColor: '#E2E8F0' },
   selectBarIcon: { fontSize: 20 },
   selectBarText: { fontSize: 12, color: '#475569', fontWeight: '500' },

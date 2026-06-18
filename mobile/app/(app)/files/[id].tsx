@@ -9,6 +9,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
+import * as MediaLibrary from 'expo-media-library';
 import { pickFileAsset } from '@/utils/pickFileAsset';
 import {
   useFile, useDownloadUrl, useToggleFavorite, useTogglePin,
@@ -187,6 +188,33 @@ export default function FileDetailScreen() {
       }
     } catch {
       Alert.alert('Ошибка', 'Не удалось открыть файл');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function handleSaveToGallery() {
+    if (!isOnline) {
+      Alert.alert('Нет подключения', 'Для сохранения необходимо подключение к сети.');
+      return;
+    }
+    setDownloading(true);
+    try {
+      const presignedUrl = await downloadUrl.mutateAsync();
+      const fileName = (file?.display_name ?? file?.original_name ?? 'file')
+        .replace(/[/\\?%*:|"<>]/g, '_');
+      const localUri = FileSystemLegacy.cacheDirectory + fileName;
+      const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
+      if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
+      const { status: permStatus } = await MediaLibrary.requestPermissionsAsync();
+      if (permStatus !== 'granted') {
+        Alert.alert('Нет доступа', 'Разрешите доступ к медиатеке в настройках телефона.');
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(localUri);
+      Alert.alert('Готово', 'Файл сохранён в галерею 📷');
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось сохранить файл в галерею');
     } finally {
       setDownloading(false);
     }
@@ -686,6 +714,13 @@ export default function FileDetailScreen() {
                     <Button
                       title={downloading ? 'Загрузка...' : '📦 Установить APK'}
                       onPress={handleDownload}
+                      loading={downloading || downloadUrl.isPending}
+                      style={styles.btn}
+                    />
+                  ) : (file.mime_type?.startsWith('image/') || file.mime_type?.startsWith('video/')) ? (
+                    <Button
+                      title={downloading ? 'Загрузка...' : '⬇ Сохранить в галерею'}
+                      onPress={handleSaveToGallery}
                       loading={downloading || downloadUrl.isPending}
                       style={styles.btn}
                     />

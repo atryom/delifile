@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
-import { pickFileAsset } from '@/utils/pickFileAsset';
+import { pickMultipleFileAssets } from '@/utils/pickFileAsset';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { filesApi } from '@/api/files';
 import { tariffsApi } from '@/api/tariffs';
@@ -40,6 +40,8 @@ export default function AddScreen() {
   const [uploadFileName, setUploadFileName] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadQueueTotal, setUploadQueueTotal] = useState(0);
+  const [uploadQueueDone, setUploadQueueDone] = useState(0);
   const uploadTaskRef = useRef<FileSystem.UploadTask | null>(null);
   const pendingFileIdRef = useRef<string | null>(null);
 
@@ -134,84 +136,90 @@ export default function AddScreen() {
 
   async function handlePickFile() {
     try {
-      const asset = await pickFileAsset();
-      if (!asset) return;
-
-      const { uri, name, size, mimeType } = asset;
+      const assets = await pickMultipleFileAssets();
+      if (!assets.length) return;
 
       const limitBytes = tariffUsage?.file_size_limit_bytes;
-      if (limitBytes && size > limitBytes) {
-        Alert.alert('Файл слишком большой', `Максимальный размер файла: ${formatFileSize(limitBytes)}`);
-        return;
-      }
-
-      setUploadFileName(name);
-      setUploadProgress(0);
-      setUploadError(null);
+      setUploadQueueTotal(assets.length);
+      setUploadQueueDone(0);
       setMode('uploading');
 
-      let fileId: string;
-      let putUrl: string;
-      let putHeaders: Record<string, string>;
-      try {
-        const initRes = await filesApi.initUpload({ original_name: name, size, mime_type: mimeType });
-        fileId = initRes.data.data.file.id;
-        putUrl = initRes.data.data.upload.url;
-        putHeaders = initRes.data.data.upload.headers;
-      } catch (e) {
-        setUploadError(getApiError(e, 'Не удалось инициализировать загрузку'));
-        return;
-      }
+      for (let i = 0; i < assets.length; i++) {
+        const asset = assets[i];
+        setUploadQueueDone(i);
+        setUploadFileName(asset.name);
+        setUploadProgress(0);
+        setUploadError(null);
 
-      pendingFileIdRef.current = fileId;
-
-      const task = FileSystem.createUploadTask(
-        putUrl,
-        uri,
-        {
-          httpMethod: 'PUT',
-          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-          headers: putHeaders,
-        },
-        (progress) => {
-          if (progress.totalBytesExpectedToSend > 0) {
-            setUploadProgress(progress.totalBytesSent / progress.totalBytesExpectedToSend);
-          }
-        },
-      );
-      uploadTaskRef.current = task;
-
-      let uploadResult: FileSystem.FileSystemUploadResult | null | undefined;
-      try {
-        uploadResult = await task.uploadAsync();
-      } catch {
-        if (pendingFileIdRef.current) {
-          filesApi.cancelUpload(pendingFileIdRef.current).catch(() => {});
-          pendingFileIdRef.current = null;
+        if (limitBytes && asset.size > limitBytes) {
+          setUploadError(`${asset.name}: превышен лимит ${formatFileSize(limitBytes)}`);
+          return;
         }
-        setMode('menu');
-        return;
-      }
-      uploadTaskRef.current = null;
 
-      if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
-        setUploadError(`Ошибка загрузки на сервер (${uploadResult?.status ?? '?'})`);
-        filesApi.cancelUpload(fileId).catch(() => {});
-        return;
+        let fileId: string;
+        let putUrl: string;
+        let putHeaders: Record<string, string>;
+        try {
+          const initRes = await filesApi.initUpload({ original_name: asset.name, size: asset.size, mime_type: asset.mimeType });
+          fileId = initRes.data.data.file.id;
+          putUrl = initRes.data.data.upload.url;
+          putHeaders = initRes.data.data.upload.headers;
+        } catch (e) {
+          setUploadError(getApiError(e, 'Не удалось инициализировать загрузку'));
+          return;
+        }
+
+        pendingFileIdRef.current = fileId;
+
+        const task = FileSystem.createUploadTask(
+          putUrl,
+          asset.uri,
+          {
+            httpMethod: 'PUT',
+            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+            headers: putHeaders,
+          },
+          (progress) => {
+            if (progress.totalBytesExpectedToSend > 0) {
+              setUploadProgress(progress.totalBytesSent / progress.totalBytesExpectedToSend);
+            }
+          },
+        );
+        uploadTaskRef.current = task;
+
+        let uploadResult: FileSystem.FileSystemUploadResult | null | undefined;
+        try {
+          uploadResult = await task.uploadAsync();
+        } catch {
+          if (pendingFileIdRef.current) {
+            filesApi.cancelUpload(pendingFileIdRef.current).catch(() => {});
+            pendingFileIdRef.current = null;
+          }
+          setMode('menu');
+          return;
+        }
+        uploadTaskRef.current = null;
+
+        if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
+          setUploadError(`Ошибка загрузки на сервер (${uploadResult?.status ?? '?'})`);
+          filesApi.cancelUpload(fileId).catch(() => {});
+          return;
+        }
+
+        try {
+          await filesApi.completeUpload(fileId);
+        } catch {
+          setUploadError('Файл загружен, но не удалось подтвердить. Попробуйте снова.');
+          return;
+        }
+
+        if (folderId) {
+          await sharedFoldersApi.addFile(folderId, fileId, true).catch(() => {});
+        }
+
+        pendingFileIdRef.current = null;
       }
 
-      try {
-        await filesApi.completeUpload(fileId);
-      } catch {
-        setUploadError('Файл загружен, но не удалось подтвердить. Попробуйте снова.');
-        return;
-      }
-
-      if (folderId) {
-        await sharedFoldersApi.addFile(folderId, fileId, true).catch(() => {});
-      }
-
-      pendingFileIdRef.current = null;
       qc.invalidateQueries({ queryKey: ['files'] });
       router.back();
     } catch {
@@ -280,7 +288,9 @@ export default function AddScreen() {
 
         {mode === 'uploading' && (
           <View style={styles.uploadBox}>
-            <Text style={styles.uploadTitle}>Загрузка файла</Text>
+            <Text style={styles.uploadTitle}>
+              {uploadQueueTotal > 1 ? `Файл ${uploadQueueDone + 1} из ${uploadQueueTotal}` : 'Загрузка файла'}
+            </Text>
             <Text style={styles.uploadName} numberOfLines={2}>{uploadFileName}</Text>
             {!uploadError ? (
               <>

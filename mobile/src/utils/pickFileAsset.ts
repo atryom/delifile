@@ -49,6 +49,64 @@ async function fromImageLibrary(): Promise<FileAsset | null> {
   };
 }
 
+async function fromDocumentPickerMultiple(): Promise<FileAsset[]> {
+  const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: true });
+  if (result.canceled || !result.assets?.length) return [];
+  return result.assets.map((asset) => ({
+    uri: asset.uri,
+    name: asset.name,
+    size: asset.size ?? 0,
+    mimeType: asset.mimeType ?? 'application/octet-stream',
+  }));
+}
+
+async function fromImageLibraryMultiple(): Promise<FileAsset[]> {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert(
+      'Нет доступа к медиатеке',
+      'Разрешите доступ к Фото в Настройках → Конфиденциальность → Фото',
+      [{ text: 'OK' }],
+    );
+    return [];
+  }
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.All,
+    allowsMultipleSelection: true,
+    quality: 1,
+    exif: false,
+  });
+  if (result.canceled || !result.assets?.length) return [];
+  return result.assets.map((asset) => {
+    const name = asset.fileName ?? asset.uri.split('/').pop() ?? 'media';
+    const mimeType = asset.mimeType ?? (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+    return { uri: asset.uri, name, size: asset.fileSize ?? 0, mimeType };
+  });
+}
+
+export function pickMultipleFileAssets(): Promise<FileAsset[]> {
+  if (Platform.OS !== 'ios') {
+    return fromDocumentPickerMultiple();
+  }
+
+  return new Promise((resolve) => {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options: ['Медиатека', 'Файлы', 'Отмена'],
+        cancelButtonIndex: 2,
+      },
+      async (index) => {
+        if (index === 2) { resolve([]); return; }
+        if (index === 0) {
+          resolve(await fromImageLibraryMultiple());
+        } else {
+          resolve(await fromDocumentPickerMultiple());
+        }
+      },
+    );
+  });
+}
+
 export function pickFileAsset(): Promise<FileAsset | null> {
   if (Platform.OS !== 'ios') {
     return fromDocumentPicker();
