@@ -65,5 +65,11 @@
 # APK builds
 *.apk
 
+# AI tool working directories
+.opencode/
+
+# Mobile plugin build artifacts
+mobile/modules/share-intent/android/build/
+
 # Local build secrets (DELIFILE_TOKEN, KEYSTORE_PASS)
 /secrets/
