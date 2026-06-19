@@ -577,7 +577,7 @@ class FileService
 
         // Pinned files first — LEFT JOIN keeps non-pinned rows; select('files.*') avoids column ambiguity
         $query->select('files.*')
-              ->leftJoin('file_user_accesses as pin_access', function ($join) use ($user) {
+              ->leftJoin('file_user_access as pin_access', function ($join) use ($user) {
                   $join->on('pin_access.file_id', '=', 'files.id')
                        ->where('pin_access.user_id', '=', $user->id);
               })
