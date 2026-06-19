@@ -276,9 +276,9 @@ export class FileDetailComponent implements OnInit, OnDestroy {
   }
 
   loadSidePanels(): void {
-    this.filesApi.listLinks(this.id()).subscribe((r) => this.links.set(r.data.items));
-    this.filesApi.accesses(this.id()).subscribe((r) => this.accesses.set(r.data.items));
-    this.filesApi.activity(this.id()).subscribe((r) => this.activity.set(r.data.items));
+    this.filesApi.listLinks(this.id()).subscribe({ next: (r) => this.links.set(r.data.items), error: () => {} });
+    this.filesApi.accesses(this.id()).subscribe({ next: (r) => this.accesses.set(r.data.items), error: () => {} });
+    this.filesApi.activity(this.id()).subscribe({ next: (r) => this.activity.set(r.data.items), error: () => {} });
   }
 
   download(): void {
@@ -353,6 +353,19 @@ export class FileDetailComponent implements OnInit, OnDestroy {
     navigator.clipboard.writeText(url).then(() =>
       this.showFeedback(this.translate.instant('files.detail.link_copied'))
     );
+  }
+
+  refreshLinkPreview(): void {
+    if (this.actionPending()) return;
+    this.actionPending.set(true);
+    this.http.post<any>(`/api/v1/files/${this.id()}/refresh-link-preview`, {}).subscribe({
+      next: (res) => {
+        this.file.set(res.data.file);
+        this.actionPending.set(false);
+        this.showFeedback('Превью обновлено');
+      },
+      error: () => this.actionPending.set(false),
+    });
   }
 
   togglePin(): void {
@@ -583,7 +596,7 @@ export class FileDetailComponent implements OnInit, OnDestroy {
   onShared(): void {
     this.showShareDialog.set(false);
     this.showFeedback(this.translate.instant('files.detail.access_granted'));
-    this.loadSidePanels();
+    setTimeout(() => this.loadSidePanels(), 300);
   }
 
   private linkWasCreated = false;

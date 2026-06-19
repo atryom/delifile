@@ -145,8 +145,9 @@ export class FoldersTreeComponent implements OnInit {
     const raw = this.rawFiles();
     if (this.currentSharedFolderId() === null) return raw;
     const f = this.activeFilter();
-    if (f === 'mine')     return raw.filter(file => (file as SharedFolderFileItem).is_owner === true);
-    if (f === 'received') return raw.filter(file => (file as SharedFolderFileItem).is_owner !== true);
+    if (f === 'mine')      return raw.filter(file => (file as SharedFolderFileItem).is_owner === true);
+    if (f === 'received')  return raw.filter(file => (file as SharedFolderFileItem).is_owner !== true);
+    if (f === 'favorites') return raw.filter(file => (file as any).is_favorite === true);
     return raw;
   });
 
@@ -267,14 +268,26 @@ export class FoldersTreeComponent implements OnInit {
   readonly sharedFoldersMoveTree = computed(() => buildSharedFolderMoveTree(this.sharedFoldersMoveList()));
 
   // ── Move folder dialog ────────────────────────────────────────────────────
-  readonly moveFolderDialogOpen  = signal(false);
-  readonly moveFolderTarget      = signal<SharedFolder | null>(null);
-  readonly moveFolderParentId    = signal<string | null>(null);
-  readonly moveFolderSaving      = signal(false);
-  readonly moveFolderCandidates  = computed<SharedFolder[]>(() => {
+  readonly moveFolderDialogOpen   = signal(false);
+  readonly moveFolderTarget       = signal<SharedFolder | null>(null);
+  readonly moveFolderParentId     = signal<string | null>(null);
+  readonly moveFolderHasSelection = signal(false);
+  readonly moveFolderSaving       = signal(false);
+
+  readonly moveFolderTreeForMove = computed<SharedFolderMoveItem[]>(() => {
     const target = this.moveFolderTarget();
     if (!target) return [];
-    return this.sharedFoldersMoveList().filter(f => f.id !== target.id && f.is_owner);
+    const allFolders = this.sharedFoldersMoveList();
+    const excludeIds = new Set<string>([target.id]);
+    const addDescendants = (parentId: string): void => {
+      allFolders.filter(f => f.parent_id === parentId).forEach(f => {
+        excludeIds.add(f.id);
+        addDescendants(f.id);
+      });
+    };
+    addDescendants(target.id);
+    const candidates = allFolders.filter(f => !excludeIds.has(f.id) && f.is_owner);
+    return buildSharedFolderMoveTree(candidates);
   });
 
   // ── Bulk delete ───────────────────────────────────────────────────────────
@@ -824,6 +837,7 @@ export class FoldersTreeComponent implements OnInit {
   startMoveFolder(folder: SharedFolder): void {
     this.moveFolderTarget.set(folder);
     this.moveFolderParentId.set(folder.parent_id ?? null);
+    this.moveFolderHasSelection.set(false);
     this.closeMenu();
     this.sfApi.listAll().subscribe({
       next: res => this.sharedFoldersMoveList.set(res.data.items.filter(f => !f.is_personal_root)),
@@ -836,11 +850,17 @@ export class FoldersTreeComponent implements OnInit {
     this.moveFolderDialogOpen.set(false);
     this.moveFolderTarget.set(null);
     this.moveFolderParentId.set(null);
+    this.moveFolderHasSelection.set(false);
+  }
+
+  selectMoveFolderParent(value: string): void {
+    this.moveFolderParentId.set(value === '' ? null : value);
+    this.moveFolderHasSelection.set(true);
   }
 
   executeMoveFolder(): void {
     const folder = this.moveFolderTarget();
-    if (!folder || this.moveFolderSaving()) return;
+    if (!folder || this.moveFolderSaving() || !this.moveFolderHasSelection()) return;
     this.moveFolderSaving.set(true);
     const newParentId = this.moveFolderParentId();
     this.sfApi.moveFolder(folder.id, newParentId).subscribe({
@@ -848,6 +868,8 @@ export class FoldersTreeComponent implements OnInit {
         this.moveFolderSaving.set(false);
         this.cancelMoveFolder();
         this.loadShared();
+        const parentId = this.currentSharedFolderId();
+        if (parentId) this.loadSfSubfolders(parentId);
       },
       error: () => this.moveFolderSaving.set(false),
     });
@@ -916,7 +938,34 @@ export class FoldersTreeComponent implements OnInit {
   }
 
   favoriteFile(file: AnyFile): void {
-    this.filesApi.favorite(file.id).subscribe({ error: () => {} });
+    const isFav = (file as any).is_favorite ?? false;
+    this.rawFiles.update(list =>
+      list.map(f => f.id === file.id ? { ...f, is_favorite: !isFav } as AnyFile : f)
+    );
+    const req = isFav ? this.filesApi.unfavorite(file.id) : this.filesApi.favorite(file.id);
+    req.subscribe({
+      error: () => {
+        this.rawFiles.update(list =>
+          list.map(f => f.id === file.id ? { ...f, is_favorite: isFav } as AnyFile : f)
+        );
+      },
+    });
+    this.closeMenu();
+  }
+
+  togglePin(file: AnyFile): void {
+    const isPinned = (file as any).is_pinned ?? false;
+    this.rawFiles.update(list =>
+      list.map(f => f.id === file.id ? { ...f, is_pinned: !isPinned } as AnyFile : f)
+    );
+    const req = isPinned ? this.filesApi.unpin(file.id) : this.filesApi.pin(file.id);
+    req.subscribe({
+      error: () => {
+        this.rawFiles.update(list =>
+          list.map(f => f.id === file.id ? { ...f, is_pinned: isPinned } as AnyFile : f)
+        );
+      },
+    });
     this.closeMenu();
   }
 

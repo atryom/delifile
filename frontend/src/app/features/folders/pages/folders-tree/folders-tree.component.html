@@ -520,6 +520,9 @@
                         <div class="file-info">
                           <div class="file-name">
                             {{ fileDisplayName(file) }}
+                            @if ($any(file).is_pinned) {
+                              <span class="pin-icon" title="Закреплён" aria-label="Закреплён">📌</span>
+                            }
                             @if ($any(file).is_favorite) {
                               <span class="fav-star" title="В избранном" aria-label="Избранное">★</span>
                             }
@@ -578,7 +581,8 @@
                         <div class="dropdown-menu" role="menu">
                           <button type="button" role="menuitem" (click)="openFileDetail(file)">Открыть</button>
                           <button type="button" role="menuitem" (click)="downloadFile(file)">Скачать</button>
-                          <button type="button" role="menuitem" (click)="favoriteFile(file)">В избранное</button>
+                          <button type="button" role="menuitem" (click)="favoriteFile(file)">{{ $any(file).is_favorite ? '★ Убрать из избранного' : '☆ В избранное' }}</button>
+                          <button type="button" role="menuitem" (click)="togglePin(file)">{{ $any(file).is_pinned ? '📌 Открепить' : '📌 Закрепить' }}</button>
                           <button type="button" role="menuitem" (click)="openTagDialogForFile(file)">Добавить тег</button>
                           <button type="button" role="menuitem" (click)="openMoveDialogForFile(file)">Переместить в папку</button>
                           @if (currentSharedFolderId() && isSharedFolderOwner()) {
@@ -942,23 +946,30 @@
     <div class="modal" (click)="$event.stopPropagation()">
       <h3 id="move-folder-title">Переместить папку «{{ moveFolderTarget()?.name }}»</h3>
       <p>Выберите новое расположение:</p>
-      <div class="field">
-        <label for="move-folder-parent">Родительская папка</label>
-        <select
-          id="move-folder-parent"
-          class="move-folder-select"
-          [ngModel]="moveFolderParentId()"
-          (ngModelChange)="moveFolderParentId.set($event === '' ? null : $event)"
-          aria-label="Выбор родительской папки"
-        >
-          <option value="">В корень (без родителя)</option>
-          @for (f of moveFolderCandidates(); track f.id) {
-            <option [value]="f.id">{{ f.name }}</option>
-          }
-        </select>
+      <div class="field folder-pick-list" role="listbox" aria-label="Выбор родительской папки">
+        <button
+          type="button"
+          role="option"
+          class="folder-pick-item"
+          [class.folder-pick-item--selected]="moveFolderHasSelection() && moveFolderParentId() === null"
+          (click)="selectMoveFolderParent('')"
+        >🏠 В корень (без родителя)</button>
+        @for (item of moveFolderTreeForMove(); track item.folder.id) {
+          <button
+            type="button"
+            role="option"
+            class="folder-pick-item"
+            [class.folder-pick-item--selected]="moveFolderParentId() === item.folder.id"
+            [style.padding-left.px]="16 + item.depth * 20"
+            (click)="selectMoveFolderParent(item.folder.id)"
+          >🗂 {{ item.folder.name }}</button>
+        }
+        @if (moveFolderTreeForMove().length === 0) {
+          <p class="folder-pick-empty">Нет доступных папок для перемещения</p>
+        }
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn-primary" (click)="executeMoveFolder()" [disabled]="moveFolderSaving()">
+        <button type="button" class="btn-primary" (click)="executeMoveFolder()" [disabled]="moveFolderSaving() || !moveFolderHasSelection()">
           {{ moveFolderSaving() ? 'Перемещение...' : 'Переместить' }}
         </button>
         <button type="button" class="btn-cancel" (click)="cancelMoveFolder()">Отмена</button>
