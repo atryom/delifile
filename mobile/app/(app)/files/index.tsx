@@ -144,6 +144,7 @@ function FileRow({
       <View style={styles.rowMain}>
         <View style={styles.fileNameRow}>
           <Text style={styles.fileName} numberOfLines={1}>{(item.display_name ?? item.original_name).replace(/\.md$/i, '')}</Text>
+          {item.is_pinned && <Text style={styles.pinIcon}>📌</Text>}
           {item.is_favorite && <Text style={styles.favStar}>★</Text>}
           {(item.unread_comments ?? 0) > 0 && (
             <View style={styles.commentBadge}>
@@ -185,13 +186,17 @@ function buildFolderHierarchy(folders: SharedFolder[]): { folder: SharedFolder; 
 
 function FolderPickerModal({
   onMove,
+  onMoveToRoot,
   onClose,
+  excludeId,
 }: {
   onMove: (targetId: string) => void;
+  onMoveToRoot?: () => void;
   onClose: () => void;
+  excludeId?: string | null;
 }) {
   const { data: folders = [], isLoading } = useSharedFolderAllFlat();
-  const filtered = folders.filter((f) => !f.is_personal_root);
+  const filtered = folders.filter((f) => !f.is_personal_root && f.id !== excludeId);
   const hierarchyItems = buildFolderHierarchy(filtered);
 
   function getFolderTypeIcon(type?: string | null) {
@@ -210,6 +215,16 @@ function FolderPickerModal({
           </TouchableOpacity>
         </View>
         {isLoading && <Spinner />}
+        {onMoveToRoot && (
+          <TouchableOpacity
+            style={styles.modalFolderRow}
+            activeOpacity={0.7}
+            onPress={() => { onMoveToRoot(); onClose(); }}
+          >
+            <Text style={styles.modalFolderIcon}>📂</Text>
+            <Text style={styles.modalFolderName}>В корень (без родительской папки)</Text>
+          </TouchableOpacity>
+        )}
         <FlatList
           data={hierarchyItems}
           keyExtractor={(item) => item.folder.id}
@@ -245,6 +260,7 @@ export default function FilesScreen() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showMoveModal, setShowMoveModal] = useState(false);
+  const [movingFolderId, setMovingFolderId] = useState<string | null>(null);
 
   function enterSelectMode(fileId: string) {
     setIsSelectMode(true);
@@ -372,10 +388,22 @@ export default function FilesScreen() {
     onError: () => Alert.alert('Ошибка', 'Не удалось покинуть папку'),
   });
 
+  async function handleFolderMove(targetId: string | null) {
+    if (!movingFolderId) return;
+    try {
+      await sharedFoldersApi.move(movingFolderId, targetId);
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось переместить папку');
+    }
+    setMovingFolderId(null);
+  }
+
   function handleFolderMenu(folder: SharedFolder) {
     if (folder.is_owner) {
       Alert.alert(folder.name, undefined, [
         { text: 'Переименовать', onPress: () => { setRenamingId(folder.id); setRenameText(folder.name); } },
+        { text: 'Переместить', onPress: () => setMovingFolderId(folder.id) },
         {
           text: 'Удалить папку',
           style: 'destructive',
@@ -560,6 +588,14 @@ export default function FilesScreen() {
       {showMoveModal && (
         <FolderPickerModal onMove={handleBulkMove} onClose={() => setShowMoveModal(false)} />
       )}
+      {movingFolderId && (
+        <FolderPickerModal
+          onMove={(targetId) => { handleFolderMove(targetId); }}
+          onMoveToRoot={() => { handleFolderMove(null); }}
+          onClose={() => setMovingFolderId(null)}
+          excludeId={movingFolderId}
+        />
+      )}
 
     </View>
   );
@@ -596,6 +632,7 @@ const styles = StyleSheet.create({
   fileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   fileName: { fontSize: 15, color: '#1E293B', fontWeight: '500', flex: 1 },
   fileMeta: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
+  pinIcon: { fontSize: 12 },
   favStar: { fontSize: 13, color: '#F59E0B' },
   commentBadge: { backgroundColor: '#EF4444', borderRadius: 8, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   commentBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },

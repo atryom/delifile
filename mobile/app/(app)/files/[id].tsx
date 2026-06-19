@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert, BackHandler, Linking, Platform, ScrollView, Share, StyleSheet, Switch,
-  Text, TouchableOpacity, View,
+  Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
@@ -94,6 +94,11 @@ export default function FileDetailScreen() {
   const pendingVersionIdRef = useRef<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
+  // Rename state
+  const [renaming, setRenaming] = useState(false);
+  const [renameText, setRenameText] = useState('');
+  const [savingRename, setSavingRename] = useState(false);
+
   // Action panels
   const [panel, setPanel] = useState<ActionPanel | null>(null);
 
@@ -161,6 +166,22 @@ export default function FileDetailScreen() {
     setPanel(p);
   }
 
+  async function handleCommitRename() {
+    const newName = renameText.trim();
+    if (!newName || newName === name) { setRenaming(false); return; }
+    setSavingRename(true);
+    try {
+      await filesApi.rename(file.id, newName);
+      qc.invalidateQueries({ queryKey: ['file', id] });
+      qc.invalidateQueries({ queryKey: ['files'] });
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось переименовать'));
+    } finally {
+      setSavingRename(false);
+      setRenaming(false);
+    }
+  }
+
   async function handleDownload() {
     if (!isOnline) {
       Alert.alert('Нет подключения', 'Для открытия необходимо подключение к сети.');
@@ -177,12 +198,17 @@ export default function FileDetailScreen() {
       if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
       const mimeType = file?.mime_type ?? 'application/octet-stream';
       if (Platform.OS === 'android') {
-        const contentUri = await FileSystemLegacy.getContentURIAsync(localUri);
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-          data: contentUri,
-          type: mimeType,
-          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-        });
+        try {
+          const contentUri = await FileSystemLegacy.getContentURIAsync(localUri);
+          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+            data: contentUri,
+            type: mimeType,
+            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+          });
+        } catch {
+          // No handler for ACTION_VIEW — fall back to share sheet
+          await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
+        }
       } else {
         await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
       }
@@ -555,21 +581,56 @@ export default function FileDetailScreen() {
       {/* Header (для не-фильмов — название и избранное) */}
       {!isMovie && (
         <View style={styles.header}>
-          <Text style={styles.name}>{name}</Text>
-          <View style={styles.actions}>
-            <TouchableOpacity
-              onPress={() => togglePin.mutate({ id: file.id, isPinned: file.is_pinned ?? false })}
-              style={styles.iconBtn}
-            >
-              <Text style={(file.is_pinned) ? styles.starActive : styles.star}>📌</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => toggleFavorite.mutate({ id: file.id, isFavorite: file.is_favorite })}
-              style={styles.iconBtn}
-            >
-              <Text style={file.is_favorite ? styles.starActive : styles.star}>★</Text>
-            </TouchableOpacity>
-          </View>
+          {renaming ? (
+            <View style={styles.renameRow}>
+              <TextInput
+                style={styles.renameInput}
+                value={renameText}
+                onChangeText={setRenameText}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleCommitRename}
+                selectTextOnFocus
+                editable={!savingRename}
+              />
+              <TouchableOpacity onPress={handleCommitRename} style={styles.iconBtn} disabled={savingRename}>
+                <Text style={styles.renameConfirm}>{savingRename ? '…' : '✓'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setRenaming(false)} style={styles.iconBtn}>
+                <Text style={styles.renameCancelIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.nameWrapper}
+                onPress={() => {
+                  if (file.is_owner) {
+                    setRenameText(name);
+                    setRenaming(true);
+                  }
+                }}
+                activeOpacity={file.is_owner ? 0.7 : 1}
+              >
+                <Text style={styles.name}>{name}</Text>
+                {file.is_owner && <Text style={styles.editHint}>✏️</Text>}
+              </TouchableOpacity>
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  onPress={() => togglePin.mutate({ id: file.id, isPinned: file.is_pinned ?? false })}
+                  style={styles.iconBtn}
+                >
+                  <Text style={(file.is_pinned) ? styles.starActive : styles.star}>📌</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => toggleFavorite.mutate({ id: file.id, isFavorite: file.is_favorite })}
+                  style={styles.iconBtn}
+                >
+                  <Text style={file.is_favorite ? styles.starActive : styles.star}>★</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
       )}
 
@@ -1275,7 +1336,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   content: { padding: 20, gap: 16 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  nameWrapper: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   name: { flex: 1, fontSize: 20, fontWeight: '700', color: '#1E293B', lineHeight: 28 },
+  editHint: { fontSize: 14, marginTop: 4 },
+  renameRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  renameInput: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 16, color: '#1E293B', borderWidth: 1, borderColor: '#2563EB' },
+  renameConfirm: { fontSize: 20, color: '#2563EB', fontWeight: '700' },
+  renameCancelIcon: { fontSize: 18, color: '#94A3B8' },
   actions: { flexDirection: 'row', gap: 4 },
   iconBtn: { padding: 8 },
   star: { fontSize: 22, color: '#CBD5E1' },

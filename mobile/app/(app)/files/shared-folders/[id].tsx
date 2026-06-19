@@ -57,6 +57,7 @@ export default function SharedFolderScreen() {
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
+  const [showFavOnly, setShowFavOnly] = useState(false);
   const renameInputRef = useRef<TextInput>(null);
 
   // Members modal state
@@ -327,7 +328,8 @@ export default function SharedFolderScreen() {
     exitSelectMode();
   }
 
-  const files = (folderData?.files ?? []) as FileListItemWithPrivacy[];
+  const allFiles = (folderData?.files ?? []) as FileListItemWithPrivacy[];
+  const files = showFavOnly ? allFiles.filter((f) => f.is_favorite) : allFiles;
   const subfolders = folderData?.subfolders ?? [];
 
   type ListItem =
@@ -359,6 +361,12 @@ export default function SharedFolderScreen() {
               </TouchableOpacity>
             ) : (
               <View style={styles.headerBtns}>
+                <TouchableOpacity
+                  onPress={() => setShowFavOnly((v) => !v)}
+                  style={[styles.headerBtn, showFavOnly && styles.headerBtnActive]}
+                >
+                  <Text style={styles.headerBtnText}>{showFavOnly ? '★' : '☆'}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => setShowMembers(true)} style={styles.headerBtn}>
                   <Text style={styles.headerBtnText}>👥</Text>
                 </TouchableOpacity>
@@ -752,7 +760,7 @@ function FileRow({
 }) {
   const isUrl = file.content_kind === 'url_file';
   const icon = file.is_private ? '🔒' : isUrl ? '🔗' : getFileIcon(file.mime_type);
-  const name = file.display_name || file.original_name;
+  const name = (file.display_name || file.original_name).replace(/\.md$/i, '');
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressActivated = useRef(false);
 
@@ -933,6 +941,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#F8FAFC' },
   headerBtns: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  headerBtnActive: { backgroundColor: '#EFF6FF', borderRadius: 8 },
   headerBtnText: { fontSize: 20 },
   addBtn: { paddingHorizontal: 8, paddingVertical: 4 },
   addBtnText: { fontSize: 24, color: '#2563EB' },

@@ -101,4 +101,7 @@ export const sharedFoldersApi = {
       `/shared-folders/${folderId}/movies`,
       { kinopoisk_id }
     ),
+
+  move: (id: string, parentId: string | null) =>
+    apiClient.patch<ApiResponse<{ folder: SharedFolder }>>(`/shared-folders/${id}/move`, { parent_id: parentId }),
 };

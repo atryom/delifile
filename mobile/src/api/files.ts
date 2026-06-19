@@ -52,6 +52,9 @@ export const filesApi = {
   createUrlFile: (url: string) =>
     apiClient.post<ApiResponse<{ file: FileCard }>>('/url-files', { url }),
 
+  rename: (id: string, display_name: string) =>
+    apiClient.patch<ApiResponse<{ display_name: string | null; original_name: string }>>(`/files/${id}/rename`, { display_name }),
+
   delete: (id: string) =>
     apiClient.delete<ApiResponse<Record<string, never>>>(`/files/${id}`),
 
