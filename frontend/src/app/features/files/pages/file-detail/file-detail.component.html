@@ -667,8 +667,8 @@
               }
             </div>
 
-            <!-- Who has access (hidden for movies) -->
-            @if (file()!.content_kind !== 'movie_item') {
+            <!-- Who has access (owners only, hidden for movies) -->
+            @if (file()!.is_owner && file()!.content_kind !== 'movie_item') {
             <div class="sidebar-section">
               <div class="section-header-row">
                 <h3 class="section-title">{{ 'files.detail.access' | translate }}</h3>

@@ -29,6 +29,13 @@ export function useTogglePin() {
   return useMutation({
     mutationFn: ({ id, isPinned }: { id: string; isPinned: boolean }) =>
       isPinned ? filesApi.unpin(id) : filesApi.pin(id),
+    onMutate: async ({ id, isPinned }) => {
+      await qc.cancelQueries({ queryKey: ['files'] });
+      qc.setQueriesData<{ items: any[] } | undefined>({ queryKey: ['files'], exact: false }, (old) => {
+        if (!old?.items) return old;
+        return { ...old, items: old.items.map((f: any) => f.id === id ? { ...f, is_pinned: !isPinned } : f) };
+      });
+    },
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: ['files'] });
       qc.invalidateQueries({ queryKey: ['file', id] });
@@ -41,6 +48,13 @@ export function useToggleFavorite() {
   return useMutation({
     mutationFn: ({ id, isFavorite }: { id: string; isFavorite: boolean }) =>
       isFavorite ? filesApi.unfavorite(id) : filesApi.favorite(id),
+    onMutate: async ({ id, isFavorite }) => {
+      await qc.cancelQueries({ queryKey: ['files'] });
+      qc.setQueriesData<{ items: any[] } | undefined>({ queryKey: ['files'], exact: false }, (old) => {
+        if (!old?.items) return old;
+        return { ...old, items: old.items.map((f: any) => f.id === id ? { ...f, is_favorite: !isFavorite } : f) };
+      });
+    },
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: ['files'] });
       qc.invalidateQueries({ queryKey: ['file', id] });

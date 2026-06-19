@@ -98,6 +98,7 @@ export default function FileDetailScreen() {
   const [renaming, setRenaming] = useState(false);
   const [renameText, setRenameText] = useState('');
   const [savingRename, setSavingRename] = useState(false);
+  const [savingPDF, setSavingPDF] = useState(false);
 
   // Action panels
   const [panel, setPanel] = useState<ActionPanel | null>(null);
@@ -182,6 +183,27 @@ export default function FileDetailScreen() {
     }
   }
 
+  async function handleSavePDF() {
+    if (!isOnline) {
+      Alert.alert('Нет подключения', 'Для скачивания необходимо подключение к сети.');
+      return;
+    }
+    setSavingPDF(true);
+    try {
+      const presignedUrl = await downloadUrl.mutateAsync();
+      const fileName = (file?.display_name ?? file?.original_name ?? 'file')
+        .replace(/[^\w.\-]/g, '_');
+      const localUri = FileSystemLegacy.cacheDirectory + fileName;
+      const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
+      if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
+      await Sharing.shareAsync(localUri, { mimeType: 'application/pdf', dialogTitle: 'Сохранить PDF' });
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось скачать файл');
+    } finally {
+      setSavingPDF(false);
+    }
+  }
+
   async function handleDownload() {
     if (!isOnline) {
       Alert.alert('Нет подключения', 'Для открытия необходимо подключение к сети.');
@@ -192,22 +214,23 @@ export default function FileDetailScreen() {
       const presignedUrl = await downloadUrl.mutateAsync();
       // Download to cache first: avoids S3 URL re-encoding on iOS (SignatureDoesNotMatch)
       const fileName = (file?.display_name ?? file?.original_name ?? 'file')
-        .replace(/[/\\?%*:|"<>]/g, '_');
+        .replace(/[^\w.\-]/g, '_');
       const localUri = FileSystemLegacy.cacheDirectory + fileName;
       const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
       if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
       const mimeType = file?.mime_type ?? 'application/octet-stream';
       if (Platform.OS === 'android') {
         try {
-          const contentUri = await FileSystemLegacy.getContentURIAsync(localUri);
+          const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
           await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
             data: contentUri,
             type: mimeType,
-            flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+            // FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK
+            flags: 268435457,
           });
         } catch {
           // No handler for ACTION_VIEW — fall back to share sheet
-          await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
+          await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть с помощью' });
         }
       } else {
         await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
@@ -761,9 +784,9 @@ export default function FileDetailScreen() {
                     </TouchableOpacity>
                   )}
                   <Button
-                    title={downloading ? 'Загрузка...' : '📄 Открыть PDF'}
-                    onPress={handleDownload}
-                    loading={downloading || downloadUrl.isPending}
+                    title={savingPDF ? 'Скачивание...' : '⬇ Скачать PDF'}
+                    onPress={handleSavePDF}
+                    loading={savingPDF}
                     style={styles.btn}
                   />
                 </>
@@ -1335,10 +1358,10 @@ function ActionItem({ icon, label, badge, onPress, last = false }: { icon: strin
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   content: { padding: 20, gap: 16 },
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  nameWrapper: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  nameWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { flex: 1, fontSize: 20, fontWeight: '700', color: '#1E293B', lineHeight: 28 },
-  editHint: { fontSize: 14, marginTop: 4 },
+  editHint: { fontSize: 14 },
   renameRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
   renameInput: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 16, color: '#1E293B', borderWidth: 1, borderColor: '#2563EB' },
   renameConfirm: { fontSize: 20, color: '#2563EB', fontWeight: '700' },

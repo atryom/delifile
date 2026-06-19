@@ -277,7 +277,9 @@ export class FileDetailComponent implements OnInit, OnDestroy {
 
   loadSidePanels(): void {
     this.filesApi.listLinks(this.id()).subscribe({ next: (r) => this.links.set(r.data.items), error: () => {} });
-    this.filesApi.accesses(this.id()).subscribe({ next: (r) => this.accesses.set(r.data.items), error: () => {} });
+    if (this.file()?.is_owner) {
+      this.filesApi.accesses(this.id()).subscribe({ next: (r) => this.accesses.set(r.data.items), error: () => {} });
+    }
     this.filesApi.activity(this.id()).subscribe({ next: (r) => this.activity.set(r.data.items), error: () => {} });
   }
 

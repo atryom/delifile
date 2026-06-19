@@ -47,6 +47,7 @@ export default function SharedFolderScreen() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showMoveModal, setShowMoveModal] = useState(false);
+  const [movingSubfolderId, setMovingSubfolderId] = useState<string | null>(null);
 
   // Movie filter / sort / search state
   const [movieFilter, setMovieFilter] = useState<MovieFilter>('all');
@@ -195,10 +196,23 @@ export default function SharedFolderScreen() {
     ]);
   }
 
+  async function handleSubfolderMove(targetId: string | null) {
+    if (!movingSubfolderId) return;
+    try {
+      await sharedFoldersApi.move(movingSubfolderId, targetId);
+      qc.invalidateQueries({ queryKey: ['shared-folders', id] });
+      qc.invalidateQueries({ queryKey: ['shared-folders'] });
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось переместить папку');
+    }
+    setMovingSubfolderId(null);
+  }
+
   function handleSubfolderMenu(subfolder: SharedFolder) {
     if (subfolder.is_owner) {
       Alert.alert(subfolder.name, undefined, [
         { text: 'Переименовать', onPress: () => startRename(subfolder) },
+        { text: 'Переместить', onPress: () => setMovingSubfolderId(subfolder.id) },
         {
           text: subfolder.is_private ? 'Открыть доступ' : 'Сделать приватной',
           onPress: () => setFolderPrivacy.mutate({ subfolderId: subfolder.id, isPrivate: !subfolder.is_private }),
@@ -741,6 +755,14 @@ export default function SharedFolderScreen() {
           onMove={handleBulkMove}
           onMoveToRoot={handleBulkMoveToRoot}
           onClose={() => setShowMoveModal(false)}
+        />
+      )}
+      {movingSubfolderId && (
+        <MoveFolderModal
+          currentFolderId={movingSubfolderId}
+          onMove={(targetId) => handleSubfolderMove(targetId)}
+          onMoveToRoot={() => handleSubfolderMove(null)}
+          onClose={() => setMovingSubfolderId(null)}
         />
       )}
     </View>
