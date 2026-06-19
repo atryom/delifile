@@ -492,7 +492,7 @@ class FileController extends Controller
             ->get()
             ->map(fn ($a) => [
                 'id'          => $a->id,
-                'access_type' => $a->access_type,
+                'access_type' => $a->access_type?->value ?? $a->access_type,
                 'user'        => $a->user ? [
                     'id'    => $a->user->id,
                     'email' => $a->user->email,
@@ -542,6 +542,37 @@ class FileController extends Controller
 
         return $this->success(__('messages.files.accesses_fetched'), [
             'items' => $accesses->merge($pending)->values(),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/files/{fileId}/refresh-link-preview
+     */
+    public function refreshLinkPreview(Request $request, string $fileId): JsonResponse
+    {
+        $file = File::find($fileId);
+        if (!$file || !$file->isOwnedBy($request->user())) {
+            return $this->notFound('File not found');
+        }
+        if ($file->content_kind !== 'url_file' || !$file->link_url) {
+            return $this->error('Not a URL file', 'NOT_URL_FILE', [], 422);
+        }
+
+        $ogData = app(\App\Services\OgFetchService::class)->fetch($file->link_url);
+        if (!empty($ogData)) {
+            $updates = array_filter([
+                'link_title'       => isset($ogData['link_title'])       ? mb_substr($ogData['link_title'], 0, 500)       : null,
+                'link_description' => isset($ogData['link_description']) ? mb_substr($ogData['link_description'], 0, 1000) : null,
+                'link_image_url'   => $ogData['link_image_url'] ?? null,
+                'link_site_name'   => isset($ogData['link_site_name'])   ? mb_substr($ogData['link_site_name'], 0, 255)    : null,
+            ], fn ($v) => $v !== null);
+            if (!empty($updates)) {
+                $file->update($updates);
+            }
+        }
+
+        return $this->success('Preview refreshed', [
+            'file' => $this->fileService->buildFileCard($file->fresh()->load(['owner', 'tags']), $request->user()),
         ]);
     }
 

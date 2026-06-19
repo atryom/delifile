@@ -128,10 +128,11 @@ Route::prefix('v1')->group(function () {
 
         // Files — actions
         Route::post('files/{id}/download',         [FileController::class, 'download']);
-        Route::post('files/{id}/pin',              [FileController::class, 'pin']);
-        Route::post('files/{id}/unpin',            [FileController::class, 'unpin']);
-        Route::post('files/{id}/favorite',         [FileController::class, 'favorite']);
-        Route::post('files/{id}/unfavorite',       [FileController::class, 'unfavorite']);
+        Route::post('files/{id}/pin',                  [FileController::class, 'pin']);
+        Route::post('files/{id}/unpin',                [FileController::class, 'unpin']);
+        Route::post('files/{id}/favorite',             [FileController::class, 'favorite']);
+        Route::post('files/{id}/unfavorite',           [FileController::class, 'unfavorite']);
+        Route::post('files/{id}/refresh-link-preview', [FileController::class, 'refreshLinkPreview']);
         Route::post('files/{id}/like',             [FileLikeController::class, 'store']);
         Route::delete('files/{id}/like',           [FileLikeController::class, 'destroy']);
         Route::post('files/{id}/move-folder',      [FileController::class, 'moveFolder']);

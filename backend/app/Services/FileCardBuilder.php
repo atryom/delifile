@@ -123,6 +123,7 @@ class FileCardBuilder
             'is_owner'      => $user ? $file->isOwnedBy($user) : null,
             'access_type'   => $access?->access_type?->value,
             'is_favorite'   => $access?->is_favorite ?? false,
+            'is_pinned'     => $access?->pinned_at !== null,
             'description'   => $access?->description,
             'preview_url'   => null,
             'is_task'        => (bool) $file->is_task,

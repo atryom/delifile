@@ -432,9 +432,32 @@ class FileService
                 'access_type' => AccessType::Owner,
             ]);
 
+            // Auto-fetch og: metadata if the frontend didn't provide a title/image
+            if (empty($preview['title']) || empty($preview['image_url'])) {
+                try {
+                    $ogData = app(OgFetchService::class)->fetch($url);
+                    $updates = [];
+                    if (!empty($ogData['link_title']) && empty($preview['title'])) {
+                        $updates['link_title'] = mb_substr($ogData['link_title'], 0, 500);
+                    }
+                    if (!empty($ogData['link_description']) && empty($preview['description'])) {
+                        $updates['link_description'] = mb_substr($ogData['link_description'], 0, 1000);
+                    }
+                    if (!empty($ogData['link_image_url'])) {
+                        $updates['link_image_url'] = $ogData['link_image_url'];
+                    }
+                    if (!empty($ogData['link_site_name'])) {
+                        $updates['link_site_name'] = mb_substr($ogData['link_site_name'], 0, 255);
+                    }
+                    if (!empty($updates)) {
+                        $file->update($updates);
+                    }
+                } catch (\Throwable) {}
+            }
+
             $this->activityService->log($file, $user, ActivityType::Uploaded);
 
-            return ['file' => $this->buildFileCard($file->load(['owner', 'tags']), $user)];
+            return ['file' => $this->buildFileCard($file->fresh()->load(['owner', 'tags']), $user)];
         });
     }
 
@@ -552,6 +575,15 @@ class FileService
             $this->applyTypeGroupFilter($query, $options['file_type_group']);
         }
 
+        // Pinned files first — LEFT JOIN keeps non-pinned rows; select('files.*') avoids column ambiguity
+        $query->select('files.*')
+              ->leftJoin('file_user_accesses as pin_access', function ($join) use ($user) {
+                  $join->on('pin_access.file_id', '=', 'files.id')
+                       ->where('pin_access.user_id', '=', $user->id);
+              })
+              ->orderByRaw('pin_access.pinned_at IS NULL ASC')
+              ->orderByRaw('pin_access.pinned_at DESC');
+
         $sortBy    = $options['sort_by'] ?? 'date';
         $sortOrder = strtolower($options['sort_order'] ?? 'desc');
         if (!in_array($sortOrder, ['asc', 'desc'])) {
@@ -560,11 +592,11 @@ class FileService
         $sortDir = strtoupper($sortOrder);
 
         if ($sortBy === 'size') {
-            $query->orderBy('size', $sortOrder);
+            $query->orderBy('files.size', $sortOrder);
         } elseif ($sortBy === 'extension') {
-            $query->orderByRaw("SUBSTRING_INDEX(original_name, '.', -1) {$sortDir}");
+            $query->orderByRaw("SUBSTRING_INDEX(files.original_name, '.', -1) {$sortDir}");
         } else {
-            $query->orderBy('created_at', $sortOrder);
+            $query->orderBy('files.created_at', $sortOrder);
         }
 
         $total = $query->count();
