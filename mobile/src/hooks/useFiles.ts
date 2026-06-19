@@ -31,9 +31,20 @@ export function useTogglePin() {
       isPinned ? filesApi.unpin(id) : filesApi.pin(id),
     onMutate: async ({ id, isPinned }) => {
       await qc.cancelQueries({ queryKey: ['files'] });
+      await qc.cancelQueries({ queryKey: ['file', id] });
+      const prev = qc.getQueryData<any>(['file', id]);
       qc.setQueriesData<{ items: any[] } | undefined>({ queryKey: ['files'], exact: false }, (old) => {
         if (!old?.items) return old;
         return { ...old, items: old.items.map((f: any) => f.id === id ? { ...f, is_pinned: !isPinned } : f) };
+      });
+      qc.setQueryData(['file', id], (old: any) => old ? { ...old, is_pinned: !isPinned } : old);
+      return { prev };
+    },
+    onError: (_err, { id, isPinned }, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['file', id], ctx.prev);
+      qc.setQueriesData<{ items: any[] } | undefined>({ queryKey: ['files'], exact: false }, (old) => {
+        if (!old?.items) return old;
+        return { ...old, items: old.items.map((f: any) => f.id === id ? { ...f, is_pinned: isPinned } : f) };
       });
     },
     onSuccess: (_, { id }) => {

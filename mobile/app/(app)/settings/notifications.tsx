@@ -1,7 +1,10 @@
-import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { authApi } from '@/api/auth';
+import { pushApi } from '@/api/push';
 import type { User } from '@/types';
 
 type NotifKey = 'notifications_enabled' | 'notify_new_files' | 'notify_folder_shared' |
@@ -21,6 +24,46 @@ const ITEMS: { key: NotifKey; title: string; sub: string }[] = [
 
 export default function NotificationsScreen() {
   const { user, setUser } = useAuthStore();
+  const [permStatus, setPermStatus] = useState<string>('checking');
+  const [registering, setRegistering] = useState(false);
+
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => setPermStatus(status));
+  }, []);
+
+  async function reregisterToken() {
+    setRegistering(true);
+    try {
+      const { status, canAskAgain } = await Notifications.requestPermissionsAsync();
+      setPermStatus(status);
+      if (status !== 'granted') {
+        if (!canAskAgain) {
+          Alert.alert(
+            'Разрешение отклонено',
+            'Откройте Настройки → Приложения → DeliFile → Уведомления и включите их.',
+            [{ text: 'Отмена' }, { text: 'Настройки', onPress: () => Linking.openSettings() }],
+          );
+        }
+        return;
+      }
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'DeliFile',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#2563EB',
+        });
+      }
+      const tokenData = await Notifications.getDevicePushTokenAsync();
+      const platform: 'android' | 'ios' = Platform.OS === 'ios' ? 'ios' : 'android';
+      await pushApi.registerToken(tokenData.data as string, platform);
+      Alert.alert('Готово', 'Push-токен зарегистрирован');
+    } catch (e: any) {
+      Alert.alert('Ошибка', 'Не удалось зарегистрировать токен: ' + (e?.message ?? String(e)));
+    } finally {
+      setRegistering(false);
+    }
+  }
 
   async function toggle(key: NotifKey, value: boolean) {
     if (!user) return;
@@ -54,6 +97,24 @@ export default function NotificationsScreen() {
         </View>
       </View>
 
+      <Text style={styles.sectionLabel}>УСТРОЙСТВО</Text>
+      <View style={styles.section}>
+        <View style={[styles.item, styles.itemBorder]}>
+          <View style={styles.itemText}>
+            <Text style={styles.itemTitle}>Разрешение на уведомления</Text>
+            <Text style={[styles.itemSub, permStatus === 'granted' ? styles.statusOk : styles.statusErr]}>
+              {permStatus === 'granted' ? '✓ Разрешено' : permStatus === 'denied' ? '✗ Отклонено' : permStatus === 'undetermined' ? '⚠ Не запрошено' : permStatus}
+            </Text>
+          </View>
+        </View>
+        <Pressable style={({ pressed }) => [styles.item, pressed && { opacity: 0.6 }]} onPress={reregisterToken} disabled={registering}>
+          <View style={styles.itemText}>
+            <Text style={styles.itemTitle}>{registering ? 'Регистрация…' : 'Зарегистрировать токен'}</Text>
+            <Text style={styles.itemSub}>Нажмите если уведомления не приходят</Text>
+          </View>
+        </Pressable>
+      </View>
+
       <Text style={styles.sectionLabel}>ЧТО УВЕДОМЛЯТЬ</Text>
       <View style={styles.section}>
         {ITEMS.map((item, i) => (
@@ -85,4 +146,6 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
   itemSub: { fontSize: 13, color: '#94A3B8', marginTop: 2 },
   dimmed: { color: '#CBD5E1' },
+  statusOk: { color: '#16A34A' },
+  statusErr: { color: '#DC2626' },
 });

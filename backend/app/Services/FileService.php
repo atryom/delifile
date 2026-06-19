@@ -326,7 +326,6 @@ class FileService
         DB::transaction(function () use ($file, $user) {
             $access = FileUserAccess::where('file_id', $file->id)
                 ->where('user_id', $user->id)
-                ->whereNot('access_type', AccessType::Owner)
                 ->first();
 
             if ($access) {
