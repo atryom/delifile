@@ -225,8 +225,8 @@ export default function FileDetailScreen() {
           await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
             data: contentUri,
             type: mimeType,
-            // FLAG_GRANT_READ_URI_PERMISSION | FLAG_ACTIVITY_NEW_TASK
-            flags: 268435457,
+            // FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
+            flags: 3,
           });
         } catch {
           // No handler for ACTION_VIEW — fall back to share sheet
@@ -643,7 +643,7 @@ export default function FileDetailScreen() {
                   onPress={() => togglePin.mutate({ id: file.id, isPinned: file.is_pinned ?? false })}
                   style={styles.iconBtn}
                 >
-                  <Text style={(file.is_pinned) ? styles.starActive : styles.star}>📌</Text>
+                  <Text style={[styles.pinBtn, file.is_pinned && styles.pinBtnActive]}>📌</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => toggleFavorite.mutate({ id: file.id, isFavorite: file.is_favorite })}
@@ -1370,6 +1370,8 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 8 },
   star: { fontSize: 22, color: '#CBD5E1' },
   starActive: { fontSize: 22, color: '#F59E0B' },
+  pinBtn: { fontSize: 22, opacity: 0.25 },
+  pinBtnActive: { opacity: 1.0 },
   accessLimitBanner: { backgroundColor: '#F1F5F9', borderRadius: 10, padding: 10, marginBottom: 12 },
   accessLimitText: { fontSize: 13, color: '#64748B' },
   meta: { backgroundColor: '#fff', borderRadius: 12, padding: 16, gap: 12 },
