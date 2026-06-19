@@ -221,25 +221,29 @@ export default function FileDetailScreen() {
       const mimeType = file?.mime_type ?? 'application/octet-stream';
       if (Platform.OS === 'android') {
         const isApk = mimeType === 'application/vnd.android.package-archive';
-        try {
-          const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
-          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
+        if (isApk) {
+          // APK installer never returns activity result — fire without await to avoid stuck spinner
+          IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
             data: contentUri,
             type: mimeType,
-            // FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
-            // + FLAG_ACTIVITY_NEW_TASK required for system installer (APK)
-            flags: isApk ? 268435459 : 3,
-          });
-          if (isApk) {
-            Alert.alert(
-              'Установка APK',
-              'Если установщик закрылся, разрешите установку в Настройки → Приложения → DeliFile → Особые разрешения → Установка неизвестных приложений',
-              [{ text: 'OK' }, { text: 'Настройки', onPress: () => IntentLauncher.startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', { data: 'package:com.delifile.app' }).catch(() => {}) }],
-            );
+            flags: 268435459, // READ | WRITE | NEW_TASK
+          }).catch(() => {});
+          Alert.alert(
+            'Установка APK',
+            'Если установщик закрылся без установки — разрешите установку из неизвестных источников: Настройки → Приложения → DeliFile → Особые разрешения → Установка неизвестных приложений',
+            [{ text: 'OK' }, { text: 'Настройки', onPress: () => IntentLauncher.startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', { data: 'package:com.delifile.app' }).catch(() => {}) }],
+          );
+        } else {
+          try {
+            await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+              data: contentUri,
+              type: mimeType,
+              flags: 3, // FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
+            });
+          } catch {
+            await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть с помощью' });
           }
-        } catch {
-          // No handler for ACTION_VIEW — fall back to share sheet
-          await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть с помощью' });
         }
       } else {
         await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
