@@ -581,6 +581,10 @@ class SharedFolderController extends Controller
         $baseQuery = SharedFolderFile::query()
             ->select('shared_folder_files.*')
             ->join('files', 'files.id', '=', 'shared_folder_files.file_id')
+            ->leftJoin('file_user_access as pin_access', function ($join) use ($user) {
+                $join->on('pin_access.file_id', '=', 'files.id')
+                     ->where('pin_access.user_id', '=', $user->id);
+            })
             ->where('shared_folder_files.shared_folder_id', $id)
             ->when(!$isOwner, fn ($q) => $q->where('shared_folder_files.is_private', false));
 
@@ -621,6 +625,9 @@ class SharedFolderController extends Controller
             $baseQuery->whereHas('file.tags', fn ($q) => $q->where('tags.id', $tagId));
         }
 
+        // Pinned files always first, then secondary sort
+        $baseQuery->orderByRaw('pin_access.pinned_at IS NULL ASC')
+                  ->orderByRaw('pin_access.pinned_at DESC');
         if ($sortBy === 'size') {
             $baseQuery->orderBy('files.size', $sortOrder);
         } elseif ($sortBy === 'name') {

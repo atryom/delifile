@@ -220,14 +220,23 @@ export default function FileDetailScreen() {
       if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
       const mimeType = file?.mime_type ?? 'application/octet-stream';
       if (Platform.OS === 'android') {
+        const isApk = mimeType === 'application/vnd.android.package-archive';
         try {
           const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
           await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
             data: contentUri,
             type: mimeType,
             // FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
-            flags: 3,
+            // + FLAG_ACTIVITY_NEW_TASK required for system installer (APK)
+            flags: isApk ? 268435459 : 3,
           });
+          if (isApk) {
+            Alert.alert(
+              'Установка APK',
+              'Если установщик закрылся, разрешите установку в Настройки → Приложения → DeliFile → Особые разрешения → Установка неизвестных приложений',
+              [{ text: 'OK' }, { text: 'Настройки', onPress: () => IntentLauncher.startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', { data: 'package:com.delifile.app' }).catch(() => {}) }],
+            );
+          }
         } catch {
           // No handler for ACTION_VIEW — fall back to share sheet
           await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть с помощью' });

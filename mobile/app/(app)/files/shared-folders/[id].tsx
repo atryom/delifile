@@ -826,6 +826,7 @@ function FileRow({
       )}
       <View style={styles.rowInfo}>
         <View style={styles.fileNameRow}>
+          {file.is_pinned && <Text style={styles.pinIcon}>📌</Text>}
           <Text style={styles.fileName} numberOfLines={1}>{name}</Text>
           {(file.unread_comments ?? 0) > 0 && (
             <View style={styles.commentBadge}>
@@ -996,6 +997,7 @@ const styles = StyleSheet.create({
   fileIcon: { fontSize: 22 },
   rowInfo: { flex: 1, gap: 2 },
   fileNameRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6 },
+  pinIcon: { fontSize: 12 },
   fileName: { fontSize: 15, fontWeight: '500', color: '#1E293B', flex: 1 },
   fileMeta: { fontSize: 13, color: '#64748B' },
   commentBadge: { backgroundColor: '#EF4444', borderRadius: 8, minWidth: 18, height: 18, alignItems: 'center' as const, justifyContent: 'center' as const, paddingHorizontal: 4 },
