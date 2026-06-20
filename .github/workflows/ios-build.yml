@@ -170,12 +170,16 @@ jobs:
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
         id: build
+        timeout-minutes: 60
         working-directory: mobile
         run: |
+          echo "=== Build step started at $(date) ==="
+          echo "=== pwd: $(pwd) ==="
           touch /tmp/build-start-marker
+          # Используем прямой путь к бинарнику вместо npx чтобы избежать лишних процессов.
           # || true: EAS может вернуть non-zero из-за cleanup (ENOTEMPTY rmdir .git),
           # хотя IPA уже создан — проверяем наличие файла, а не exit code.
-          npx eas build \
+          ./node_modules/.bin/eas build \
             --platform ios \
             --profile production \
             --local \
