@@ -156,13 +156,14 @@ jobs:
           done
 
       - name: Pre-build diagnostics
+        working-directory: mobile
         run: |
           echo "=== Disk space ==="
           df -h /
           echo "=== eas-cli version ==="
-          cd mobile && npx eas --version
+          npx eas --version
           echo "=== expo version ==="
-          cd mobile && npx expo --version
+          npx expo --version
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
