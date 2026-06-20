@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: mobile
-        run: npm ci && npm install -g eas-cli
+        run: npm ci && npm remove -g eas-cli 2>/dev/null || true && npm install -g eas-cli
 
       - name: Unlock login keychain
         run: security unlock-keychain -p "${{ secrets.MAC_KEYCHAIN_PASSWORD }}" "$HOME/Library/Keychains/login.keychain-db"
