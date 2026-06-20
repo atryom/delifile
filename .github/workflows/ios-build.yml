@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: mobile
-        run: npm ci && npm remove -g eas-cli 2>/dev/null || true && npm install -g eas-cli
+        run: npm ci
 
       - name: Unlock login keychain
         run: security unlock-keychain -p "${{ secrets.MAC_KEYCHAIN_PASSWORD }}" "$HOME/Library/Keychains/login.keychain-db"
@@ -163,7 +163,7 @@ jobs:
           touch /tmp/build-start-marker
           # || true: EAS может вернуть non-zero из-за cleanup (ENOTEMPTY rmdir .git),
           # хотя IPA уже создан — проверяем наличие файла, а не exit code.
-          eas build \
+          npx eas build \
             --platform ios \
             --profile production \
             --local \
@@ -211,7 +211,7 @@ jobs:
               json.dump(cfg, f, indent=2, ensure_ascii=False)
           print('ASC API Key подставлен в eas.json (ascApiKeyId=' + os.environ['ASC_KEY_ID'] + ')')
           "
-          eas submit \
+          npx eas submit \
             --platform ios \
             --path "${{ steps.build.outputs.ipa_path }}" \
             --non-interactive
