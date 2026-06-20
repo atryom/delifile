@@ -235,15 +235,13 @@ export default function FileDetailScreen() {
             [{ text: 'OK' }, { text: 'Настройки', onPress: () => IntentLauncher.startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', { data: 'package:com.delifile.app' }).catch(() => {}) }],
           );
         } else {
-          try {
-            await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-              data: contentUri,
-              type: mimeType,
-              flags: 3, // FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
-            });
-          } catch {
-            await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть с помощью' });
-          }
+          // Fire-and-forget: awaiting causes RESULT_CANCELED (user closed viewer) to trigger
+          // Sharing.shareAsync fallback — showing unwanted "save" sheet instead of nothing.
+          IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+            data: contentUri,
+            type: mimeType,
+            flags: 3, // FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
+          }).catch(() => {});
         }
       } else {
         await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
