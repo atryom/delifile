@@ -155,6 +155,17 @@ jobs:
             echo "Pre-build unlock OK: $KC_PATH"
           done
 
+      - name: Pre-build diagnostics
+        run: |
+          echo "=== Disk space ==="
+          df -h /
+          echo "=== eas-cli version ==="
+          cd mobile && npx eas --version
+          echo "=== expo version ==="
+          cd mobile && npx expo --version
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       # Сборка занимает ~15–30 минут. Лог пишется в /tmp/ios-build.log.
       - name: Build iOS (local)
         id: build
