@@ -261,6 +261,30 @@
 .twofa-qr-image { text-align: center; margin-bottom: 10px; }
 .twofa-qr-image img { border-radius: 8px; max-width: 100%; }
 .twofa-step { font-size: 0.85rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
+.where-link {
+  font-size: 0.8rem; color: var(--accent-text); cursor: pointer; text-decoration: underline;
+  margin-left: 4px; white-space: nowrap;
+  &:hover { color: var(--accent); }
+}
+.app-info-popup {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;
+  &__body {
+    background: var(--surface); border-radius: 14px; padding: 28px 32px;
+    max-width: 380px; width: 90%; position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    h3 { margin: 0 0 12px; font-size: 1.05rem; color: var(--text); }
+    p { margin: 0 0 12px; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
+    ul { margin: 0; padding: 0 0 0 18px; }
+    li { margin-bottom: 6px; font-size: 0.88rem; }
+    a { color: var(--accent-text); &:hover { color: var(--accent); } }
+  }
+  &__close {
+    position: absolute; top: 10px; right: 14px; background: none; border: none;
+    font-size: 1.4rem; cursor: pointer; color: var(--text-muted); padding: 0; line-height: 1;
+    font-family: inherit;
+    &:hover { color: var(--text); }
+  }
+}
 .alert-error {
   color: #dc2626; font-size: 0.85rem;
   background: #fef2f2; border: 1px solid #fecaca;

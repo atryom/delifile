@@ -33,6 +33,11 @@ export class SecurityComponent implements OnInit {
   readonly loadingQR      = signal(false);
   readonly twoFaEnabling  = signal(false);
   readonly twoFaDisabling = signal(false);
+  readonly showAppInfo    = signal(false);
+
+  toggleAppInfo(): void {
+    this.showAppInfo.update(v => !v);
+  }
   readonly twoFaError     = signal<string | null>(null);
   readonly twoFaSuccess   = signal<string | null>(null);
   readonly showQRSection  = signal(false);

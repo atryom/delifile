@@ -447,9 +447,28 @@
             <div class="toggle-row">
               <div class="toggle-info">
                 <span class="toggle-label">QR-код</span>
-                <span class="toggle-desc">Отсканируйте в приложении LockPass</span>
+                <span class="toggle-desc">
+                  Отсканируйте в приложении LockPass
+                  <span class="where-link" (click)="toggleAppInfo()">Где найти?</span>
+                </span>
               </div>
             </div>
+
+            @if (showAppInfo()) {
+              <div class="app-info-popup" (click)="toggleAppInfo()">
+                <div class="app-info-popup__body" (click)="$event.stopPropagation()">
+                  <button class="app-info-popup__close" (click)="toggleAppInfo()">&times;</button>
+                  <h3>Приложение LockPass</h3>
+                  <p>Скачайте LockPass из официального магазина приложений:</p>
+                  <ul>
+                    <li><a href="https://apps.apple.com/ru/app/lockpass/id6443960246" target="_blank" rel="noopener">App Store (iOS)</a></li>
+                    <li><a href="https://www.rustore.ru/catalog/app/com.lockpass.app" target="_blank" rel="noopener">RuStore (Android)</a></li>
+                    <li><a href="https://play.google.com/store/apps/details?id=com.lockpass.app" target="_blank" rel="noopener">Google Play (Android)</a></li>
+                  </ul>
+                </div>
+              </div>
+            }
+
             <div class="twofa-qr-block">
               <div class="twofa-qr-image">
                 <img [src]="qrImageUrl(twoFaQR()!.qr_payload)"
