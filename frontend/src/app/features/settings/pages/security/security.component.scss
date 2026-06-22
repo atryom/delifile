@@ -246,6 +246,31 @@
   }
 }
 
+// 2FA section
+.twofa-status-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.twofa-badge {
+  display: inline-block; padding: 4px 12px;
+  background: #fef9c3; color: #a16207;
+  border-radius: 99px; font-size: 0.8rem; font-weight: 600;
+  &--on { background: #dcfce7; color: #16a34a; }
+}
+.twofa-devices { font-size: 0.85rem; color: var(--text-muted); }
+.twofa-qr-block {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 20px; margin-top: 14px;
+}
+.twofa-step { font-size: 0.88rem; color: var(--text); margin: 0 0 8px; line-height: 1.5; }
+.twofa-qr-payload {
+  font-family: monospace; font-size: 0.75rem; word-break: break-all;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 12px; margin: 8px 0; user-select: all;
+}
+.alert-error {
+  color: #dc2626; font-size: 0.85rem;
+  background: #fef2f2; border: 1px solid #fecaca;
+  padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;
+}
+
 @media (max-width: v.$bp-mobile) {
   .page { padding: 16px 12px; }
   .settings-section { padding: 16px; }

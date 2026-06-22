@@ -181,7 +181,7 @@ class LockPassService
     public function getProjectQR(): array
     {
         try {
-            $response = $this->publicClient()
+            $response = $this->withProjectAuth()
                 ->get($this->baseUrl() . '/integration/qr/' . $this->projectId());
 
             if (!$response->successful()) {
