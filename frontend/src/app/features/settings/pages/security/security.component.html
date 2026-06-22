@@ -415,46 +415,71 @@
         <div class="alert-success">{{ twoFaSuccess() }}</div>
       }
 
-      <div class="twofa-status-row">
-        <span class="twofa-badge" [class.twofa-badge--on]="authState.user()?.two_factor_enabled">
-          @if (authState.user()?.two_factor_enabled) { Включена } @else { Отключена }
-        </span>
-        @if (authState.user()?.two_factor_enabled) {
-          <span class="twofa-devices">Устройств: {{ authState.user()?.devices_count ?? 0 }}</span>
-        }
-      </div>
+      <div class="toggles-list">
 
-      @if (!authState.user()?.two_factor_enabled) {
-        @if (!showQRSection()) {
-          <button class="btn-primary" (click)="loadQR()" [disabled]="loadingQR()">
-            {{ loadingQR() ? 'Загрузка…' : 'Подключить LockPass' }}
-          </button>
-        }
-
-        @if (showQRSection() && twoFaQR()) {
-          <div class="twofa-qr-block">
-            <div class="twofa-qr-image">
-              <img
-                [src]="qrImageUrl(twoFaQR()!.qr_payload)"
-                alt="QR-код LockPass" width="200" height="200">
-            </div>
-            <p class="twofa-step">
-              Отсканируйте QR-код в приложении LockPass или нажмите
-              <a [href]="twoFaQR()!.qr_payload" target="_blank" rel="noopener">открыть ссылку</a>.
-            </p>
-            <p class="twofa-step">
-              После привязки вернитесь сюда. Страница обновится автоматически.
-            </p>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <span class="toggle-label">Статус</span>
+            <span class="toggle-desc">
+              <span class="twofa-badge" [class.twofa-badge--on]="authState.user()?.two_factor_enabled">
+                @if (authState.user()?.two_factor_enabled) { Включена } @else { Отключена }
+              </span>
+              @if (authState.user()?.two_factor_enabled) {
+                <span class="twofa-devices">&nbsp;· Устройств: {{ authState.user()?.devices_count ?? 0 }}</span>
+              }
+            </span>
           </div>
+        </div>
+
+        @if (!authState.user()?.two_factor_enabled) {
+
+          @if (!showQRSection()) {
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <span class="toggle-label">Подключить LockPass</span>
+                <span class="toggle-desc">Скачайте приложение и отсканируйте QR-код</span>
+              </div>
+              <button class="btn-primary" (click)="loadQR()" [disabled]="loadingQR()">
+                {{ loadingQR() ? 'Загрузка…' : 'Подключить' }}
+              </button>
+            </div>
+          }
+
+          @if (showQRSection() && twoFaQR()) {
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <span class="toggle-label">QR-код</span>
+                <span class="toggle-desc">Отсканируйте в приложении LockPass</span>
+              </div>
+            </div>
+            <div class="twofa-qr-block">
+              <div class="twofa-qr-image">
+                <img [src]="qrImageUrl(twoFaQR()!.qr_payload)"
+                     alt="QR-код LockPass" width="200" height="200">
+              </div>
+              <p class="twofa-step">
+                После привязки вернитесь на эту страницу — 2FA включится автоматически.
+              </p>
+            </div>
+          }
+
+        } @else {
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">Защита входа</span>
+              <span class="toggle-desc">
+                При каждом входе вы будете получать push-уведомление в LockPass.
+                Управление устройствами — внутри приложения LockPass.
+              </span>
+            </div>
+            <button class="btn-danger-outline" (click)="disableTwoFa()" [disabled]="twoFaDisabling()">
+              {{ twoFaDisabling() ? 'Отключение…' : 'Отключить 2FA' }}
+            </button>
+          </div>
+
         }
-      } @else {
-        <p class="section-desc">
-          При каждом входе вы будете получать push-уведомление в LockPass.
-          Управление устройствами — внутри приложения LockPass.
-        </p>
-        <button class="btn-danger-outline" (click)="disableTwoFa()" [disabled]="twoFaDisabling()">
-          {{ twoFaDisabling() ? 'Отключение…' : 'Отключить 2FA' }}
-        </button>
-      }
+
+      </div>
     </div>
 
