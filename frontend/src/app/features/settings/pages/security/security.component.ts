@@ -331,6 +331,10 @@ export class SecurityComponent implements OnInit {
 
   // ─── 2FA ─────────────────────────────────────────────────────────────────
 
+  qrImageUrl(payload: string): string {
+    return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(payload);
+  }
+
   loadQR(): void {
     if (this.twoFaQR()) { this.showQRSection.set(true); return; }
     this.loadingQR.set(true);

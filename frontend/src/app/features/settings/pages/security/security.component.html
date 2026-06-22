@@ -435,7 +435,7 @@
           <div class="twofa-qr-block">
             <div class="twofa-qr-image">
               <img
-                [src]="'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(twoFaQR()!.qr_payload)"
+                [src]="qrImageUrl(twoFaQR()!.qr_payload)"
                 alt="QR-код LockPass" width="200" height="200">
             </div>
             <p class="twofa-step">
