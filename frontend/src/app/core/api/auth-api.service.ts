@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from '../api/api.service';
 import { ApiResponse, CurrentUser, DeviceSession } from '../../shared/models/api.models';
+import { TwoFaSession } from './lockpass-api.service';
 
 export interface LoginRequest {
   email: string;
@@ -34,7 +35,7 @@ export class AuthApiService {
     return this.api.post('/auth/register', data);
   }
 
-  login(data: LoginRequest): Observable<ApiResponse<{ token: string; user: CurrentUser }>> {
+  login(data: LoginRequest): Observable<ApiResponse<{ token: string; user: CurrentUser } | TwoFaSession>> {
     return this.api.post('/auth/login', data);
   }
 

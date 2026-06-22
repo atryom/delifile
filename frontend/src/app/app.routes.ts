@@ -101,6 +101,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/support/pages/support/support.component').then(m => m.SupportComponent),
       },
+      {
+        path: '2fa/callback',
+        loadComponent: () =>
+          import('./features/settings/pages/twofa-callback/twofa-callback.component').then(m => m.TwoFaCallbackComponent),
+      },
     ],
   },
 

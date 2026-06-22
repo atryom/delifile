@@ -6,6 +6,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { UserSettingsApiService } from '../../../../core/api/user-settings-api.service';
+import { LockPassApiService, ProjectQR } from '../../../../core/api/lockpass-api.service';
 import { NotificationService } from '../../../../core/notifications/notification.service';
 import { DeviceSession, ContactRequestItem } from '../../../../shared/models/api.models';
 
@@ -24,7 +25,17 @@ export class SecurityComponent implements OnInit {
   private readonly router         = inject(Router);
   private readonly translate      = inject(TranslateService);
   private readonly settingsApi    = inject(UserSettingsApiService);
+  private readonly lockPassApi    = inject(LockPassApiService);
   readonly notifService           = inject(NotificationService);
+
+  // 2FA
+  readonly twoFaQR        = signal<ProjectQR | null>(null);
+  readonly loadingQR      = signal(false);
+  readonly twoFaEnabling  = signal(false);
+  readonly twoFaDisabling = signal(false);
+  readonly twoFaError     = signal<string | null>(null);
+  readonly twoFaSuccess   = signal<string | null>(null);
+  readonly showQRSection  = signal(false);
 
   readonly sessions        = signal<DeviceSession[]>([]);
   readonly loadingSessions = signal(false);
@@ -315,6 +326,60 @@ export class SecurityComponent implements OnInit {
   rejectContactRequest(id: string): void {
     this.settingsApi.rejectContactRequest(id).subscribe(() => {
       this.contactRequests.update(rs => rs.filter(r => r.id !== id));
+    });
+  }
+
+  // ─── 2FA ─────────────────────────────────────────────────────────────────
+
+  loadQR(): void {
+    if (this.twoFaQR()) { this.showQRSection.set(true); return; }
+    this.loadingQR.set(true);
+    this.twoFaError.set(null);
+    this.lockPassApi.getProjectQR().subscribe({
+      next: (res) => {
+        this.twoFaQR.set(res.data);
+        this.showQRSection.set(true);
+        this.loadingQR.set(false);
+      },
+      error: () => {
+        this.twoFaError.set('Не удалось загрузить QR-код. Попробуйте позже.');
+        this.loadingQR.set(false);
+      },
+    });
+  }
+
+  handleLockPassCallback(lockpassUserId: number): void {
+    this.twoFaEnabling.set(true);
+    this.twoFaError.set(null);
+    this.twoFaSuccess.set(null);
+    this.lockPassApi.enable(lockpassUserId).subscribe({
+      next: (res) => {
+        this.authState.updateUser(res.data.user);
+        this.twoFaSuccess.set('2FA успешно включена.');
+        this.showQRSection.set(false);
+        this.twoFaEnabling.set(false);
+      },
+      error: () => {
+        this.twoFaError.set('Не удалось включить 2FA.');
+        this.twoFaEnabling.set(false);
+      },
+    });
+  }
+
+  disableTwoFa(): void {
+    this.twoFaDisabling.set(true);
+    this.twoFaError.set(null);
+    this.twoFaSuccess.set(null);
+    this.lockPassApi.disable().subscribe({
+      next: (res) => {
+        this.authState.updateUser(res.data.user);
+        this.twoFaSuccess.set('2FA отключена.');
+        this.twoFaDisabling.set(false);
+      },
+      error: () => {
+        this.twoFaError.set('Не удалось отключить 2FA.');
+        this.twoFaDisabling.set(false);
+      },
     });
   }
 

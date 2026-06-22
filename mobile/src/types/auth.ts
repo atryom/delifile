@@ -25,6 +25,22 @@ export interface User {
   notify_task_assigned: boolean;
   allow_contacts_without_confirmation: boolean;
   auto_add_received_files: boolean;
+  lockpass_user_id: number | null;
+  two_factor_enabled: boolean;
+  devices_count: number;
+}
+
+export interface TwoFaSession {
+  requires_2fa: true;
+  session_id: string;
+  qr_payload: string | null;
+  expires_at: string;
+}
+
+export interface TwoFaPollResult {
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  token?: string;
+  user?: User;
 }
 
 export interface DeviceSession {

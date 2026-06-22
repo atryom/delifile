@@ -59,6 +59,24 @@ class AuthController extends Controller
             ]);
         }
 
+        if (!empty($result['requires_2fa'])) {
+            return $this->success('Требуется двухфакторная аутентификация', [
+                'requires_2fa' => true,
+                'session_id'   => $result['session_id'],
+                'qr_payload'   => $result['qr_payload'],
+                'expires_at'   => $result['expires_at'],
+            ]);
+        }
+
+        if (!empty($result['two_fa_unavailable'])) {
+            return $this->error(
+                'Сервис 2FA временно недоступен. Попробуйте позже.',
+                'TWO_FA_UNAVAILABLE',
+                [],
+                503
+            );
+        }
+
         if (!empty($result['device_limit'])) {
             return $this->error(
                 'Достигнуто максимальное количество устройств для вашего тарифного плана.',

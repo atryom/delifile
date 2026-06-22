@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { authApi } from '@/api/auth';
+import { lockpassApi } from '@/api/lockpass';
+import { useAuthStore } from '@/store/auth';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -11,6 +13,7 @@ import { getApiError } from '@/utils/error';
 
 export default function SecurityScreen() {
   const qc = useQueryClient();
+  const { user, setUser } = useAuthStore((s) => ({ user: s.user, setUser: s.setUser }));
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -124,9 +127,98 @@ export default function SecurityScreen() {
           </View>
         )}
       </View>
+
+      {/* ── 2FA section ── */}
+      <TwoFaSection user={user} setUser={setUser} />
+
     </ScrollView>
   );
 }
+
+function TwoFaSection({ user, setUser }: { user: any; setUser: (u: any) => void }) {
+  const [qrData, setQrData] = useState<{ qr_payload: string; deep_link: string; app_store: string; ru_store: string } | null>(null);
+  const [loadingQR, setLoadingQR] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const disableMutation = useMutation({
+    mutationFn: () => lockpassApi.disable(),
+    onSuccess: (res) => { setUser(res.data.data.user); setError(null); },
+    onError: (e) => setError(getApiError(e, 'Не удалось отключить 2FA')),
+  });
+
+  async function loadQR() {
+    setLoadingQR(true);
+    setError(null);
+    try {
+      const res = await lockpassApi.getProjectQR();
+      setQrData(res.data.data);
+    } catch (e) {
+      setError(getApiError(e, 'Не удалось загрузить QR'));
+    } finally {
+      setLoadingQR(false);
+    }
+  }
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Двухфакторная аутентификация</Text>
+
+      {error && <Text style={{ color: '#ef4444', fontSize: 13 }}>{error}</Text>}
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={[s2fa.badge, user?.two_factor_enabled ? s2fa.badgeOn : s2fa.badgeOff]}>
+          <Text style={s2fa.badgeText}>{user?.two_factor_enabled ? 'Включена' : 'Отключена'}</Text>
+        </View>
+        {user?.two_factor_enabled && (
+          <Text style={{ color: '#64748b', fontSize: 13 }}>Устройств: {user?.devices_count ?? 0}</Text>
+        )}
+      </View>
+
+      {!user?.two_factor_enabled ? (
+        <>
+          <Text style={{ color: '#64748b', fontSize: 13 }}>
+            Подтверждайте вход в приложении LockPass.
+          </Text>
+          {!qrData ? (
+            <Button title={loadingQR ? 'Загрузка…' : 'Подключить LockPass'} onPress={loadQR} loading={loadingQR} />
+          ) : (
+            <View style={{ gap: 10 }}>
+              <Text style={{ color: '#64748b', fontSize: 13 }}>
+                Откройте LockPass и отсканируйте QR или нажмите кнопку ниже.
+              </Text>
+              <Button title="Открыть в LockPass" onPress={() => Linking.openURL(qrData.deep_link)} />
+              <Text style={{ color: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }} numberOfLines={2}>
+                {qrData.qr_payload}
+              </Text>
+            </View>
+          )}
+        </>
+      ) : (
+        <>
+          <Text style={{ color: '#64748b', fontSize: 13 }}>
+            При каждом входе вы получаете push в LockPass.
+          </Text>
+          <TouchableOpacity
+            onPress={() => Alert.alert('Отключить 2FA', 'Вы уверены?', [
+              { text: 'Отмена', style: 'cancel' },
+              { text: 'Отключить', style: 'destructive', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); disableMutation.mutate(); } },
+            ])}
+            style={styles.revokeBtn}
+          >
+            <Text style={styles.revokeText}>{disableMutation.isPending ? 'Отключение…' : 'Отключить 2FA'}</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  );
+}
+
+const s2fa = StyleSheet.create({
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  badgeOn: { backgroundColor: '#dcfce7' },
+  badgeOff: { backgroundColor: '#f1f5f9' },
+  badgeText: { fontSize: 13, fontWeight: '600', color: '#1e293b' },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },

@@ -211,23 +211,24 @@ export default function FileDetailScreen() {
     }
     setDownloading(true);
     try {
-      const presignedUrl = await downloadUrl.mutateAsync();
-      // Download to cache first: avoids S3 URL re-encoding on iOS (SignatureDoesNotMatch)
-      const fileName = (file?.display_name ?? file?.original_name ?? 'file')
-        .replace(/[^\w.\-]/g, '_');
-      const localUri = FileSystemLegacy.cacheDirectory + fileName;
-      const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
-      if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
       const mimeType = file?.mime_type ?? 'application/octet-stream';
       if (Platform.OS === 'android') {
         const isApk = mimeType === 'application/vnd.android.package-archive';
-        const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
         if (isApk) {
-          // APK installer never returns activity result — fire without await to avoid stuck spinner
+          // APK must be local for installation — download to cache, then open via content URI.
+          // FLAG_ACTIVITY_NEW_TASK required for system package installer.
+          // Fire-and-forget: installer never returns activity result, await hangs forever.
+          const presignedUrl = await downloadUrl.mutateAsync();
+          const fileName = (file?.display_name ?? file?.original_name ?? 'file')
+            .replace(/[^\w.\-]/g, '_');
+          const localUri = FileSystemLegacy.cacheDirectory + fileName;
+          const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
+          if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
+          const contentUri = await FileSystemLegacy.getContentUriAsync(localUri);
           IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
             data: contentUri,
             type: mimeType,
-            flags: 268435459, // READ | WRITE | NEW_TASK
+            flags: 268435459, // FLAG_GRANT_READ | FLAG_GRANT_WRITE | FLAG_ACTIVITY_NEW_TASK
           }).catch(() => {});
           Alert.alert(
             'Установка APK',
@@ -235,16 +236,39 @@ export default function FileDetailScreen() {
             [{ text: 'OK' }, { text: 'Настройки', onPress: () => IntentLauncher.startActivityAsync('android.settings.MANAGE_UNKNOWN_APP_SOURCES', { data: 'package:com.delifile.app' }).catch(() => {}) }],
           );
         } else {
-          // Fire-and-forget: awaiting causes RESULT_CANCELED (user closed viewer) to trigger
-          // Sharing.shareAsync fallback — showing unwanted "save" sheet instead of nothing.
-          IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-            data: contentUri,
-            type: mimeType,
-            flags: 3, // FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
-          }).catch(() => {});
+          // Use view_url (no Content-Disposition: attachment) so Chrome displays inline.
+          // download-url has "attachment" disposition → Chrome downloads instead of viewing.
+          // view_url is already in file data (generated at fetch time, TTL 120 min).
+          const viewUrl = file?.view_url;
+          if (viewUrl) {
+            Linking.openURL(viewUrl).catch(() => Alert.alert('Ошибка', 'Не удалось открыть файл'));
+          } else {
+            // No view_url (e.g. DOCX, ZIP) — download to cache and show share sheet.
+            const presignedUrl = await downloadUrl.mutateAsync();
+            const fileName = (file?.display_name ?? file?.original_name ?? 'file')
+              .replace(/[^\w.\-]/g, '_');
+            const localUri = FileSystemLegacy.cacheDirectory + fileName;
+            const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
+            if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
+            await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть с помощью' });
+          }
         }
       } else {
-        await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
+        // iOS: PDF и медиа с view_url — открываем напрямую в Safari (inline, без share sheet).
+        // view_url не имеет Content-Disposition: attachment, поэтому Safari показывает файл, а не скачивает.
+        // Для остальных типов (DOCX, ZIP и т.п.) — скачиваем в кеш и показываем share sheet.
+        const viewUrl = file?.view_url;
+        if (viewUrl) {
+          Linking.openURL(viewUrl).catch(() => Alert.alert('Ошибка', 'Не удалось открыть файл'));
+        } else {
+          const presignedUrl = await downloadUrl.mutateAsync();
+          const fileName = (file?.display_name ?? file?.original_name ?? 'file')
+            .replace(/[^\w.\-]/g, '_');
+          const localUri = FileSystemLegacy.cacheDirectory + fileName;
+          const { status } = await FileSystemLegacy.downloadAsync(presignedUrl, localUri);
+          if (status !== 200) { Alert.alert('Ошибка', 'Не удалось скачать файл'); return; }
+          await Sharing.shareAsync(localUri, { mimeType, dialogTitle: 'Открыть файл' });
+        }
       }
     } catch {
       Alert.alert('Ошибка', 'Не удалось открыть файл');

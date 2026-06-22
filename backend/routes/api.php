@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\SupportAdminController;
 use App\Http\Controllers\Admin\SuggestionAdminController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\LockPass2FAController;
 use App\Http\Controllers\Files\FileController;
 use App\Http\Controllers\Files\FileLikeController;
 use App\Http\Controllers\Files\FileRequestController;
@@ -56,6 +57,12 @@ Route::prefix('v1')->group(function () {
         Route::post('password/forgot',             [AuthController::class, 'forgotPassword']);
         Route::post('password/verify-reset-token', [AuthController::class, 'verifyResetToken']);
         Route::post('password/reset',              [AuthController::class, 'resetPassword']);
+
+        // LockPass 2FA — public endpoints (no project token exposed)
+        Route::get('2fa/qr',       [LockPass2FAController::class, 'qr']);
+        Route::post('2fa/poll',    [LockPass2FAController::class, 'poll']);
+        Route::post('2fa/totp',    [LockPass2FAController::class, 'totp']);
+        Route::post('2fa/recovery',[LockPass2FAController::class, 'recovery']);
 
         // Email verification (GET → redirect to SPA)
         Route::get('email/verify/{token}', [AuthController::class, 'verifyEmail'])
@@ -214,6 +221,10 @@ Route::prefix('v1')->group(function () {
 
         // User settings
         Route::patch('user/settings', [UserSettingsController::class, 'update']);
+
+        // LockPass 2FA settings
+        Route::post('settings/2fa/enable',  [LockPass2FAController::class, 'enable']);
+        Route::post('settings/2fa/disable', [LockPass2FAController::class, 'disable']);
 
         // API tokens
         Route::get('api-tokens',         [ApiTokenController::class, 'index']);

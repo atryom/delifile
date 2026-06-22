@@ -4,12 +4,15 @@ namespace App\Services;
 
 use App\Models\DeviceSession;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AuthService
 {
     public function __construct(
-        private readonly EmailVerificationService $verificationService
+        private readonly EmailVerificationService $verificationService,
+        private readonly LockPassService          $lockPassService,
     ) {}
 
     /**
@@ -56,9 +59,44 @@ class AuthService
             ];
         }
 
-        $deviceId   = $credentials['device_id'] ?? null;
-        $deviceType = $credentials['device_type'] ?? null;
-        $deviceName = $credentials['device_name'] ?? $deviceType ?? 'Web Browser';
+        // 2FA check (uses cached status — no HTTP request on the hot login path)
+        if ($user->two_factor_enabled && $user->lockpass_user_id) {
+            try {
+                $session = $this->lockPassService->create2FASession((int) $user->lockpass_user_id);
+
+                Cache::put('lockpass_2fa_' . $session['session_id'], [
+                    'user_id'     => $user->id,
+                    'device_id'   => $credentials['device_id'] ?? null,
+                    'device_type' => $credentials['device_type'] ?? null,
+                    'device_name' => $credentials['device_name'] ?? $credentials['device_type'] ?? 'Web Browser',
+                    'user_agent'  => $userAgent,
+                    'ip'          => $ip,
+                ], now()->addMinutes(6));
+
+                return [
+                    'requires_2fa' => true,
+                    'session_id'   => $session['session_id'],
+                    'qr_payload'   => $session['qr_payload'] ?? null,
+                    'expires_at'   => now()->addMinutes(5)->toIso8601String(),
+                ];
+            } catch (\Throwable $e) {
+                Log::error('LockPass 2FA session creation failed', ['error' => $e->getMessage()]);
+                return ['two_fa_unavailable' => true];
+            }
+        }
+
+        return $this->finalizeLogin($user, $credentials, $userAgent, $ip);
+    }
+
+    /**
+     * Create a Sanctum token + DeviceSession after successful authentication.
+     * Called after password check OR after 2FA approval.
+     */
+    public function finalizeLogin(User $user, array $deviceInfo, ?string $userAgent, ?string $ip): array
+    {
+        $deviceId   = $deviceInfo['device_id'] ?? null;
+        $deviceType = $deviceInfo['device_type'] ?? null;
+        $deviceName = $deviceInfo['device_name'] ?? $deviceType ?? 'Web Browser';
 
         $existingSession = $deviceId
             ? DeviceSession::where('user_id', $user->id)->where('device_id', $deviceId)->first()
@@ -191,6 +229,10 @@ class AuthService
             'allow_contacts_without_confirmation'   => (bool) ($user->allow_contacts_without_confirmation ?? true),
             'auto_add_received_files'               => (bool) ($user->auto_add_received_files ?? true),
             'notify_task_assigned'                  => (bool) ($user->notify_task_assigned ?? true),
+            // LockPass 2FA
+            'lockpass_user_id'                      => $user->lockpass_user_id,
+            'two_factor_enabled'                    => (bool) $user->two_factor_enabled,
+            'devices_count'                         => (int) ($user->devices_count ?? 0),
         ];
     }
 }

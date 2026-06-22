@@ -11,69 +11,168 @@
           <p>{{ 'auth.login.subtitle' | translate }}</p>
         </div>
 
-        @if (emailVerifiedParam() === 'true') {
-          <div class="alert-success">{{ 'auth.login.email_verified_success' | translate }}</div>
-        }
-        @if (emailVerifiedParam() === 'false') {
-          <div class="alert-error">{{ 'auth.login.email_verify_failed' | translate }}</div>
-        }
-
-        <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form" novalidate>
-
-          @if (serverError()) {
-            <div class="alert-error">{{ serverError() }}</div>
+        <!-- ── Credentials step ─────────────────────────────────────── -->
+        @if (step() === 'credentials') {
+          @if (emailVerifiedParam() === 'true') {
+            <div class="alert-success">{{ 'auth.login.email_verified_success' | translate }}</div>
+          }
+          @if (emailVerifiedParam() === 'false') {
+            <div class="alert-error">{{ 'auth.login.email_verify_failed' | translate }}</div>
           }
 
-          <div class="field">
-            <label for="email">{{ 'auth.login.email' | translate }}</label>
-            <input
-              id="email"
-              type="email"
-              formControlName="email"
-              placeholder="you@example.com"
-              autocomplete="username"
-              [class.input-error]="fieldError('email')"
-            />
-            @if (fieldError('email')) {
-              <span class="field-error">{{ fieldError('email') }}</span>
+          <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form" novalidate>
+
+            @if (serverError()) {
+              <div class="alert-error">{{ serverError() }}</div>
+            }
+
+            <div class="field">
+              <label for="email">{{ 'auth.login.email' | translate }}</label>
+              <input
+                id="email"
+                type="email"
+                formControlName="email"
+                placeholder="you@example.com"
+                autocomplete="username"
+                [class.input-error]="fieldError('email')"
+              />
+              @if (fieldError('email')) {
+                <span class="field-error">{{ fieldError('email') }}</span>
+              }
+            </div>
+
+            <div class="field">
+              <label for="password">{{ 'auth.login.password' | translate }}</label>
+              <input
+                id="password"
+                type="password"
+                formControlName="password"
+                autocomplete="current-password"
+                [class.input-error]="fieldError('password')"
+              />
+              @if (fieldError('password')) {
+                <span class="field-error">{{ fieldError('password') }}</span>
+              }
+            </div>
+
+            <div class="remember-row">
+              <label class="remember-label">
+                <input type="checkbox" formControlName="remember" class="remember-check"/>
+                {{ 'auth.login.remember_me' | translate }}
+              </label>
+            </div>
+
+            <button type="submit" class="btn-primary btn-full" [disabled]="pending()">
+              {{ pending() ? ('auth.login.submitting' | translate) : ('auth.login.submit' | translate) }}
+            </button>
+
+            <p class="auth-switch">
+              <a routerLink="/forgot-password" class="link-primary">{{ 'auth.login.forgot_password' | translate }}</a>
+            </p>
+
+            <p class="auth-switch">
+              {{ 'auth.login.no_account' | translate }}
+              <a routerLink="/register" class="link-primary">{{ 'auth.login.register_link' | translate }}</a>
+            </p>
+
+          </form>
+        }
+
+        <!-- ── 2FA step ───────────────────────────────────────────────── -->
+        @if (step() === '2fa') {
+          <div class="twofa-block">
+
+            <!-- Timer -->
+            <div class="twofa-timer" [class.twofa-timer--expiring]="secondsLeft() < 60">
+              {{ formatSecondsLeft() }}
+            </div>
+
+            <!-- Approved -->
+            @if (twoFaStatus() === 'approved') {
+              <div class="alert-success twofa-status">Аутентификация подтверждена. Входим…</div>
+            }
+
+            <!-- Rejected -->
+            @if (twoFaStatus() === 'rejected') {
+              <div class="alert-error twofa-status">Запрос отклонён в LockPass.</div>
+              <button class="btn-primary btn-full" (click)="retryTwoFa()">Попробовать снова</button>
+            }
+
+            <!-- Expired -->
+            @if (twoFaStatus() === 'expired') {
+              <div class="alert-error twofa-status">Время сессии истекло.</div>
+              <button class="btn-primary btn-full" (click)="retryTwoFa()">Запросить новый код</button>
+            }
+
+            <!-- Pending -->
+            @if (twoFaStatus() === 'pending') {
+              <!-- Mode tabs -->
+              <div class="twofa-tabs">
+                <button class="twofa-tab" [class.twofa-tab--active]="twoFaMode() === 'push'" (click)="setTwoFaMode('push')">Push</button>
+                <button class="twofa-tab" [class.twofa-tab--active]="twoFaMode() === 'totp'" (click)="setTwoFaMode('totp')">Код</button>
+                <button class="twofa-tab" [class.twofa-tab--active]="twoFaMode() === 'recovery'" (click)="setTwoFaMode('recovery')">Резервный</button>
+              </div>
+
+              <!-- Push mode -->
+              @if (twoFaMode() === 'push') {
+                <div class="twofa-push">
+                  <div class="twofa-spinner"></div>
+                  <p class="twofa-hint">Подтвердите запрос в приложении LockPass на вашем устройстве.</p>
+                  @if (twoFaSession()?.qr_payload) {
+                    <p class="twofa-hint-small">Нет телефона рядом? Отсканируйте QR:</p>
+                    <div class="twofa-qr">{{ twoFaSession()?.qr_payload }}</div>
+                  }
+                </div>
+              }
+
+              <!-- TOTP mode -->
+              @if (twoFaMode() === 'totp') {
+                <div class="twofa-totp">
+                  <p class="twofa-hint">Введите 6-значный код из приложения LockPass.</p>
+                  @if (totpError()) {
+                    <div class="alert-error">{{ totpError() }}</div>
+                  }
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="6"
+                    placeholder="000000"
+                    class="totp-input"
+                    [value]="totpCode()"
+                    (input)="totpCode.set($any($event.target).value)"
+                    (keyup.enter)="submitTotp()"
+                  />
+                  <button class="btn-primary btn-full" [disabled]="totpCode().length !== 6 || pending()" (click)="submitTotp()">
+                    Подтвердить
+                  </button>
+                </div>
+              }
+
+              <!-- Recovery mode -->
+              @if (twoFaMode() === 'recovery') {
+                <div class="twofa-recovery">
+                  <p class="twofa-hint">Введите резервный код (формат: xxxx-xxxx).</p>
+                  @if (recoveryError()) {
+                    <div class="alert-error">{{ recoveryError() }}</div>
+                  }
+                  <input
+                    type="text"
+                    placeholder="abcd-1234"
+                    class="totp-input"
+                    [value]="recoveryCode()"
+                    (input)="recoveryCode.set($any($event.target).value)"
+                    (keyup.enter)="submitRecovery()"
+                  />
+                  <button class="btn-primary btn-full" [disabled]="!recoveryCode() || pending()" (click)="submitRecovery()">
+                    Подтвердить
+                  </button>
+                </div>
+              }
+
+              <button class="btn-link" (click)="retryTwoFa()">← Назад к форме входа</button>
             }
           </div>
+        }
 
-          <div class="field">
-            <label for="password">{{ 'auth.login.password' | translate }}</label>
-            <input
-              id="password"
-              type="password"
-              formControlName="password"
-              autocomplete="current-password"
-              [class.input-error]="fieldError('password')"
-            />
-            @if (fieldError('password')) {
-              <span class="field-error">{{ fieldError('password') }}</span>
-            }
-          </div>
-
-          <div class="remember-row">
-            <label class="remember-label">
-              <input type="checkbox" formControlName="remember" class="remember-check"/>
-              {{ 'auth.login.remember_me' | translate }}
-            </label>
-          </div>
-
-          <button type="submit" class="btn-primary btn-full" [disabled]="pending()">
-            {{ pending() ? ('auth.login.submitting' | translate) : ('auth.login.submit' | translate) }}
-          </button>
-
-          <p class="auth-switch">
-            <a routerLink="/forgot-password" class="link-primary">{{ 'auth.login.forgot_password' | translate }}</a>
-          </p>
-
-          <p class="auth-switch">
-            {{ 'auth.login.no_account' | translate }}
-            <a routerLink="/register" class="link-primary">{{ 'auth.login.register_link' | translate }}</a>
-          </p>
-
-        </form>
       </div>
     </div>
-  

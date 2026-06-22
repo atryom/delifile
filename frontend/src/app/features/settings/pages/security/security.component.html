@@ -398,3 +398,65 @@
       </div>
 
     </div>
+
+    <!-- ── 2FA (LockPass) ──────────────────────────────────────────────── -->
+    <div class="section">
+      <h2 class="section-title">Двухфакторная аутентификация</h2>
+
+      @if (twoFaError()) {
+        <div class="alert-error">{{ twoFaError() }}</div>
+      }
+      @if (twoFaSuccess()) {
+        <div class="alert-success">{{ twoFaSuccess() }}</div>
+      }
+
+      <div class="twofa-status-row">
+        <span class="twofa-badge" [class.twofa-badge--on]="authState.user()?.two_factor_enabled">
+          {{ authState.user()?.two_factor_enabled ? 'Включена' : 'Отключена' }}
+        </span>
+        @if (authState.user()?.two_factor_enabled) {
+          <span class="twofa-devices">Устройств: {{ authState.user()?.devices_count ?? 0 }}</span>
+        }
+      </div>
+
+      @if (!authState.user()?.two_factor_enabled) {
+        <p class="section-desc">
+          Подтверждайте вход в приложении LockPass на вашем смартфоне.
+        </p>
+
+        @if (!showQRSection()) {
+          <button class="btn-primary" (click)="loadQR()" [disabled]="loadingQR()">
+            {{ loadingQR() ? 'Загрузка…' : 'Подключить LockPass' }}
+          </button>
+        }
+
+        @if (showQRSection() && twoFaQR()) {
+          <div class="twofa-qr-block">
+            <p class="twofa-step">
+              1. Скачайте приложение LockPass:
+              <a [href]="twoFaQR()!.app_store" target="_blank" rel="noopener">App Store</a> /
+              <a [href]="twoFaQR()!.ru_store" target="_blank" rel="noopener">RuStore</a>
+            </p>
+            <p class="twofa-step">
+              2. Откройте LockPass и отсканируйте QR-код или нажмите
+              <a [href]="twoFaQR()!.deep_link">Открыть в LockPass</a>.
+            </p>
+            <div class="twofa-qr-payload">{{ twoFaQR()!.qr_payload }}</div>
+            <p class="twofa-step">
+              3. После привязки вернитесь сюда. Страница обновится автоматически
+              через deep link
+              (<code>https://delifile.ru/settings/2fa/callback?lockpass_user_id=…</code>).
+            </p>
+          </div>
+        }
+      } @else {
+        <p class="section-desc">
+          При каждом входе вы будете получать push-уведомление в LockPass.
+          Управление устройствами — внутри приложения LockPass.
+        </p>
+        <button class="btn-danger-outline" (click)="disableTwoFa()" [disabled]="twoFaDisabling()">
+          {{ twoFaDisabling() ? 'Отключение…' : 'Отключить 2FA' }}
+        </button>
+      }
+    </div>
+

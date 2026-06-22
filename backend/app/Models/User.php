@@ -31,6 +31,10 @@ class User extends Authenticatable
         'notify_contacts_added',
         'allow_contacts_without_confirmation',
         'auto_add_received_files',
+        // LockPass 2FA
+        'lockpass_user_id',
+        'two_factor_enabled',
+        'devices_count',
     ];
 
     protected $hidden = [
@@ -58,6 +62,8 @@ class User extends Authenticatable
             'notify_contacts_added'                 => 'boolean',
             'allow_contacts_without_confirmation'   => 'boolean',
             'auto_add_received_files'               => 'boolean',
+            'two_factor_enabled'                    => 'boolean',
+            'devices_count'                         => 'integer',
         ];
     }
 
