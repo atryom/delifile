@@ -401,7 +401,12 @@
 
     <!-- ── 2FA (LockPass) ──────────────────────────────────────────────── -->
     <div class="settings-section">
-      <h2 class="section-title">Двухфакторная аутентификация</h2>
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Двухфакторная аутентификация</h2>
+          <p class="section-desc">Подтверждайте вход в приложении LockPass на вашем смартфоне</p>
+        </div>
+      </div>
 
       @if (twoFaError()) {
         <div class="alert-error">{{ twoFaError() }}</div>
@@ -412,7 +417,7 @@
 
       <div class="twofa-status-row">
         <span class="twofa-badge" [class.twofa-badge--on]="authState.user()?.two_factor_enabled">
-          {{ authState.user()?.two_factor_enabled ? 'Включена' : 'Отключена' }}
+          @if (authState.user()?.two_factor_enabled) { Включена } @else { Отключена }
         </span>
         @if (authState.user()?.two_factor_enabled) {
           <span class="twofa-devices">Устройств: {{ authState.user()?.devices_count ?? 0 }}</span>
@@ -420,10 +425,6 @@
       </div>
 
       @if (!authState.user()?.two_factor_enabled) {
-        <p class="section-desc">
-          Подтверждайте вход в приложении LockPass на вашем смартфоне.
-        </p>
-
         @if (!showQRSection()) {
           <button class="btn-primary" (click)="loadQR()" [disabled]="loadingQR()">
             {{ loadingQR() ? 'Загрузка…' : 'Подключить LockPass' }}
