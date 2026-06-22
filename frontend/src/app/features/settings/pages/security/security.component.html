@@ -433,20 +433,17 @@
 
         @if (showQRSection() && twoFaQR()) {
           <div class="twofa-qr-block">
+            <div class="twofa-qr-image">
+              <img
+                [src]="'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(twoFaQR()!.qr_payload)"
+                alt="QR-код LockPass" width="200" height="200">
+            </div>
             <p class="twofa-step">
-              1. Скачайте приложение LockPass:
-              <a [href]="twoFaQR()!.app_store" target="_blank" rel="noopener">App Store</a> /
-              <a [href]="twoFaQR()!.ru_store" target="_blank" rel="noopener">RuStore</a>
+              Отсканируйте QR-код в приложении LockPass или нажмите
+              <a [href]="twoFaQR()!.qr_payload" target="_blank" rel="noopener">открыть ссылку</a>.
             </p>
             <p class="twofa-step">
-              2. Откройте LockPass и отсканируйте QR-код или нажмите
-              <a [href]="twoFaQR()!.deep_link">Открыть в LockPass</a>.
-            </p>
-            <div class="twofa-qr-payload">{{ twoFaQR()!.qr_payload }}</div>
-            <p class="twofa-step">
-              3. После привязки вернитесь сюда. Страница обновится автоматически
-              через deep link
-              (<code>https://delifile.ru/settings/2fa/callback?lockpass_user_id=…</code>).
+              После привязки вернитесь сюда. Страница обновится автоматически.
             </p>
           </div>
         }

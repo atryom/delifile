@@ -259,6 +259,8 @@
   background: var(--surface2); border: 1px solid var(--border);
   border-radius: 10px; padding: 16px 20px; margin-top: 14px;
 }
+.twofa-qr-image { text-align: center; margin-bottom: 14px; }
+.twofa-qr-image img { border-radius: 8px; max-width: 100%; }
 .twofa-step { font-size: 0.88rem; color: var(--text); margin: 0 0 8px; line-height: 1.5; }
 .twofa-qr-payload {
   font-family: monospace; font-size: 0.75rem; word-break: break-all;
