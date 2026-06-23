@@ -26,15 +26,17 @@ const asyncStoragePersister = createAsyncStoragePersister({
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
-  componentDidCatch(_error: Error, _info: ErrorInfo) {}
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[AppErrorBoundary]', error.message, error.stack, info.componentStack);
+  }
   render() {
     if (this.state.error) {
       return (
         <View style={errStyles.container}>
           <Text style={errStyles.title}>Что-то пошло не так</Text>
           <Text style={errStyles.sub}>Произошла непредвиденная ошибка.</Text>
-          <TouchableOpacity style={errStyles.btn} onPress={() => this.setState({ error: null })}>
-            <Text style={errStyles.btnText}>Попробовать снова</Text>
+          <TouchableOpacity style={errStyles.btn} onPress={() => { this.setState({ error: null }); try { router.replace('/'); } catch {} }}>
+            <Text style={errStyles.btnText}>Вернуться на главную</Text>
           </TouchableOpacity>
         </View>
       );

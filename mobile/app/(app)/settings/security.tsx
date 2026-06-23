@@ -19,6 +19,12 @@ export default function SecurityScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
 
+  useQuery({
+    queryKey: ['me'],
+    queryFn: () => authApi.me().then((r) => { setUser(r.data.data.user); return r.data.data.user; }),
+    staleTime: 0,
+  });
+
   const { data: sessions, isLoading } = useQuery({
     queryKey: ['sessions'],
     queryFn: () => authApi.sessions().then((r) => r.data.data.items),
