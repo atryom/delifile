@@ -1,7 +1,9 @@
-import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Subscription, interval } from 'rxjs';
+import { switchMap, takeWhile } from 'rxjs/operators';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
@@ -18,7 +20,7 @@ import { DeviceSession, ContactRequestItem } from '../../../../shared/models/api
   templateUrl: './security.component.html',
   styleUrl: './security.component.scss',
 })
-export class SecurityComponent implements OnInit {
+export class SecurityComponent implements OnInit, OnDestroy {
   private readonly authApi        = inject(AuthApiService);
   readonly authState              = inject(AuthStateService);
   private readonly fb             = inject(FormBuilder);
@@ -34,6 +36,10 @@ export class SecurityComponent implements OnInit {
   readonly twoFaEnabling  = signal(false);
   readonly twoFaDisabling = signal(false);
   readonly showAppInfo    = signal(false);
+  readonly twoFaPolling   = signal(false);
+
+  private twoFaTempToken: string | null  = null;
+  private connectPollSub: Subscription | null = null;
 
   toggleAppInfo(): void {
     this.showAppInfo.update(v => !v);
@@ -341,14 +347,25 @@ export class SecurityComponent implements OnInit {
   }
 
   loadQR(): void {
-    if (this.twoFaQR()) { this.showQRSection.set(true); return; }
+    if (this.twoFaQR() && this.twoFaTempToken) {
+      this.showQRSection.set(true);
+      this.startConnectPolling();
+      return;
+    }
     this.loadingQR.set(true);
     this.twoFaError.set(null);
-    this.lockPassApi.getProjectQR().subscribe({
+    this.lockPassApi.initConnect().subscribe({
       next: (res) => {
-        this.twoFaQR.set(res.data);
+        this.twoFaQR.set({
+          qr_payload: res.data.qr_payload,
+          deep_link:  res.data.deep_link,
+          app_store:  '',
+          ru_store:   '',
+        });
+        this.twoFaTempToken = res.data.temp_token;
         this.showQRSection.set(true);
         this.loadingQR.set(false);
+        this.startConnectPolling();
       },
       error: () => {
         this.twoFaError.set('Не удалось загрузить QR-код. Попробуйте позже.');
@@ -357,22 +374,40 @@ export class SecurityComponent implements OnInit {
     });
   }
 
-  handleLockPassCallback(lockpassUserId: number): void {
-    this.twoFaEnabling.set(true);
-    this.twoFaError.set(null);
-    this.twoFaSuccess.set(null);
-    this.lockPassApi.enable(lockpassUserId).subscribe({
+  private startConnectPolling(): void {
+    this.stopConnectPolling();
+    const tempToken = this.twoFaTempToken;
+    if (!tempToken) return;
+    this.twoFaPolling.set(true);
+    this.connectPollSub = interval(2000).pipe(
+      switchMap(() => this.lockPassApi.pollConnect(tempToken)),
+      takeWhile((res) => res.data.status !== 'connected', true),
+    ).subscribe({
       next: (res) => {
-        this.authState.updateUser(res.data.user);
-        this.twoFaSuccess.set('2FA успешно включена.');
-        this.showQRSection.set(false);
-        this.twoFaEnabling.set(false);
+        if (res.data.status === 'connected' && res.data.user) {
+          this.authState.updateUser(res.data.user);
+          this.twoFaSuccess.set('2FA успешно включена.');
+          this.showQRSection.set(false);
+          this.twoFaQR.set(null);
+          this.twoFaTempToken = null;
+          this.twoFaPolling.set(false);
+        }
       },
       error: () => {
-        this.twoFaError.set('Не удалось включить 2FA.');
-        this.twoFaEnabling.set(false);
+        this.twoFaError.set('Ошибка при ожидании подключения. Попробуйте снова.');
+        this.twoFaPolling.set(false);
       },
+      complete: () => this.twoFaPolling.set(false),
     });
+  }
+
+  private stopConnectPolling(): void {
+    this.connectPollSub?.unsubscribe();
+    this.connectPollSub = null;
+  }
+
+  ngOnDestroy(): void {
+    this.stopConnectPolling();
   }
 
   disableTwoFa(): void {

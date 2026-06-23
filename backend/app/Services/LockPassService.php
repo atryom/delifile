@@ -193,4 +193,44 @@ class LockPassService
             throw new RuntimeException('LockPass недоступен: ' . $e->getMessage(), 0, $e);
         }
     }
+
+    /**
+     * Initiate a per-user LockPass connection.
+     * Returns: { temp_token, qr_payload, deep_link, expires_at? }
+     */
+    public function initConnect(): array
+    {
+        try {
+            $response = $this->withProjectAuth()
+                ->post($this->baseUrl() . '/integration/init-connect/' . $this->projectId());
+
+            if (!$response->successful()) {
+                throw new RuntimeException('LockPass init-connect failed: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('LockPass недоступен: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Poll LockPass for connection completion.
+     * Returns: { status: 'pending'|'connected', lockpass_user_id?: int }
+     */
+    public function pollConnect(string $tempToken): array
+    {
+        try {
+            $response = $this->withProjectAuth()
+                ->get($this->baseUrl() . '/integration/poll-connect/' . $tempToken);
+
+            if (!$response->successful()) {
+                throw new RuntimeException('LockPass poll-connect failed: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('LockPass недоступен: ' . $e->getMessage(), 0, $e);
+        }
+    }
 }

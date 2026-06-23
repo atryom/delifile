@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -136,28 +136,60 @@ export default function SecurityScreen() {
 }
 
 function TwoFaSection({ user, setUser }: { user: any; setUser: (u: any) => void }) {
-  const [qrData, setQrData] = useState<{ qr_payload: string; deep_link: string; app_store: string; ru_store: string } | null>(null);
+  const [connectData, setConnectData] = useState<{ qr_payload: string; deep_link: string; temp_token: string } | null>(null);
   const [loadingQR, setLoadingQR] = useState(false);
+  const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const disableMutation = useMutation({
-    mutationFn: () => lockpassApi.disable(),
-    onSuccess: (res) => { setUser(res.data.data.user); setError(null); },
-    onError: (e) => setError(getApiError(e, 'Не удалось отключить 2FA')),
-  });
+  function stopPolling() {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    setPolling(false);
+  }
+
+  useEffect(() => () => stopPolling(), []);
+
+  function startPolling(tempToken: string) {
+    stopPolling();
+    setPolling(true);
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await lockpassApi.pollConnect(tempToken);
+        const { status, user: updatedUser } = res.data.data;
+        if (status === 'connected' && updatedUser) {
+          stopPolling();
+          setConnectData(null);
+          setUser(updatedUser);
+          setError(null);
+        }
+      } catch {
+        stopPolling();
+        setError('Ошибка при ожидании подключения. Попробуйте снова.');
+      }
+    }, 2000);
+  }
 
   async function loadQR() {
+    if (connectData) { startPolling(connectData.temp_token); return; }
     setLoadingQR(true);
     setError(null);
     try {
-      const res = await lockpassApi.getProjectQR();
-      setQrData(res.data.data);
+      const res = await lockpassApi.initConnect();
+      const data = res.data.data;
+      setConnectData({ qr_payload: data.qr_payload, deep_link: data.deep_link, temp_token: data.temp_token });
+      startPolling(data.temp_token);
     } catch (e) {
       setError(getApiError(e, 'Не удалось загрузить QR'));
     } finally {
       setLoadingQR(false);
     }
   }
+
+  const disableMutation = useMutation({
+    mutationFn: () => lockpassApi.disable(),
+    onSuccess: (res) => { setUser(res.data.data.user); setError(null); },
+    onError: (e) => setError(getApiError(e, 'Не удалось отключить 2FA')),
+  });
 
   return (
     <View style={styles.section}>
@@ -179,16 +211,16 @@ function TwoFaSection({ user, setUser }: { user: any; setUser: (u: any) => void 
           <Text style={{ color: '#64748b', fontSize: 13 }}>
             Подтверждайте вход в приложении LockPass.
           </Text>
-          {!qrData ? (
+          {!connectData ? (
             <Button title={loadingQR ? 'Загрузка…' : 'Подключить LockPass'} onPress={loadQR} loading={loadingQR} />
           ) : (
             <View style={{ gap: 10 }}>
               <Text style={{ color: '#64748b', fontSize: 13 }}>
-                Откройте LockPass и отсканируйте QR или нажмите кнопку ниже.
+                {polling ? 'Ожидаем подтверждения в LockPass…' : 'Откройте LockPass и отсканируйте QR или нажмите кнопку ниже.'}
               </Text>
-              <Button title="Открыть в LockPass" onPress={() => Linking.openURL(qrData.deep_link)} />
+              <Button title="Открыть в LockPass" onPress={() => Linking.openURL(connectData.deep_link)} />
               <Text style={{ color: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }} numberOfLines={2}>
-                {qrData.qr_payload}
+                {connectData.qr_payload}
               </Text>
             </View>
           )}

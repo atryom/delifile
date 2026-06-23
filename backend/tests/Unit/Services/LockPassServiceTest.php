@@ -185,6 +185,78 @@ class LockPassServiceTest extends TestCase
         $this->service->verifyRecoveryCode('sess-1', 'bad-code');
     }
 
+    // ─── initConnect ─────────────────────────────────────────────────────────
+
+    public function test_init_connect_returns_data(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/init-connect/42' => Http::response([
+                'temp_token' => 'tmp-abc',
+                'qr_payload' => 'lockpass://connect/tmp-abc',
+                'deep_link'  => 'lockpass://project/42/connect?token=tmp-abc',
+            ], 200),
+        ]);
+
+        $result = $this->service->initConnect();
+
+        $this->assertSame('tmp-abc', $result['temp_token']);
+
+        Http::assertSent(fn ($req) =>
+            $req->url() === 'https://lockpass.test/api/integration/init-connect/42' &&
+            $req->hasHeader('Authorization', 'Bearer test-token')
+        );
+    }
+
+    public function test_init_connect_throws_on_error(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/init-connect/42' => Http::response([], 500),
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->service->initConnect();
+    }
+
+    // ─── pollConnect ──────────────────────────────────────────────────────────
+
+    public function test_poll_connect_returns_pending(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/poll-connect/tmp-abc' => Http::response([
+                'status' => 'pending',
+            ], 200),
+        ]);
+
+        $result = $this->service->pollConnect('tmp-abc');
+
+        $this->assertSame('pending', $result['status']);
+    }
+
+    public function test_poll_connect_returns_connected_with_user_id(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/poll-connect/tmp-abc' => Http::response([
+                'status'           => 'connected',
+                'lockpass_user_id' => 999,
+            ], 200),
+        ]);
+
+        $result = $this->service->pollConnect('tmp-abc');
+
+        $this->assertSame('connected', $result['status']);
+        $this->assertSame(999, $result['lockpass_user_id']);
+    }
+
+    public function test_poll_connect_throws_on_error(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/poll-connect/bad-token' => Http::response([], 503),
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->service->pollConnect('bad-token');
+    }
+
     // ─── getProjectQR ────────────────────────────────────────────────────────
 
     public function test_get_project_qr_returns_data(): void

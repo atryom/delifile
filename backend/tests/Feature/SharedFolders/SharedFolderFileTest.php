@@ -14,47 +14,23 @@ class SharedFolderFileTest extends TestCase
 {
     // ─── addToMyFiles ───────────────────────────────────────────────────────
 
-    public function test_user_can_add_shared_folder_only_file_to_my_files(): void
+    public function test_owner_can_add_file_to_my_files(): void
     {
         $user = User::factory()->create();
-        $file = File::factory()->create([
-            'owner_id'           => $user->id,
-            'shared_folder_only' => true,
-        ]);
+        $file = File::factory()->create(['owner_id' => $user->id]);
 
         $response = $this->actingAs($user)
             ->postJson("/api/v1/files/{$file->id}/add-to-my-files");
 
         $response->assertOk();
-        $this->assertDatabaseHas('files', [
-            'id'                 => $file->id,
-            'shared_folder_only' => false,
-        ]);
-    }
-
-    public function test_add_to_my_files_fails_if_not_shared_folder_only(): void
-    {
-        $user = User::factory()->create();
-        $file = File::factory()->create([
-            'owner_id'           => $user->id,
-            'shared_folder_only' => false,
-        ]);
-
-        $response = $this->actingAs($user)
-            ->postJson("/api/v1/files/{$file->id}/add-to-my-files");
-
-        $response->assertStatus(422)
-            ->assertJsonPath('data.code', 'ALREADY_IN_MY_FILES');
+        $this->assertDatabaseHas('files', ['id' => $file->id, 'folder_id' => null]);
     }
 
     public function test_add_to_my_files_fails_for_other_users_file(): void
     {
         $owner = User::factory()->create();
         $other = User::factory()->create();
-        $file = File::factory()->create([
-            'owner_id'           => $owner->id,
-            'shared_folder_only' => true,
-        ]);
+        $file  = File::factory()->create(['owner_id' => $owner->id]);
 
         $response = $this->actingAs($other)
             ->postJson("/api/v1/files/{$file->id}/add-to-my-files");
@@ -82,22 +58,6 @@ class SharedFolderFileTest extends TestCase
             'shared_folder_id' => $folder->id,
             'file_id'          => $file->id,
         ]);
-    }
-
-    public function test_update_shared_folders_fails_for_shared_folder_only_file(): void
-    {
-        $user = User::factory()->create();
-        $file = File::factory()->create([
-            'owner_id'           => $user->id,
-            'shared_folder_only' => true,
-        ]);
-
-        $response = $this->actingAs($user)
-            ->postJson("/api/v1/files/{$file->id}/shared-folders", [
-                'folder_ids' => [],
-            ]);
-
-        $response->assertStatus(403);
     }
 
     public function test_update_shared_folders_requires_folder_ids(): void
@@ -270,14 +230,11 @@ class SharedFolderFileTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_owner_removing_shared_folder_only_file_from_last_folder_deletes_it(): void
+    public function test_owner_can_remove_file_from_its_only_folder(): void
     {
         $owner  = User::factory()->create();
         $folder = SharedFolder::factory()->create(['owner_id' => $owner->id]);
-        $file   = File::factory()->create([
-            'owner_id'           => $owner->id,
-            'shared_folder_only' => true,
-        ]);
+        $file   = File::factory()->create(['owner_id' => $owner->id]);
         SharedFolderFile::create([
             'shared_folder_id' => $folder->id,
             'file_id'          => $file->id,
@@ -288,20 +245,18 @@ class SharedFolderFileTest extends TestCase
             ->deleteJson("/api/v1/shared-folders/{$folder->id}/files/{$file->id}");
 
         $response->assertOk();
-        // The file lived only inside the folder — it must be deleted, NOT leaked
-        // back into the owner's root (which previously caused a re-upload duplicate).
-        $this->assertSoftDeleted('files', ['id' => $file->id]);
+        $this->assertDatabaseMissing('shared_folder_files', [
+            'shared_folder_id' => $folder->id,
+            'file_id'          => $file->id,
+        ]);
     }
 
-    public function test_owner_removing_shared_folder_only_file_kept_when_in_other_folders(): void
+    public function test_owner_removing_file_kept_when_in_other_folders(): void
     {
         $owner   = User::factory()->create();
         $folderA = SharedFolder::factory()->create(['owner_id' => $owner->id]);
         $folderB = SharedFolder::factory()->create(['owner_id' => $owner->id]);
-        $file    = File::factory()->create([
-            'owner_id'           => $owner->id,
-            'shared_folder_only' => true,
-        ]);
+        $file    = File::factory()->create(['owner_id' => $owner->id]);
         SharedFolderFile::create(['shared_folder_id' => $folderA->id, 'file_id' => $file->id, 'added_by' => $owner->id]);
         SharedFolderFile::create(['shared_folder_id' => $folderB->id, 'file_id' => $file->id, 'added_by' => $owner->id]);
 
@@ -309,12 +264,12 @@ class SharedFolderFileTest extends TestCase
             ->deleteJson("/api/v1/shared-folders/{$folderA->id}/files/{$file->id}");
 
         $response->assertOk();
-        // Still in folder B → keep it, remain hidden from root.
-        $this->assertDatabaseHas('files', ['id' => $file->id, 'shared_folder_only' => true, 'deleted_at' => null]);
+        $this->assertDatabaseMissing('shared_folder_files', ['shared_folder_id' => $folderA->id, 'file_id' => $file->id]);
         $this->assertDatabaseHas('shared_folder_files', ['shared_folder_id' => $folderB->id, 'file_id' => $file->id]);
+        $this->assertDatabaseHas('files', ['id' => $file->id, 'deleted_at' => null]);
     }
 
-    public function test_non_owner_removing_orphaned_shared_folder_only_file_keeps_it_for_owner(): void
+    public function test_non_owner_with_edit_access_can_remove_file_from_folder(): void
     {
         $owner  = User::factory()->create();
         $editor = User::factory()->create();
@@ -323,18 +278,15 @@ class SharedFolderFileTest extends TestCase
             'shared_folder_id' => $folder->id,
             'user_id'          => $editor->id,
         ]);
-        $file = File::factory()->create([
-            'owner_id'           => $owner->id,
-            'shared_folder_only' => true,
-        ]);
+        $file = File::factory()->create(['owner_id' => $owner->id]);
         SharedFolderFile::create(['shared_folder_id' => $folder->id, 'file_id' => $file->id, 'added_by' => $owner->id]);
 
         $response = $this->actingAs($editor)
             ->deleteJson("/api/v1/shared-folders/{$folder->id}/files/{$file->id}");
 
         $response->assertOk();
-        // A non-owner cannot delete the owner's file — keep it accessible in root.
-        $this->assertDatabaseHas('files', ['id' => $file->id, 'shared_folder_only' => false, 'deleted_at' => null]);
+        $this->assertDatabaseMissing('shared_folder_files', ['shared_folder_id' => $folder->id, 'file_id' => $file->id]);
+        $this->assertDatabaseHas('files', ['id' => $file->id, 'deleted_at' => null]);
     }
 
     public function test_remove_file_fails_without_permission(): void

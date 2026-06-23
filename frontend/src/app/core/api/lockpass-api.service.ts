@@ -23,6 +23,18 @@ export interface ProjectQR {
   ru_store: string;
 }
 
+export interface ConnectSession {
+  temp_token: string;
+  qr_payload: string;
+  deep_link: string;
+  expires_at?: string;
+}
+
+export interface ConnectPollResult {
+  status: 'pending' | 'connected';
+  user?: CurrentUser;
+}
+
 @Injectable({ providedIn: 'root' })
 export class LockPassApiService {
   private readonly api = inject(ApiService);
@@ -49,5 +61,13 @@ export class LockPassApiService {
 
   disable(): Observable<ApiResponse<{ user: CurrentUser }>> {
     return this.api.post('/settings/2fa/disable');
+  }
+
+  initConnect(): Observable<ApiResponse<ConnectSession>> {
+    return this.api.post('/auth/2fa/init-connect', {});
+  }
+
+  pollConnect(tempToken: string): Observable<ApiResponse<ConnectPollResult>> {
+    return this.api.get(`/auth/2fa/poll-connect/${tempToken}`);
   }
 }

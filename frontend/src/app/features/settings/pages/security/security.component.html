@@ -474,9 +474,15 @@
                 <img [src]="qrImageUrl(twoFaQR()!.qr_payload)"
                      alt="QR-код LockPass" width="200" height="200">
               </div>
-              <p class="twofa-step">
-                После привязки вернитесь на эту страницу — 2FA включится автоматически.
-              </p>
+              @if (twoFaPolling()) {
+                <p class="twofa-step twofa-step--polling">
+                  Ожидаем подтверждения в LockPass…
+                </p>
+              } @else {
+                <p class="twofa-step">
+                  Отсканируйте QR в приложении LockPass — страница обновится автоматически.
+                </p>
+              }
             </div>
           }
 

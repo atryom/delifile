@@ -142,8 +142,7 @@ Route::prefix('v1')->group(function () {
         Route::post('files/{id}/refresh-link-preview', [FileController::class, 'refreshLinkPreview']);
         Route::post('files/{id}/like',             [FileLikeController::class, 'store']);
         Route::delete('files/{id}/like',           [FileLikeController::class, 'destroy']);
-        Route::post('files/{id}/move-folder',      [FileController::class, 'moveFolder']);
-        Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
+Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
         Route::patch('files/{id}/movie-meta',       [MovieController::class, 'updateMeta']);
         Route::patch('files/{id}/description',     [FileController::class, 'updateDescription']);
         Route::patch('files/{id}/rename',          [FileController::class, 'rename']);
@@ -225,6 +224,10 @@ Route::prefix('v1')->group(function () {
         // LockPass 2FA settings
         Route::post('settings/2fa/enable',  [LockPass2FAController::class, 'enable']);
         Route::post('settings/2fa/disable', [LockPass2FAController::class, 'disable']);
+
+        // LockPass 2FA connect flow (polling)
+        Route::post('auth/2fa/init-connect',               [LockPass2FAController::class, 'initConnect']);
+        Route::get('auth/2fa/poll-connect/{tempToken}',    [LockPass2FAController::class, 'pollConnect']);
 
         // API tokens
         Route::get('api-tokens',         [ApiTokenController::class, 'index']);

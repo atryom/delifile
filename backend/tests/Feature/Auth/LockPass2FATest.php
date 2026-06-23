@@ -296,6 +296,110 @@ class LockPass2FATest extends TestCase
         $response->assertStatus(422)->assertJsonPath('data.code', 'RECOVERY_INVALID');
     }
 
+    // ─── POST /api/v1/auth/2fa/init-connect ─────────────────────────────────
+
+    public function test_init_connect_returns_qr_and_token(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/init-connect/1' => Http::response([
+                'temp_token' => 'tmp-abc',
+                'qr_payload' => 'lockpass://connect/tmp-abc',
+                'deep_link'  => 'lockpass://project/1/connect?token=tmp-abc',
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->postJson('/api/v1/auth/2fa/init-connect');
+
+        $response->assertOk()
+            ->assertJsonPath('data.temp_token', 'tmp-abc')
+            ->assertJsonStructure(['data' => ['temp_token', 'qr_payload', 'deep_link']]);
+    }
+
+    public function test_init_connect_requires_auth(): void
+    {
+        $response = $this->postJson('/api/v1/auth/2fa/init-connect');
+        $response->assertStatus(401);
+    }
+
+    public function test_init_connect_returns_503_when_lockpass_down(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/init-connect/1' => Http::response([], 503),
+        ]);
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->postJson('/api/v1/auth/2fa/init-connect');
+        $response->assertStatus(503)->assertJsonPath('data.code', 'LOCKPASS_UNAVAILABLE');
+    }
+
+    // ─── GET /api/v1/auth/2fa/poll-connect/{tempToken} ───────────────────────
+
+    public function test_poll_connect_returns_pending(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/poll-connect/tmp-abc' => Http::response([
+                'status' => 'pending',
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->getJson('/api/v1/auth/2fa/poll-connect/tmp-abc');
+        $response->assertOk()->assertJsonPath('data.status', 'pending');
+    }
+
+    public function test_poll_connect_saves_user_on_connected(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/poll-connect/tmp-abc' => Http::response([
+                'status'           => 'connected',
+                'lockpass_user_id' => 777,
+            ], 200),
+            'lockpass.test/api/2fa/user/status*' => Http::response([
+                'two_factor_enabled' => true,
+                'devices_count'      => 1,
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->getJson('/api/v1/auth/2fa/poll-connect/tmp-abc');
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'connected')
+            ->assertJsonPath('data.user.lockpass_user_id', 777)
+            ->assertJsonPath('data.user.two_factor_enabled', true);
+
+        $user->refresh();
+        $this->assertSame(777, (int) $user->lockpass_user_id);
+        $this->assertTrue($user->two_factor_enabled);
+    }
+
+    public function test_poll_connect_rejects_duplicate_lockpass_user_id(): void
+    {
+        Http::fake([
+            'lockpass.test/api/integration/poll-connect/tmp-dup' => Http::response([
+                'status'           => 'connected',
+                'lockpass_user_id' => 888,
+            ], 200),
+        ]);
+
+        User::factory()->create(['lockpass_user_id' => 888]);
+        $another = User::factory()->create();
+
+        $response = $this->actingAs($another)->getJson('/api/v1/auth/2fa/poll-connect/tmp-dup');
+        $response->assertStatus(422)->assertJsonPath('data.code', 'LOCKPASS_ALREADY_LINKED');
+    }
+
+    public function test_poll_connect_requires_auth(): void
+    {
+        $response = $this->getJson('/api/v1/auth/2fa/poll-connect/tmp-abc');
+        $response->assertStatus(401);
+    }
+
     // ─── POST /api/v1/settings/2fa/enable ────────────────────────────────────
 
     public function test_enable_saves_lockpass_user_id_and_syncs_status(): void

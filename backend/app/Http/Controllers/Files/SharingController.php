@@ -58,7 +58,7 @@ class SharingController extends Controller
         $access  = $file ? FileUserAccess::where('file_id', $file->id)
                                ->where('user_id', $request->user()->id)->first() : null;
         $isOwner = $file?->isOwnedBy($request->user()) ?? false;
-        $canShare = $isOwner;
+        $canShare = $isOwner || ($access && $access->access_type === AccessType::Shared);
 
         if (!$file || !$canShare) {
             return $this->notFound('File not found');

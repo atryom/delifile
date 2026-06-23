@@ -5,9 +5,7 @@ namespace Tests\Feature\Files;
 use App\Models\User;
 use App\Models\File;
 use App\Models\FileUserAccess;
-use App\Models\Folder;
 use App\Models\Tag;
-use App\Enums\AccessType;
 use Tests\TestCase;
 
 class FileActionsTest extends TestCase
@@ -63,28 +61,6 @@ class FileActionsTest extends TestCase
 
         $response = $this->actingAs($this->user)
             ->postJson("/api/v1/files/{$this->file->id}/unfavorite");
-
-        $response->assertOk();
-    }
-
-    public function test_user_can_move_file_to_folder(): void
-    {
-        $folder = Folder::factory()->create(['user_id' => $this->user->id]);
-
-        $response = $this->actingAs($this->user)
-            ->postJson("/api/v1/files/{$this->file->id}/move-folder", [
-                'folder_id' => $folder->id,
-            ]);
-
-        $response->assertOk();
-    }
-
-    public function test_user_can_clear_folder(): void
-    {
-        $response = $this->actingAs($this->user)
-            ->postJson("/api/v1/files/{$this->file->id}/move-folder", [
-                'folder_id' => null,
-            ]);
 
         $response->assertOk();
     }

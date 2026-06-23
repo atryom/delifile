@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Comments;
 
-use App\Models\Folder;
 use App\Models\SharedFolder;
 use App\Models\SharedFolderAccess;
 use App\Models\User;
@@ -132,37 +131,6 @@ class CommentSettingsTest extends TestCase
             ]);
 
         $response->assertStatus(422);
-    }
-
-    // ─── Local Folder Settings — PATCH ─────────────────────────────────────
-
-    public function test_owner_can_update_local_folder_comment_settings(): void
-    {
-        $user = User::factory()->create();
-        $folder = Folder::factory()->create(['user_id' => $user->id]);
-
-        $response = $this->actingAs($user)
-            ->patchJson("/api/v1/local-folders/{$folder->id}/comment-settings", [
-                'privateCommentsEnabled' => false,
-            ]);
-
-        $response->assertOk()
-            ->assertJsonPath('result', 'success')
-            ->assertJsonStructure(['data' => ['settings' => ['private_comments_enabled']]]);
-    }
-
-    public function test_other_user_cannot_update_local_folder_comment_settings(): void
-    {
-        $owner = User::factory()->create();
-        $other = User::factory()->create();
-        $folder = Folder::factory()->create(['user_id' => $owner->id]);
-
-        $response = $this->actingAs($other)
-            ->patchJson("/api/v1/local-folders/{$folder->id}/comment-settings", [
-                'privateCommentsEnabled' => false,
-            ]);
-
-        $response->assertStatus(404);
     }
 
     public function test_update_local_folder_settings_nonexistent_returns_404(): void

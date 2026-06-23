@@ -8,6 +8,18 @@ export interface ProjectQR {
   ru_store: string;
 }
 
+export interface ConnectSession {
+  temp_token: string;
+  qr_payload: string;
+  deep_link: string;
+  expires_at?: string;
+}
+
+export interface ConnectPollResult {
+  status: 'pending' | 'connected';
+  user?: User;
+}
+
 export const lockpassApi = {
   getProjectQR: () =>
     apiClient.get<ApiResponse<ProjectQR>>('/auth/2fa/qr'),
@@ -26,4 +38,10 @@ export const lockpassApi = {
 
   disable: () =>
     apiClient.post<ApiResponse<{ user: User }>>('/settings/2fa/disable'),
+
+  initConnect: () =>
+    apiClient.post<ApiResponse<ConnectSession>>('/auth/2fa/init-connect', {}),
+
+  pollConnect: (tempToken: string) =>
+    apiClient.get<ApiResponse<ConnectPollResult>>(`/auth/2fa/poll-connect/${tempToken}`),
 };
