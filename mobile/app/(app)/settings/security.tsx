@@ -19,11 +19,15 @@ export default function SecurityScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
 
-  useQuery({
+  const { data: freshUser } = useQuery({
     queryKey: ['me'],
-    queryFn: () => authApi.me().then((r) => { setUser(r.data.data.user); return r.data.data.user; }),
-    staleTime: 0,
+    queryFn: () => authApi.me().then((r) => r.data.data.user),
+    staleTime: 30_000,
   });
+
+  useEffect(() => {
+    if (freshUser) setUser(freshUser);
+  }, [freshUser]);
 
   const { data: sessions, isLoading } = useQuery({
     queryKey: ['sessions'],
