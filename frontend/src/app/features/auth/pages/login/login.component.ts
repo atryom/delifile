@@ -199,6 +199,10 @@ export class LoginComponent implements OnDestroy {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
+  qrImageUrl(payload: string): string {
+    return 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(payload);
+  }
+
   // ─── Private ──────────────────────────────────────────────────────────────
 
   private startPolling(sessionId: string, remember: boolean): void {

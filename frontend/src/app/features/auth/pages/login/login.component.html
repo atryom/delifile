@@ -118,9 +118,12 @@
                 <div class="twofa-push">
                   <div class="twofa-spinner"></div>
                   <p class="twofa-hint">Подтвердите запрос в приложении LockPass на вашем устройстве.</p>
-                  @if (twoFaSession()?.qr_payload) {
+                  @let qrPayload = twoFaSession()?.qr_payload;
+                  @if (qrPayload) {
                     <p class="twofa-hint-small">Нет телефона рядом? Отсканируйте QR:</p>
-                    <div class="twofa-qr">{{ twoFaSession()?.qr_payload }}</div>
+                    <div class="twofa-qr">
+                      <img [src]="qrImageUrl(qrPayload)" alt="QR-код для LockPass" width="180" height="180" />
+                    </div>
                   }
                 </div>
               }
