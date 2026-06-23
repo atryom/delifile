@@ -48,6 +48,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
 
+    // 2FA poll — отдельный лимит 60/мин (поллинг каждые 2-3 сек, не должен попадать под throttle:auth)
+    Route::post('auth/2fa/poll', [LockPass2FAController::class, 'poll'])
+        ->middleware('throttle:2fa-poll');
+
     // ─── Auth — Public ────────────────────────────────────────────────────────
     Route::prefix('auth')->middleware('throttle:auth')->group(function () {
         Route::post('register', [AuthController::class, 'register']);
@@ -60,7 +64,6 @@ Route::prefix('v1')->group(function () {
 
         // LockPass 2FA — public endpoints (no project token exposed)
         Route::get('2fa/qr',       [LockPass2FAController::class, 'qr']);
-        Route::post('2fa/poll',    [LockPass2FAController::class, 'poll']);
         Route::post('2fa/totp',    [LockPass2FAController::class, 'totp']);
         Route::post('2fa/recovery',[LockPass2FAController::class, 'recovery']);
 

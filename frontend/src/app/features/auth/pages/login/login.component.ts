@@ -2,8 +2,8 @@ import { Component, inject, signal, ChangeDetectionStrategy, OnDestroy } from '@
 import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { Subscription, interval } from 'rxjs';
-import { switchMap, takeWhile } from 'rxjs/operators';
+import { Subscription, interval, of } from 'rxjs';
+import { switchMap, takeWhile, catchError } from 'rxjs/operators';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { DeviceService } from '../../../../core/services/device.service';
@@ -207,7 +207,11 @@ export class LoginComponent implements OnDestroy {
 
   private startPolling(sessionId: string, remember: boolean): void {
     this.pollSub = interval(2000).pipe(
-      switchMap(() => this.lockPass.poll(sessionId)),
+      switchMap(() => this.lockPass.poll(sessionId).pipe(
+        // Ошибка (429 Too Many Attempts, сеть и т.д.) — считаем статус pending
+        // и продолжаем поллинг. Без catchError здесь Observable завершается навсегда.
+        catchError(() => of({ data: { status: 'pending' as const } })),
+      )),
       takeWhile((res) => res.data.status === 'pending', true),
     ).subscribe({
       next: (res) => {
@@ -221,9 +225,6 @@ export class LoginComponent implements OnDestroy {
             this.pending.set(false);
           }
         }
-      },
-      error: () => {
-        // Network error — silently retry next tick
       },
     });
   }

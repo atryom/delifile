@@ -23,5 +23,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('auth', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
         });
+
+        // 2FA poll вызывается каждые 2-3 сек во время ожидания — нужен отдельный лимит,
+        // чтобы не блокироваться общим throttle:auth (10/мин).
+        RateLimiter::for('2fa-poll', function (Request $request) {
+            return Limit::perMinute(60)->by($request->ip());
+        });
     }
 }
