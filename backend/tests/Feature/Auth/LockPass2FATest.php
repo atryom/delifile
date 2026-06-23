@@ -15,10 +15,13 @@ class LockPass2FATest extends TestCase
     {
         parent::setUp();
         config([
-            'lockpass.api_url'    => 'https://lockpass.test/api',
-            'lockpass.api_token'  => 'proj-token',
-            'lockpass.project_id' => '1',
+            'lockpass.api_url'          => 'https://lockpass.test/api',
+            'lockpass.api_token'        => 'proj-token',
+            'lockpass.project_id'       => '1',
+            'lockpass.service_email'    => 'service@test.test',
+            'lockpass.service_password' => 'secret',
         ]);
+        Cache::forget('lockpass_sanctum_token');
     }
 
     // ─── Login: 2FA triggered ────────────────────────────────────────────────
@@ -301,7 +304,8 @@ class LockPass2FATest extends TestCase
     public function test_init_connect_returns_qr_and_token(): void
     {
         Http::fake([
-            'lockpass.test/api/integration/init-connect/1' => Http::response([
+            'lockpass.test/api/auth/login'                   => Http::response(['token' => 'sanctum-tok'], 200),
+            'lockpass.test/api/integration/init-connect/1'   => Http::response([
                 'temp_token' => 'tmp-abc',
                 'qr_payload' => 'lockpass://connect/tmp-abc',
                 'deep_link'  => 'lockpass://project/1/connect?token=tmp-abc',
@@ -326,7 +330,8 @@ class LockPass2FATest extends TestCase
     public function test_init_connect_returns_503_when_lockpass_down(): void
     {
         Http::fake([
-            'lockpass.test/api/integration/init-connect/1' => Http::response([], 503),
+            'lockpass.test/api/auth/login'                  => Http::response(['token' => 'sanctum-tok'], 200),
+            'lockpass.test/api/integration/init-connect/1'  => Http::response([], 503),
         ]);
 
         $user = User::factory()->create();
@@ -340,9 +345,8 @@ class LockPass2FATest extends TestCase
     public function test_poll_connect_returns_pending(): void
     {
         Http::fake([
-            'lockpass.test/api/integration/poll-connect/tmp-abc' => Http::response([
-                'status' => 'pending',
-            ], 200),
+            'lockpass.test/api/auth/login'                           => Http::response(['token' => 'sanctum-tok'], 200),
+            'lockpass.test/api/integration/poll-connect/tmp-abc'     => Http::response(['status' => 'pending'], 200),
         ]);
 
         $user = User::factory()->create();
@@ -354,6 +358,7 @@ class LockPass2FATest extends TestCase
     public function test_poll_connect_saves_user_on_connected(): void
     {
         Http::fake([
+            'lockpass.test/api/auth/login'                       => Http::response(['token' => 'sanctum-tok'], 200),
             'lockpass.test/api/integration/poll-connect/tmp-abc' => Http::response([
                 'status'           => 'connected',
                 'lockpass_user_id' => 777,
@@ -381,6 +386,7 @@ class LockPass2FATest extends TestCase
     public function test_poll_connect_rejects_duplicate_lockpass_user_id(): void
     {
         Http::fake([
+            'lockpass.test/api/auth/login'                       => Http::response(['token' => 'sanctum-tok'], 200),
             'lockpass.test/api/integration/poll-connect/tmp-dup' => Http::response([
                 'status'           => 'connected',
                 'lockpass_user_id' => 888,

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -34,6 +35,28 @@ class LockPassService
     private function publicClient()
     {
         return Http::timeout(10)->acceptJson();
+    }
+
+    private function getSanctumToken(): string
+    {
+        return Cache::remember('lockpass_sanctum_token', now()->addHour(), function () {
+            $response = Http::timeout(10)->acceptJson()
+                ->post($this->baseUrl() . '/auth/login', [
+                    'email'    => config('lockpass.service_email'),
+                    'password' => config('lockpass.service_password'),
+                ]);
+
+            if (!$response->successful()) {
+                throw new RuntimeException('LockPass service login failed: ' . $response->body());
+            }
+
+            return $response->json('token');
+        });
+    }
+
+    private function withSanctumAuth()
+    {
+        return Http::withToken($this->getSanctumToken())->timeout(10)->acceptJson();
     }
 
     /**
@@ -201,7 +224,7 @@ class LockPassService
     public function initConnect(): array
     {
         try {
-            $response = $this->withProjectAuth()
+            $response = $this->withSanctumAuth()
                 ->post($this->baseUrl() . '/integration/init-connect/' . $this->projectId());
 
             if (!$response->successful()) {
@@ -221,7 +244,7 @@ class LockPassService
     public function pollConnect(string $tempToken): array
     {
         try {
-            $response = $this->withProjectAuth()
+            $response = $this->withSanctumAuth()
                 ->get($this->baseUrl() . '/integration/poll-connect/' . $tempToken);
 
             if (!$response->successful()) {

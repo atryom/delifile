@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\LockPassService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 use Tests\TestCase;
@@ -18,10 +19,13 @@ class LockPassServiceTest extends TestCase
     {
         parent::setUp();
         config([
-            'lockpass.api_url'    => 'https://lockpass.test/api',
-            'lockpass.api_token'  => 'test-token',
-            'lockpass.project_id' => '42',
+            'lockpass.api_url'          => 'https://lockpass.test/api',
+            'lockpass.api_token'        => 'test-token',
+            'lockpass.project_id'       => '42',
+            'lockpass.service_email'    => 'service@test.test',
+            'lockpass.service_password' => 'secret',
         ]);
+        Cache::forget('lockpass_sanctum_token');
         $this->service = new LockPassService();
     }
 
@@ -190,7 +194,8 @@ class LockPassServiceTest extends TestCase
     public function test_init_connect_returns_data(): void
     {
         Http::fake([
-            'lockpass.test/api/integration/init-connect/42' => Http::response([
+            'lockpass.test/api/auth/login'                    => Http::response(['token' => 'sanctum-tok'], 200),
+            'lockpass.test/api/integration/init-connect/42'   => Http::response([
                 'temp_token' => 'tmp-abc',
                 'qr_payload' => 'lockpass://connect/tmp-abc',
                 'deep_link'  => 'lockpass://project/42/connect?token=tmp-abc',
@@ -203,14 +208,15 @@ class LockPassServiceTest extends TestCase
 
         Http::assertSent(fn ($req) =>
             $req->url() === 'https://lockpass.test/api/integration/init-connect/42' &&
-            $req->hasHeader('Authorization', 'Bearer test-token')
+            $req->hasHeader('Authorization', 'Bearer sanctum-tok')
         );
     }
 
     public function test_init_connect_throws_on_error(): void
     {
         Http::fake([
-            'lockpass.test/api/integration/init-connect/42' => Http::response([], 500),
+            'lockpass.test/api/auth/login'                   => Http::response(['token' => 'sanctum-tok'], 200),
+            'lockpass.test/api/integration/init-connect/42'  => Http::response([], 500),
         ]);
 
         $this->expectException(RuntimeException::class);
@@ -222,9 +228,8 @@ class LockPassServiceTest extends TestCase
     public function test_poll_connect_returns_pending(): void
     {
         Http::fake([
-            'lockpass.test/api/integration/poll-connect/tmp-abc' => Http::response([
-                'status' => 'pending',
-            ], 200),
+            'lockpass.test/api/auth/login'                           => Http::response(['token' => 'sanctum-tok'], 200),
+            'lockpass.test/api/integration/poll-connect/tmp-abc'     => Http::response(['status' => 'pending'], 200),
         ]);
 
         $result = $this->service->pollConnect('tmp-abc');
@@ -235,6 +240,7 @@ class LockPassServiceTest extends TestCase
     public function test_poll_connect_returns_connected_with_user_id(): void
     {
         Http::fake([
+            'lockpass.test/api/auth/login'                       => Http::response(['token' => 'sanctum-tok'], 200),
             'lockpass.test/api/integration/poll-connect/tmp-abc' => Http::response([
                 'status'           => 'connected',
                 'lockpass_user_id' => 999,
@@ -250,7 +256,8 @@ class LockPassServiceTest extends TestCase
     public function test_poll_connect_throws_on_error(): void
     {
         Http::fake([
-            'lockpass.test/api/integration/poll-connect/bad-token' => Http::response([], 503),
+            'lockpass.test/api/auth/login'                            => Http::response(['token' => 'sanctum-tok'], 200),
+            'lockpass.test/api/integration/poll-connect/bad-token'    => Http::response([], 503),
         ]);
 
         $this->expectException(RuntimeException::class);
