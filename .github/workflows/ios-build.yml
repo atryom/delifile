@@ -47,7 +47,7 @@ jobs:
             "$HOME/Library/Keychains/login.keychain-db"
           # Снимаем авто-блокировку login.keychain на время сборки (до 8 часов),
           # чтобы keychain не заблокировался во время долгого pod install + xcodebuild archive.
-          security set-keychain-settings -lut 28800 "$HOME/Library/Keychains/login.keychain-db"
+          security set-keychain-settings "$HOME/Library/Keychains/login.keychain-db"
 
       - name: Install Apple WWDR certificates
         run: |
@@ -96,6 +96,7 @@ jobs:
           mkdir -p /tmp/xcode-wrap
           cp .github/scripts/xcode-wrap.sh /tmp/xcode-wrap/xcodebuild
           chmod +x /tmp/xcode-wrap/xcodebuild
+          echo "/tmp/xcode-wrap" >> "$GITHUB_PATH"
           echo "xcodebuild wrapper installed at /tmp/xcode-wrap/xcodebuild"
 
       - name: Start EAS keychain partition-list watcher
@@ -111,7 +112,7 @@ jobs:
             unlock_kc() {
               local kc="$1" pass="$2"
               /usr/bin/security unlock-keychain -p "$pass" "$kc" 2>/dev/null
-              /usr/bin/security set-keychain-settings -lut 28800 "$kc" 2>/dev/null
+              /usr/bin/security set-keychain-settings "$kc" 2>/dev/null
               /usr/bin/security list-keychains -d user -s "$kc" \
                 $(/usr/bin/security list-keychains -d user 2>/dev/null | tr -d '"' | tr '\n' ' ') 2>/dev/null || true
               if /usr/bin/security set-key-partition-list \
@@ -121,7 +122,7 @@ jobs:
                   echo "OK:$kc" >> "$LOGGED_FILE"
                 }
               else
-                log "WARN: partition failed: $kc"
+                log "WARN: partition failed: $kc (will retry)"
               fi
             }
 
@@ -174,7 +175,7 @@ jobs:
             KC_PATH=$(find "$HOME/Library/Keychains" /var/folders -maxdepth 6 -name "$KC_NAME*" 2>/dev/null | head -1)
             [ -z "$KC_PATH" ] && continue
             /usr/bin/security unlock-keychain -p "$KC_PASS" "$KC_PATH" 2>/dev/null || true
-            /usr/bin/security set-keychain-settings -lut 28800 "$KC_PATH" 2>/dev/null || true
+            /usr/bin/security set-keychain-settings "$KC_PATH" 2>/dev/null || true
             /usr/bin/security list-keychains -d user -s "$KC_PATH" $(/usr/bin/security list-keychains -d user 2>/dev/null | tr -d '"' | tr '\n' ' ') 2>/dev/null || true
             /usr/bin/security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$KC_PATH" 2>/dev/null || true
             echo "Pre-build unlock OK: $KC_PATH"
