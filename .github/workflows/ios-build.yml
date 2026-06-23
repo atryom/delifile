@@ -57,6 +57,13 @@ jobs:
             rm -f /tmp/$CERT
           done
 
+      - name: Patch EAS keychain.js (macOS 14/15 fixes)
+        working-directory: mobile
+        run: python3 ../.github/scripts/patch_keychain.py
+
+      - name: Patch fastlane create_keychain.rb (macOS 15 fixes)
+        run: python3 .github/scripts/patch_fastlane.py
+
       - name: Set iOS build number
         working-directory: mobile
         run: |
@@ -180,6 +187,24 @@ jobs:
             /usr/bin/security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$KC_PASS" "$KC_PATH" 2>/dev/null || true
             echo "Pre-build unlock OK: $KC_PATH"
           done
+
+      - name: Clean up stale EAS keychains from search list
+        # Каждый неудачный билд добавляет eas-build-UUID.keychain в системный список.
+        # После десятков упавших сборок список накапливает тысячи дублей → ARG_MAX overflow
+        # → fastlane exit 1 на следующей сборке. Сбрасываем список до чистых записей.
+        run: |
+          BEFORE=$(/usr/bin/security list-keychains -d user | wc -l | tr -d ' ')
+          echo "Keychain list entries before cleanup: $BEFORE"
+          CLEAN=$(/usr/bin/security list-keychains -d user \
+            | tr -d '"' | tr -d ' ' | sort -u \
+            | grep -v "eas-build" | grep -v "^$" || true)
+          if [ -n "$CLEAN" ]; then
+            echo "$CLEAN" | xargs /usr/bin/security list-keychains -s
+          else
+            /usr/bin/security list-keychains -s "$HOME/Library/Keychains/login.keychain-db"
+          fi
+          AFTER=$(/usr/bin/security list-keychains -d user | wc -l | tr -d ' ')
+          echo "Keychain list entries after cleanup: $AFTER (removed $((BEFORE - AFTER)))"
 
       - name: Pre-build diagnostics
         working-directory: mobile
