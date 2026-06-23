@@ -1,6 +1,6 @@
 import { Component, useEffect, useRef } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import { AppState, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ShareIntentModule from '@/native/shareIntent';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -23,22 +23,37 @@ const asyncStoragePersister = createAsyncStoragePersister({
   throttleTime: 1000,
 });
 
-class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null };
+class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null; componentStack: string }> {
+  state = { error: null, componentStack: '' };
   static getDerivedStateFromError(error: Error) { return { error }; }
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[AppErrorBoundary]', error.message, error.stack, info.componentStack);
+    this.setState({ componentStack: info.componentStack ?? '' });
   }
   render() {
     if (this.state.error) {
+      const err = this.state.error as Error;
       return (
-        <View style={errStyles.container}>
+        <ScrollView style={errStyles.scroll} contentContainerStyle={errStyles.container}>
           <Text style={errStyles.title}>Что-то пошло не так</Text>
-          <Text style={errStyles.sub}>Произошла непредвиденная ошибка.</Text>
-          <TouchableOpacity style={errStyles.btn} onPress={() => { this.setState({ error: null }); try { router.replace('/'); } catch {} }}>
+          <Text style={errStyles.label}>Ошибка:</Text>
+          <Text style={errStyles.code}>{err.message}</Text>
+          {!!err.stack && (
+            <>
+              <Text style={errStyles.label}>Stack:</Text>
+              <Text style={errStyles.code}>{err.stack}</Text>
+            </>
+          )}
+          {!!this.state.componentStack && (
+            <>
+              <Text style={errStyles.label}>Component stack:</Text>
+              <Text style={errStyles.code}>{this.state.componentStack}</Text>
+            </>
+          )}
+          <TouchableOpacity style={errStyles.btn} onPress={() => { this.setState({ error: null, componentStack: '' }); try { router.replace('/'); } catch {} }}>
             <Text style={errStyles.btnText}>Вернуться на главную</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       );
     }
     return this.props.children;
@@ -46,10 +61,12 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
 }
 
 const errStyles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#fff' },
-  title: { fontSize: 18, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
-  sub: { fontSize: 14, color: '#64748B', marginBottom: 24, textAlign: 'center' },
-  btn: { paddingVertical: 12, paddingHorizontal: 32, backgroundColor: '#2563EB', borderRadius: 10 },
+  scroll: { flex: 1, backgroundColor: '#fff' },
+  container: { padding: 20, paddingBottom: 40, gap: 8 },
+  title: { fontSize: 18, fontWeight: '700', color: '#DC2626', marginBottom: 4 },
+  label: { fontSize: 12, fontWeight: '700', color: '#64748B', marginTop: 8 },
+  code: { fontSize: 11, color: '#1E293B', backgroundColor: '#F1F5F9', padding: 10, borderRadius: 8, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  btn: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 32, backgroundColor: '#2563EB', borderRadius: 10, alignSelf: 'flex-start' },
   btnText: { fontSize: 15, fontWeight: '600', color: '#fff' },
 });
 
