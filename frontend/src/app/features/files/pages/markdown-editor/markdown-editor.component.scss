@@ -1,23 +1,18 @@
 .md-editor-shell {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh; // iOS 15.4+ — обновляется при появлении клавиатуры
-  // overflow:hidden убрано — на iOS Safari оно клипало всё содержимое,
-  // давая белый экран до первого тапа
+  // position: fixed даёт надёжное полноэкранное поведение в Safari —
+  // без зависимости от dvh и padding родителей
+  position: fixed;
+  inset: 0;
+  z-index: 120; // выше мобильного хедера (z-index: 110) и сайдбара (100)
   background: var(--bg);
-  // Форсируем GPU-слой на уровне всего редактора — убирает белый экран
-  // в iOS Safari до первого касания (стекинг-контекст не инициализируется без этого)
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   isolation: isolate;
 
-  @media (max-width: 1023px) {
-    // Вычитаем высоту фиксированного мобильного хедера (56px)
-    height: calc(100vh - 56px);
-    height: calc(100dvh - 56px);
-    // Отменяем padding-bottom от .main-content (bottom-nav)
-    margin-bottom: -110px;
+  @media (min-width: 1024px) {
+    left: 240px; // правее фиксированного сайдбара
   }
 }
 
@@ -188,15 +183,11 @@
 }
 
 .md-editor-body {
-  // flex: 1 1 0 — Safari-safe: base 0 вместо auto устраняет неверный расчёт высоты
-  flex: 1 1 0;
+  flex: 1;
   min-height: 0;
-  height: 0; // совместно с flex: 1 1 0 фиксирует Safari-баг с flex+overflow
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  // transform убран с body — родительский .md-editor-shell уже форсирует GPU-слой;
-  // отдельный transform на body создавал в Safari неверный z-порядок слоёв
   scroll-padding-top: 80px;
   padding: 32px;
   display: flex;

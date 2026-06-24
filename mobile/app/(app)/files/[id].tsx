@@ -766,7 +766,27 @@ export default function FileDetailScreen() {
           )}
 
           {file.content_kind === 'url_file' && file.link_url ? (
-            <Button title="Открыть ссылку" onPress={() => Linking.openURL(file.link_url!)} style={styles.btn} />
+            <>
+              <View style={styles.linkPreviewCard}>
+                {file.link_image_url ? (
+                  <Image
+                    source={{ uri: file.link_image_url }}
+                    style={styles.linkPreviewImage}
+                    contentFit="cover"
+                  />
+                ) : null}
+                <View style={styles.linkPreviewBody}>
+                  {file.link_site_name ? (
+                    <Text style={styles.linkPreviewSite} numberOfLines={1}>{file.link_site_name}</Text>
+                  ) : null}
+                  {file.link_title ? (
+                    <Text style={styles.linkPreviewTitle} numberOfLines={2}>{file.link_title}</Text>
+                  ) : null}
+                  <Text style={styles.linkPreviewUrl} numberOfLines={1}>{file.link_url}</Text>
+                </View>
+              </View>
+              <Button title="Открыть ссылку" onPress={() => Linking.openURL(file.link_url!)} style={styles.btn} />
+            </>
           ) : file.content_kind !== 'movie_item' && file.mime_type !== 'text/markdown' ? (
             <>
               {/* Image / video — inline preview + viewer */}
@@ -845,7 +865,7 @@ export default function FileDetailScreen() {
                     />
                   ) : (
                     <Button
-                      title={downloading ? 'Загрузка...' : 'Открыть'}
+                      title={downloading ? 'Загрузка...' : '⬇ Скачать'}
                       onPress={handleDownload}
                       loading={downloading || downloadUrl.isPending}
                       style={styles.btn}
@@ -1591,4 +1611,39 @@ const styles = StyleSheet.create({
   kpBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   movieFavoriteRow: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#fff' },
   movieFavoriteBtn: { paddingVertical: 6 },
+
+  // Link preview card
+  linkPreviewCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  linkPreviewImage: {
+    width: '100%',
+    height: 160,
+    backgroundColor: '#F1F5F9',
+  },
+  linkPreviewBody: {
+    padding: 12,
+    gap: 4,
+  },
+  linkPreviewSite: {
+    fontSize: 12,
+    color: '#6366F1',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  linkPreviewTitle: {
+    fontSize: 15,
+    color: '#1E293B',
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  linkPreviewUrl: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
 });
