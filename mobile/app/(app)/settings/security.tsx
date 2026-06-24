@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { getApiError } from '@/utils/error';
 
+const SCREEN_OPTIONS = { title: 'Безопасность' };
+
 export default function SecurityScreen() {
   const qc = useQueryClient();
   const { user, setUser } = useAuthStore((s) => ({ user: s.user, setUser: s.setUser }));
@@ -74,7 +76,7 @@ export default function SecurityScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Stack.Screen options={{ title: 'Безопасность' }} />
+      <Stack.Screen options={SCREEN_OPTIONS} />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Смена пароля</Text>
