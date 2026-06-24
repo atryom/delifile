@@ -6,6 +6,11 @@
   // overflow:hidden убрано — на iOS Safari оно клипало всё содержимое,
   // давая белый экран до первого тапа
   background: var(--bg);
+  // Форсируем GPU-слой на уровне всего редактора — убирает белый экран
+  // в iOS Safari до первого касания (стекинг-контекст не инициализируется без этого)
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  isolation: isolate;
 
   @media (max-width: 1023px) {
     // Вычитаем высоту фиксированного мобильного хедера (56px)
@@ -187,8 +192,8 @@
   min-height: 0; // критично для flex + overflow на iOS
   overflow-y: auto;
   overflow-x: hidden;
-  // transform: translateZ(0) форсирует GPU-слой — убирает белый экран в Safari
-  // до первого тапа при -webkit-overflow-scrolling (устарело, убрано)
+  -webkit-overflow-scrolling: touch; // помогает на старых iOS (14 и ниже)
+  -webkit-transform: translateZ(0);
   transform: translateZ(0);
   scroll-padding-top: 80px;
   padding: 32px;

@@ -8,6 +8,7 @@ use App\Enums\SharedFolderAccessType;
 use App\Models\File;
 use App\Models\SharedFolder;
 use App\Models\SharedFolderFile;
+use App\Models\UserFileMovieMeta;
 use App\Services\KinopoiskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,17 +52,29 @@ class MovieController extends Controller
             }
         }
 
-        $meta = (array) ($file->custom_metadata ?? []);
+        $updates = [];
         if (array_key_exists('watched', $data)) {
-            $meta['watched'] = $data['watched'];
+            $updates['watched'] = $data['watched'] ?? false;
         }
         if (array_key_exists('personal_rating', $data)) {
-            $meta['personal_rating'] = $data['personal_rating'];
+            $updates['personal_rating'] = $data['personal_rating'];
         }
-        $file->custom_metadata = $meta;
-        $file->save();
 
-        return $this->success('Метаданные обновлены', ['custom_metadata' => $file->custom_metadata]);
+        $record = UserFileMovieMeta::firstOrNew([
+            'user_id' => $user->id,
+            'file_id' => $fileId,
+        ]);
+        foreach ($updates as $key => $value) {
+            $record->$key = $value;
+        }
+        $record->save();
+
+        return $this->success('Метаданные обновлены', [
+            'movie_meta' => [
+                'watched'         => $record->watched,
+                'personal_rating' => $record->personal_rating,
+            ],
+        ]);
     }
 
     /**

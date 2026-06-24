@@ -11,9 +11,11 @@ export function getApiError(e: unknown, fallback = 'Произошла ошиб�
 }
 
 export function getFolderHasFilesCount(e: unknown): number | null {
-  if (isAxiosError<{ code?: string; data?: { file_count?: number } }>(e) &&
-      e.response?.data?.code === 'FOLDER_HAS_FILES') {
-    return e.response?.data?.data?.file_count ?? 0;
+  if (isAxiosError<{ data?: { code?: string; errors?: { file_count?: number } } }>(e)) {
+    const inner = e.response?.data?.data;
+    if (inner?.code === 'FOLDER_HAS_FILES') {
+      return inner?.errors?.file_count ?? 0;
+    }
   }
   return null;
 }

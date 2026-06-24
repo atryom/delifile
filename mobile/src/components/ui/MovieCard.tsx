@@ -21,8 +21,8 @@ export function MovieCard({ item, onDelete, onWatchedToggle, onRatingChange }: P
   const rating = meta?.rating_kp;
   const genres = meta?.genres?.slice(0, 2) ?? [];
 
-  const watched        = !!(meta as any)?.watched;
-  const personalRating = (meta as any)?.personal_rating as number | null | undefined;
+  const watched        = !!(item.movie_meta?.watched ?? (meta as any)?.watched);
+  const personalRating = (item.movie_meta?.personal_rating ?? (meta as any)?.personal_rating) as number | null | undefined;
 
   const [showPicker, setShowPicker] = useState(false);
 

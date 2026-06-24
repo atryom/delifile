@@ -9,6 +9,7 @@ use App\Models\FileLike;
 use App\Models\FileUserAccess;
 use App\Models\FileVersion;
 use App\Models\User;
+use App\Models\UserFileMovieMeta;
 use Illuminate\Support\Facades\DB;
 
 class FileCardBuilder
@@ -74,6 +75,11 @@ class FileCardBuilder
             $base['link_url']        = $file->link_url;
             $base['preview_url']     = null;
             $base['view_url']        = null;
+            $userMeta = UserFileMovieMeta::where('user_id', $user->id)->where('file_id', $file->id)->first();
+            $base['movie_meta'] = $userMeta ? [
+                'watched'         => (bool) $userMeta->watched,
+                'personal_rating' => $userMeta->personal_rating,
+            ] : null;
         } elseif ($file->isUrlFile()) {
             $base['link_url']         = $file->link_url;
             $base['link_title']       = $file->link_title;
@@ -145,6 +151,12 @@ class FileCardBuilder
         if ($file->content_kind === 'movie_item') {
             $item['custom_metadata'] = $file->custom_metadata;
             $item['link_url']        = $file->link_url;
+            // Per-user movie meta (watched / personal_rating) — pre-loaded via setAttribute
+            $userMeta = $file->getAttribute('user_movie_meta_cached');
+            $item['movie_meta'] = $userMeta ? [
+                'watched'         => (bool) $userMeta->watched,
+                'personal_rating' => $userMeta->personal_rating,
+            ] : null;
         } elseif ($file->content_kind === 'url_file') {
             $item['link_url']       = $file->link_url;
             $item['link_title']     = $file->link_title;

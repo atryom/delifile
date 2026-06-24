@@ -406,6 +406,8 @@ class FileService
             $rawTitle = strip_tags($preview['title'] ?? $hostname ?? '');
             // Remove characters invalid in filenames (including markdown **, iOS-problematic chars)
             $title = preg_replace('/[\/\\\\\?%\*:|"<>\[\]\{\}#\^~]/', '', $rawTitle);
+            // Remove emojis and other non-BMP characters that break iOS filenames
+            $title = preg_replace('/[\x{1F000}-\x{1FFFF}]/u', '', (string) $title);
             $title = trim((string) preg_replace('/\s+/', ' ', $title));
             $title = mb_substr($title ?: $hostname, 0, 200);
 

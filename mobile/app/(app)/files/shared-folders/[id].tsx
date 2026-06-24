@@ -278,16 +278,17 @@ export default function SharedFolderScreen() {
 
   async function handleBulkDelete() {
     Alert.alert(
-      `Убрать ${selectedIds.length} файл(а) из папки?`, undefined,
+      `Удалить ${selectedIds.length} файл(а)?`, 'Файлы будут удалены безвозвратно.',
       [
         { text: 'Отмена', style: 'cancel' },
         {
-          text: 'Убрать',
+          text: 'Удалить',
           style: 'destructive',
           onPress: async () => {
-            await Promise.allSettled(selectedIds.map((fid) => sharedFoldersApi.removeFile(id, fid)));
+            await Promise.allSettled(selectedIds.map((fid) => filesApi.delete(fid)));
             qc.invalidateQueries({ queryKey: ['shared-folders', id] });
             qc.invalidateQueries({ queryKey: ['shared-folders'] });
+            qc.invalidateQueries({ queryKey: ['files'] });
             exitSelectMode();
           },
         },
@@ -568,7 +569,7 @@ export default function SharedFolderScreen() {
                 }
                 if (movieFilter === 'all') return true;
                 const localW = localMovieMeta[f.id]?.watched;
-                const watched = localW !== undefined ? localW : !!(f.custom_metadata as any)?.watched;
+                const watched = localW !== undefined ? localW : !!(f.movie_meta?.watched ?? (f.custom_metadata as any)?.watched);
                 return movieFilter === 'watched' ? !!watched : !watched;
               });
               if (movieSort === 'kp_rating') {
@@ -577,8 +578,8 @@ export default function SharedFolderScreen() {
                 );
               } else if (movieSort === 'personal_rating') {
                 result = [...result].sort((a, b) => {
-                  const ra = localMovieMeta[a.id]?.personal_rating ?? (a.custom_metadata as any)?.personal_rating ?? null;
-                  const rb = localMovieMeta[b.id]?.personal_rating ?? (b.custom_metadata as any)?.personal_rating ?? null;
+                  const ra = localMovieMeta[a.id]?.personal_rating ?? a.movie_meta?.personal_rating ?? null;
+                  const rb = localMovieMeta[b.id]?.personal_rating ?? b.movie_meta?.personal_rating ?? null;
                   return (rb ?? -1) - (ra ?? -1);
                 });
               }
@@ -599,7 +600,7 @@ export default function SharedFolderScreen() {
             renderItem={({ item }) => {
               const localMeta = localMovieMeta[item.id];
               const mergedItem = localMeta
-                ? { ...item, custom_metadata: { ...(item.custom_metadata ?? {}), ...localMeta } as any }
+                ? { ...item, movie_meta: { watched: localMeta.watched ?? item.movie_meta?.watched ?? false, personal_rating: localMeta.personal_rating ?? item.movie_meta?.personal_rating ?? null } }
                 : item;
               return (
                 <MovieCard

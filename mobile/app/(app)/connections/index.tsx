@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { Alert, Keyboard, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
-import { useContacts, useContactRequests, useCreateContact, useAcceptContactRequest, useRejectContactRequest } from '@/hooks/useContacts';
+import { useContacts, useContactRequests, useCreateContact, useUpdateContact, useReorderContacts, useAcceptContactRequest, useRejectContactRequest } from '@/hooks/useContacts';
 import { useInboxCount, useInboxFiles, useInboxSharedFolders, useAcceptInboxFile, useRejectInboxFile, useAcceptInboxFolder, useRejectInboxFolder } from '@/hooks/useInbox';
 import { usePendingFileRequests, useAcceptFileRequest, useRejectFileRequest, useAcceptFileRequestFile, useRejectFileRequestFile } from '@/hooks/useFileRequests';
 import type { FileRequestItem, FileRequestFileItem } from '@/types';
@@ -26,20 +26,60 @@ function formatRelative(isoString: string): string {
 
 type Tab = 'contacts' | 'requests' | 'notifications';
 
-function ContactItem({ contact }: { contact: Contact }) {
+function ContactItem({
+  contact,
+  isReordering,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
+  onRename,
+}: {
+  contact: Contact;
+  isReordering?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+  onRename?: () => void;
+}) {
   const name = contact.name || contact.resolved_user?.name || '—';
   const email = contact.email || contact.resolved_user?.email || '';
+
   return (
-    <View style={styles.listItem}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{(name[0] || '?').toUpperCase()}</Text>
-      </View>
+    <TouchableOpacity
+      style={styles.listItem}
+      onLongPress={!isReordering ? onRename : undefined}
+      activeOpacity={isReordering ? 1 : 0.7}
+    >
+      {isReordering ? (
+        <View style={styles.reorderBtns}>
+          <TouchableOpacity
+            onPress={onMoveUp}
+            disabled={isFirst}
+            style={[styles.reorderBtn, isFirst && styles.reorderBtnDisabled]}
+          >
+            <Text style={styles.reorderBtnText}>▲</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onMoveDown}
+            disabled={isLast}
+            style={[styles.reorderBtn, isLast && styles.reorderBtnDisabled]}
+          >
+            <Text style={styles.reorderBtnText}>▼</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{(name[0] || '?').toUpperCase()}</Text>
+        </View>
+      )}
       <View style={styles.itemMain}>
         <Text style={styles.itemTitle}>{name}</Text>
         {email ? <Text style={styles.itemSub}>{email}</Text> : null}
         {!contact.is_registered && <Text style={styles.itemTag}>Приглашён</Text>}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -62,16 +102,29 @@ function ContactsTab() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [kbHeight, setKbHeight] = useState(0);
+  const [isReordering, setIsReordering] = useState(false);
+  const [localOrder, setLocalOrder] = useState<string[]>([]);
+  // Rename state
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState('');
   const nameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
+  const renameRef = useRef<TextInput>(null);
   const { data, isLoading } = useContacts(search || undefined);
   const createContact = useCreateContact();
+  const updateContact = useUpdateContact();
+  const reorderContacts = useReorderContacts();
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', (e) => setKbHeight(e.endCoordinates.height));
     const hide = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
     return () => { show.remove(); hide.remove(); };
   }, []);
+
+  const contacts = data ?? [];
+  const ordered = isReordering && localOrder.length > 0
+    ? localOrder.map((id) => contacts.find((c) => c.id === id)).filter(Boolean) as typeof contacts
+    : contacts;
 
   function openForm() {
     setInviteEmail('');
@@ -101,29 +154,134 @@ function ContactsTab() {
     }
   }
 
+  function startReorder() {
+    setLocalOrder(contacts.map((c) => c.id));
+    setIsReordering(true);
+  }
+
+  async function saveReorder() {
+    try {
+      await reorderContacts.mutateAsync(localOrder);
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось сохранить порядок');
+    }
+    setIsReordering(false);
+  }
+
+  function moveUp(index: number) {
+    if (index === 0) return;
+    const next = [...localOrder];
+    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+    setLocalOrder(next);
+  }
+
+  function moveDown(index: number) {
+    if (index >= localOrder.length - 1) return;
+    const next = [...localOrder];
+    [next[index], next[index + 1]] = [next[index + 1], next[index]];
+    setLocalOrder(next);
+  }
+
+  function startRename(contact: Contact) {
+    setRenamingId(contact.id);
+    setRenameText(contact.name || contact.resolved_user?.name || '');
+    setTimeout(() => renameRef.current?.focus(), 50);
+  }
+
+  async function saveRename() {
+    if (!renamingId || !renameText.trim()) { setRenamingId(null); return; }
+    try {
+      await updateContact.mutateAsync({ id: renamingId, name: renameText.trim() });
+    } catch (e) {
+      Alert.alert('Ошибка', getApiError(e, 'Не удалось переименовать контакт'));
+    }
+    setRenamingId(null);
+  }
+
   return (
     <View style={styles.flex}>
       <View style={styles.searchRow}>
-        <TextInput
-          style={styles.search}
-          placeholder="Поиск контактов..."
-          value={search}
-          onChangeText={setSearch}
-          placeholderTextColor="#94A3B8"
-        />
-        <TouchableOpacity style={styles.inviteBtn} onPress={openForm}>
-          <Text style={styles.inviteBtnText}>＋</Text>
-        </TouchableOpacity>
+        {isReordering ? (
+          <Text style={[styles.search, { lineHeight: 40, color: '#64748B' }]}>Порядок контактов</Text>
+        ) : (
+          <TextInput
+            style={styles.search}
+            placeholder="Поиск контактов..."
+            value={search}
+            onChangeText={setSearch}
+            placeholderTextColor="#94A3B8"
+          />
+        )}
+        {isReordering ? (
+          <TouchableOpacity style={styles.inviteBtn} onPress={saveReorder}>
+            <Text style={styles.inviteBtnText}>✓</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.inviteBtn, { backgroundColor: '#64748B', marginRight: 6 }]}
+            onPress={startReorder}
+          >
+            <Text style={styles.inviteBtnText}>☰</Text>
+          </TouchableOpacity>
+        )}
+        {!isReordering && (
+          <TouchableOpacity style={styles.inviteBtn} onPress={openForm}>
+            <Text style={styles.inviteBtnText}>＋</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {isLoading ? (
         <Spinner />
       ) : (
         <ScrollView contentContainerStyle={adding ? { paddingBottom: 220 } : undefined}>
-          {(data ?? []).length === 0 ? (
+          {ordered.length === 0 ? (
             <Text style={styles.empty}>Нет контактов</Text>
           ) : (
-            (data ?? []).map((c) => <ContactItem key={c.id} contact={c} />)
+            ordered.map((c, idx) => {
+              if (renamingId === c.id) {
+                return (
+                  <View key={c.id} style={[styles.listItem, { gap: 8 }]}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{((c.name || c.resolved_user?.name || '?')[0]).toUpperCase()}</Text>
+                    </View>
+                    <TextInput
+                      ref={renameRef}
+                      style={[styles.input, { flex: 1, height: 40 }]}
+                      value={renameText}
+                      onChangeText={setRenameText}
+                      autoFocus
+                      returnKeyType="done"
+                      onSubmitEditing={saveRename}
+                      selectTextOnFocus
+                    />
+                    <TouchableOpacity onPress={saveRename} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={{ fontSize: 18, color: '#2563EB', fontWeight: '700' }}>✓</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setRenamingId(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={{ fontSize: 16, color: '#94A3B8' }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+              return (
+                <ContactItem
+                  key={c.id}
+                  contact={c}
+                  isReordering={isReordering}
+                  onMoveUp={() => moveUp(idx)}
+                  onMoveDown={() => moveDown(idx)}
+                  isFirst={idx === 0}
+                  isLast={idx === ordered.length - 1}
+                  onRename={() => startRename(c)}
+                />
+              );
+            })
+          )}
+          {isReordering && (
+            <Text style={[styles.empty, { marginTop: 16, fontSize: 13 }]}>
+              Нажмите ▲▼ чтобы изменить порядок, затем ✓ для сохранения
+            </Text>
           )}
         </ScrollView>
       )}
@@ -468,6 +626,10 @@ const styles = StyleSheet.create({
   inviteBtn: { width: 40, height: 40, backgroundColor: '#2563EB', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   inviteBtnText: { color: '#fff', fontSize: 22, lineHeight: 26 },
   listItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12 },
+  reorderBtns: { flexDirection: 'column', gap: 2 },
+  reorderBtn: { width: 28, height: 24, borderRadius: 6, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
+  reorderBtnDisabled: { backgroundColor: '#F1F5F9', opacity: 0.4 },
+  reorderBtnText: { fontSize: 11, color: '#2563EB', fontWeight: '700' },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 16, fontWeight: '700', color: '#2563EB' },
   itemMain: { flex: 1 },

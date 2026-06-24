@@ -11,8 +11,11 @@ export interface MovieMetadata {
   director: string | null;
   description: string | null;
   kp_url: string | null;
-  watched?: boolean | null;
-  personal_rating?: number | null;
+}
+
+export interface UserMovieMeta {
+  watched: boolean;
+  personal_rating: number | null;
 }
 export type FileFilter = 'all' | 'mine' | 'received' | 'favorites';
 export type AccessType = 'owner' | 'shared' | 'saved';
@@ -50,6 +53,7 @@ export interface FileListItem {
   link_image_url?: string | null;
   link_site_name?: string | null;
   custom_metadata?: MovieMetadata | null;
+  movie_meta?: UserMovieMeta | null;
   likes_count?: number;
   is_liked?: boolean;
   is_favorite?: boolean;
@@ -70,6 +74,7 @@ export interface FileCard extends FileListItem {
   versions: FileVersion[];
   link_description?: string | null;
   custom_metadata?: MovieMetadata | null;
+  movie_meta?: UserMovieMeta | null;
   is_task?: boolean;
   task_status?: TaskStatus | null;
   task_start_date?: string | null;

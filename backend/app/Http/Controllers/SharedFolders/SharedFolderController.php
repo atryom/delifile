@@ -18,6 +18,7 @@ use App\Models\SharedFolderAccess;
 use App\Models\SharedFolderFile;
 use App\Models\SharedFolderLink;
 use App\Models\User;
+use App\Models\UserFileMovieMeta;
 use App\Services\FileCardBuilder;
 use App\Services\FileService;
 use App\Services\LinkPreviewService;
@@ -677,12 +678,19 @@ class SharedFolderController extends Controller
                 ->pluck('unread', 'target_id')
                 ->all();
 
+            // Batch-load per-user movie meta (watched / personal_rating)
+            $movieMeta = UserFileMovieMeta::where('user_id', $user->id)
+                ->whereIn('file_id', $fileIds)
+                ->get()
+                ->keyBy('file_id');
+
             foreach ($sharedFiles as $sf) {
                 if ($sf->file) {
                     $sf->file->setAttribute('likes_count_cached',       $likeCounts[$sf->file->id] ?? 0);
                     $sf->file->setAttribute('is_liked_cached',          isset($likedSet[$sf->file->id]));
                     $sf->file->setAttribute('comments_count_cached',    $commentCounts[$sf->file->id] ?? 0);
                     $sf->file->setAttribute('unread_comments_cached',   (int) ($unreadComments[$sf->file->id] ?? 0));
+                    $sf->file->setAttribute('user_movie_meta_cached',   $movieMeta[$sf->file->id] ?? null);
                 }
             }
         }

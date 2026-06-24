@@ -27,6 +27,22 @@ export function useCreateContact() {
   });
 }
 
+export function useUpdateContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => contactsApi.update(id, name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts'] }),
+  });
+}
+
+export function useReorderContacts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => contactsApi.reorder(ids),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts'] }),
+  });
+}
+
 export function useAcceptContactRequest() {
   const qc = useQueryClient();
   return useMutation({
