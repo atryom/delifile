@@ -67,27 +67,33 @@ type SortBy = 'default' | 'kp_rating' | 'personal_rating';
                 }
               }
 
-              <!-- Personal rating edit -->
+              <!-- Personal rating + watched -->
               <div class="movie-actions" (click)="$event.stopPropagation()">
-                @if (editingRatingId() === file.id) {
-                  <input class="rating-input" type="number" min="0" max="10" step="0.5"
-                         [value]="ratingInput()"
-                         (input)="ratingInput.set($any($event.target).value)"
-                         (keydown.enter)="commitRating($event, file)"
-                         (keydown.escape)="cancelRating()"
-                         (blur)="commitRating($event, file)"
-                         aria-label="Личная оценка от 0 до 10" />
-                } @else {
+                <div class="rating-wrap">
                   <button type="button" class="action-btn rating-btn"
-                          (click)="startEditRating($event, file)"
+                          (click)="toggleRatingPicker($event, file.id)"
                           [attr.aria-label]="'Личная оценка: ' + (getPersonalRating(file) ?? 'не задана')">
                     @if (getPersonalRating(file) !== null) {
-                      <span>{{ getPersonalRating(file) }}/10</span>
+                      <span>⭐ {{ getPersonalRating(file) }}/10</span>
                     } @else {
-                      <span class="muted">Оценить</span>
+                      <span class="muted">⭐ Оценить</span>
                     }
                   </button>
-                }
+                  @if (ratingPickerId() === file.id) {
+                    <div class="rating-picker" role="dialog" aria-label="Выберите оценку">
+                      <div class="rating-picker-grid">
+                        @for (r of ratingValues; track r) {
+                          <button type="button" class="rating-pick-btn"
+                                  [class.active]="getPersonalRating(file) === r"
+                                  (click)="pickRating($event, file, r)">{{ r }}</button>
+                        }
+                      </div>
+                      @if (getPersonalRating(file) !== null) {
+                        <button type="button" class="rating-clear-btn" (click)="pickRating($event, file, null)">Сбросить</button>
+                      }
+                    </div>
+                  }
+                </div>
                 <button type="button" class="action-btn watch-btn"
                         [class.active]="getWatched(file)"
                         (click)="toggleWatched($event, file)"
@@ -149,8 +155,8 @@ export class MovieViewComponent {
   sortBy       = signal<SortBy>('default');
 
   localMeta      = signal<Record<string, { watched?: boolean | null; personal_rating?: number | null }>>({});
-  editingRatingId = signal<string | null>(null);
-  ratingInput     = signal<string>('');
+  ratingPickerId  = signal<string | null>(null);
+  readonly ratingValues = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   constructor() {
     this.destroyRef.onDestroy(() => this.observer?.disconnect());
@@ -251,28 +257,18 @@ export class MovieViewComponent {
     });
   }
 
-  startEditRating(event: MouseEvent, file: SharedFolderFileItem): void {
+  toggleRatingPicker(event: MouseEvent, fileId: string): void {
     event.stopPropagation();
-    const current = this.getPersonalRating(file);
-    this.ratingInput.set(current !== null ? String(current) : '');
-    this.editingRatingId.set(file.id);
+    this.ratingPickerId.set(this.ratingPickerId() === fileId ? null : fileId);
   }
 
-  commitRating(event: Event, file: SharedFolderFileItem): void {
+  pickRating(event: MouseEvent, file: SharedFolderFileItem, rating: number | null): void {
     event.stopPropagation();
-    if (this.editingRatingId() !== file.id) return;
-    const raw = this.ratingInput().trim();
-    const num = raw === '' ? null : Math.min(10, Math.max(0, parseFloat(raw)));
-    if (num !== null && isNaN(num as number)) { this.editingRatingId.set(null); return; }
     const old = this.getPersonalRating(file);
-    this.localMeta.update(m => ({ ...m, [file.id]: { ...m[file.id], personal_rating: num } }));
-    this.editingRatingId.set(null);
-    this.http.patch(`/api/v1/files/${file.id}/movie-meta`, { personal_rating: num }).subscribe({
+    this.localMeta.update(m => ({ ...m, [file.id]: { ...m[file.id], personal_rating: rating } }));
+    this.ratingPickerId.set(null);
+    this.http.patch(`/api/v1/files/${file.id}/movie-meta`, { personal_rating: rating }).subscribe({
       error: () => this.localMeta.update(m => ({ ...m, [file.id]: { ...m[file.id], personal_rating: old } })),
     });
-  }
-
-  cancelRating(): void {
-    this.editingRatingId.set(null);
   }
 }

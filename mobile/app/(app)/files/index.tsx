@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
@@ -141,6 +142,9 @@ function FileRow({
           {isSelected && <Text style={styles.checkmark}>✓</Text>}
         </View>
       )}
+      {item.content_kind === 'url_file' && item.link_image_url ? (
+        <Image source={{ uri: item.link_image_url }} style={styles.linkThumb} contentFit="cover" />
+      ) : null}
       <View style={styles.rowMain}>
         <View style={styles.fileNameRow}>
           <Text style={styles.fileName} numberOfLines={1}>{(item.display_name ?? item.original_name).replace(/\.md$/i, '')}</Text>
@@ -153,7 +157,7 @@ function FileRow({
           )}
         </View>
         <Text style={styles.fileMeta}>
-          {item.content_kind === 'url_file' ? 'Ссылка' : formatFileSize(item.size)}
+          {item.content_kind === 'url_file' ? (item.link_site_name ?? 'Ссылка') : formatFileSize(item.size)}
           {item.uploaded_at ? ` · ${formatDate(item.uploaded_at)}` : ''}
         </Text>
       </View>
@@ -624,6 +628,7 @@ const styles = StyleSheet.create({
   renameInput: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, color: '#1E293B', borderWidth: 1, borderColor: '#2563EB' },
   renameConfirm: { fontSize: 18, color: '#2563EB', fontWeight: '700' },
   fileRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 10 },
+  linkThumb: { width: 48, height: 48, borderRadius: 6, backgroundColor: '#E2E8F0', flexShrink: 0 },
   fileRowSelected: { backgroundColor: '#EFF6FF' },
   checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { borderColor: '#6366F1', backgroundColor: '#6366F1' },

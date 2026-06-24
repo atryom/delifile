@@ -41,7 +41,7 @@ class MovieController extends Controller
         // Allow if user owns the file or has access to a shared folder containing it
         if ($file->owner_id !== $user->id) {
             $hasAccess = SharedFolderFile::where('file_id', $fileId)
-                ->whereHas('sharedFolder', function ($q) use ($user) {
+                ->whereHas('folder', function ($q) use ($user) {
                     $q->where('owner_id', $user->id)
                       ->orWhereHas('accesses', fn ($q2) => $q2->where('user_id', $user->id));
                 })

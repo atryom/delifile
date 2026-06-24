@@ -28,27 +28,46 @@ class OgFetchService
     {
         $meta = [];
 
-        if (preg_match('/<meta[^>]+property=["\']og:title["\'][^>]+content=["\'](.*?)["\'][^>]*>/si', $html, $m)) {
-            $meta['link_title'] = html_entity_decode(trim($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($v = $this->ogAttr($html, 'og:title')) {
+            $meta['link_title'] = html_entity_decode(trim($v), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         } elseif (preg_match('/<title[^>]*>(.*?)<\/title>/si', $html, $m)) {
             $meta['link_title'] = html_entity_decode(trim($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
-        if (preg_match('/<meta[^>]+property=["\']og:description["\'][^>]+content=["\'](.*?)["\'][^>]*>/si', $html, $m)) {
-            $meta['link_description'] = html_entity_decode(trim($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($v = $this->ogAttr($html, 'og:description')) {
+            $meta['link_description'] = html_entity_decode(trim($v), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
-        if (preg_match('/<meta[^>]+property=["\']og:image["\'][^>]+content=["\'](.*?)["\'][^>]*>/si', $html, $m)) {
-            $imageUrl = trim($m[1]);
+        if ($v = $this->ogAttr($html, 'og:image')) {
+            $imageUrl = trim($v);
             if ($imageUrl && filter_var($imageUrl, FILTER_VALIDATE_URL)) {
                 $meta['link_image_url'] = $imageUrl;
             }
         }
 
-        if (preg_match('/<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\'](.*?)["\'][^>]*>/si', $html, $m)) {
-            $meta['link_site_name'] = html_entity_decode(trim($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($v = $this->ogAttr($html, 'og:site_name')) {
+            $meta['link_site_name'] = html_entity_decode(trim($v), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
         return $meta;
+    }
+
+    /**
+     * Extracts the content of a meta OG property, handling both attribute orderings:
+     *   <meta property="og:X" content="VALUE" />
+     *   <meta content="VALUE" property="og:X" />
+     */
+    private function ogAttr(string $html, string $property): ?string
+    {
+        $escaped = preg_quote($property, '/');
+        // property before content
+        if (preg_match('/<meta[^>]+property=["\']' . $escaped . '["\'][^>]+content=["\'](.*?)["\'][^>]*>/si', $html, $m)) {
+            return $m[1] !== '' ? $m[1] : null;
+        }
+        // content before property
+        if (preg_match('/<meta[^>]+content=["\'](.*?)["\'][^>]+property=["\']' . $escaped . '["\'][^>]*>/si', $html, $m)) {
+            return $m[1] !== '' ? $m[1] : null;
+        }
+        return null;
     }
 }

@@ -188,18 +188,19 @@
 }
 
 .md-editor-body {
-  flex: 1;
-  min-height: 0; // критично для flex + overflow на iOS
+  // flex: 1 1 0 — Safari-safe: base 0 вместо auto устраняет неверный расчёт высоты
+  flex: 1 1 0;
+  min-height: 0;
+  height: 0; // совместно с flex: 1 1 0 фиксирует Safari-баг с flex+overflow
   overflow-y: auto;
   overflow-x: hidden;
-  -webkit-overflow-scrolling: touch; // помогает на старых iOS (14 и ниже)
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
+  -webkit-overflow-scrolling: touch;
+  // transform убран с body — родительский .md-editor-shell уже форсирует GPU-слой;
+  // отдельный transform на body создавал в Safari неверный z-порядок слоёв
   scroll-padding-top: 80px;
   padding: 32px;
   display: flex;
   justify-content: center;
-  position: relative; // нужно для z-index в Safari
 
   @media (max-width: 600px) {
     padding: 16px;
