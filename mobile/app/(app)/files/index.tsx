@@ -147,7 +147,11 @@ function FileRow({
       ) : null}
       <View style={styles.rowMain}>
         <View style={styles.fileNameRow}>
-          <Text style={styles.fileName} numberOfLines={1}>{(item.display_name ?? item.original_name).replace(/\.md$/i, '')}</Text>
+          <Text style={styles.fileName} numberOfLines={1}>
+            {item.content_kind === 'url_file'
+              ? (item.link_title ?? item.display_name ?? item.original_name)
+              : (item.display_name ?? item.original_name).replace(/\.md$/i, '')}
+          </Text>
           {item.is_pinned && <Text style={styles.pinIcon}>📌</Text>}
           {item.is_favorite && <Text style={styles.favStar}>★</Text>}
           {(item.unread_comments ?? 0) > 0 && (

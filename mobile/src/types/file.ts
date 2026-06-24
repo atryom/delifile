@@ -50,6 +50,7 @@ export interface FileListItem {
   view_url?: string | null;
   link_url?: string | null;
   link_title?: string | null;
+  link_description?: string | null;
   link_image_url?: string | null;
   link_site_name?: string | null;
   custom_metadata?: MovieMetadata | null;

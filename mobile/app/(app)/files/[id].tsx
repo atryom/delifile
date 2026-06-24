@@ -575,7 +575,9 @@ export default function FileDetailScreen() {
     );
   }
 
-  const rawName = file.display_name ?? file.original_name;
+  const rawName = file.content_kind === 'url_file'
+    ? (file.link_title ?? file.display_name ?? file.original_name)
+    : (file.display_name ?? file.original_name);
   const name = file.mime_type === 'text/markdown' ? rawName.replace(/\.md$/i, '') : rawName;
   const isMovie = file.content_kind === 'movie_item';
   const movie = isMovie ? (file as any).custom_metadata : null;
@@ -781,6 +783,9 @@ export default function FileDetailScreen() {
                   ) : null}
                   {file.link_title ? (
                     <Text style={styles.linkPreviewTitle} numberOfLines={2}>{file.link_title}</Text>
+                  ) : null}
+                  {file.link_description ? (
+                    <Text style={styles.linkPreviewDesc} numberOfLines={3}>{file.link_description}</Text>
                   ) : null}
                   <Text style={styles.linkPreviewUrl} numberOfLines={1}>{file.link_url}</Text>
                 </View>
@@ -1641,6 +1646,11 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     fontWeight: '600',
     lineHeight: 20,
+  },
+  linkPreviewDesc: {
+    fontSize: 13,
+    color: '#475569',
+    lineHeight: 18,
   },
   linkPreviewUrl: {
     fontSize: 12,
