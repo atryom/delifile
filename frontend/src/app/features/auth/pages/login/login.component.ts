@@ -11,6 +11,7 @@ import { LockPassApiService, TwoFaSession, TwoFaPollResult } from '../../../../c
 import { ApiError, CurrentUser } from '../../../../shared/models/api.models';
 
 type LoginStep = 'credentials' | '2fa';
+type LoginTab  = 'password' | 'lockpass';
 
 @Component({
   selector: 'app-login',
@@ -31,11 +32,16 @@ export class LoginComponent implements OnDestroy {
   private readonly translate   = inject(TranslateService);
 
   readonly step        = signal<LoginStep>('credentials');
+  readonly loginTab    = signal<LoginTab>('password');
   readonly pending     = signal(false);
   readonly serverError = signal<string | null>(null);
   private  fieldErrors = signal<Record<string, string[]>>({});
 
-  // 2FA state
+  // LockPass alternative-login state
+  readonly lockpassEmail      = signal('');
+  readonly lockpassLoginError = signal<string | null>(null);
+
+  // 2FA / LockPass session state
   readonly twoFaSession  = signal<TwoFaSession | null>(null);
   readonly twoFaStatus   = signal<'pending' | 'approved' | 'rejected' | 'expired'>('pending');
   readonly twoFaMode     = signal<'push' | 'totp' | 'recovery'>('push');
@@ -191,6 +197,42 @@ export class LoginComponent implements OnDestroy {
     this.recoveryError.set(null);
     this.secondsLeft.set(300);
     this.pending.set(false);
+    this.serverError.set(null);
+  }
+
+  initLockpassLogin(): void {
+    const email = this.lockpassEmail().trim();
+    if (!email || this.pending()) return;
+
+    this.pending.set(true);
+    this.lockpassLoginError.set(null);
+
+    this.lockPass.loginInit(email, this.device.getDeviceId(), this.device.getDeviceType()).subscribe({
+      next: (res) => {
+        const data = res.data;
+        this.twoFaSession.set({
+          requires_2fa: true,
+          session_id:   data.session_id,
+          qr_payload:   data.qr_payload,
+          expires_at:   data.expires_at,
+        });
+        this.step.set('2fa');
+        this.startTimer();
+        this.startPolling(data.session_id, true);
+        this.pending.set(false);
+      },
+      error: (err: ApiError) => {
+        this.pending.set(false);
+        this.lockpassLoginError.set(
+          err.message ?? 'Не удалось инициировать вход через LockPass'
+        );
+      },
+    });
+  }
+
+  switchLoginTab(tab: LoginTab): void {
+    this.loginTab.set(tab);
+    this.lockpassLoginError.set(null);
     this.serverError.set(null);
   }
 

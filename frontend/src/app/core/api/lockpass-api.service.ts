@@ -35,6 +35,12 @@ export interface ConnectPollResult {
   user?: CurrentUser;
 }
 
+export interface LockpassLoginSession {
+  session_id: string;
+  qr_payload: string | null;
+  expires_at: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class LockPassApiService {
   private readonly api = inject(ApiService);
@@ -69,5 +75,13 @@ export class LockPassApiService {
 
   pollConnect(tempToken: string): Observable<ApiResponse<ConnectPollResult>> {
     return this.api.get(`/auth/2fa/poll-connect/${tempToken}`);
+  }
+
+  loginInit(email: string, deviceId: string, deviceType: string): Observable<ApiResponse<LockpassLoginSession>> {
+    return this.api.post('/auth/lockpass/login-init', { email, device_id: deviceId, device_type: deviceType });
+  }
+
+  setMode(mode: '2fa' | 'alternative'): Observable<ApiResponse<{ user: CurrentUser }>> {
+    return this.api.post('/settings/lockpass/set-mode', { mode });
   }
 }

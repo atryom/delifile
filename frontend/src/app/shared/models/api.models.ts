@@ -218,10 +218,11 @@ export interface CurrentUser {
   allow_contacts_without_confirmation: boolean;
   auto_add_received_files: boolean;
   notify_task_assigned: boolean;
-  // LockPass 2FA
+  // LockPass
   lockpass_user_id: number | null;
   two_factor_enabled: boolean;
   devices_count: number;
+  lockpass_auth_mode: '2fa' | 'alternative' | null;
 }
 
 // ─── Admin Models ─────────────────────────────────────────────────────────────

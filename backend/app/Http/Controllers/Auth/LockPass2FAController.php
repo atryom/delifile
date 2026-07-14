@@ -130,6 +130,84 @@ class LockPass2FAController extends Controller
     }
 
     /**
+     * POST /api/v1/auth/lockpass/login-init — public
+     * Creates a LockPass session by email for the "alternative login" mode (no password needed).
+     */
+    public function loginInit(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email'       => 'required|email',
+            'device_id'   => 'nullable|string',
+            'device_type' => 'nullable|string',
+        ]);
+
+        $user = User::where('email', $request->input('email'))->first();
+
+        if (!$user || !$user->lockpass_user_id || $user->lockpass_auth_mode !== 'alternative') {
+            return $this->error(
+                'Альтернативный вход через LockPass недоступен для этого аккаунта',
+                'LOCKPASS_ALT_UNAVAILABLE',
+                [],
+                422
+            );
+        }
+
+        if (!$user->two_factor_enabled) {
+            return $this->error(
+                'LockPass не настроен. Добавьте устройство в приложении LockPass.',
+                'LOCKPASS_NOT_SETUP',
+                [],
+                422
+            );
+        }
+
+        try {
+            $session = $this->lockPass->create2FASession((int) $user->lockpass_user_id);
+
+            Cache::put('lockpass_2fa_' . $session['session_id'], [
+                'user_id'     => $user->id,
+                'device_id'   => $request->input('device_id'),
+                'device_type' => $request->input('device_type'),
+                'device_name' => $request->input('device_type') ?? 'Web Browser',
+                'user_agent'  => $request->userAgent(),
+                'ip'          => $request->ip(),
+            ], now()->addMinutes(6));
+
+            return $this->success('Сессия создана', [
+                'session_id' => $session['session_id'],
+                'qr_payload' => $session['qr_payload'] ?? null,
+                'expires_at' => now()->addMinutes(5)->toIso8601String(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('LockPass loginInit failed', ['error' => $e->getMessage()]);
+            return $this->error('Сервис LockPass временно недоступен', 'LOCKPASS_UNAVAILABLE', [], 503);
+        }
+    }
+
+    /**
+     * POST /api/v1/settings/lockpass/set-mode — requires Sanctum auth
+     * Sets the LockPass authentication mode for the authenticated user.
+     */
+    public function setMode(Request $request): JsonResponse
+    {
+        $request->validate([
+            'mode' => 'required|string|in:2fa,alternative',
+        ]);
+
+        $user = $request->user();
+
+        if (!$user->lockpass_user_id) {
+            return $this->error('LockPass не подключён', 'LOCKPASS_NOT_CONNECTED', [], 422);
+        }
+
+        $user->update(['lockpass_auth_mode' => $request->input('mode')]);
+
+        return $this->success('Режим LockPass обновлён', [
+            'user' => $this->authService->formatUser($user->fresh()),
+        ]);
+    }
+
+    /**
      * POST /api/v1/auth/2fa/init-connect — requires Sanctum auth
      * Initiates a per-user LockPass connection; returns QR + temp_token.
      */
@@ -183,7 +261,10 @@ class LockPass2FAController extends Controller
             );
         }
 
-        $user->update(['lockpass_user_id' => $lockpassUserId]);
+        $user->update([
+            'lockpass_user_id'   => $lockpassUserId,
+            'lockpass_auth_mode' => $user->lockpass_auth_mode ?? '2fa',
+        ]);
 
         try {
             $this->lockPass->sync2FAStatus($user->fresh());
@@ -247,6 +328,7 @@ class LockPass2FAController extends Controller
             'lockpass_user_id'   => null,
             'two_factor_enabled' => false,
             'devices_count'      => 0,
+            'lockpass_auth_mode' => null,
         ]);
 
         return $this->success('2FA отключена', [

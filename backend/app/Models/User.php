@@ -35,6 +35,7 @@ class User extends Authenticatable
         'lockpass_user_id',
         'two_factor_enabled',
         'devices_count',
+        'lockpass_auth_mode',
     ];
 
     protected $hidden = [

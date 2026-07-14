@@ -1,5 +1,41 @@
 @use 'styles/auth-shared' as *;
 
+// ── Login method tabs (Password / LockPass) ────────────────────────────────
+
+.login-method-tabs {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border, #e2e8f0);
+  margin-bottom: 20px;
+}
+
+.login-method-tab {
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  border: none;
+  background: var(--surface, #f8fafc);
+  color: var(--text-dim, #64748b);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+
+  &.login-method-tab--active {
+    background: var(--accent, #6366f1);
+    color: #fff;
+  }
+}
+
+// ── LockPass alternative login tab ─────────────────────────────────────────
+
+.lockpass-login {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0;
+}
+
 .remember-row { display: flex; align-items: center; margin-bottom: 4px; }
 .remember-label { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: #6b7280; cursor: pointer; }
 .remember-check { width: 15px; height: 15px; cursor: pointer; accent-color: #6366f1; }

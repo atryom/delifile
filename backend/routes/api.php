@@ -62,10 +62,11 @@ Route::prefix('v1')->group(function () {
         Route::post('password/verify-reset-token', [AuthController::class, 'verifyResetToken']);
         Route::post('password/reset',              [AuthController::class, 'resetPassword']);
 
-        // LockPass 2FA — public endpoints (no project token exposed)
-        Route::get('2fa/qr',       [LockPass2FAController::class, 'qr']);
-        Route::post('2fa/totp',    [LockPass2FAController::class, 'totp']);
-        Route::post('2fa/recovery',[LockPass2FAController::class, 'recovery']);
+        // LockPass — public endpoints
+        Route::get('2fa/qr',                [LockPass2FAController::class, 'qr']);
+        Route::post('2fa/totp',             [LockPass2FAController::class, 'totp']);
+        Route::post('2fa/recovery',         [LockPass2FAController::class, 'recovery']);
+        Route::post('lockpass/login-init',  [LockPass2FAController::class, 'loginInit']);
 
         // Email verification (GET → redirect to SPA)
         Route::get('email/verify/{token}', [AuthController::class, 'verifyEmail'])
@@ -224,9 +225,10 @@ Route::post('files/{id}/set-tags',         [FileController::class, 'setTags']);
         // User settings
         Route::patch('user/settings', [UserSettingsController::class, 'update']);
 
-        // LockPass 2FA settings
-        Route::post('settings/2fa/enable',  [LockPass2FAController::class, 'enable']);
-        Route::post('settings/2fa/disable', [LockPass2FAController::class, 'disable']);
+        // LockPass settings
+        Route::post('settings/2fa/enable',         [LockPass2FAController::class, 'enable']);
+        Route::post('settings/2fa/disable',        [LockPass2FAController::class, 'disable']);
+        Route::post('settings/lockpass/set-mode',  [LockPass2FAController::class, 'setMode']);
 
         // LockPass 2FA connect flow (polling)
         Route::post('auth/2fa/init-connect',               [LockPass2FAController::class, 'initConnect']);

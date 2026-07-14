@@ -397,113 +397,159 @@
         }
       </div>
 
-      <!-- ── 2FA (LockPass) ──────────────────────────────────────────────── -->
+      <!-- ── LockPass ──────────────────────────────────────────────────────── -->
       <div class="settings-section">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">Двухфакторная аутентификация</h2>
-          <p class="section-desc">Подтверждайте вход в приложении LockPass на вашем смартфоне</p>
-        </div>
-      </div>
-
-      @if (twoFaError()) {
-        <div class="alert-error">{{ twoFaError() }}</div>
-      }
-      @if (twoFaSuccess()) {
-        <div class="alert-success">{{ twoFaSuccess() }}</div>
-      }
-
-      <div class="toggles-list">
-
-        <div class="toggle-row">
-          <div class="toggle-info">
-            <span class="toggle-label">Статус</span>
-            <span class="toggle-desc">
-              <span class="twofa-badge" [class.twofa-badge--on]="authState.user()?.two_factor_enabled">
-                @if (authState.user()?.two_factor_enabled) { Включена } @else { Отключена }
-              </span>
-              @if (authState.user()?.two_factor_enabled) {
-                <span class="twofa-devices">&nbsp;· Устройств: {{ authState.user()?.devices_count ?? 0 }}</span>
-              }
-            </span>
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">LockPass</h2>
+            <p class="section-desc">Используйте приложение LockPass для защиты входа</p>
           </div>
         </div>
 
-        @if (!authState.user()?.two_factor_enabled) {
+        @if (twoFaError()) {
+          <div class="alert-error">{{ twoFaError() }}</div>
+        }
+        @if (twoFaSuccess()) {
+          <div class="alert-success">{{ twoFaSuccess() }}</div>
+        }
 
-          @if (!showQRSection()) {
-            <div class="toggle-row">
-              <div class="toggle-info">
-                <span class="toggle-label">Подключить LockPass</span>
-                <span class="toggle-desc">Скачайте приложение и отсканируйте QR-код</span>
-              </div>
-              <button class="btn-primary" (click)="loadQR()" [disabled]="loadingQR()">
-                {{ loadingQR() ? 'Загрузка…' : 'Подключить' }}
-              </button>
+        <div class="toggles-list">
+
+          <!-- Status badge -->
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-label">Статус</span>
+              <span class="toggle-desc">
+                @if (authState.user()?.lockpass_user_id) {
+                  <span class="twofa-badge twofa-badge--on">Подключён</span>
+                  @if (authState.user()?.two_factor_enabled) {
+                    <span class="twofa-devices">&nbsp;· Устройств: {{ authState.user()?.devices_count ?? 0 }}</span>
+                  } @else {
+                    <span class="twofa-devices">&nbsp;· Нет устройств в LockPass</span>
+                  }
+                } @else {
+                  <span class="twofa-badge">Не подключён</span>
+                }
+              </span>
             </div>
-          }
+          </div>
 
-          @if (showQRSection() && twoFaQR()) {
-            <div class="toggle-row">
-              <div class="toggle-info">
-                <span class="toggle-label">QR-код</span>
-                <span class="toggle-desc">
-                  Отсканируйте в приложении LockPass
-                  <span class="where-link" (click)="toggleAppInfo()">Где найти?</span>
-                </span>
-              </div>
-            </div>
+          <!-- Not connected: show connect button / QR -->
+          @if (!authState.user()?.lockpass_user_id) {
 
-            @if (showAppInfo()) {
-              <div class="app-info-popup" (click)="toggleAppInfo()">
-                <div class="app-info-popup__body" (click)="$event.stopPropagation()">
-                  <button class="app-info-popup__close" (click)="toggleAppInfo()">&times;</button>
-                  <h3>Приложение LockPass</h3>
-                  <p>Скачайте LockPass из официального магазина приложений:</p>
-                  <ul>
-                    <li><a href="https://apps.apple.com/ru/app/lockpass/id6443960246" target="_blank" rel="noopener">App Store (iOS)</a></li>
-                    <li><a href="https://www.rustore.ru/catalog/app/com.lockpass.app" target="_blank" rel="noopener">RuStore (Android)</a></li>
-                    <li><a href="https://play.google.com/store/apps/details?id=com.lockpass.app" target="_blank" rel="noopener">Google Play (Android)</a></li>
-                  </ul>
+            @if (!showQRSection()) {
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <span class="toggle-label">Подключить LockPass</span>
+                  <span class="toggle-desc">Скачайте приложение и отсканируйте QR-код</span>
                 </div>
+                <button class="btn-primary" (click)="loadQR()" [disabled]="loadingQR()">
+                  {{ loadingQR() ? 'Загрузка…' : 'Подключить' }}
+                </button>
               </div>
             }
 
-            <div class="twofa-qr-block">
-              <div class="twofa-qr-image">
-                <img [src]="qrImageUrl(twoFaQR()!.qr_payload)"
-                     alt="QR-код LockPass" width="200" height="200">
+            @if (showQRSection() && twoFaQR()) {
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <span class="toggle-label">QR-код</span>
+                  <span class="toggle-desc">
+                    Отсканируйте в приложении LockPass
+                    <span class="where-link" (click)="toggleAppInfo()">Где найти?</span>
+                  </span>
+                </div>
               </div>
-              @if (twoFaPolling()) {
-                <p class="twofa-step twofa-step--polling">
-                  Ожидаем подтверждения в LockPass…
-                </p>
-              } @else {
-                <p class="twofa-step">
-                  Отсканируйте QR в приложении LockPass — страница обновится автоматически.
-                </p>
+
+              @if (showAppInfo()) {
+                <div class="app-info-popup" (click)="toggleAppInfo()">
+                  <div class="app-info-popup__body" (click)="$event.stopPropagation()">
+                    <button class="app-info-popup__close" (click)="toggleAppInfo()">&times;</button>
+                    <h3>Приложение LockPass</h3>
+                    <p>Скачайте LockPass из официального магазина приложений:</p>
+                    <ul>
+                      <li><a href="https://apps.apple.com/ru/app/lockpass/id6443960246" target="_blank" rel="noopener">App Store (iOS)</a></li>
+                      <li><a href="https://www.rustore.ru/catalog/app/com.lockpass.app" target="_blank" rel="noopener">RuStore (Android)</a></li>
+                      <li><a href="https://play.google.com/store/apps/details?id=com.lockpass.app" target="_blank" rel="noopener">Google Play (Android)</a></li>
+                    </ul>
+                  </div>
+                </div>
               }
+
+              <div class="twofa-qr-block">
+                <div class="twofa-qr-image">
+                  <img [src]="qrImageUrl(twoFaQR()!.qr_payload)"
+                       alt="QR-код LockPass" width="200" height="200">
+                </div>
+                @if (twoFaPolling()) {
+                  <p class="twofa-step twofa-step--polling">Ожидаем подтверждения в LockPass…</p>
+                } @else {
+                  <p class="twofa-step">Отсканируйте QR в приложении LockPass — страница обновится автоматически.</p>
+                }
+              </div>
+            }
+
+          } @else {
+
+            <!-- Connected: mode selector -->
+            <div class="lockpass-mode-selector">
+              <p class="lockpass-mode-label">Выберите режим использования LockPass:</p>
+
+              <label class="lockpass-mode-card" [class.lockpass-mode-card--active]="authState.user()?.lockpass_auth_mode === '2fa'">
+                <input
+                  type="radio"
+                  name="lockpass-mode"
+                  value="2fa"
+                  [checked]="authState.user()?.lockpass_auth_mode === '2fa'"
+                  (change)="setLockpassMode('2fa')"
+                  [disabled]="settingMode() || !authState.user()?.two_factor_enabled"
+                />
+                <div class="lockpass-mode-card__body">
+                  <span class="lockpass-mode-card__title">Двухфакторная аутентификация</span>
+                  <span class="lockpass-mode-card__desc">
+                    После ввода пароля — подтверждение push-уведомлением или кодом из LockPass.
+                    @if (!authState.user()?.two_factor_enabled) {
+                      <br><em>Недоступно: добавьте устройство в приложении LockPass.</em>
+                    }
+                  </span>
+                </div>
+              </label>
+
+              <label class="lockpass-mode-card" [class.lockpass-mode-card--active]="authState.user()?.lockpass_auth_mode === 'alternative'">
+                <input
+                  type="radio"
+                  name="lockpass-mode"
+                  value="alternative"
+                  [checked]="authState.user()?.lockpass_auth_mode === 'alternative'"
+                  (change)="setLockpassMode('alternative')"
+                  [disabled]="settingMode() || !authState.user()?.two_factor_enabled"
+                />
+                <div class="lockpass-mode-card__body">
+                  <span class="lockpass-mode-card__title">Альтернативный вход</span>
+                  <span class="lockpass-mode-card__desc">
+                    На странице входа появится вкладка «LockPass» — войдите без пароля,
+                    отсканировав QR-код или введя код из приложения.
+                    @if (!authState.user()?.two_factor_enabled) {
+                      <br><em>Недоступно: добавьте устройство в приложении LockPass.</em>
+                    }
+                  </span>
+                </div>
+              </label>
             </div>
+
+            <!-- Disconnect button -->
+            <div class="toggle-row" style="margin-top:8px">
+              <div class="toggle-info">
+                <span class="toggle-label">Отключить LockPass</span>
+                <span class="toggle-desc">Привязка будет удалена, вход через LockPass отключится.</span>
+              </div>
+              <button class="btn-danger-outline" (click)="disableTwoFa()" [disabled]="twoFaDisabling()">
+                {{ twoFaDisabling() ? 'Отключение…' : 'Отключить' }}
+              </button>
+            </div>
+
           }
 
-        } @else {
-
-          <div class="toggle-row">
-            <div class="toggle-info">
-              <span class="toggle-label">Защита входа</span>
-              <span class="toggle-desc">
-                При каждом входе вы будете получать push-уведомление в LockPass.
-                Управление устройствами — внутри приложения LockPass.
-              </span>
-            </div>
-            <button class="btn-danger-outline" (click)="disableTwoFa()" [disabled]="twoFaDisabling()">
-              {{ twoFaDisabling() ? 'Отключение…' : 'Отключить 2FA' }}
-            </button>
-          </div>
-
-        }
-
+        </div>
       </div>
-    </div>
     </div>
 

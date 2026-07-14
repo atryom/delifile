@@ -291,6 +291,73 @@
   padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;
 }
 
+// ── LockPass mode selector ─────────────────────────────────────────────────
+
+.lockpass-mode-selector {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.lockpass-mode-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+}
+
+.lockpass-mode-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:last-child { margin-bottom: 0; }
+
+  input[type="radio"] {
+    margin-top: 3px;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent, #6366f1);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  &--active {
+    border-color: var(--accent, #6366f1);
+    background: color-mix(in srgb, var(--accent, #6366f1) 6%, transparent);
+  }
+
+  &:has(input:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.lockpass-mode-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lockpass-mode-card__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lockpass-mode-card__desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+
+  em { color: #b45309; font-style: normal; }
+}
+
 @media (max-width: v.$bp-mobile) {
   .page { padding: 16px 12px; }
   .settings-section { padding: 16px; }

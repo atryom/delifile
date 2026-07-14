@@ -340,10 +340,34 @@ export class SecurityComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ─── 2FA ─────────────────────────────────────────────────────────────────
+  // ─── LockPass ────────────────────────────────────────────────────────────
+
+  readonly settingMode   = signal(false);
 
   qrImageUrl(payload: string): string {
     return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(payload);
+  }
+
+  setLockpassMode(mode: '2fa' | 'alternative'): void {
+    if (this.settingMode()) return;
+    this.settingMode.set(true);
+    this.twoFaError.set(null);
+    this.twoFaSuccess.set(null);
+    this.lockPassApi.setMode(mode).subscribe({
+      next: (res) => {
+        this.authState.updateUser(res.data.user);
+        this.twoFaSuccess.set(
+          mode === '2fa'
+            ? 'Режим двухфакторной аутентификации активирован.'
+            : 'Режим альтернативного входа активирован.'
+        );
+        this.settingMode.set(false);
+      },
+      error: () => {
+        this.twoFaError.set('Не удалось изменить режим LockPass.');
+        this.settingMode.set(false);
+      },
+    });
   }
 
   loadQR(): void {

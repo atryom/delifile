@@ -20,62 +20,121 @@
             <div class="alert-error">{{ 'auth.login.email_verify_failed' | translate }}</div>
           }
 
-          <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form" novalidate>
-
-            @if (serverError()) {
-              <div class="alert-error">{{ serverError() }}</div>
-            }
-
-            <div class="field">
-              <label for="email">{{ 'auth.login.email' | translate }}</label>
-              <input
-                id="email"
-                type="email"
-                formControlName="email"
-                placeholder="you@example.com"
-                autocomplete="username"
-                [class.input-error]="fieldError('email')"
-              />
-              @if (fieldError('email')) {
-                <span class="field-error">{{ fieldError('email') }}</span>
-              }
-            </div>
-
-            <div class="field">
-              <label for="password">{{ 'auth.login.password' | translate }}</label>
-              <input
-                id="password"
-                type="password"
-                formControlName="password"
-                autocomplete="current-password"
-                [class.input-error]="fieldError('password')"
-              />
-              @if (fieldError('password')) {
-                <span class="field-error">{{ fieldError('password') }}</span>
-              }
-            </div>
-
-            <div class="remember-row">
-              <label class="remember-label">
-                <input type="checkbox" formControlName="remember" class="remember-check"/>
-                {{ 'auth.login.remember_me' | translate }}
-              </label>
-            </div>
-
-            <button type="submit" class="btn-primary btn-full" [disabled]="pending()">
-              {{ pending() ? ('auth.login.submitting' | translate) : ('auth.login.submit' | translate) }}
+          <!-- Login method tabs -->
+          <div class="login-method-tabs" role="tablist">
+            <button
+              role="tab"
+              [attr.aria-selected]="loginTab() === 'password'"
+              class="login-method-tab"
+              [class.login-method-tab--active]="loginTab() === 'password'"
+              (click)="switchLoginTab('password')">
+              Пароль
             </button>
+            <button
+              role="tab"
+              [attr.aria-selected]="loginTab() === 'lockpass'"
+              class="login-method-tab"
+              [class.login-method-tab--active]="loginTab() === 'lockpass'"
+              (click)="switchLoginTab('lockpass')">
+              LockPass
+            </button>
+          </div>
 
-            <p class="auth-switch">
-              <a routerLink="/forgot-password" class="link-primary">{{ 'auth.login.forgot_password' | translate }}</a>
-            </p>
+          <!-- Password tab -->
+          @if (loginTab() === 'password') {
+            <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form" novalidate>
 
-            <p class="auth-switch">
-              {{ 'auth.login.no_account' | translate }}
-              <a routerLink="/register" class="link-primary">{{ 'auth.login.register_link' | translate }}</a>
-            </p>
+              @if (serverError()) {
+                <div class="alert-error">{{ serverError() }}</div>
+              }
 
-          </form>
+              <div class="field">
+                <label for="email">{{ 'auth.login.email' | translate }}</label>
+                <input
+                  id="email"
+                  type="email"
+                  formControlName="email"
+                  placeholder="you@example.com"
+                  autocomplete="username"
+                  [class.input-error]="fieldError('email')"
+                />
+                @if (fieldError('email')) {
+                  <span class="field-error">{{ fieldError('email') }}</span>
+                }
+              </div>
+
+              <div class="field">
+                <label for="password">{{ 'auth.login.password' | translate }}</label>
+                <input
+                  id="password"
+                  type="password"
+                  formControlName="password"
+                  autocomplete="current-password"
+                  [class.input-error]="fieldError('password')"
+                />
+                @if (fieldError('password')) {
+                  <span class="field-error">{{ fieldError('password') }}</span>
+                }
+              </div>
+
+              <div class="remember-row">
+                <label class="remember-label">
+                  <input type="checkbox" formControlName="remember" class="remember-check"/>
+                  {{ 'auth.login.remember_me' | translate }}
+                </label>
+              </div>
+
+              <button type="submit" class="btn-primary btn-full" [disabled]="pending()">
+                {{ pending() ? ('auth.login.submitting' | translate) : ('auth.login.submit' | translate) }}
+              </button>
+
+              <p class="auth-switch">
+                <a routerLink="/forgot-password" class="link-primary">{{ 'auth.login.forgot_password' | translate }}</a>
+              </p>
+
+              <p class="auth-switch">
+                {{ 'auth.login.no_account' | translate }}
+                <a routerLink="/register" class="link-primary">{{ 'auth.login.register_link' | translate }}</a>
+              </p>
+
+            </form>
+          }
+
+          <!-- LockPass tab -->
+          @if (loginTab() === 'lockpass') {
+            <div class="lockpass-login">
+              <p class="twofa-hint">Войдите без пароля — подтвердите через приложение LockPass.</p>
+
+              @if (lockpassLoginError()) {
+                <div class="alert-error">{{ lockpassLoginError() }}</div>
+              }
+
+              <div class="field">
+                <label for="lp-email">Email</label>
+                <input
+                  id="lp-email"
+                  type="email"
+                  autocomplete="username"
+                  placeholder="you@example.com"
+                  [value]="lockpassEmail()"
+                  (input)="lockpassEmail.set($any($event.target).value)"
+                  (keyup.enter)="initLockpassLogin()"
+                />
+              </div>
+
+              <button
+                class="btn-primary btn-full"
+                [disabled]="!lockpassEmail().trim() || pending()"
+                (click)="initLockpassLogin()">
+                {{ pending() ? 'Загрузка…' : 'Получить QR-код' }}
+              </button>
+
+              <p class="auth-switch">
+                {{ 'auth.login.no_account' | translate }}
+                <a routerLink="/register" class="link-primary">{{ 'auth.login.register_link' | translate }}</a>
+              </p>
+            </div>
+          }
         }
 
         <!-- ── 2FA step ───────────────────────────────────────────────── -->

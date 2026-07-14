@@ -59,8 +59,8 @@ class AuthService
             ];
         }
 
-        // 2FA check (uses cached status — no HTTP request on the hot login path)
-        if ($user->two_factor_enabled && $user->lockpass_user_id) {
+        // 2FA check — only when user explicitly chose 2FA mode
+        if ($user->lockpass_auth_mode === '2fa' && $user->two_factor_enabled && $user->lockpass_user_id) {
             try {
                 $session = $this->lockPassService->create2FASession((int) $user->lockpass_user_id);
 
@@ -229,10 +229,11 @@ class AuthService
             'allow_contacts_without_confirmation'   => (bool) ($user->allow_contacts_without_confirmation ?? true),
             'auto_add_received_files'               => (bool) ($user->auto_add_received_files ?? true),
             'notify_task_assigned'                  => (bool) ($user->notify_task_assigned ?? true),
-            // LockPass 2FA
+            // LockPass
             'lockpass_user_id'                      => $user->lockpass_user_id,
             'two_factor_enabled'                    => (bool) $user->two_factor_enabled,
             'devices_count'                         => (int) ($user->devices_count ?? 0),
+            'lockpass_auth_mode'                    => $user->lockpass_auth_mode,
         ];
     }
 }
