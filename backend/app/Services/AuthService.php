@@ -102,6 +102,16 @@ class AuthService
             ? DeviceSession::where('user_id', $user->id)->where('device_id', $deviceId)->first()
             : null;
 
+        // Fallback: match by device_name + device_type when device_id not found
+        // (covers localStorage clear on web, app reinstall on mobile)
+        if (!$existingSession && $deviceName && $deviceType) {
+            $existingSession = DeviceSession::where('user_id', $user->id)
+                ->where('device_name', $deviceName)
+                ->where('device_type', $deviceType)
+                ->orderByDesc('last_active_at')
+                ->first();
+        }
+
         if ($existingSession) {
             $user->tokens()->where('id', $existingSession->token_id)->delete();
 
@@ -109,6 +119,7 @@ class AuthService
 
             $existingSession->update([
                 'token_id'       => $token->accessToken->id,
+                'device_id'      => $deviceId ?? $existingSession->device_id,
                 'device_name'    => $deviceName,
                 'device_type'    => $deviceType,
                 'user_agent'     => $userAgent,

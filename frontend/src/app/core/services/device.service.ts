@@ -1,16 +1,28 @@
 import { Injectable } from '@angular/core';
 
 const DEVICE_ID_KEY = 'df_device_id';
+const DEVICE_ID_COOKIE = 'df_did';
+const COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 year in seconds
 
 @Injectable({ providedIn: 'root' })
 export class DeviceService {
   getDeviceId(): string {
-    let id = localStorage.getItem(DEVICE_ID_KEY);
+    let id = localStorage.getItem(DEVICE_ID_KEY) ?? this.readCookie(DEVICE_ID_COOKIE);
     if (!id) {
       id = crypto.randomUUID();
-      localStorage.setItem(DEVICE_ID_KEY, id);
     }
+    localStorage.setItem(DEVICE_ID_KEY, id);
+    this.writeCookie(DEVICE_ID_COOKIE, id, COOKIE_MAX_AGE);
     return id;
+  }
+
+  private readCookie(name: string): string | null {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  private writeCookie(name: string, value: string, maxAge: number): void {
+    document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${maxAge}; path=/; SameSite=Strict`;
   }
 
   getDeviceType(): string {
