@@ -7,7 +7,7 @@ import { switchMap, takeWhile, catchError } from 'rxjs/operators';
 import { AuthApiService } from '../../../../core/api/auth-api.service';
 import { AuthStateService } from '../../../../core/auth/auth-state.service';
 import { DeviceService } from '../../../../core/services/device.service';
-import { LockPassApiService, TwoFaSession, TwoFaPollResult } from '../../../../core/api/lockpass-api.service';
+import { LockPassApiService, TwoFaSession, TwoFaPollResult, AnonymousLoginSession, AnonPollResult } from '../../../../core/api/lockpass-api.service';
 import { ApiError, CurrentUser } from '../../../../shared/models/api.models';
 
 type LoginStep = 'credentials' | '2fa';
@@ -37,9 +37,17 @@ export class LoginComponent implements OnDestroy {
   readonly serverError = signal<string | null>(null);
   private  fieldErrors = signal<Record<string, string[]>>({});
 
-  // LockPass alternative-login state
-  readonly lockpassEmail      = signal('');
-  readonly lockpassLoginError = signal<string | null>(null);
+  // LockPass anonymous-login state
+  readonly anonSession    = signal<AnonymousLoginSession | null>(null);
+  readonly anonLoading    = signal(false);
+  readonly anonLoadError  = signal<string | null>(null);
+  readonly anonLoginCode  = signal('');
+  readonly anonLoginError = signal<string | null>(null);
+  readonly anonStatus     = signal<'pending' | 'approved' | 'rejected' | 'expired'>('pending');
+
+  private anonPollSub?: Subscription;
+  private anonTimerSub?: Subscription;
+  readonly anonSecondsLeft = signal(300);
 
   // 2FA / LockPass session state
   readonly twoFaSession  = signal<TwoFaSession | null>(null);
@@ -66,6 +74,7 @@ export class LoginComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.stopPolling();
+    this.stopAnonPolling();
   }
 
   fieldError(name: string): string | null {
@@ -200,40 +209,42 @@ export class LoginComponent implements OnDestroy {
     this.serverError.set(null);
   }
 
-  initLockpassLogin(): void {
-    const email = this.lockpassEmail().trim();
-    if (!email || this.pending()) return;
+  switchLoginTab(tab: LoginTab): void {
+    this.loginTab.set(tab);
+    this.serverError.set(null);
+    if (tab === 'lockpass') {
+      this.startAnonymousSession();
+    } else {
+      this.stopAnonPolling();
+    }
+  }
 
-    this.pending.set(true);
-    this.lockpassLoginError.set(null);
+  retryAnonymousSession(): void {
+    this.stopAnonPolling();
+    this.startAnonymousSession();
+  }
 
-    this.lockPass.loginInit(email, this.device.getDeviceId(), this.device.getDeviceType()).subscribe({
-      next: (res) => {
-        const data = res.data;
-        this.twoFaSession.set({
-          requires_2fa: true,
-          session_id:   data.session_id,
-          qr_payload:   data.qr_payload,
-          expires_at:   data.expires_at,
-        });
-        this.step.set('2fa');
-        this.startTimer();
-        this.startPolling(data.session_id, true);
-        this.pending.set(false);
-      },
+  submitLoginCode(): void {
+    const code = this.anonLoginCode().trim();
+    if (code.length !== 6 || this.anonLoading()) return;
+
+    this.anonLoading.set(true);
+    this.anonLoginError.set(null);
+    this.stopAnonPolling();
+
+    this.lockPass.verifyLoginCode(code).subscribe({
+      next: (res) => this.handleAnonApproved(res.data),
       error: (err: ApiError) => {
-        this.pending.set(false);
-        this.lockpassLoginError.set(
-          err.message ?? 'Не удалось инициировать вход через LockPass'
-        );
+        this.anonLoading.set(false);
+        this.anonLoginError.set(err.message ?? 'Неверный код');
+        this.startAnonPolling(this.anonSession()!.session_id);
       },
     });
   }
 
-  switchLoginTab(tab: LoginTab): void {
-    this.loginTab.set(tab);
-    this.lockpassLoginError.set(null);
-    this.serverError.set(null);
+  formatAnonSecondsLeft(): string {
+    const s = this.anonSecondsLeft();
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
   formatSecondsLeft(): string {
@@ -294,6 +305,77 @@ export class LoginComponent implements OnDestroy {
     this.stopPolling();
     if (data.token && data.user) {
       this.authState.setUser(data.user, data.token, remember);
+      this.navigateAfterLogin(data.user);
+    }
+  }
+
+  private startAnonymousSession(): void {
+    this.anonLoading.set(true);
+    this.anonSession.set(null);
+    this.anonLoadError.set(null);
+    this.anonLoginCode.set('');
+    this.anonLoginError.set(null);
+    this.anonStatus.set('pending');
+    this.anonSecondsLeft.set(300);
+
+    this.lockPass.createAnonymousSession().subscribe({
+      next: (res) => {
+        this.anonSession.set(res.data);
+        this.anonLoading.set(false);
+        this.startAnonTimer();
+        this.startAnonPolling(res.data.session_id);
+      },
+      error: (err: ApiError) => {
+        this.anonLoading.set(false);
+        this.anonLoadError.set(err.message ?? 'Не удалось создать сессию LockPass');
+      },
+    });
+  }
+
+  private startAnonPolling(sessionId: string): void {
+    this.anonPollSub = interval(2000).pipe(
+      switchMap(() => this.lockPass.pollAnonymous(sessionId).pipe(
+        catchError(() => of({ data: { status: 'pending' as const } })),
+      )),
+      takeWhile((res) => res.data.status === 'pending', true),
+    ).subscribe({
+      next: (res) => {
+        const status = res.data.status;
+        if (status !== 'pending') {
+          this.anonStatus.set(status);
+          if (status === 'approved') {
+            this.handleAnonApproved(res.data);
+          } else {
+            this.stopAnonPolling();
+            this.anonLoading.set(false);
+          }
+        }
+      },
+    });
+  }
+
+  private stopAnonPolling(): void {
+    this.anonPollSub?.unsubscribe();
+    this.anonPollSub = undefined;
+    this.anonTimerSub?.unsubscribe();
+    this.anonTimerSub = undefined;
+  }
+
+  private startAnonTimer(): void {
+    this.anonTimerSub = interval(1000).subscribe(() => {
+      const left = this.anonSecondsLeft() - 1;
+      this.anonSecondsLeft.set(left);
+      if (left <= 0) {
+        this.anonStatus.set('expired');
+        this.stopAnonPolling();
+      }
+    });
+  }
+
+  private handleAnonApproved(data: AnonPollResult): void {
+    this.stopAnonPolling();
+    if (data.token && data.user) {
+      this.authState.setUser(data.user, data.token, true);
       this.navigateAfterLogin(data.user);
     }
   }

@@ -66,7 +66,9 @@ Route::prefix('v1')->group(function () {
         Route::get('2fa/qr',                [LockPass2FAController::class, 'qr']);
         Route::post('2fa/totp',             [LockPass2FAController::class, 'totp']);
         Route::post('2fa/recovery',         [LockPass2FAController::class, 'recovery']);
-        Route::post('lockpass/login-init',  [LockPass2FAController::class, 'loginInit']);
+        Route::post('lockpass/login-init',      [LockPass2FAController::class, 'loginInit']);
+        Route::post('lockpass/session-create',  [LockPass2FAController::class, 'createAnonymousSession']);
+        Route::post('lockpass/verify-code',     [LockPass2FAController::class, 'verifyLoginCode']);
 
         // Email verification (GET → redirect to SPA)
         Route::get('email/verify/{token}', [AuthController::class, 'verifyEmail'])

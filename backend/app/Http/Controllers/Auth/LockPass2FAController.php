@@ -36,6 +36,7 @@ class LockPass2FAController extends Controller
     /**
      * POST /api/v1/auth/2fa/poll — public (session_id acts as a temporary credential)
      * Polls LockPass session status. If approved, issues Sanctum token.
+     * Handles both standard 2FA sessions and anonymous login sessions.
      */
     public function poll(Request $request): JsonResponse
     {
@@ -48,8 +49,14 @@ class LockPass2FAController extends Controller
             return $this->error('Сессия не найдена или истекла', 'SESSION_NOT_FOUND', [], 404);
         }
 
+        $isAnonymous = ($cached['session_type'] ?? null) === 'anonymous';
+
         try {
-            $data   = $this->lockPass->getSessionStatus($sessionId);
+            if ($isAnonymous) {
+                $data = $this->lockPass->getAnonymousLoginSessionStatus($sessionId);
+            } else {
+                $data = $this->lockPass->getSessionStatus($sessionId);
+            }
             $status = $data['status'] ?? 'pending';
         } catch (\Throwable $e) {
             Log::error('LockPass poll failed', ['session_id' => $sessionId, 'error' => $e->getMessage()]);
@@ -57,10 +64,106 @@ class LockPass2FAController extends Controller
         }
 
         if ($status === 'approved') {
+            if ($isAnonymous) {
+                return $this->completeAnonAuth($sessionId, $cached, $data, $request);
+            }
             return $this->completeAuth($sessionId, $cached, $request);
         }
 
         return $this->success('Статус получен', ['status' => $status]);
+    }
+
+    /**
+     * POST /api/v1/auth/lockpass/session-create — public
+     * Creates an anonymous login session (no email/user_id needed). Returns QR payload.
+     */
+    public function createAnonymousSession(Request $request): JsonResponse
+    {
+        try {
+            $data = $this->lockPass->createAnonymousLoginSession();
+        } catch (\Throwable $e) {
+            Log::error('LockPass createAnonymousSession failed', ['error' => $e->getMessage()]);
+            return $this->error('Сервис LockPass временно недоступен', 'LOCKPASS_UNAVAILABLE', [], 503);
+        }
+
+        $sessionId = $data['session_id'] ?? null;
+        if (!$sessionId) {
+            return $this->error('Некорректный ответ от LockPass', 'LOCKPASS_ERROR', [], 502);
+        }
+
+        Cache::put('lockpass_2fa_' . $sessionId, [
+            'session_type' => 'anonymous',
+            'user_id'      => null,
+            'device_id'    => $request->input('device_id'),
+            'device_type'  => $request->input('device_type'),
+            'device_name'  => $request->input('device_type') ?? 'Web Browser',
+            'user_agent'   => $request->userAgent(),
+            'ip'           => $request->ip(),
+        ], now()->addMinutes(6));
+
+        return $this->success('Анонимная сессия создана', [
+            'session_id' => $sessionId,
+            'qr_payload' => $data['qr_payload'] ?? null,
+            'expires_at' => $data['expires_at'] ?? now()->addMinutes(5)->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/auth/lockpass/verify-code — public
+     * Verifies a login code from the LockPass "Одноразовый код" tab. Issues Sanctum token if valid.
+     */
+    public function verifyLoginCode(Request $request): JsonResponse
+    {
+        $request->validate([
+            'code'        => 'required|string|digits:6',
+            'device_id'   => 'nullable|string',
+            'device_type' => 'nullable|string',
+        ]);
+
+        try {
+            $data = $this->lockPass->verifyLoginCode($request->input('code'));
+        } catch (\Illuminate\Http\Client\RequestException $e) {
+            return $this->error('Неверный или устаревший код', 'LOGIN_CODE_INVALID', [], 422);
+        } catch (\Throwable $e) {
+            Log::error('LockPass verifyLoginCode failed', ['error' => $e->getMessage()]);
+            return $this->error('Сервис LockPass временно недоступен', 'LOCKPASS_UNAVAILABLE', [], 503);
+        }
+
+        $lockpassUserId = $data['lockpass_user_id'] ?? null;
+        if (!$lockpassUserId) {
+            return $this->error('Некорректный ответ от LockPass', 'LOCKPASS_ERROR', [], 502);
+        }
+
+        $user = User::where('lockpass_user_id', $lockpassUserId)
+            ->where('lockpass_auth_mode', 'alternative')
+            ->first();
+
+        if (!$user) {
+            return $this->error('Аккаунт не найден или альтернативный вход не настроен', 'USER_NOT_FOUND', [], 422);
+        }
+
+        $deviceInfo = [
+            'device_id'   => $request->input('device_id'),
+            'device_type' => $request->input('device_type'),
+            'device_name' => $request->input('device_type') ?? 'Web Browser',
+        ];
+
+        $result = $this->authService->finalizeLogin($user, $deviceInfo, $request->userAgent(), $request->ip());
+
+        if (!empty($result['device_limit'])) {
+            return $this->error(
+                'Достигнуто максимальное количество устройств.',
+                'DEVICE_LIMIT_EXCEEDED',
+                [],
+                403
+            );
+        }
+
+        return $this->success('Вход выполнен.', [
+            'status' => 'approved',
+            'token'  => $result['token'],
+            'user'   => $result['user'],
+        ]);
     }
 
     /**
@@ -355,6 +458,42 @@ class LockPass2FAController extends Controller
         }
 
         return $this->success('2FA подтверждена. Вход выполнен.', [
+            'status' => 'approved',
+            'token'  => $result['token'],
+            'user'   => $result['user'],
+        ]);
+    }
+
+    private function completeAnonAuth(string $sessionId, array $cached, array $lpData, Request $request): JsonResponse
+    {
+        Cache::forget('lockpass_2fa_' . $sessionId);
+
+        $lockpassUserId = $lpData['lockpass_user_id'] ?? null;
+        if (!$lockpassUserId) {
+            Log::error('LockPass anonymous poll: approved but no lockpass_user_id', $lpData);
+            return $this->error('Не удалось определить пользователя', 'LOCKPASS_ERROR', [], 500);
+        }
+
+        $user = User::where('lockpass_user_id', $lockpassUserId)
+            ->where('lockpass_auth_mode', 'alternative')
+            ->first();
+
+        if (!$user) {
+            return $this->error('Аккаунт не найден или альтернативный вход не настроен', 'USER_NOT_FOUND', [], 422);
+        }
+
+        $result = $this->authService->finalizeLogin($user, $cached, $cached['user_agent'], $cached['ip']);
+
+        if (!empty($result['device_limit'])) {
+            return $this->error(
+                'Достигнуто максимальное количество устройств.',
+                'DEVICE_LIMIT_EXCEEDED',
+                [],
+                403
+            );
+        }
+
+        return $this->success('Вход выполнен.', [
             'status' => 'approved',
             'token'  => $result['token'],
             'user'   => $result['user'],

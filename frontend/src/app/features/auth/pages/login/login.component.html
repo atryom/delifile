@@ -103,31 +103,85 @@
           <!-- LockPass tab -->
           @if (loginTab() === 'lockpass') {
             <div class="lockpass-login">
-              <p class="twofa-hint">Войдите без пароля — подтвердите через приложение LockPass.</p>
 
-              @if (lockpassLoginError()) {
-                <div class="alert-error">{{ lockpassLoginError() }}</div>
+              <!-- Loading session -->
+              @if (anonLoading() && !anonSession()) {
+                <div class="lockpass-loading">
+                  <div class="twofa-spinner"></div>
+                  <p class="twofa-hint">Создаём сессию…</p>
+                </div>
               }
 
-              <div class="field">
-                <label for="lp-email">Email</label>
-                <input
-                  id="lp-email"
-                  type="email"
-                  autocomplete="username"
-                  placeholder="you@example.com"
-                  [value]="lockpassEmail()"
-                  (input)="lockpassEmail.set($any($event.target).value)"
-                  (keyup.enter)="initLockpassLogin()"
-                />
-              </div>
+              <!-- Session load error -->
+              @if (anonLoadError()) {
+                <div class="alert-error">{{ anonLoadError() }}</div>
+                <button class="btn-primary btn-full" (click)="retryAnonymousSession()">Попробовать снова</button>
+              }
 
-              <button
-                class="btn-primary btn-full"
-                [disabled]="!lockpassEmail().trim() || pending()"
-                (click)="initLockpassLogin()">
-                {{ pending() ? 'Загрузка…' : 'Получить QR-код' }}
-              </button>
+              <!-- Session active -->
+              @if (anonSession()) {
+                <!-- Approved -->
+                @if (anonStatus() === 'approved') {
+                  <div class="alert-success twofa-status">Аутентификация подтверждена. Входим…</div>
+                }
+
+                <!-- Rejected -->
+                @if (anonStatus() === 'rejected') {
+                  <div class="alert-error twofa-status">Запрос отклонён в LockPass.</div>
+                  <button class="btn-primary btn-full" (click)="retryAnonymousSession()">Попробовать снова</button>
+                }
+
+                <!-- Expired -->
+                @if (anonStatus() === 'expired') {
+                  <div class="alert-error twofa-status">Время сессии истекло.</div>
+                  <button class="btn-primary btn-full" (click)="retryAnonymousSession()">Обновить QR-код</button>
+                }
+
+                <!-- Pending — QR + code side by side -->
+                @if (anonStatus() === 'pending') {
+                  <div class="twofa-timer" [class.twofa-timer--expiring]="anonSecondsLeft() < 60">
+                    {{ formatAnonSecondsLeft() }}
+                  </div>
+
+                  <div class="lockpass-cols">
+                    <!-- QR column -->
+                    <div class="lockpass-col">
+                      <p class="lockpass-col-title">Сканировать QR</p>
+                      <p class="twofa-hint-small">Откройте LockPass → «Войти» → наведите камеру</p>
+                      <div class="twofa-qr">
+                        <img [src]="qrImageUrl(anonSession()!.qr_payload)" alt="QR-код для входа" width="160" height="160" />
+                      </div>
+                    </div>
+
+                    <div class="lockpass-divider" aria-hidden="true">или</div>
+
+                    <!-- Code column -->
+                    <div class="lockpass-col">
+                      <p class="lockpass-col-title">Одноразовый код</p>
+                      <p class="twofa-hint-small">Откройте LockPass → «Одноразовый код» → введите 6 цифр</p>
+                      @if (anonLoginError()) {
+                        <div class="alert-error">{{ anonLoginError() }}</div>
+                      }
+                      <input
+                        type="text"
+                        inputmode="numeric"
+                        maxlength="6"
+                        placeholder="000000"
+                        class="totp-input"
+                        [value]="anonLoginCode()"
+                        (input)="anonLoginCode.set($any($event.target).value)"
+                        (keyup.enter)="submitLoginCode()"
+                      />
+                      <button
+                        class="btn-primary btn-full"
+                        [disabled]="anonLoginCode().length !== 6 || anonLoading()"
+                        (click)="submitLoginCode()">
+                        {{ anonLoading() ? 'Проверка…' : 'Войти по коду' }}
+                      </button>
+                    </div>
+                  </div>
+                }
+              }
 
               <p class="auth-switch">
                 {{ 'auth.login.no_account' | translate }}

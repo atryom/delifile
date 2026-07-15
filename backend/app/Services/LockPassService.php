@@ -199,6 +199,73 @@ class LockPassService
     }
 
     /**
+     * Create an anonymous login session (no user_id needed).
+     * Returns: { session_id, qr_payload, deep_link, expires_at }
+     */
+    public function createAnonymousLoginSession(): array
+    {
+        try {
+            $response = $this->withProjectAuth()
+                ->post($this->baseUrl() . '/integration/login-session/create');
+
+            if (!$response->successful()) {
+                throw new RuntimeException('LockPass create anonymous session failed: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('LockPass недоступен: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Get status of an anonymous login session.
+     * Returns: { status: pending|approved|rejected|expired, lockpass_user_id?: int }
+     */
+    public function getAnonymousLoginSessionStatus(string $sessionId): array
+    {
+        try {
+            $response = $this->withProjectAuth()
+                ->get($this->baseUrl() . '/integration/login-session/' . $sessionId . '/status');
+
+            if (!$response->successful()) {
+                throw new RuntimeException('LockPass anonymous session status failed: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('LockPass недоступен: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Verify a login code (from the "Одноразовый код" tab in LockPass) without a session_id.
+     * Returns: { lockpass_user_id: int }
+     *
+     * @throws RuntimeException on network failure
+     * @throws \Illuminate\Http\Client\RequestException on 422 (invalid code)
+     */
+    public function verifyLoginCode(string $code): array
+    {
+        try {
+            $response = $this->withProjectAuth()
+                ->post($this->baseUrl() . '/integration/login-code/verify', ['code' => $code]);
+
+            if ($response->status() === 422) {
+                throw new RequestException($response);
+            }
+
+            if (!$response->successful()) {
+                throw new RuntimeException('LockPass verify-login-code failed: ' . $response->body());
+            }
+
+            return $response->json();
+        } catch (ConnectionException $e) {
+            throw new RuntimeException('LockPass недоступен: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
      * Get the project QR code for onboarding.
      */
     public function getProjectQR(): array

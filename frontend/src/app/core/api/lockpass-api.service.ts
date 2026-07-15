@@ -41,6 +41,19 @@ export interface LockpassLoginSession {
   expires_at: string;
 }
 
+export interface AnonymousLoginSession {
+  session_id: string;
+  qr_payload: string;
+  deep_link: string;
+  expires_at: string;
+}
+
+export interface AnonPollResult {
+  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  token?: string;
+  user?: CurrentUser;
+}
+
 @Injectable({ providedIn: 'root' })
 export class LockPassApiService {
   private readonly api = inject(ApiService);
@@ -83,5 +96,17 @@ export class LockPassApiService {
 
   setMode(mode: '2fa' | 'alternative'): Observable<ApiResponse<{ user: CurrentUser }>> {
     return this.api.post('/settings/lockpass/set-mode', { mode });
+  }
+
+  createAnonymousSession(): Observable<ApiResponse<AnonymousLoginSession>> {
+    return this.api.post('/auth/lockpass/session-create', {});
+  }
+
+  pollAnonymous(sessionId: string): Observable<ApiResponse<AnonPollResult>> {
+    return this.api.post('/auth/2fa/poll', { session_id: sessionId });
+  }
+
+  verifyLoginCode(code: string): Observable<ApiResponse<AnonPollResult>> {
+    return this.api.post('/auth/lockpass/verify-code', { code });
   }
 }
