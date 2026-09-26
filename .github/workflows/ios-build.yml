@@ -59,6 +59,7 @@ jobs:
 
       - name: Patch EAS keychain.js (macOS 14/15 fixes)
         working-directory: mobile
+        timeout-minutes: 5
         run: python3 ../.github/scripts/patch_keychain.py
 
       - name: Patch fastlane create_keychain.rb (macOS 15 fixes)

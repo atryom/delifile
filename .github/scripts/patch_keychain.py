@@ -16,22 +16,27 @@ import pathlib
 MARKER = "_macOS15"
 
 
+def run_find(root: pathlib.Path) -> list:
+    # Не обходим весь $HOME: на macOS find по ~/Library упирается в TCC-запросы
+    # и в неинтерактивном раннере висит до таймаута job'а.
+    if not root.is_dir():
+        return []
+    try:
+        result = subprocess.run(
+            ["find", str(root), "-name", "keychain.js",
+             "-path", "*build-tools/dist/ios/credentials*"],
+            capture_output=True, text=True, timeout=120
+        )
+    except subprocess.TimeoutExpired:
+        print(f"[patch_keychain] find timed out in {root} — skipping")
+        return []
+    return [f for f in result.stdout.splitlines() if f.strip()]
+
+
 def find_files():
-    result = subprocess.run(
-        ["find", str(pathlib.Path.home() / ".npm/_npx"), "-name", "keychain.js",
-         "-path", "*/@expo/build-tools/*"],
-        capture_output=True, text=True
-    )
-    files = [f for f in result.stdout.splitlines() if f.strip()]
-
-    # Also check local node_modules (eas-cli bundles build-tools)
-    result2 = subprocess.run(
-        ["find", str(pathlib.Path.home()), "-maxdepth", "10",
-         "-name", "keychain.js", "-path", "*build-tools/dist/ios/credentials*"],
-        capture_output=True, text=True
-    )
-    files += [f for f in result2.stdout.splitlines() if f.strip()]
-
+    # Скрипт запускается из mobile/ — eas-cli в devDependencies (node_modules)
+    files = run_find(pathlib.Path.cwd() / "node_modules")
+    files += run_find(pathlib.Path.home() / ".npm/_npx")
     return list(set(files))
 
 
