@@ -16,6 +16,34 @@ if printf '%s\n' "$@" | grep -qF -- '-exportArchive'; then
         echo "[xcode-wrap] WARN: partition failed: $KC_PATH" >&2
     fi
   done
+
+  # exportArchive переподписывает приложение. Без signingCertificate в export
+  # options Xcode ищет "Apple Distribution" и находит посторонний сертификат
+  # в login keychain -> "Provisioning profile doesn't include signing certificate".
+  # Закрепляем SHA1 сертификата из EAS keychain в копии export options plist.
+  EAS_KC=$(ls -t /private/var/folders/*/*/T/eas-build-*.keychain* 2>/dev/null | head -1)
+  SHA1=""
+  [ -n "$EAS_KC" ] && SHA1=$(/usr/bin/security find-identity -p codesigning "$EAS_KC" 2>/dev/null \
+    | awk '/Distribution/ {print $2; exit}')
+  if [ -n "$SHA1" ]; then
+    ARGS=()
+    NEXT_IS_PLIST=0
+    for a in "$@"; do
+      if [ "$NEXT_IS_PLIST" = 1 ]; then
+        NEW_PLIST="/tmp/xcode-wrap-export-options-$$.plist"
+        cp "$a" "$NEW_PLIST"
+        /usr/libexec/PlistBuddy -c "Delete :signingCertificate" "$NEW_PLIST" >/dev/null 2>&1
+        /usr/libexec/PlistBuddy -c "Add :signingCertificate string $SHA1" "$NEW_PLIST"
+        echo "[xcode-wrap] exportArchive: signingCertificate=$SHA1 (from $EAS_KC)" >&2
+        a="$NEW_PLIST"
+        NEXT_IS_PLIST=0
+      fi
+      [ "$a" = "-exportOptionsPlist" ] && NEXT_IS_PLIST=1
+      ARGS+=("$a")
+    done
+    exec /usr/bin/xcodebuild "${ARGS[@]}"
+  fi
+  echo "[xcode-wrap] WARN: no Distribution identity in EAS keychain — signingCertificate not pinned" >&2
   exec /usr/bin/xcodebuild "$@"
 fi
 
